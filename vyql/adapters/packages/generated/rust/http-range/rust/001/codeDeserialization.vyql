@@ -1,0 +1,9 @@
+module bindings.rust.migration.mfa8ae6da;
+
+binding deserialization1 {
+  requires {
+    dependency("http-range")
+  }
+  query pattern callExpr where callee.method == "parse_bytes"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.mbc5d4aee;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/kr/logfmt")
+  }
+  query pattern callExpr where callee.method == "Unmarshal"
+  emit sink code.Deserialization at args[0]
+}

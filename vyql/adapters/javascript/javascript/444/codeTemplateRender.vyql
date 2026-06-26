@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding templateRender444 {
+  query pattern callExpr where callee.path ~= "reply.view"
+  emit sink code.TemplateRender at args[0]
+}

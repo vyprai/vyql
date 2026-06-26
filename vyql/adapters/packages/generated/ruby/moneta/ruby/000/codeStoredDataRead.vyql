@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m69cc252a;
+
+binding storedDataRead0 {
+  requires {
+    dependency("moneta")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,7 +1,0 @@
-adapter java {
-  package "org.apache.commons:commons-csv" {
-    sink method "CSVFormat.parse" -> code.Deserialization
-    control method "CSVFormat.escape" -> core.InputValidation
-    sink method "CSVParser.parse" -> code.Deserialization
-  }
-}

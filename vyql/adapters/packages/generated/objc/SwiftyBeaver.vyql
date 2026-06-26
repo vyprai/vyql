@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "SwiftyBeaver" {
-    sink method "decode" -> code.Deserialization
-  }
-}

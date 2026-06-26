@@ -1,0 +1,9 @@
+module bindings.php.migration.mc30de6aa;
+
+binding filePathAccess1 {
+  requires {
+    dependency("typo3/phar-stream-wrapper")
+  }
+  query pattern callExpr where callee.method == "stream_open"
+  emit sink code.FilePathAccess at args[0]
+}

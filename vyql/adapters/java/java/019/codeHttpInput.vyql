@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding httpInput19 {
+  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "class_annotation:RequestMapping"
+  emit source code.HttpInput at call.result
+}

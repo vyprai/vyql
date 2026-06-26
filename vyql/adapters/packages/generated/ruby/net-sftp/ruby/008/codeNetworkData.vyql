@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m2f77b2d5;
+
+binding networkData8 {
+  requires {
+    dependency("net-sftp")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

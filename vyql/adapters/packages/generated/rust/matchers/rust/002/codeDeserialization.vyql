@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc6514917;
+
+binding deserialization2 {
+  requires {
+    dependency("matchers")
+  }
+  query pattern callExpr where callee.method == "read_matches"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{CliArgument}
-adapter java {
-  package "com.beust:jcommander" {
-    source method "parse" -> code.CliArgument
-    source method "parseWithoutValidation" -> code.CliArgument
-    source method "parseValues" -> code.CliArgument
-  }
-}

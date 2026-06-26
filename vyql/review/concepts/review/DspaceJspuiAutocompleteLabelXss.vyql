@@ -1,0 +1,8 @@
+module code;
+
+review code.DspaceJspuiAutocompleteLabelXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review JSPUI autocomplete label rendering for escapeHtml around displayedValue before insertion into label HTML"
+}

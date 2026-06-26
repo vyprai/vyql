@@ -1,6 +1,0 @@
-adapter cpp {
-  package "protobuf" {
-    sink method "Parse" -> code.Deserialization
-    sink method "Serialize" -> code.Deserialization
-  }
-}

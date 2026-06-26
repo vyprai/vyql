@@ -1,0 +1,9 @@
+module bindings.python.migration.mf4fe81f1;
+
+binding fileUse2 {
+  requires {
+    dependency("django-ckeditor")
+  }
+  query pattern callExpr where callee.method == "ckeditor_uploader.views.post"
+  emit sink code.FileUseSink at args[0]
+}

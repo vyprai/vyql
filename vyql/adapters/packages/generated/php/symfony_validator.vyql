@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "symfony/validator" {
-    sink method "addXmlMapping" -> code.Deserialization
-    sink method "addYamlMapping" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m49a8a0e6;
+
+binding deserialization0 {
+  requires {
+    dependency("toml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

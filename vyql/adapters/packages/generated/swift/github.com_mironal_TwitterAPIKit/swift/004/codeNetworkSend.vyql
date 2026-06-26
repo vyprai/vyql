@@ -1,0 +1,9 @@
+module bindings.swift.migration.m88ea3d50;
+
+binding networkSend4 {
+  requires {
+    dependency("github.com/mironal/TwitterAPIKit")
+  }
+  query pattern callExpr where callee.method == "postInvalidateAccessToken"
+  emit sink code.NetworkSend at args[0]
+}

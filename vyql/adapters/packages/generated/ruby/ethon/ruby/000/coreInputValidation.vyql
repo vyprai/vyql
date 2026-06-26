@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m9620706e;
+
+binding inputValidation0 {
+  requires {
+    dependency("ethon")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

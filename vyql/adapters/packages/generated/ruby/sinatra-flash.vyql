@@ -1,5 +1,0 @@
-adapter ruby {
-  package "sinatra-flash" {
-    sink method "styled_flash" -> code.HtmlRender
-  }
-}

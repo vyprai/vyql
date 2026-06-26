@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule ProtocolListAmplification {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400]
+    id: "VYQL-DOS-012"
+    severity: high
+  }
+  issue code.ProtocolListAmplification as list
+}

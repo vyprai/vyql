@@ -1,0 +1,11 @@
+module code;
+
+concept CodeIgniterRestserverXmlEntityLoaderXxe : issue {
+  cwe: [CWE_611]
+  review_assumption: "the bundled Format library parses XML bodies with simplexml_load_string and request clients can submit XML payloads"
+  reviewCategory: xml
+  reviewCondition: "CodeIgniter Rest Server parses XML request bodies without disabling external entity loading"
+  reviewConfidence: high
+  reviewEvidence: "REST_Controller constructor context {pattern} accepts application/xml and sends the request body through the Format XML parser before libxml_disable_entity_loader(true)"
+  vulnerableTo: [deserialization.Xxe]
+}

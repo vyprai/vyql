@@ -1,0 +1,9 @@
+module bindings.bash.migration.m7c05a0a5;
+
+binding codeEval0 {
+  requires {
+    dependency("zsh")
+  }
+  query pattern callExpr where callee.path ~= "zsh.eval"
+  emit sink code.CodeEval at args[0]
+}

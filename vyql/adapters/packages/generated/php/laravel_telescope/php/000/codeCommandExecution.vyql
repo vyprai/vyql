@@ -1,0 +1,9 @@
+module bindings.php.migration.m7330fa7c;
+
+binding commandExecution0 {
+  requires {
+    dependency("laravel/telescope")
+  }
+  query pattern callExpr where callee.method == "recordCommand"
+  emit sink code.CommandExecution at args[0]
+}

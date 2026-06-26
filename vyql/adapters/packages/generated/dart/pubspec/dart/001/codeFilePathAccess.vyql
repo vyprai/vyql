@@ -1,0 +1,9 @@
+module bindings.dart.migration.mff42e49b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pubspec")
+  }
+  query pattern callExpr where callee.method == "PubSpec.loadFile"
+  emit sink code.FilePathAccess at args[0]
+}

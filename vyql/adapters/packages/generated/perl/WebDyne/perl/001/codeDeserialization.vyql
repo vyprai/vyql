@@ -1,0 +1,9 @@
+module bindings.perl.migration.m3766ff8f;
+
+binding deserialization1 {
+  requires {
+    dependency("WebDyne")
+  }
+  query pattern callExpr where callee.method == "WebDyne::Compile::parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.go.migration.m364c6374;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("contrib.go.opencensus.io/exporter/ocagent")
+  }
+  query pattern callExpr where callee.method == "WithTLSCredentials"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

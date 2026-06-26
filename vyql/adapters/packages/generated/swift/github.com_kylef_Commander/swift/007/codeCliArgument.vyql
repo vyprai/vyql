@@ -1,0 +1,9 @@
+module bindings.swift.migration.m05efabc2;
+
+binding cliArgument7 {
+  requires {
+    dependency("github.com/kylef/Commander")
+  }
+  query pattern callExpr where callee.method == "Group.run"
+  emit source code.CliArgument at call.result
+}

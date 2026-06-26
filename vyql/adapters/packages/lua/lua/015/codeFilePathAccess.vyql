@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding filePathAccess15 {
+  requires {
+    dependency("lua")
+  }
+  query pattern callExpr where callee.path ~= "io.open"
+  emit sink code.FilePathAccess at args[0]
+}

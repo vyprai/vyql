@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2e91238a;
+
+binding databaseRead3 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "load_schema"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule CertValidationDisabled {
+  meta {
+    cwe: [CWE_295]
+    id: "VYQL-CFG-004"
+    severity: high
+  }
+  issue code.CertValidationDisabled as c
+}

@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter objc {
-  package "JWT" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

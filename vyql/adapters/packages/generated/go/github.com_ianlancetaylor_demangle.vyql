@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/ianlancetaylor/demangle" {
-    sink method "Filter" -> code.Deserialization
-    sink method "ToString" -> code.Deserialization
-  }
-}

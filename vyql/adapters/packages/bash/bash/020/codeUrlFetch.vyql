@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding urlFetch20 {
+  requires {
+    dependency("curl")
+  }
+  query pattern callExpr where callee.path ~= "curl"
+  emit sink code.UrlFetch at args[0]
+}

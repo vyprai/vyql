@@ -1,0 +1,14 @@
+module bindings.objc.migration.mc2fae2a1;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("KakaoSDKAuth")
+  }
+  query pattern callExpr where callee.method == "setToken"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m5b9c56c6;
+
+binding inputValidation3 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "unescape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

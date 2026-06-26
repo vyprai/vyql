@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter dart {
-  package "local_auth_android" {
-    control method "authenticate" -> core.AuthenticationCheck
-  }
-}

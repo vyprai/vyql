@@ -1,0 +1,9 @@
+module bindings.php.migration.mecdba9b5;
+
+binding networkSend0 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

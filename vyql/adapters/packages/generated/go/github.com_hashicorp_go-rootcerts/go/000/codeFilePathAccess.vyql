@@ -1,0 +1,9 @@
+module bindings.go.migration.m4c256cfd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/hashicorp/go-rootcerts")
+  }
+  query pattern callExpr where callee.method == "LoadCAFile"
+  emit sink code.FilePathAccess at args[0]
+}

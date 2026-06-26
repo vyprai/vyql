@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter cpp {
-  package "boost-coroutine" {
-    sink method "bind_to_processor" -> code.CommandExecution
-  }
-}

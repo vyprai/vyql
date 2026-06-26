@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf0e166cc;
+
+binding networkSend0 {
+  requires {
+    dependency("CNIODarwin")
+  }
+  query pattern callExpr where callee.method == "CNIODarwin_sendmmsg"
+  emit sink code.NetworkSend at args[0]
+}

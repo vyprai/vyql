@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me3d081e9;
+
+binding sqlExecution2 {
+  requires {
+    dependency("sqlitex")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

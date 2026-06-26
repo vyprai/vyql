@@ -1,0 +1,9 @@
+module bindings.perl.migration.m5bc4b210;
+
+binding codeEval0 {
+  requires {
+    dependency("Try")
+  }
+  query pattern callExpr where callee.method == "try"
+  emit sink code.CodeEval at args[0]
+}

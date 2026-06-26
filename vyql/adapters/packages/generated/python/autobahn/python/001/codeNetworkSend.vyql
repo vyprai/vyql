@@ -1,0 +1,9 @@
+module bindings.python.migration.m0d97c43e;
+
+binding networkSend1 {
+  requires {
+    dependency("autobahn")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

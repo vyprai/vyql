@@ -1,0 +1,9 @@
+module bindings.python.migration.m9246b0d9;
+
+binding expressionEval0 {
+  requires {
+    dependency("faker")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.ExpressionEval at args[0]
+}

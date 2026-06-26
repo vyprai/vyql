@@ -1,0 +1,9 @@
+module bindings.swift.migration.m528664b7;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/kean/Nuke")
+  }
+  query pattern callExpr where callee.method == "ImageDecoding.decodePartiallyDownloadedData"
+  emit sink code.Deserialization at args[0]
+}

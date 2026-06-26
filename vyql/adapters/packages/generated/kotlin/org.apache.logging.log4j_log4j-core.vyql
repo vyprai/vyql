@@ -1,7 +1,0 @@
-import code.{FilePathAccess, NetworkSend}
-adapter kotlin {
-  package "org.apache.logging.log4j:log4j-core" {
-    sink method "FileManager.write" -> code.FilePathAccess
-    sink method "HttpManager.send" -> code.NetworkSend
-  }
-}

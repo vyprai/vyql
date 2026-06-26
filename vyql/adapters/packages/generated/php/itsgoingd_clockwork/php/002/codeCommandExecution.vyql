@@ -1,0 +1,9 @@
+module bindings.php.migration.m13f7a0a2;
+
+binding commandExecution2 {
+  requires {
+    dependency("itsgoingd/clockwork")
+  }
+  query pattern callExpr where callee.method == "resolveAsCommand"
+  emit sink code.CommandExecution at args[0]
+}

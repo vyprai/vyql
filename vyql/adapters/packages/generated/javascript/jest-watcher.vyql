@@ -1,5 +1,0 @@
-adapter javascript {
-  package "jest-watcher" {
-    source method "onKey" -> code.StdinInput
-  }
-}

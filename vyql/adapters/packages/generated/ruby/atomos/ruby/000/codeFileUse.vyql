@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md7ae7f45;
+
+binding fileUse0 {
+  requires {
+    dependency("atomos")
+  }
+  query pattern callExpr where callee.method == "atomic_write"
+  emit sink code.FileUseSink at args[0]
+}

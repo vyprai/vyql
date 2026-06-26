@@ -1,0 +1,9 @@
+module bindings.php.migration.ma4bd628b;
+
+binding userControlledData0 {
+  requires {
+    dependency("tedivm/stash")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

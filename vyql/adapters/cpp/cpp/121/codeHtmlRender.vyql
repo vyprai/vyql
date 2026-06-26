@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding htmlRender121 {
+  query pattern callExpr where callee.path ~= "fputs"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m86a9aea8;
+
+binding cliArgument2 {
+  requires {
+    dependency("optionator")
+  }
+  query pattern callExpr where callee.method == "parseArgv"
+  emit source code.CliArgument at call.result
+}

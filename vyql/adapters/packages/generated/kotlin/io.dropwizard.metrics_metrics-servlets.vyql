@@ -1,8 +1,0 @@
-import code.{HttpInput, HtmlRender}
-adapter kotlin {
-  package "io.dropwizard.metrics:metrics-servlets" {
-    source method "service" -> code.HttpInput
-    source method "getJsonpCallbackParameter" -> code.HttpInput
-    sink method "getWriter" -> code.HtmlRender
-  }
-}

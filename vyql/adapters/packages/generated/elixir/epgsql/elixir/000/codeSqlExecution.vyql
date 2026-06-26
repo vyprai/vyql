@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5bf0ccd9;
+
+binding sqlExecution0 {
+  requires {
+    dependency("epgsql")
+  }
+  query pattern callExpr where callee.method == "prepared_query"
+  emit sink code.SqlExecution at args[0]
+}

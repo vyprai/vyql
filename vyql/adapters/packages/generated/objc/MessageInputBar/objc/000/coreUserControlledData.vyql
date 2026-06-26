@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma7d1b6f0;
+
+binding userControlledData0 {
+  requires {
+    dependency("MessageInputBar")
+  }
+  query pattern callExpr where callee.method == "InputTextView.paste"
+  emit source core.UserControlledData at call.result
+}

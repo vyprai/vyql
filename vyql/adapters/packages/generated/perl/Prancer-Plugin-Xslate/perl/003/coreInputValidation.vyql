@@ -1,0 +1,14 @@
+module bindings.perl.migration.m36bd324a;
+
+binding inputValidation3 {
+  requires {
+    dependency("Prancer-Plugin-Xslate")
+  }
+  query pattern callExpr where callee.method == "uri_escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

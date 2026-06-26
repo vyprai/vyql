@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8ef532e7;
+
+binding deserialization1 {
+  requires {
+    dependency("assert_value")
+  }
+  query pattern callExpr where callee.method == "parse_assert_value"
+  emit sink code.Deserialization at args[0]
+}

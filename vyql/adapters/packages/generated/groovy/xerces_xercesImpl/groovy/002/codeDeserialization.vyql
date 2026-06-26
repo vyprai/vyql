@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md55d82e7;
+
+binding deserialization2 {
+  requires {
+    dependency("xerces:xercesImpl")
+  }
+  query pattern callExpr where callee.method == "processingInstruction"
+  emit sink code.Deserialization at args[0]
+}

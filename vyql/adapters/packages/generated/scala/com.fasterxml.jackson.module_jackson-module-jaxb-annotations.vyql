@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.fasterxml.jackson.module:jackson-module-jaxb-annotations" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

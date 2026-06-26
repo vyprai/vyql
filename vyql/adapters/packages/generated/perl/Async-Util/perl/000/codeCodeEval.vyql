@@ -1,0 +1,9 @@
+module bindings.perl.migration.m5873f70c;
+
+binding codeEval0 {
+  requires {
+    dependency("Async-Util")
+  }
+  query pattern callExpr where callee.method == "amap"
+  emit sink code.CodeEval at args[0]
+}

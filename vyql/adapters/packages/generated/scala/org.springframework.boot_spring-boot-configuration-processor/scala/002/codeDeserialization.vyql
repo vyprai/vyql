@@ -1,0 +1,9 @@
+module bindings.scala.migration.mfc9336ae;
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-configuration-processor")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

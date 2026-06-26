@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding regexCompile19 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "Regexp.new"
+  emit sink code.RegexCompileSink at args[0]
+}

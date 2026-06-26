@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc18252ef;
+
+binding networkSend3 {
+  requires {
+    dependency("github.com/NozeIO/swift-nio-redis-client")
+  }
+  query pattern callExpr where callee.method == "punsubscribe"
+  emit sink code.NetworkSend at args[0]
+}

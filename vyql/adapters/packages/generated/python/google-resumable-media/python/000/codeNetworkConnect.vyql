@@ -1,0 +1,9 @@
+module bindings.python.migration.mae35c7b7;
+
+binding networkConnect0 {
+  requires {
+    dependency("google-resumable-media")
+  }
+  query pattern callExpr where callee.method == "http_request"
+  emit sink code.NetworkConnectSink at args[0]
+}

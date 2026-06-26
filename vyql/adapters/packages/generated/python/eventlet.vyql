@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "eventlet" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

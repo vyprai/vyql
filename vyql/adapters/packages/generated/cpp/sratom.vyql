@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{FileUse}
-
-adapter cpp {
-  package "sratom" {
-    source method "sratom_read" -> core.UserControlledData
-    sink method "sratom_set_sink" -> code.FileUse
-  }
-}

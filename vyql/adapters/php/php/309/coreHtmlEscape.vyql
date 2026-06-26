@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding htmlEscape309 {
+  query pattern callExpr where callee.path ~= "e"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

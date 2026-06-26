@@ -1,0 +1,9 @@
+module bindings.objc.migration.mb3c86832;
+
+binding urlFetch0 {
+  requires {
+    dependency("KakaoSDKStory")
+  }
+  query pattern callExpr where callee.method == "postLink"
+  emit sink code.UrlFetch at args[0]
+}

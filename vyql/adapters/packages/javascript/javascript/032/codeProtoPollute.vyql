@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding protoPollute32 {
+  requires {
+    dependency("lodash")
+  }
+  query pattern callExpr where callee.path ~= "Object.assign"
+  emit sink code.ProtoPollute at args.any.collection
+}

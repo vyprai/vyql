@@ -1,0 +1,6 @@
+module bindings.powershell.migration.m390f1180;
+
+binding filePathAccess28 {
+  query pattern callExpr where callee.path ~= "Out-File"
+  emit sink code.FilePathAccess at args[0]
+}

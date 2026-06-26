@@ -1,5 +1,0 @@
-adapter perl {
-  package "Encode-MAB2" {
-    sink method "decode" -> code.Deserialization
-  }
-}

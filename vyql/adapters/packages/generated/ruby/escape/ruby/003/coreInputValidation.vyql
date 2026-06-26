@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m59c914f1;
+
+binding inputValidation3 {
+  requires {
+    dependency("escape")
+  }
+  query pattern callExpr where callee.method == "uri_segment"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

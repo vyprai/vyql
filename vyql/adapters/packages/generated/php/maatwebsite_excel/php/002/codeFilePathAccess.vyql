@@ -1,0 +1,9 @@
+module bindings.php.migration.m667d63fa;
+
+binding filePathAccess2 {
+  requires {
+    dependency("maatwebsite/excel")
+  }
+  query pattern callExpr where callee.method == "toArray"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess, CodeEval}
-adapter python {
-  package "executing" {
-    sink method "for_filename" -> code.FilePathAccess
-    sink method "compile_similar_to" -> code.CodeEval
-  }
-}

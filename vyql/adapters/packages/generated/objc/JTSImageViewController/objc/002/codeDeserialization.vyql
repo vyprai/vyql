@@ -1,0 +1,9 @@
+module bindings.objc.migration.m90ee6c25;
+
+binding deserialization2 {
+  requires {
+    dependency("JTSImageViewController")
+  }
+  query pattern callExpr where callee.method == "animatedImageWithAnimatedGIFData:"
+  emit sink code.Deserialization at args[0]
+}

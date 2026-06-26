@@ -1,0 +1,11 @@
+module code;
+
+concept CodeDxJenkinsRemoteValidationMissingPostPermission : issue {
+  cwe: [CWE_352, CWE_862, CWE_918]
+  review_assumption: "a user with Overall/Read or a browser-backed request can reach the descriptor endpoint with attacker-controlled URL parameters"
+  reviewCategory: request_forgery
+  reviewCondition: "Jenkins Code Dx form endpoint can connect to a supplied Code Dx URL without POST and item/admin permission checks"
+  reviewConfidence: high
+  reviewEvidence: "Code Dx descriptor endpoint context {pattern} builds a CodeDxClient from query parameters and fetches projects before the patched @POST and checkPermissionForRemoteRequests gate"
+  vulnerableTo: [request_forgery.Csrf, access_control.MissingAuthorization, request_forgery.Ssrf]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m367a7c67;
+
+binding htmlRender3 {
+  requires {
+    dependency("laracasts/flash")
+  }
+  query pattern callExpr where callee.method == "warning"
+  emit sink code.HtmlRender at args[0]
+}

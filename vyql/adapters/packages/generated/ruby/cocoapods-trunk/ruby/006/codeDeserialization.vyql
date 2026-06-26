@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m02cc521c;
+
+binding deserialization6 {
+  requires {
+    dependency("cocoapods-trunk")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{WeakHash}
-adapter perl {
-  package "Digest-Adler32" {
-    flag code.WeakHash on any {
-      method "add"
-    }
-  }
-}

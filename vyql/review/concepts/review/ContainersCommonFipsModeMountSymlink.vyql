@@ -1,0 +1,8 @@
+module code;
+
+review code.ContainersCommonFipsModeMountSymlink {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review FIPS subscription bind-mount sources for symlink-safe resolution inside the container root before mounting"
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.m3c846fbc;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spirv-cross")
+  }
+  query pattern callExpr where callee.method == "read_spirv_file"
+  emit sink code.FilePathAccess at args[0]
+}

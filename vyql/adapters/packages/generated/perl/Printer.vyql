@@ -1,6 +1,0 @@
-adapter perl {
-  package "Printer" {
-    sink method "print_command" -> code.CommandExecution
-    sink method "system" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcfc7fb88;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Merror")
+  }
+  query pattern callExpr where callee.method == "parseErrorFile"
+  emit sink code.FilePathAccess at args[0]
+}

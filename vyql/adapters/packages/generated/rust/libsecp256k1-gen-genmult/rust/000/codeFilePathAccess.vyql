@@ -1,0 +1,9 @@
+module bindings.rust.migration.m633f3f0f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libsecp256k1-gen-genmult")
+  }
+  query pattern callExpr where callee.method == "generate_to"
+  emit sink code.FilePathAccess at args[0]
+}

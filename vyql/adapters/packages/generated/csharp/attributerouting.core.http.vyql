@@ -1,5 +1,0 @@
-adapter csharp {
-  package "attributerouting.core.http" {
-    sink method "GETAttribute" -> code.UrlFetch
-  }
-}

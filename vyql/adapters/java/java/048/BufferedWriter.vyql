@@ -1,0 +1,8 @@
+module bindings.java.migration.m420f6b67;
+
+binding bufferedWriter48 {
+  query pattern callExpr where callee.path ~= "BufferedWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: BufferedWriter
+  }
+}

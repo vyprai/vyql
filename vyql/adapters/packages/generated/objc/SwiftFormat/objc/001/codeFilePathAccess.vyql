@@ -1,0 +1,9 @@
+module bindings.objc.migration.m175808fe;
+
+binding filePathAccess1 {
+  requires {
+    dependency("SwiftFormat")
+  }
+  query pattern callExpr where callee.method == "expandGlobs"
+  emit sink code.FilePathAccess at args[0]
+}

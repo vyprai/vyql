@@ -1,0 +1,9 @@
+module bindings.php.migration.md1297b56;
+
+binding urlFetch0 {
+  requires {
+    dependency("guzzle/stream")
+  }
+  query pattern callExpr where callee.method == "fopen"
+  emit sink code.UrlFetch at args[0]
+}

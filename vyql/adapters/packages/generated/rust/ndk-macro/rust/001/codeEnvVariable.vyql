@@ -1,0 +1,9 @@
+module bindings.rust.migration.ma840f320;
+
+binding envVariable1 {
+  requires {
+    dependency("ndk-macro")
+  }
+  query pattern callExpr where callee.method == "main_with_backtrace_full"
+  emit source code.EnvVariable at call.result
+}

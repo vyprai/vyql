@@ -1,7 +1,0 @@
-import code.{HttpInput, Deserialization}
-adapter swift {
-  package "github.com/mattpolzin/VaporTypedRoutes" {
-    source method "query" -> code.HttpInput
-    sink method "decodeBody" -> code.Deserialization
-  }
-}

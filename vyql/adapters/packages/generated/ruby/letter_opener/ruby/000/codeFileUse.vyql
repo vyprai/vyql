@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mce3a3e56;
+
+binding fileUse0 {
+  requires {
+    dependency("letter_opener")
+  }
+  query pattern callExpr where callee.method == "deliver!"
+  emit sink code.FileUseSink at args[0]
+}

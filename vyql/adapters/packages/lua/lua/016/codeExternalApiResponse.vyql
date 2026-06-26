@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding externalApiResponse16 {
+  requires {
+    dependency("lua-resty-http")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}

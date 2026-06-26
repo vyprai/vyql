@@ -1,9 +1,0 @@
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "creole" {
-    sink method "creolize" -> code.Deserialization
-    control method "escape_html" -> core.HtmlEscape
-    control method "escape_url" -> core.InputValidation
-  }
-}

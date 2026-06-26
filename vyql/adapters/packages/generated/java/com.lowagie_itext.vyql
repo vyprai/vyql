@@ -1,9 +1,0 @@
-import code.{UrlFetch}
-adapter java {
-  package "com.lowagie:itext" {
-    sink method "com.itextpdf.text.Jpeg.Jpeg" -> code.UrlFetch
-    sink method "com.itextpdf.text.Image.Image" -> code.UrlFetch
-    sink method "com.itextpdf.text.Image.getInstance" -> code.UrlFetch
-    sink method "com.itextpdf.text.Image.setUrl" -> code.UrlFetch
-  }
-}

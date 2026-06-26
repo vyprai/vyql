@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m391346ae;
+
+binding userControlledData5 {
+  requires {
+    dependency("qt5-androidextras")
+  }
+  query pattern callExpr where callee.method == "readVariant"
+  emit source core.UserControlledData at call.result
+}

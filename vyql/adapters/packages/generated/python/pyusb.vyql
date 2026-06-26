@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter python {
-  package "pyusb" {
-    sink method "write" -> code.NetworkSend
-    source method "read" -> code.NetworkData
-    sink method "ctrl_transfer" -> code.NetworkSend
-  }
-}

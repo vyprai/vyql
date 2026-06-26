@@ -1,0 +1,9 @@
+module bindings.java.migration.mddb29b43;
+
+binding codeEval4 {
+  requires {
+    dependency("org.glassfish.web:jstl-impl")
+  }
+  query pattern callExpr where callee.method == "parseExpressionString"
+  emit sink code.CodeEval at args[0]
+}

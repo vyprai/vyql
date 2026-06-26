@@ -1,8 +1,0 @@
-import code.{SecretValue}
-adapter objc {
-  package "SimpleKeychain" {
-    source method "string" -> code.SecretValue
-    source method "data" -> code.SecretValue
-    source method "set" -> code.SecretValue
-  }
-}

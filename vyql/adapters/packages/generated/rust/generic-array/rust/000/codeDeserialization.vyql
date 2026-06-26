@@ -1,0 +1,9 @@
+module bindings.rust.migration.mbcaa85d5;
+
+binding deserialization0 {
+  requires {
+    dependency("generic-array")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

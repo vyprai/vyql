@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "dealerdirect/phpcodesniffer-composer-installer" {
-    sink method "PHPCSStandards\Composer\Plugin\Installers\PHPCodeSniffer\Plugin::getPhpcsCommand" -> code.CommandExecution
-    sink method "PHPCSStandards\Composer\Plugin\Installers\PHPCodeSniffer\Plugin::getPhpExecCommand" -> code.CommandExecution
-  }
-}

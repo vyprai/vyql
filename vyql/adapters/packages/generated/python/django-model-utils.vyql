@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter python {
-  package "django-model-utils" {
-    sink method "run" -> code.CommandExecution
-  }
-}

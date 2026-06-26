@@ -1,0 +1,9 @@
+module bindings.dart.migration.m66bacc08;
+
+binding deserialization0 {
+  requires {
+    dependency("date_time_picker")
+  }
+  query pattern callExpr where callee.method == "onChangedHandler"
+  emit sink code.Deserialization at args[0]
+}

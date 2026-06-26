@@ -1,0 +1,9 @@
+module bindings.java.migration.m4a156c89;
+
+binding networkData1 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "fetchConnections"
+  emit source code.NetworkData at call.result
+}

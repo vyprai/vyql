@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m53911c0a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.webjars:webjars-locator-core")
+  }
+  query pattern callExpr where callee.method == "getFullPathExact"
+  emit sink code.FilePathAccess at args[0]
+}

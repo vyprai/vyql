@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3e68051e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "setFileName"
+  emit sink code.FilePathAccess at args[0]
+}

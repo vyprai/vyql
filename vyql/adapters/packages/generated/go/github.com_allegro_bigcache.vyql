@@ -1,8 +1,0 @@
-adapter go {
-  package "github.com/allegro/bigcache" {
-    source method "Set" -> code.SecretValue
-    flag code.WeakHash on any {
-      method "Hash"
-    }
-  }
-}

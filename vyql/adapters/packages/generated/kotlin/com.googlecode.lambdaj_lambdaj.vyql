@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-
-adapter kotlin {
-  package "com.googlecode.lambdaj:lambdaj" {
-    sink method "exec" -> code.ExpressionEval
-  }
-}

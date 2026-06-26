@@ -1,0 +1,9 @@
+module bindings.swift.migration.m0b81da73;
+
+binding logOutput0 {
+  requires {
+    dependency("github.com/Kitura/HeliumLogger")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

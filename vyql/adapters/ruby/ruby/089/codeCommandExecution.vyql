@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding commandExecution89 {
+  query pattern callExpr where callee.path ~= "IO.foreach"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m5e5fd364;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.glassfish.jersey.core:jersey-common")
+  }
+  query pattern callExpr where callee.method == "trustStoreFile"
+  emit sink code.FilePathAccess at args[0]
+}

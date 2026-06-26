@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "ASN1Decoder" {
-    sink method "decode" -> code.Deserialization
-  }
-}

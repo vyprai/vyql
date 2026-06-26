@@ -1,8 +1,0 @@
-import code.{HttpInput, Deserialization}
-
-adapter elixir {
-  package "bandit" {
-    source method "run" -> code.HttpInput
-    sink method "parse" -> code.Deserialization
-  }
-}

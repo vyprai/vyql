@@ -1,0 +1,9 @@
+module bindings.swift.migration.m023cf93f;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("github.com/vapor-community/google-cloud-kit")
+  }
+  query pattern callExpr where callee.method == "createSimpleUpload"
+  emit sink code.StoredDataWrite at args[0]
+}

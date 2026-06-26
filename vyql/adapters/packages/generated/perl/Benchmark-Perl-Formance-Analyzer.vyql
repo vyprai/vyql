@@ -1,7 +1,0 @@
-import code.{NosqlQuery}
-
-adapter perl {
-  package "Benchmark-Perl-Formance-Analyzer" {
-    sink method "run" -> code.NosqlQuery
-  }
-}

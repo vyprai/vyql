@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter ruby {
-  package "activerecord" {
-    sink method "sql" -> code.SqlExecution
-    sink method "query" -> code.SqlExecution
-  }
-}

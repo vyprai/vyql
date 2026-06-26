@@ -1,0 +1,9 @@
+module bindings.python.migration.m27518148;
+
+binding deserialization4 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

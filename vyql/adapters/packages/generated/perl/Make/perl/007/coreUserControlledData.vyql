@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2c6e877b;
+
+binding userControlledData7 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "evaluate_macro"
+  emit source core.UserControlledData at call.result
+}

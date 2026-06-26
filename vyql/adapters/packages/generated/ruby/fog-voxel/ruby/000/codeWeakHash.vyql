@@ -1,0 +1,13 @@
+module bindings.ruby.migration.m0a76e97f;
+
+binding weakHash0 {
+  requires {
+    dependency("fog-voxel")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "create_signature"
+  emit issue code.WeakHash at node
+}

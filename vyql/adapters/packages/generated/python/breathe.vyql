@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "breathe" {
-    sink method "parse" -> code.Deserialization
-  }
-}

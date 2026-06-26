@@ -1,0 +1,9 @@
+module bindings.php.migration.m868e4597;
+
+binding expressionEval0 {
+  requires {
+    dependency("behat/behat")
+  }
+  query pattern callExpr where callee.method == "BehatBehatUtilStrictRegex::replace"
+  emit sink code.ExpressionEval at args[0]
+}

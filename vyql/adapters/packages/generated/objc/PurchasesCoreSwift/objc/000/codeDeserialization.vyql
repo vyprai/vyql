@@ -1,0 +1,9 @@
+module bindings.objc.migration.mee0c05b0;
+
+binding deserialization0 {
+  requires {
+    dependency("PurchasesCoreSwift")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

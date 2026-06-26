@@ -1,0 +1,9 @@
+module bindings.python.migration.mdab890f9;
+
+binding deserialization1 {
+  requires {
+    dependency("chardet")
+  }
+  query pattern callExpr where callee.method == "detect_all"
+  emit sink code.Deserialization at args[0]
+}

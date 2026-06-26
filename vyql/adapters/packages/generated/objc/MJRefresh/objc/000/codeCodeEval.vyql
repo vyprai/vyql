@@ -1,0 +1,9 @@
+module bindings.objc.migration.m960b5d10;
+
+binding codeEval0 {
+  requires {
+    dependency("MJRefresh")
+  }
+  query pattern callExpr where callee.method == "executeRefreshingCallback"
+  emit sink code.CodeEval at args[0]
+}

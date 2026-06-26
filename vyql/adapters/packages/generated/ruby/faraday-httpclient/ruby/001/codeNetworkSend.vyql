@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9c4c4c72;
+
+binding networkSend1 {
+  requires {
+    dependency("faraday-httpclient")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkSend at args[0]
+}

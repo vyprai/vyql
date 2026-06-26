@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter bash {
-  package "firebase-cli" {
-    source method "FirebaseCli" -> code.CliArgument
-  }
-}

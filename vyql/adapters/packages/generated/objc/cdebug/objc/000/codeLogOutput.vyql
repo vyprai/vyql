@@ -1,0 +1,9 @@
+module bindings.objc.migration.md133a5be;
+
+binding logOutput0 {
+  requires {
+    dependency("cdebug")
+  }
+  query pattern callExpr where callee.method == "test"
+  emit sink code.LogOutput at args[0]
+}

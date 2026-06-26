@@ -1,0 +1,11 @@
+module vypr.deserialization;
+
+rule DeserializableInvocationHandler {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_502]
+    id: "VYQL-DESER-009"
+    severity: high
+  }
+  issue code.DeserializableInvocationHandler as handler
+}

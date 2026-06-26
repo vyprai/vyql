@@ -1,9 +1,0 @@
-import code.{SecretValue, StoredDataWrite}
-adapter dart {
-  package "flutter_secure_storage" {
-    source method "write" -> code.SecretValue
-    source method "read" -> code.SecretValue
-    sink method "delete" -> code.StoredDataWrite
-    sink method "deleteAll" -> code.StoredDataWrite
-  }
-}

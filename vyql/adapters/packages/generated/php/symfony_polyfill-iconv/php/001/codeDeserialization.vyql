@@ -1,0 +1,9 @@
+module bindings.php.migration.ma3b31931;
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/polyfill-iconv")
+  }
+  query pattern callExpr where callee.method == "iconv_mime_decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-
-adapter php {
-  package "consolidation/robo" {
-    sink method "process" -> code.CommandExecution
-    sink method "createConfiguration" -> code.FilePathAccess
-    sink method "loadConfiguration" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m0ef950b7;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/phimage/Erik")
+  }
+  query pattern callExpr where callee.method == "querySelectorAll"
+  emit sink code.Deserialization at args[0]
+}

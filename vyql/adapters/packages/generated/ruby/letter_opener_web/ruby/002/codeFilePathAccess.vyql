@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m27eca931;
+
+binding filePathAccess2 {
+  requires {
+    dependency("letter_opener_web")
+  }
+  query pattern callExpr where callee.method == "LettersController.attachment"
+  emit sink code.FilePathAccess at args[0]
+}

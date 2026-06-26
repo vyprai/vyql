@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9eba5595;
+
+binding deserialization8 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromWebpCtx"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "JavaScript" {
-    sink method "exec" -> code.CodeEval
-    sink method "compile" -> code.CodeEval
-  }
-}

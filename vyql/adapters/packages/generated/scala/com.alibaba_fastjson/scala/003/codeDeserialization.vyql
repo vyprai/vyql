@@ -1,0 +1,9 @@
+module bindings.scala.migration.m490decd4;
+
+binding deserialization3 {
+  requires {
+    dependency("com.alibaba:fastjson")
+  }
+  query pattern callExpr where callee.method == "parseArray"
+  emit sink code.Deserialization at args[0]
+}

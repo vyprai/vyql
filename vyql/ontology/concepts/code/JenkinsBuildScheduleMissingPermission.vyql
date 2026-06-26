@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsBuildScheduleMissingPermission : issue {
+  cwe: [CWE_862]
+  review_assumption: "callers with Item/Read or endpoint access can reach the Stapler action and queue builds"
+  reviewCategory: auth
+  reviewCondition: "a Jenkins Stapler build endpoint schedules a project build without checking Item/Build permission"
+  reviewConfidence: high
+  reviewEvidence: "Jenkins build endpoint context {pattern} calls Jenkins queue schedule before an observed hasPermission/checkPermission Item.BUILD gate"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

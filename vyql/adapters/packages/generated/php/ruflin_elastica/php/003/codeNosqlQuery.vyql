@@ -1,0 +1,9 @@
+module bindings.php.migration.m628c72ff;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("ruflin/elastica")
+  }
+  query pattern callExpr where callee.method == "ElasticaIndex::updateDocuments"
+  emit sink code.NosqlQuery at args[0]
+}

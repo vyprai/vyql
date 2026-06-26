@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule PdfJsEvalSupported {
+  meta {
+    cwe: [CWE_79]
+    id: "VYQL-INJ-022"
+    severity: high
+  }
+  taint code.PdfJsEvalSupportedSource -> code.PdfJsDocumentLoad
+}

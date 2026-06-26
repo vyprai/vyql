@@ -1,0 +1,9 @@
+module bindings.python.migration.mb6c97805;
+
+binding filePathAccess3 {
+  requires {
+    dependency("pyreadline")
+  }
+  query pattern callExpr where callee.method == "write_history_file"
+  emit sink code.FilePathAccess at args[0]
+}

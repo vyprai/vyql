@@ -1,0 +1,11 @@
+module code;
+
+concept DjangoAttachmentSaveWithoutModelValidation : issue {
+  cwe: [CWE_434]
+  review_assumption: "the model FileField or clean method defines upload validation that is not enforced by Model.save() alone"
+  reviewCategory: upload
+  reviewCondition: "uploaded attachment model is saved directly, bypassing Django model field validators"
+  reviewConfidence: high
+  reviewEvidence: "attachment processing context {pattern} builds an attachment model from uploaded file metadata and calls save() without full_clean()"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

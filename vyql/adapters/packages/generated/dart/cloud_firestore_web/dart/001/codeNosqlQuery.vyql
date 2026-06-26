@@ -1,0 +1,9 @@
+module bindings.dart.migration.maa824161;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("cloud_firestore_web")
+  }
+  query pattern callExpr where callee.method == "doc"
+  emit sink code.NosqlQuery at args[0]
+}

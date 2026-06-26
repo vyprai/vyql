@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "makeup_eex" {
-    sink method "Makeup.Lexers.EExLexer.lex" -> code.Deserialization
-    sink method "Makeup.Lexers.EExLexer.postprocess" -> code.Deserialization
-    sink method "Makeup.Lexers.HEExLexer.heex_postprocess" -> code.Deserialization
-  }
-}

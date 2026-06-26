@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb81bf22d;
+
+binding deserialization2 {
+  requires {
+    dependency("monetize")
+  }
+  query pattern callExpr where callee.method == "parse_collection"
+  emit sink code.Deserialization at args[0]
+}

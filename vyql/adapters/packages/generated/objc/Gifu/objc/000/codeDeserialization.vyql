@@ -1,0 +1,9 @@
+module bindings.objc.migration.m119a3a5d;
+
+binding deserialization0 {
+  requires {
+    dependency("Gifu")
+  }
+  query pattern callExpr where callee.method == "prepareForAnimation"
+  emit sink code.Deserialization at args[0]
+}

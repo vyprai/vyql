@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7af59fd2;
+
+binding deserialization0 {
+  requires {
+    dependency("SwiftProtobuf")
+  }
+  query pattern callExpr where callee.method == "decodeSingularFloatField"
+  emit sink code.Deserialization at args[0]
+}

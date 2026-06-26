@@ -1,0 +1,9 @@
+module bindings.swift.migration.m16772b5b;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/SwiftGen/StencilSwiftKit")
+  }
+  query pattern callExpr where callee.method == "parseStringArgument"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m710fd6f4;
+
+binding userControlledData2 {
+  requires {
+    dependency("guzzlehttp/psr7")
+  }
+  query pattern callExpr where callee.method == "getUserInfo"
+  emit source core.UserControlledData at call.result
+}

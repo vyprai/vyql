@@ -1,0 +1,11 @@
+module code;
+
+concept LocklessSharedMutation : issue {
+  cwe: [CWE_362]
+  review_assumption: "multiple attacker-triggerable executions can interleave on the same state"
+  reviewCategory: race
+  reviewCondition: "shared state appears to be mutated without an observed lock or atomic guard"
+  reviewConfidence: low
+  reviewEvidence: "concurrency-capable mutation primitive {pattern} is present"
+  vulnerableTo: [concurrency.RaceCondition]
+}

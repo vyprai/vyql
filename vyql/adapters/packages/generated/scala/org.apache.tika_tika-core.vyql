@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.apache.tika:tika-core" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseToString" -> code.Deserialization
-  }
-}

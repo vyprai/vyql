@@ -1,0 +1,9 @@
+module bindings.ruby.migration.meced84ea;
+
+binding userControlledData0 {
+  requires {
+    dependency("highline")
+  }
+  query pattern callExpr where callee.method == "HighLine.agree"
+  emit source core.UserControlledData at call.result
+}

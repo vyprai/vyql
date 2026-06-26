@@ -1,0 +1,7 @@
+module code;
+
+concept ResponseHeaderWrite : sink {
+  cwe: [CWE_113]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.HttpResponseSplitting]
+}

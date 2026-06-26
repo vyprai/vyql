@@ -1,0 +1,9 @@
+module bindings.scala.migration.ma6b87da4;
+
+binding httpInput6 {
+  requires {
+    dependency("org.springframework.ws:spring-ws-core")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.HttpInput at call.result
+}

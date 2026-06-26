@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter dart {
-  package "dds" {
-    sink method "listen" -> code.NetworkConnect
-    sink method "sendNotification" -> code.NetworkSend
-    sink method "sendRequest" -> code.NetworkSend
-  }
-}

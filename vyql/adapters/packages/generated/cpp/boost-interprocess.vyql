@@ -1,6 +1,0 @@
-adapter cpp {
-  package "boost-interprocess" {
-    source method "get" -> code.NetworkData
-    sink method "close_file" -> code.NetworkSend
-  }
-}

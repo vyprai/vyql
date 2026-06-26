@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m948c362a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("shotgun")
+  }
+  query pattern callExpr where callee.method == "Loader.call!"
+  emit sink code.FilePathAccess at args[0]
+}

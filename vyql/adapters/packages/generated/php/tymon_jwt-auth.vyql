@@ -1,6 +1,0 @@
-import code.{Cookie}
-adapter php {
-  package "tymon/jwt-auth" {
-    source method "parse" -> code.Cookie
-  }
-}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.fasterxml.jackson.module:jackson-module-jaxb-annotations" {
-    sink method "findDeserializer" -> code.Deserialization
-    sink method "findKeyDeserializer" -> code.Deserialization
-    sink method "findContentDeserializer" -> code.Deserialization
-    sink method "deserialize" -> code.Deserialization
-  }
-}

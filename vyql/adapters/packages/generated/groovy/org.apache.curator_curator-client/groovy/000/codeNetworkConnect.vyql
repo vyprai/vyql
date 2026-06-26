@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbd77e0a1;
+
+binding networkConnect0 {
+  requires {
+    dependency("org.apache.curator:curator-client")
+  }
+  query pattern callExpr where callee.method == "CuratorZookeeperClient.start()"
+  emit sink code.NetworkConnectSink at args[0]
+}

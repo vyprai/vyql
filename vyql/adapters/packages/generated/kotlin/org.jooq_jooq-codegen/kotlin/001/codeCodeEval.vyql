@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mfaf9adc6;
+
+binding codeEval1 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.compile"
+  emit sink code.CodeEval at args[0]
+}

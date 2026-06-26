@@ -1,0 +1,9 @@
+module bindings.c.migration.ma7c2e50a;
+
+binding fileUse15 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FileUseSink at args[0]
+}

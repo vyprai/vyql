@@ -1,0 +1,14 @@
+module bindings.rust.migration.m8e5e84b2;
+
+binding htmlEscape1 {
+  requires {
+    dependency("wasm-bindgen-shared")
+  }
+  query pattern callExpr where callee.method == "escape_string"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

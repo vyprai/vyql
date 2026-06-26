@@ -1,8 +1,0 @@
-import code.{Deserialization, FileUse}
-adapter rust {
-  package "cargo_toml" {
-    sink method "from_path" -> code.Deserialization
-    sink method "complete_from_path" -> code.Deserialization
-    sink method "parse_root_workspace" -> code.Deserialization
-  }
-}

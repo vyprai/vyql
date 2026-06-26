@@ -1,0 +1,9 @@
+module bindings.go.migration.m6f17747c;
+
+binding logOutput1 {
+  requires {
+    dependency("k8s.io/klog")
+  }
+  query pattern callExpr where callee.method == "SetOutputBySeverity"
+  emit sink code.LogOutput at args[0]
+}

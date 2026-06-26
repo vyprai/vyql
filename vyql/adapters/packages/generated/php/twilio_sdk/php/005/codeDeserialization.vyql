@@ -1,0 +1,9 @@
+module bindings.php.migration.m17bf60a7;
+
+binding deserialization5 {
+  requires {
+    dependency("twilio/sdk")
+  }
+  query pattern callExpr where callee.method == "TwilioJwtJWT::urlsafeB64Decode"
+  emit sink code.Deserialization at args[0]
+}

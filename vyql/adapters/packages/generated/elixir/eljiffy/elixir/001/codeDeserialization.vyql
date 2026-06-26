@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8fe0b81c;
+
+binding deserialization1 {
+  requires {
+    dependency("eljiffy")
+  }
+  query pattern callExpr where callee.method == "decode_maps"
+  emit sink code.Deserialization at args[0]
+}

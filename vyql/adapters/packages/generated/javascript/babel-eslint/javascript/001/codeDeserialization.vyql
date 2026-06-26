@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m77877b7d;
+
+binding deserialization1 {
+  requires {
+    dependency("babel-eslint")
+  }
+  query pattern callExpr where callee.method == "parseForESLint"
+  emit sink code.Deserialization at args[0]
+}

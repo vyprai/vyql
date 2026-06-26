@@ -1,0 +1,9 @@
+module bindings.php.migration.m7bcde4e5;
+
+binding deserialization1 {
+  requires {
+    dependency("hassankhan/config")
+  }
+  query pattern callExpr where callee.method == "parseString"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.php.migration.m5a1ab60d;
+
+binding inputValidation9 {
+  requires {
+    dependency("symfony/polyfill-ctype")
+  }
+  query pattern callExpr where callee.method == "ctype_upper"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

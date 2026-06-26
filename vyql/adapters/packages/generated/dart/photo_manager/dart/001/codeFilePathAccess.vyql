@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8b71e5ff;
+
+binding filePathAccess1 {
+  requires {
+    dependency("photo_manager")
+  }
+  query pattern callExpr where callee.method == "deletePath"
+  emit sink code.FilePathAccess at args[0]
+}

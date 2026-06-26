@@ -1,9 +1,0 @@
-import code.{ArchiveEntryWrite, Deserialization}
-adapter javascript {
-  package "tar" {
-    sink method "extract" -> code.ArchiveEntryWrite
-    sink method "extractFileSync" -> code.ArchiveEntryWrite
-    sink method "extractFile" -> code.ArchiveEntryWrite
-    sink method "parse" -> code.Deserialization
-  }
-}

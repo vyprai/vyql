@@ -1,5 +1,0 @@
-adapter ruby {
-  package "binding_of_caller" {
-    sink method "eval" -> code.CodeEval
-  }
-}

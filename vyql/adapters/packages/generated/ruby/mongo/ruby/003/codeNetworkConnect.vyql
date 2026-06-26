@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb1fc3a64;
+
+binding networkConnect3 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "validate_max_connecting!"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding trustBoundary688 {
+  query pattern callExpr where callee.path ~= "Object.assign"
+  emit sink code.TrustBoundary at args.any.collection
+}

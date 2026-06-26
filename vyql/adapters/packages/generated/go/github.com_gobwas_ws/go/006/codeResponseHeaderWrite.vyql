@@ -1,0 +1,9 @@
+module bindings.go.migration.ma2dd4563;
+
+binding responseHeaderWrite6 {
+  requires {
+    dependency("github.com/gobwas/ws")
+  }
+  query pattern callExpr where callee.method == "httpWriteResponseUpgrade"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

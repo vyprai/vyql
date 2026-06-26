@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/kr/logfmt" {
-    sink method "Unmarshal" -> code.Deserialization
-  }
-}

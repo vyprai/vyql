@@ -1,0 +1,13 @@
+module bindings.scala.migration.maf6a4921;
+
+binding pointerUse3 {
+  requires {
+    dependency("net.java.dev.jna:jna")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "malloc"
+  emit issue code.PointerUse at node
+}

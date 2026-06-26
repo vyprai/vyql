@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7c64ffc3;
+
+binding commandExecution0 {
+  requires {
+    dependency("ndk-sys")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

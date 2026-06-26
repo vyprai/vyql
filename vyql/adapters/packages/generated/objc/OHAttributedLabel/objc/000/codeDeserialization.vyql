@@ -1,0 +1,9 @@
+module bindings.objc.migration.m573092eb;
+
+binding deserialization0 {
+  requires {
+    dependency("OHAttributedLabel")
+  }
+  query pattern callExpr where callee.method == "processMarkupInAttributedString"
+  emit sink code.Deserialization at args[0]
+}

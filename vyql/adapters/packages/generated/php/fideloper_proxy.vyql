@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter php {
-  package "fideloper/proxy" {
-    control method "handle" -> core.InputValidation
-  }
-}

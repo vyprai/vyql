@@ -14,9 +14,10 @@ import (
 // `expression` nodes (peeled by solUnwrap). For a low-level call
 // (to.call/to.transfer) the receiver address is modeled as arg0.
 type solConv struct {
-	src  []byte
-	file string
-	key  string
+	src          []byte
+	file         string
+	key          string
+	adminGuarded bool
 }
 
 // ExtractSolidity parses .sol files into one NIR Program.
@@ -72,7 +73,10 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "function_definition", "modifier_definition", "constructor_definition", "fallback_receive_definition":
 		params := c.params(n)
 		bodyNode := c.solBody(n)
+		prevAdminGuarded := c.adminGuarded
+		c.adminGuarded = solAdminGuarded(c.text(bodyNode))
 		body := c.block(bodyNode)
+		c.adminGuarded = prevAdminGuarded
 		name := c.text(field(n, "name"))
 		return []nir.Stmt{nir.FuncDef{
 			Name:         name,
@@ -138,14 +142,42 @@ func (c *solConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
 		left := c.unwrap(field(n, "left"))
 		right := c.expr(field(n, "right"))
 		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+			target := c.text(left)
+			stmts := []nir.Stmt{nir.Assign{Targets: []string{target}, Value: right}}
+			if target != "" {
+				stmts = append(stmts, nir.ExprStmt{Value: c.stateWriteCall(n, right, target)})
+			}
+			return stmts
 		}
 		// A member/index assignment writes contract storage; emit a markable state-write event.
-		L := c.loc(n)
-		sw := nir.Call{Callee: nir.Name{ID: "state_write", Loc: L}, Path: "state_write", Method: "state_write", Loc: L}
-		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: sw}}
+		return []nir.Stmt{nir.ExprStmt{Value: right}, nir.ExprStmt{Value: c.stateWriteCall(n, right, c.dotted(left))}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *solConv) stateWriteCall(n *tree_sitter.Node, value nir.Expr, target string) nir.Call {
+	L := c.loc(n)
+	if target == "admin" {
+		if c.adminGuarded {
+			target = "admin:guarded"
+		} else {
+			target = "admin:unguarded"
+		}
+	}
+	return nir.Call{
+		Callee: nir.Name{ID: "state_write", Loc: L},
+		Args: []nir.Expr{
+			value,
+			nir.Const{Loc: L, Value: "target:" + target},
+		},
+		Path:   "state_write",
+		Method: "state_write",
+		Loc:    L,
+	}
+}
+
+func solAdminGuarded(body string) bool {
+	return strings.Contains(solCompactText(body), "require(msg.sender==admin)")
 }
 
 func (c *solConv) solBody(n *tree_sitter.Node) *tree_sitter.Node {
@@ -332,7 +364,7 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "string":
-		return nir.Const{Loc: L}
+		return nir.Const{Loc: L, Value: solLiteralValue(c.text(n))}
 	case "member_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "property")), Path: c.dotted(n), Loc: L}
 	case "array_access", "slice_access":
@@ -382,6 +414,16 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 		return parts[0]
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func solLiteralValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if q := raw[0]; (q == '"' || q == '\'') && raw[len(raw)-1] == q {
+			return raw[1 : len(raw)-1]
+		}
+	}
+	return raw
 }
 
 // call models a call_expression. For a member call (to.call(...), to.transfer(x))

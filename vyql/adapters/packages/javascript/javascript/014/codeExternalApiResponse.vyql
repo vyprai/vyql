@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding externalApiResponse14 {
+  requires {
+    dependency("axios")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}

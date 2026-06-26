@@ -1,0 +1,9 @@
+module bindings.scala.migration.m99a73854;
+
+binding deserialization0 {
+  requires {
+    dependency("com.airbnb.android:lottie")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m222602a5;
+
+binding deserialization21 {
+  requires {
+    dependency("bincode")
+  }
+  query pattern callExpr where callee.path ~= "bincode.deserialize"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m1b732e90;
+
+binding stdinInput0 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "readln"
+  emit source code.StdinInput at call.result
+}

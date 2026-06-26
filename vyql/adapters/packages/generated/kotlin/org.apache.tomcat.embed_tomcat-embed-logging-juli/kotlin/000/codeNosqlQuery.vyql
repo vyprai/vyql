@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m9f81b7a8;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "findProperty"
+  emit sink code.NosqlQuery at args[0]
+}

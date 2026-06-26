@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "c-ares" {
-    sink method "ares_dns_parse" -> code.Deserialization
-  }
-}

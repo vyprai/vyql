@@ -1,0 +1,11 @@
+module bindings.lua.migration.ma99d12f7;
+
+binding authenticationCheck88 {
+  query pattern callExpr where callee.path ~= "ensure_authenticated"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

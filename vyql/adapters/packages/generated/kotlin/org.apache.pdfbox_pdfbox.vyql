@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-adapter kotlin {
-  package "org.apache.pdfbox:pdfbox" {
-    sink method "loadFDF" -> code.FilePathAccess
-    sink method "loadXFDF" -> code.FilePathAccess
-    sink method "loadPDF" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

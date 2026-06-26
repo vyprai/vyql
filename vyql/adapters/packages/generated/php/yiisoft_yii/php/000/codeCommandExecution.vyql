@@ -1,0 +1,9 @@
+module bindings.php.migration.m57d2fb6b;
+
+binding commandExecution0 {
+  requires {
+    dependency("yiisoft/yii")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

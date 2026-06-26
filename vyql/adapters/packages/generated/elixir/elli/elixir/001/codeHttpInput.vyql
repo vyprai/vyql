@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m89b0616d;
+
+binding httpInput1 {
+  requires {
+    dependency("elli")
+  }
+  query pattern callExpr where callee.method == "get_headers"
+  emit source code.HttpInput at call.result
+}

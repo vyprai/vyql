@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me4f8d7af;
+
+binding networkSend1 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

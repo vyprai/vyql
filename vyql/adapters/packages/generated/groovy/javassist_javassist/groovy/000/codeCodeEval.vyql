@@ -1,0 +1,9 @@
+module bindings.groovy.migration.maf6db217;
+
+binding codeEval0 {
+  requires {
+    dependency("javassist:javassist")
+  }
+  query pattern callExpr where callee.method == "toClass"
+  emit sink code.CodeEval at args[0]
+}

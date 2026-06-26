@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "country_pickers" {
-    source method "getCountryByIso3Code" -> core.UserControlledData
-    source method "getCountryByIsoCode" -> core.UserControlledData
-    source method "getCountryByName" -> core.UserControlledData
-    source method "getCountryByPhoneCode" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.go.migration.m7d94b4d1;
+
+binding inputValidation0 {
+  requires {
+    dependency("github.com/DataDog/datadog-go")
+  }
+  query pattern callExpr where callee.method == "appendEscapedEventText"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

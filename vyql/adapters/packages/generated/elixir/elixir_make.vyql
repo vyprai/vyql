@@ -1,8 +1,0 @@
-import code.{CommandExecution, NetworkConnect, NetworkSend}
-adapter elixir {
-  package "elixir_make" {
-    sink method "cmd" -> code.CommandExecution
-    sink method "download" -> code.NetworkConnect
-    sink method "download" -> code.NetworkSend
-  }
-}

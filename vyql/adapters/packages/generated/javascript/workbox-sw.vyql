@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter javascript {
-  package "workbox-sw" {
-    sink method "importScripts" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.mde4307ef;
+
+binding deserialization1 {
+  requires {
+    dependency("ZipArchive")
+  }
+  query pattern callExpr where callee.method == "UnzipFileToMemory"
+  emit sink code.Deserialization at args[0]
+}

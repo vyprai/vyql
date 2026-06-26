@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedNumericSqlInterpolation : issue {
+  cwe: [CWE_89, CWE_20]
+  review_assumption: "attackers can choose the route or request parameter used as the numeric identifier"
+  reviewCategory: sql
+  reviewCondition: "request-derived numeric identifier reaches an ORM primary-key lookup or SQL predicate without a numeric validation guard"
+  reviewConfidence: high
+  reviewEvidence: "PHP action context {pattern} passes an uncast request/route identifier into numeric query handling"
+  vulnerableTo: [injection.SqlInjection, validation.ImproperInputValidation]
+}

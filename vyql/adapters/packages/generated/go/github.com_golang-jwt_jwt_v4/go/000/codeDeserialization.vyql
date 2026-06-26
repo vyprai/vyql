@@ -1,0 +1,9 @@
+module bindings.go.migration.m98268312;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/golang-jwt/jwt/v4")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

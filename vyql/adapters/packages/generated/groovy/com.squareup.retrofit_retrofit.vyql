@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "com.squareup.retrofit:retrofit" {
-    sink method "RequestFactoryParser.parse" -> code.Deserialization
-  }
-}

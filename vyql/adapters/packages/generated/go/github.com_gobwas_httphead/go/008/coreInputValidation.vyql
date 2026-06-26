@@ -1,0 +1,14 @@
+module bindings.go.migration.m4f608b1f;
+
+binding inputValidation8 {
+  requires {
+    dependency("github.com/gobwas/httphead")
+  }
+  query pattern callExpr where callee.method == "ValidCookieName"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

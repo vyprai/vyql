@@ -1,0 +1,9 @@
+module bindings.java.migration.mc903e4d9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-file")
+  }
+  query pattern callExpr where callee.method == "reopen"
+  emit sink code.FilePathAccess at args[0]
+}

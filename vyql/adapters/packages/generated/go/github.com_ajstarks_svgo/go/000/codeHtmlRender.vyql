@@ -1,0 +1,9 @@
+module bindings.go.migration.m1f67e858;
+
+binding htmlRender0 {
+  requires {
+    dependency("github.com/ajstarks/svgo")
+  }
+  query pattern callExpr where callee.method == "New"
+  emit sink code.HtmlRender at args[0]
+}

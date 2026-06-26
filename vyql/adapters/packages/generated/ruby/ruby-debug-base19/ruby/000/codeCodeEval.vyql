@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8cc89312;
+
+binding codeEval0 {
+  requires {
+    dependency("ruby-debug-base19")
+  }
+  query pattern callExpr where callee.method == "hbinding"
+  emit sink code.CodeEval at args[0]
+}

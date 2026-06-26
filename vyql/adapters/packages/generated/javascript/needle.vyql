@@ -1,8 +1,0 @@
-import code.{UrlFetch, HttpInput}
-
-adapter javascript {
-  package "needle" {
-    sink method "request" -> code.UrlFetch
-    source method "read" -> code.HttpInput
-  }
-}

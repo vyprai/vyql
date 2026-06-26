@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.apache.httpcomponents:httpmime" {
-    sink method "writeTo" -> code.NetworkSend
-  }
-}

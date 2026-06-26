@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2d34304f;
+
+binding networkSend17 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor")
+  }
+  query pattern callExpr where callee.method == "writeUTF8String"
+  emit sink code.NetworkSend at args[0]
+}

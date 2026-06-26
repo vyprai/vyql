@@ -1,0 +1,9 @@
+module bindings.dart.migration.m505601c2;
+
+binding codeEval0 {
+  requires {
+    dependency("flutter_sound_web")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.CodeEval at args[0]
+}

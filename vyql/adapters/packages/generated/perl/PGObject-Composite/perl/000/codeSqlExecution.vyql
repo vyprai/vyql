@@ -1,0 +1,9 @@
+module bindings.perl.migration.m30539e6d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("PGObject-Composite")
+  }
+  query pattern callExpr where callee.method == "call_dbmethod"
+  emit sink code.SqlExecution at args[0]
+}

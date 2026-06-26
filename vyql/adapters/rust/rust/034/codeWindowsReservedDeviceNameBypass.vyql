@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding windowsReservedDeviceNameBypass34 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "path.file_stem()" and node.token contains "stemstr.to_uppercase().as_str()" and node.token contains "\"COM0\"" and node.token contains "\"COM9\"" and node.token contains "manually::open" and not (node.token contains "\"COM¹\"")
+  emit issue code.WindowsReservedDeviceNameBypass at node
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.mb97208a3;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/glycerine/go-unsnap-stream")
+  }
+  query pattern callExpr where callee.method == "ReadSnappyStreamCompressedFile"
+  emit sink code.FilePathAccess at args[0]
+}

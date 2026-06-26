@@ -1,0 +1,9 @@
+module bindings.perl.migration.m64b68b08;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("Apache-Session")
+  }
+  query pattern callExpr where callee.method == "DELETE"
+  emit sink code.StoredDataWrite at args[0]
+}

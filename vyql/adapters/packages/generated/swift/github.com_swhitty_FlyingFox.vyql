@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter swift {
-  package "github.com/swhitty/FlyingFox" {
-    source method "query" -> code.HttpInput
-  }
-}

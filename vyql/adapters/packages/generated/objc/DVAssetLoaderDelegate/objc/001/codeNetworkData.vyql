@@ -1,0 +1,9 @@
+module bindings.objc.migration.m37087380;
+
+binding networkData1 {
+  requires {
+    dependency("DVAssetLoaderDelegate")
+  }
+  query pattern callExpr where callee.method == "URLSession"
+  emit source code.NetworkData at call.result
+}

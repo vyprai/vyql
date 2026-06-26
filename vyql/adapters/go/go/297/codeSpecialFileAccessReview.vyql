@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding specialFileAccessReview297 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:os.OpenFile" and node.token contains "literal:/proc/self/attr/exec" and not (node.scopeCall.any contains "OpenProcRoot") and not (node.scopeCall.any contains "OpenThreadSelf") and not (node.token contains "call_path:pathrs.Reopen")
+  emit issue code.SpecialFileAccessReview at node
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m819f9f3d;
+
+binding httpInput0 {
+  requires {
+    dependency("airbrake")
+  }
+  query pattern callExpr where callee.method == "Airbrake::Rack::HttpParamsFilter#call"
+  emit source code.HttpInput at call.result
+}

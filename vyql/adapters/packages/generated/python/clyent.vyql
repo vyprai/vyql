@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "clyent" {
-    source method "add_default_arguments" -> code.CliArgument
-  }
-}

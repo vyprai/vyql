@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend, UrlFetch}
-
-adapter perl {
-  package "Net-SMS-CDYNE" {
-    sink method "do_cdyne_request" -> code.NetworkConnect
-    sink method "do_cdyne_request" -> code.NetworkSend
-  }
-}

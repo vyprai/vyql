@@ -1,0 +1,9 @@
+module bindings.swift.migration.mef427669;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/migueldeicaza/SwiftGodot")
+  }
+  query pattern callExpr where callee.method == "_fromRawArgument"
+  emit sink code.Deserialization at args[0]
+}

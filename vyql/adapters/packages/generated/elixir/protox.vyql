@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "protox" {
-    sink method "parse" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

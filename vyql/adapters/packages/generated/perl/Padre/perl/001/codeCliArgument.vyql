@@ -1,0 +1,9 @@
+module bindings.perl.migration.m637a43fb;
+
+binding cliArgument1 {
+  requires {
+    dependency("Padre")
+  }
+  query pattern callExpr where callee.method == "Padre::run"
+  emit source code.CliArgument at call.result
+}

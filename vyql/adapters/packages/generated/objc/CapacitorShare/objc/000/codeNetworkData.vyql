@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc5d754bf;
+
+binding networkData0 {
+  requires {
+    dependency("CapacitorShare")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

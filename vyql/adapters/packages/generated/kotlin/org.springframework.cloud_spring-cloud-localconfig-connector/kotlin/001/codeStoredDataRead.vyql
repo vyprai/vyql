@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me534ebd7;
+
+binding storedDataRead1 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-localconfig-connector")
+  }
+  query pattern callExpr where callee.method == "readServices"
+  emit source code.StoredDataRead at call.result
+}

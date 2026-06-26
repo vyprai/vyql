@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding unsanitizedSvgUpload113 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=php" and containsAny(node.token, ["literal:svg", "literal:image/svg+xml"]) and containsAny(node.token, ["call_path:getClientOriginalExtension", "call_path:storeAs", "call_path:getContent"]) and not (containsAny(node.scopeCall.any, [sanitizeSvg, svgSanitize, Sanitizer]))
+  emit issue code.UnsanitizedSvgUpload at node
+}

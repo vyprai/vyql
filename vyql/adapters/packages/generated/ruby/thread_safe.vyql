@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "thread_safe" {
-    sink method "marshal_load" -> code.Deserialization
-  }
-}

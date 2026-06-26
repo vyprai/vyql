@@ -1,6 +1,0 @@
-adapter perl {
-  package "XXX" {
-    source method "_set_dump_module" -> core.UserControlledData
-    sink method "_xxx_dump" -> code.CodeEval
-  }
-}

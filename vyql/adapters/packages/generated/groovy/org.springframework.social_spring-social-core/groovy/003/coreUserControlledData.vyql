@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md15b4d9e;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "Connection.getProfileUrl"
+  emit source core.UserControlledData at call.result
+}

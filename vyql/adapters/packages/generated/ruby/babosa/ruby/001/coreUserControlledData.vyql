@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc2203c1e;
+
+binding userControlledData1 {
+  requires {
+    dependency("babosa")
+  }
+  query pattern callExpr where callee.method == "transliterate!"
+  emit source core.UserControlledData at call.result
+}

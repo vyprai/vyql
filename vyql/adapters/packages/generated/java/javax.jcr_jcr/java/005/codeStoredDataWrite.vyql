@@ -1,0 +1,9 @@
+module bindings.java.migration.mbbc78ebf;
+
+binding storedDataWrite5 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "setProperty"
+  emit sink code.StoredDataWrite at args[0]
+}

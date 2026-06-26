@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m59a22635;
+
+binding networkConnect0 {
+  requires {
+    dependency("net-ssh-gateway")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

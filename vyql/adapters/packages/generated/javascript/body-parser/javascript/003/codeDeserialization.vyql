@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m9d068601;
+
+binding deserialization3 {
+  requires {
+    dependency("body-parser")
+  }
+  query pattern callExpr where callee.method == "textParser"
+  emit sink code.Deserialization at args[0]
+}

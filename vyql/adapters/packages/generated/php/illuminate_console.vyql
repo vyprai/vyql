@@ -1,7 +1,0 @@
-adapter php {
-  package "illuminate/console" {
-    sink method "exec" -> code.CommandExecution
-    source method "parse" -> core.UserControlledData
-    source method "parseCommand" -> core.UserControlledData
-  }
-}

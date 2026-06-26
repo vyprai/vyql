@@ -1,0 +1,11 @@
+module code;
+
+concept PhpMyAdminSetupRedirectorOpenRedirect : issue {
+  cwe: [CWE_601]
+  review_assumption: "setup pages do not have the normal token protection for redirector requests"
+  reviewCategory: request_forgery
+  reviewCondition: "phpMyAdmin setup-mode links route external URLs through the url.php redirector"
+  reviewConfidence: high
+  reviewEvidence: "PMA_linkURL context {pattern} returns ../url.php with the caller-supplied url parameter while PMA_SETUP is defined"
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

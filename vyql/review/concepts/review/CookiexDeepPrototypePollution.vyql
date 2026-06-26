@@ -1,0 +1,8 @@
+module code;
+
+review code.CookiexDeepPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review cookiex-deep recursive assignment for __proto__/constructor/prototype filtering before writing target keys"
+}

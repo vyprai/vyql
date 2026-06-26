@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter ruby {
-  package "uuid" {
-    control method "UUID.validate" -> core.InputValidation
-  }
-}

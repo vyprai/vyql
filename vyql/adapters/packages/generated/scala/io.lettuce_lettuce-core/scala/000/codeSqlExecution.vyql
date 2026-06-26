@@ -1,0 +1,9 @@
+module bindings.scala.migration.m850f4b79;
+
+binding sqlExecution0 {
+  requires {
+    dependency("io.lettuce:lettuce-core")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

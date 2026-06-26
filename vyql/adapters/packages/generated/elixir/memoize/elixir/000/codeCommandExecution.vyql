@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m03c9f7f1;
+
+binding commandExecution0 {
+  requires {
+    dependency("memoize")
+  }
+  query pattern callExpr where callee.method == "mix_cmd_with_status_check"
+  emit sink code.CommandExecution at args[0]
+}

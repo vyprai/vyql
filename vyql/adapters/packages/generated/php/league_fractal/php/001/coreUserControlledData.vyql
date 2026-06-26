@@ -1,0 +1,9 @@
+module bindings.php.migration.m3d5275a3;
+
+binding userControlledData1 {
+  requires {
+    dependency("league/fractal")
+  }
+  query pattern callExpr where callee.method == "parseFieldsets"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding pathCanonicalization552 {
+  query pattern callExpr where callee.method == "relative_to"
+  emit check core.PathCanonicalization at callee.receiver {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}

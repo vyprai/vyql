@@ -1,0 +1,9 @@
+module bindings.c.migration.m2816daee;
+
+binding filePathAccess4 {
+  requires {
+    dependency("libc")
+  }
+  query pattern callExpr where callee.path ~= "fopen"
+  emit sink code.FilePathAccess at args[0]
+}

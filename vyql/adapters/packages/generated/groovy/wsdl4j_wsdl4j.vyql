@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "wsdl4j:wsdl4j" {
-    sink method "readWSDL" -> code.Deserialization
-  }
-}

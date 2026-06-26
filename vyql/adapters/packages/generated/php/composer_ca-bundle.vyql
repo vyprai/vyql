@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter php {
-  package "composer/ca-bundle" {
-    sink method "validateCaFile" -> code.FilePathAccess
-  }
-}

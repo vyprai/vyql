@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding templateRender33 {
+  requires {
+    dependency("thymeleaf")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.TemplateRender at args[0]
+}

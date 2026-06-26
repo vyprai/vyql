@@ -1,0 +1,11 @@
+module code;
+
+concept ShareInfoDirectDownloadTokenExposure : issue {
+  cwe: [CWE_306, CWE_862, CWE_200]
+  review_assumption: "the public share-info response is reachable with only the share hash and its direct download URL bypasses password-gated share access"
+  reviewCategory: auth
+  reviewCondition: "a public share-info endpoint returns a tokenized direct-download URL before the share password challenge"
+  reviewConfidence: high
+  reviewEvidence: "share-info context {pattern} looks up a share by hash and sets DownloadURL with a direct getShareURL call using the share token"
+  vulnerableTo: [authentication.MissingAuthentication, access_control.MissingAuthorization, secrets.SecretLeak]
+}

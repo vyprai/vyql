@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "nth-check" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf71d9c34;
+
+binding codeEval0 {
+  requires {
+    dependency("power_assert")
+  }
+  query pattern callExpr where callee.method == "PowerAssert::Parser#initialize"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/lunixbochs/vtclean" {
-    control method "Clean" -> core.InputValidation
-  }
-}

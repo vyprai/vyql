@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m38431dde;
+
+binding deserialization1 {
+  requires {
+    dependency("qtspeech")
+  }
+  query pattern callExpr where callee.method == "QVoice.writeTo"
+  emit sink code.Deserialization at args[0]
+}

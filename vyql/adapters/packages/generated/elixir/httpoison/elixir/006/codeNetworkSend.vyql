@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m73153651;
+
+binding networkSend6 {
+  requires {
+    dependency("httpoison")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkSend at args[0]
+}

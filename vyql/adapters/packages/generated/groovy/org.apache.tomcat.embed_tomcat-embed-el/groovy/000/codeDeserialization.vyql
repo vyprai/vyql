@@ -1,0 +1,9 @@
+module bindings.groovy.migration.ma6e4ec74;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-el")
+  }
+  query pattern callExpr where callee.path ~= "org.apache.el.parser.ELParser.parse"
+  emit sink code.Deserialization at args[0]
+}

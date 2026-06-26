@@ -1,0 +1,9 @@
+module bindings.perl.migration.m98837b45;
+
+binding deserialization4 {
+  requires {
+    dependency("Config-GitLike")
+  }
+  query pattern callExpr where callee.method == "parse_content"
+  emit sink code.Deserialization at args[0]
+}

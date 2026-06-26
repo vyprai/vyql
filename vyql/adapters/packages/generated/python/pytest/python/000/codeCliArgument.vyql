@@ -1,0 +1,9 @@
+module bindings.python.migration.ma7fea193;
+
+binding cliArgument0 {
+  requires {
+    dependency("pytest")
+  }
+  query pattern callExpr where callee.method == "pytest_addoption"
+  emit source code.CliArgument at call.result
+}

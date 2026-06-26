@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m23330ad8;
+
+binding userControlledData1 {
+  requires {
+    dependency("joken")
+  }
+  query pattern callExpr where callee.method == "peek_claims"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding logWrite422 {
+  query pattern callExpr where callee.path ~= "log.warn"
+  emit sink code.LogWriteSink at args.any
+}

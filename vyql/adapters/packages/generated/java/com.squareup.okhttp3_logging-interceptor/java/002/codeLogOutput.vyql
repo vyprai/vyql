@@ -1,0 +1,9 @@
+module bindings.java.migration.m8161c3a2;
+
+binding logOutput2 {
+  requires {
+    dependency("com.squareup.okhttp3:logging-interceptor")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

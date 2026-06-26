@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7acbe63c;
+
+binding deserialization0 {
+  requires {
+    dependency("unicase")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

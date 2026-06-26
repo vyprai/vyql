@@ -1,5 +1,0 @@
-adapter bash {
-  package "iproute2mac" {
-    source path "iproute2mac.argv" -> code.CliArgument
-  }
-}

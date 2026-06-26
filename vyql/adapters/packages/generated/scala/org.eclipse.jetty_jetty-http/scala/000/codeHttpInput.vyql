@@ -1,0 +1,9 @@
+module bindings.scala.migration.m32be35e1;
+
+binding httpInput0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.HttpInput at call.result
+}

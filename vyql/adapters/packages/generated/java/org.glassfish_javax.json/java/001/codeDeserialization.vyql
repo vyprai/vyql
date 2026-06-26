@@ -1,0 +1,9 @@
+module bindings.java.migration.m19269745;
+
+binding deserialization1 {
+  requires {
+    dependency("org.glassfish:javax.json")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

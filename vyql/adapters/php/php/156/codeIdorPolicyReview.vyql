@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding idorPolicyReview156 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "audioigniter_playlist_id" and node.token contains "get_post(" and node.token contains "get_post_meta(" and node.token contains "wp_send_json(" and not (node.token contains "post_status") and not (node.token contains "current_user_can")
+  emit issue code.IdorPolicyReview at node
+}

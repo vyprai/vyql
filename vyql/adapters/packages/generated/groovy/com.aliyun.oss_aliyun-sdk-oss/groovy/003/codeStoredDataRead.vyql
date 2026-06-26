@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbc89df60;
+
+binding storedDataRead3 {
+  requires {
+    dependency("com.aliyun.oss:aliyun-sdk-oss")
+  }
+  query pattern callExpr where callee.method == "selectObject"
+  emit source code.StoredDataRead at call.result
+}

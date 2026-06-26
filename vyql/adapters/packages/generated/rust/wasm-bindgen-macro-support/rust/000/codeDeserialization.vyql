@@ -1,0 +1,9 @@
+module bindings.rust.migration.mb6ffa369;
+
+binding deserialization0 {
+  requires {
+    dependency("wasm-bindgen-macro-support")
+  }
+  query pattern callExpr where callee.method == "ClassMarker::parse"
+  emit sink code.Deserialization at args[0]
+}

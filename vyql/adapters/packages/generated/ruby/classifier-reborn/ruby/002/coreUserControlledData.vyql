@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m18dedbda;
+
+binding userControlledData2 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "classify_with_score"
+  emit source core.UserControlledData at call.result
+}

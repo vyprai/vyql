@@ -1,7 +1,0 @@
-import code.{XmlParse}
-adapter javascript {
-  package "w3c-xmlserializer" {
-    sink method "xmlSerialization" -> code.XmlParse
-    sink method "serializeAttributeValue" -> code.XmlParse
-  }
-}

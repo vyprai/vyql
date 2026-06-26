@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1c1357ee;
+
+binding httpInput3 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.path ~= "httplib.Request"
+  emit source code.HttpInput at call.result
+}

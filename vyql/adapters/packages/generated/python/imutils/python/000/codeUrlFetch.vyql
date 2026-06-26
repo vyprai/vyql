@@ -1,0 +1,9 @@
+module bindings.python.migration.m2996e3d3;
+
+binding urlFetch0 {
+  requires {
+    dependency("imutils")
+  }
+  query pattern callExpr where callee.method == "url_to_image"
+  emit sink code.UrlFetch at args[0]
+}

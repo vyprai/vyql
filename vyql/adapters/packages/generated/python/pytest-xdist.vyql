@@ -1,7 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter python {
-  package "pytest-xdist" {
-    source method "parse_numprocesses" -> code.CliArgument
-    sink method "handle_command" -> code.CommandExecution
-  }
-}

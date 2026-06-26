@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter objc {
-  package "Kingfisher" {
-    sink method "retrieveImage" -> code.UrlFetch
-  }
-}

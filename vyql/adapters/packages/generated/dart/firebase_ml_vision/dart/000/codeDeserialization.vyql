@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma5c4bbc9;
+
+binding deserialization0 {
+  requires {
+    dependency("firebase_ml_vision")
+  }
+  query pattern callExpr where callee.method == "processImage"
+  emit sink code.Deserialization at args[0]
+}

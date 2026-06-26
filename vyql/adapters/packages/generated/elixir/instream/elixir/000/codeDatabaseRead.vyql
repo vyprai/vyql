@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m86249842;
+
+binding databaseRead0 {
+  requires {
+    dependency("instream")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.DatabaseReadSink at args[0]
+}

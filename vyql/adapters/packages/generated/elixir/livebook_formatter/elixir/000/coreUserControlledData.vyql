@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma30c1885;
+
+binding userControlledData0 {
+  requires {
+    dependency("livebook_formatter")
+  }
+  query pattern callExpr where callee.method == "reformat"
+  emit source core.UserControlledData at call.result
+}

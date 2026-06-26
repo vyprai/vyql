@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding commandExecution8 {
+  requires {
+    dependency("perl")
+  }
+  query pattern callExpr where callee.path ~= "exec"
+  emit sink code.CommandExecution at args[0]
+}

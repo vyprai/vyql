@@ -1,0 +1,9 @@
+module bindings.perl.migration.m27397705;
+
+binding networkSend1 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "meta"
+  emit sink code.NetworkSend at args[0]
+}

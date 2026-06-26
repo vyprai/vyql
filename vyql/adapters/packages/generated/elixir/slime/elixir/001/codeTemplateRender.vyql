@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mde7df98d;
+
+binding templateRender1 {
+  requires {
+    dependency("slime")
+  }
+  query pattern callExpr where callee.method == "Slime.Renderer.render"
+  emit sink code.TemplateRender at args[0]
+}

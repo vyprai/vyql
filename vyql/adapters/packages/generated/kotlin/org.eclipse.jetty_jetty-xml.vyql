@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.eclipse.jetty:jetty-xml" {
-    sink method "XmlParser.parse" -> code.Deserialization
-  }
-}

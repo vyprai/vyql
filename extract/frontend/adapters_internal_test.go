@@ -56,6 +56,19 @@ func TestMatchPath(t *testing.T) {
 	}
 }
 
+func TestClassBaseContextTokenDoesNotMatchSuffixes(t *testing.T) {
+	tokens := "class_base:org.yaml.snakeyaml.constructor.SafeConstructor"
+	if contextTokenValuePredicate("contains", []string{"class_base:Constructor"}, tokens) {
+		t.Fatal("class_base:Constructor should not match SafeConstructor")
+	}
+	if !contextTokenValuePredicate("contains", []string{"class_base:SafeConstructor"}, tokens) {
+		t.Fatal("class_base:SafeConstructor should match its exact simple name")
+	}
+	if !contextTokenValuePredicate("contains", []string{"class_base:org.yaml.snakeyaml.constructor.SafeConstructor"}, tokens) {
+		t.Fatal("fully qualified class base should match")
+	}
+}
+
 func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
@@ -144,7 +157,7 @@ func frontendSourceVarNeedles(t *testing.T) []string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parser.ParseRuntime(string(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +246,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parser.ParseRuntime(string(raw))
 		if err != nil {
 			return err
 		}
@@ -1371,7 +1384,6 @@ adapter php {
 	}})
 	store.AddNode(usg.Node{ID: "encode", Type: "code.Call", Props: map[string]string{
 		"loc":         "fields.php:12",
-		"region":      "fields.php/fn1/if1",
 		"callee_path": "json_encode",
 		"method":      "json_encode",
 		"str_args":    "$data[$field_name]",
@@ -1598,7 +1610,7 @@ adapter javascript {
 	if !flagNodeKindAllows(spec.Flags[0], debug) {
 		t.Fatalf("debug node kind was not allowed by flag: %+v", spec.Flags[0])
 	}
-	if !flagMatchesNode(store, &flowTokenIndex{}, spec.Flags[0], debug, "javascript", false, nil) {
+	if !flagMatchesNode(store, &flagMatchIndex{}, spec.Flags[0], debug, "javascript", false, nil) {
 		t.Fatalf("call operand flag did not match transitive URL flow into debug call")
 	}
 
@@ -1688,6 +1700,144 @@ func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	got := spec.sinkAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
 		t.Fatalf("collection first sink mapping wrong: %+v", got)
+	}
+}
+
+func TestCollectionFirstSinkTargetsElementThroughVariableArg(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:         "custom.Command",
+			Pattern:         "subprocess.Popen",
+			Collection:      true,
+			CollectionFirst: true,
+			CollectionIndex: 0,
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "elem0", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "sample.x:1", "collection_index": "0",
+	}})
+	store.AddNode(usg.Node{ID: "seq", Type: "code.Seq", Props: map[string]string{"loc": "sample.x:1"}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "subprocess.Popen", "method": "Popen", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem0", Dst: "seq"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "seq", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
+		t.Fatalf("collection first sink should follow variable-held argv list: %+v", got)
+	}
+}
+
+func TestCollectionSinkAcceptsVariableHeldCollectionArg(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.Command",
+			Pattern:    "runtime.execv",
+			Collection: true,
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "elem0", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "sample.x:1", "collection_index": "0",
+	}})
+	store.AddNode(usg.Node{ID: "seq", Type: "code.Seq", Props: map[string]string{"loc": "sample.x:1"}})
+	store.AddNode(usg.Node{ID: "tmp", Type: "code.Call", Props: map[string]string{"loc": "sample.x:1"}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Call",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "runtime.execv", "method": "execv", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem0", Dst: "seq"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "seq", Dst: "tmp"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tmp", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Command" {
+		t.Fatalf("collection sink should accept collection-valued call arg: %+v", got)
+	}
+}
+
+func TestSinkBestMatchKeepsCollectionAndScalarTargets(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{
+			{Concept: "custom.Command", Pattern: "Process.run", ArgIndex: -1},
+			{Concept: "custom.Command", Pattern: "Process.run", ArgIndex: -1, Collection: true},
+		},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:1", "vkind": "Const",
+	}})
+	store.AddNode(usg.Node{ID: "arg1", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:1", "vkind": "Seq",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "Process.run", "method": "run", "arg0": "arg0", "arg1": "arg1",
+	}})
+
+	got := spec.sinkAdapter().Apply(store)
+	seen := map[string]bool{}
+	for _, m := range got {
+		if m.Concept == "custom.Command" {
+			seen[m.NodeID] = true
+		}
+	}
+	if !seen["arg0"] || !seen["arg1"] {
+		t.Fatalf("collection and scalar sink mappings should both survive best-match selection: %+v", got)
+	}
+}
+
+func TestOverlayAdaptersLoadV2Binding(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "overlay.vyql")
+	if err := os.WriteFile(path, []byte(`
+module bindings.python.overlay;
+concept custom.SqlExecution : sink {}
+binding cursorExecuteQuery {
+  query pattern callExpr where callee.method == "execute"
+  emit sink custom.SqlExecution at args[0]
+}
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ads, err := OverlayAdapters(dir, []string{"python"})
+	if err != nil {
+		t.Fatalf("OverlayAdapters: %v", err)
+	}
+	if len(ads) == 0 {
+		t.Fatal("OverlayAdapters returned no adapters for v2 binding")
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.py:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.py:2", "callee_path": "cursor.execute", "method": "execute", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	var got []string
+	for _, ad := range ads {
+		for _, m := range ad.Apply(store) {
+			got = append(got, m.NodeID+":"+m.Concept)
+		}
+	}
+	if strings.Join(got, ",") != "arg0:custom.SqlExecution" {
+		t.Fatalf("v2 overlay adapter labels = %v, want arg0:custom.SqlExecution", got)
 	}
 }
 
@@ -1906,6 +2056,31 @@ func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
+	}})
+
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Controls: []controlSpec{{
+			Concept:  "custom.Control",
+			Pattern:  "normalize",
+			ByMethod: true,
+			Detail:   map[string]string{"coverage": "sameScope"},
+		}},
+	}
+	got := spec.controlAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
+		t.Fatalf("control mapping wrong: %+v", got)
+	}
+	if got[0].Detail["coverage"] != "sameScope" {
+		t.Fatalf("coverage detail not preserved: %+v", got[0])
+	}
+}
+
 func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "recv", Type: "code.Name", Props: map[string]string{"loc": "sample.x:1"}})
@@ -1928,5 +2103,36 @@ func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 	got := spec.controlAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "recv" || got[0].Concept != "custom.Control" {
 		t.Fatalf("receiver control mapping wrong: %+v", got)
+	}
+}
+
+func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.ReceiverSink",
+			Pattern:    "danger",
+			ByMethod:   true,
+			Receiver:   true,
+			Constraint: "samplepkg.SafeReceiver",
+		}},
+	}
+	adapter := spec.sinkAdapter()
+
+	wrongType := usg.NewInMemStore()
+	wrongType.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger", "recv_type": "samplepkg.OtherReceiver",
+	}})
+	if got := adapter.Apply(wrongType); len(got) != 0 {
+		t.Fatalf("receiver sink fired for conflicting receiver type: %+v", got)
+	}
+
+	rightType := usg.NewInMemStore()
+	rightType.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger", "recv_type": "samplepkg.SafeReceiver",
+	}})
+	if got := adapter.Apply(rightType); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.ReceiverSink" {
+		t.Fatalf("receiver sink did not fire for matching receiver type: %+v", got)
 	}
 }

@@ -1,0 +1,9 @@
+module bindings.php.migration.m09cebc4d;
+
+binding xmlParse1 {
+  requires {
+    dependency("nb/oxymel")
+  }
+  query pattern callExpr where callee.method == "tag"
+  emit sink code.XmlParse at args[0]
+}

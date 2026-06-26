@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.osgi:org.osgi.core" {
-    sink method "getDataFile" -> code.FilePathAccess
-  }
-}

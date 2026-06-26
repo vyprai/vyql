@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m590c1f57;
+
+binding userControlledData0 {
+  requires {
+    dependency("microsoft.kinect")
+  }
+  query pattern callExpr where callee.method == "ProcessUpEvent"
+  emit source core.UserControlledData at call.result
+}

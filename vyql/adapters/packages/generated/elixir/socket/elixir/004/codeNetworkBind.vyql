@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0319cc00;
+
+binding networkBind4 {
+  requires {
+    dependency("socket")
+  }
+  query pattern callExpr where callee.method == "listen"
+  emit sink code.NetworkBind at args[0]
+}

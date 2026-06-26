@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m4cc9b78f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pnp-webpack-plugin")
+  }
+  query pattern callExpr where callee.method == "resolveModuleName"
+  emit sink code.FilePathAccess at args[0]
+}

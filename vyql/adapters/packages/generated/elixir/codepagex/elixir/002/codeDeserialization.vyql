@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mabadd313;
+
+binding deserialization2 {
+  requires {
+    dependency("codepagex")
+  }
+  query pattern callExpr where callee.method == "from_string"
+  emit sink code.Deserialization at args[0]
+}

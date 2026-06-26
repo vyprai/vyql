@@ -1,0 +1,9 @@
+module bindings.c.migration.m609ac372;
+
+binding deserialization0 {
+  requires {
+    dependency("boringssl")
+  }
+  query pattern callExpr where callee.method == "ParseOCSPCertID"
+  emit sink code.Deserialization at args[0]
+}

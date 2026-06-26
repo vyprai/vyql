@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "xpp3:xpp3" {
-    sink method "parse" -> code.Deserialization
-  }
-}

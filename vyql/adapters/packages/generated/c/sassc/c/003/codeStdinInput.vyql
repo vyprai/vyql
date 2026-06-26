@@ -1,0 +1,9 @@
+module bindings.c.migration.m313a9cbc;
+
+binding stdinInput3 {
+  requires {
+    dependency("sassc")
+  }
+  query pattern callExpr where callee.method == "compile_stdin"
+  emit source code.StdinInput at call.result
+}

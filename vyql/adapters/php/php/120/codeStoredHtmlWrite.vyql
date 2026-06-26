@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding storedHtmlWrite120 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=save" and node.token contains "$html=post('html')" and node.token contains "$html=$this->_filter_html($html)" and node.token contains "Comment_model::updateOrCreate" and node.token contains "'html'=>$html" and not (node.token contains "ParseMarkdown") and not (node.token contains "setSafeMode(true)")
+  emit issue code.StoredHtmlWrite at node
+}

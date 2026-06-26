@@ -1,5 +1,0 @@
-adapter groovy {
-  package "com.fasterxml.jackson.datatype:jackson-datatype-hppc" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6de833d3;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/mercari/QRScanner")
+  }
+  query pattern callExpr where callee.method == "metadataOutput"
+  emit source core.UserControlledData at call.result
+}

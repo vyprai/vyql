@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter kotlin {
-  package "commons-cli:commons-cli" {
-    source method "parse" -> code.CliArgument
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m2275c761;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/binaryscraping/GetExtensions")
+  }
+  query pattern callExpr where callee.method == "client"
+  emit sink code.NetworkConnectSink at args[0]
+}

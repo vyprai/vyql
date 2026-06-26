@@ -1,0 +1,9 @@
+module bindings.objc.migration.m28b32004;
+
+binding filePathAccess0 {
+  requires {
+    dependency("VTAcknowledgementsViewController")
+  }
+  query pattern callExpr where callee.method == "initWithAcknowledgementsPlistPath:"
+  emit sink code.FilePathAccess at args[0]
+}

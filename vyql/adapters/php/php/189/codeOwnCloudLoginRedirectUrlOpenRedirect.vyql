@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding ownCloudLoginRedirectUrlOpenRedirect189 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=redirectToDefaultPage" and node.token contains "isset($_REQUEST['redirect_url'])" and node.token contains "header('Location:/'.htmlentities($_REQUEST['redirect_url']))" and not (node.token contains "substr($_REQUEST['redirect_url'],0,strlen(OC::$WEBROOT))==OC::$WEBROOT")
+  emit issue code.OwnCloudLoginRedirectUrlOpenRedirect at node
+}

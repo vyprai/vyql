@@ -1,5 +1,0 @@
-adapter scala {
-  package "com.jcraft:jsch" {
-    sink method "setCommand" -> code.CommandExecution
-  }
-}

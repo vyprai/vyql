@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/envoyproxy/protoc-gen-validate" {
-    control method "validate" -> core.InputValidation
-  }
-}

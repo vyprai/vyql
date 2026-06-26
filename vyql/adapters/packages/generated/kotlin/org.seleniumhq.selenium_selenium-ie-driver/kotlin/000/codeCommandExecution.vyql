@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mcb41e207;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-ie-driver")
+  }
+  query pattern callExpr where callee.method == "addCommandSwitches"
+  emit sink code.CommandExecution at args[0]
+}

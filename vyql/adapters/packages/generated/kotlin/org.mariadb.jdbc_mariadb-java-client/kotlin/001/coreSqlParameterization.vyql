@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.mcf507f72;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("org.mariadb.jdbc:mariadb-java-client")
+  }
+  query pattern callExpr where callee.method == "prepareCall"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

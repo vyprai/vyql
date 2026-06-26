@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mfb949fbd;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("redis")
+  }
+  query pattern callExpr where callee.method == "blocking_call_v"
+  emit sink code.NosqlQuery at args[0]
+}

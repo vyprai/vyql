@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m191318b4;
+
+binding authenticationCheck10 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "form"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

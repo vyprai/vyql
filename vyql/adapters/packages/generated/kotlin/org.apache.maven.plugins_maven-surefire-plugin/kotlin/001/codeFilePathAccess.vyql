@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m04569a9c;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setTestClassesDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

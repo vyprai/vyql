@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding nosqlQuery48 {
+  requires {
+    dependency("pymongo")
+  }
+  query pattern callExpr where callee.method == "aggregate_raw_batches"
+  emit sink code.NosqlQuery at args[0]
+}

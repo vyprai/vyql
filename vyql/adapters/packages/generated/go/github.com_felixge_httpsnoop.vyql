@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter go {
-  package "github.com/felixge/httpsnoop" {
-    source method "CaptureMetrics" -> code.HttpInput
-  }
-}

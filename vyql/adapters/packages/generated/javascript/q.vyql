@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter javascript {
-  package "q" {
-    sink method "spawn" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9592d749;
+
+binding cliArgument3 {
+  requires {
+    dependency("github.com/Kitura/Configuration")
+  }
+  query pattern callExpr where callee.method == "commandLineArgumentPathSeparator"
+  emit source code.CliArgument at call.result
+}

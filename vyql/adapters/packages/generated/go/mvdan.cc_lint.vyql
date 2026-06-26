@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter go {
-  package "mvdan.cc/lint" {
-    source method "runLinters" -> code.CliArgument
-  }
-}

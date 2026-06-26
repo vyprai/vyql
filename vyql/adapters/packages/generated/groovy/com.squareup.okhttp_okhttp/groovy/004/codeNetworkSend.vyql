@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me77b76be;
+
+binding networkSend4 {
+  requires {
+    dependency("com.squareup.okhttp:okhttp")
+  }
+  query pattern callExpr where callee.method == "enqueue"
+  emit sink code.NetworkSend at args[0]
+}

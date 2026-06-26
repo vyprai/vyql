@@ -1,0 +1,11 @@
+module code;
+
+concept InternalContentExposureReview : issue {
+  cwe: [CWE_200, CWE_863]
+  review_assumption: "the generated page or document may be readable by principals beyond the intended operators"
+  reviewCategory: secret
+  reviewCondition: "internal or diagnostic content is persisted without an observed visibility restriction"
+  reviewConfidence: possibility
+  reviewEvidence: "document serialization context {pattern} lacks a matching hidden or access-policy hardening call"
+  vulnerableTo: [secrets.SecretLeak, access_control.IncorrectAuthorization]
+}

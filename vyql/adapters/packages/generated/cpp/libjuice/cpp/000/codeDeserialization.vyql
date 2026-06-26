@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m658442c0;
+
+binding deserialization0 {
+  requires {
+    dependency("libjuice")
+  }
+  query pattern callExpr where callee.method == "ice_parse_sdp"
+  emit sink code.Deserialization at args[0]
+}

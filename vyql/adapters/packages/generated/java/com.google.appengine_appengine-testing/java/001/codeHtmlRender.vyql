@@ -1,0 +1,9 @@
+module bindings.java.migration.ma8891afe;
+
+binding htmlRender1 {
+  requires {
+    dependency("com.google.appengine:appengine-testing")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}

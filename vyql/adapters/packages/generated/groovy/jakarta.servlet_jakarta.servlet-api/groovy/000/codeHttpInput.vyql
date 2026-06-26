@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m3f7dc6a8;
+
+binding httpInput0 {
+  requires {
+    dependency("jakarta.servlet:jakarta.servlet-api")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

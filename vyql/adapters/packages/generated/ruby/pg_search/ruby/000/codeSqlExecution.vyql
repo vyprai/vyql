@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc8c9ea6a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("pg_search")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

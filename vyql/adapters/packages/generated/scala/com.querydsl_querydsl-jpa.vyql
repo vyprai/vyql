@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.querydsl:querydsl-jpa" {
-    sink method "createQuery" -> code.SqlExecution
-    control method "where" -> core.SqlParameterization
-  }
-}

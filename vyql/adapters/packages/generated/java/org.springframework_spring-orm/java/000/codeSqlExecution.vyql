@@ -1,0 +1,9 @@
+module bindings.java.migration.m2cbc4cd0;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework:spring-orm")
+  }
+  query pattern callExpr where callee.method == "applyTransactionTimeout"
+  emit sink code.SqlExecution at args[0]
+}

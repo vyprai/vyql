@@ -1,0 +1,9 @@
+module bindings.php.migration.mec6b0a22;
+
+binding sqlExecution6 {
+  requires {
+    dependency("encore/laravel-admin")
+  }
+  query pattern callExpr where callee.method == "prepareInsert"
+  emit sink code.SqlExecution at args[0]
+}

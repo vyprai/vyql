@@ -1,0 +1,9 @@
+module bindings.go.migration.maab03f2b;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/jackc/pgconn")
+  }
+  query pattern callExpr where callee.method == "Connect"
+  emit source core.UserControlledData at call.result
+}

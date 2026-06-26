@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc1d2b8cf;
+
+binding networkData2 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m222602a5;
+
+binding sqlExecution9 {
+  requires {
+    dependency("sqlx")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

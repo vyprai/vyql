@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule BackendServiceResourceTraversal {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22]
+    id: "VYQL-PATH-028"
+    severity: high
+  }
+  issue code.BackendServiceResourceTraversal as sink
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m652af54a;
+
+binding expressionEval2 {
+  requires {
+    dependency("exquisite")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.ExpressionEval at args[0]
+}

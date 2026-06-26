@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/hashicorp/go-version" {
-    sink method "NewVersion" -> code.Deserialization
-    sink method "NewConstraint" -> code.Deserialization
-  }
-}

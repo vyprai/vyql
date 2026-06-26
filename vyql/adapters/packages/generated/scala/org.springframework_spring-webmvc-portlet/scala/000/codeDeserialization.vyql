@@ -1,0 +1,9 @@
+module bindings.scala.migration.m38bace61;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework:spring-webmvc-portlet")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

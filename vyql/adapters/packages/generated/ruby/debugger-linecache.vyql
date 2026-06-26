@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter ruby {
-  package "debugger-linecache" {
-    sink method "cache" -> code.FilePathAccess
-    sink method "getline" -> code.FilePathAccess
-    sink method "update_cache" -> code.FilePathAccess
-  }
-}

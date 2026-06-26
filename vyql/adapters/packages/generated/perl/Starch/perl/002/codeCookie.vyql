@@ -1,0 +1,9 @@
+module bindings.perl.migration.m92833b84;
+
+binding cookie2 {
+  requires {
+    dependency("Starch")
+  }
+  query pattern callExpr where callee.method == "cookie_args"
+  emit source code.Cookie at call.result
+}

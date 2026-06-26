@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.ma8d8feef;
+
+binding inputValidation24 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "encodeURL"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

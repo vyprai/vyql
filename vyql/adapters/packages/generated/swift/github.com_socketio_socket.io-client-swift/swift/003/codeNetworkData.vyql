@@ -1,0 +1,9 @@
+module bindings.swift.migration.mbcf7bc01;
+
+binding networkData3 {
+  requires {
+    dependency("github.com/socketio/socket.io-client-swift")
+  }
+  query pattern callExpr where callee.method == "handlePacket"
+  emit source code.NetworkData at call.result
+}

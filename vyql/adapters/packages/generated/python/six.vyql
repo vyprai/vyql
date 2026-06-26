@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter python {
-  package "six" {
-    sink method "exec_" -> code.CodeEval
-  }
-}

@@ -1,9 +1,0 @@
-import code.{NetworkData}
-
-adapter objc {
-  package "Reachability" {
-    source method "reachabilityWithHostname:" -> code.NetworkData
-    source method "reachabilityWithURL:" -> code.NetworkData
-    source method "reachabilityWithAddress:" -> code.NetworkData
-  }
-}

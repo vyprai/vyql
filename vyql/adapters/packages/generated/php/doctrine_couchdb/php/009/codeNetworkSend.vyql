@@ -1,0 +1,9 @@
+module bindings.php.migration.m32da63f9;
+
+binding networkSend9 {
+  requires {
+    dependency("doctrine/couchdb")
+  }
+  query pattern callExpr where callee.method == "replicate"
+  emit sink code.NetworkSend at args[0]
+}

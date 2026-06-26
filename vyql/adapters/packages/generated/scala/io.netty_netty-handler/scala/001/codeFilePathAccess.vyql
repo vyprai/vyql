@@ -1,0 +1,9 @@
+module bindings.scala.migration.m15f547fc;
+
+binding filePathAccess1 {
+  requires {
+    dependency("io.netty:netty-handler")
+  }
+  query pattern callExpr where callee.method == "readPrivateKey"
+  emit sink code.FilePathAccess at args[0]
+}

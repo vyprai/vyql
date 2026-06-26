@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule CopypartyCprStaticPathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-025"
+    severity: high
+  }
+  issue code.CopypartyCprStaticPathTraversal as sink
+}

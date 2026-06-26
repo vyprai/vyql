@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedGeneratedJavaStringFieldName {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94, CWE_116]
+    id: "VYQL-INJ-175"
+    severity: high
+  }
+  issue code.UnescapedGeneratedJavaStringFieldName as codegen
+}

@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m2e324f70;
+
+binding inputValidation2 {
+  requires {
+    dependency("jest-regex-util")
+  }
+  query pattern callExpr where callee.method == "replacePathSepForRegex"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

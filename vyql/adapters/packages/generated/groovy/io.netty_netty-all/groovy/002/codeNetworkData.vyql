@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1afc5a6b;
+
+binding networkData2 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "readBoolean"
+  emit source code.NetworkData at call.result
+}

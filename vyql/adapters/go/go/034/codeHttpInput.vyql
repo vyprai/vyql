@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding httpInput34 {
+  query pattern callExpr where callee.path ~= ".GetQuery"
+  emit source code.HttpInput at call.result
+}

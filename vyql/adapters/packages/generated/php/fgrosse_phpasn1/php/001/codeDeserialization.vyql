@@ -1,0 +1,9 @@
+module bindings.php.migration.mf24928a3;
+
+binding deserialization1 {
+  requires {
+    dependency("fgrosse/phpasn1")
+  }
+  query pattern callExpr where callee.method == "FGASN1TemplateParser::parseBinary"
+  emit sink code.Deserialization at args[0]
+}

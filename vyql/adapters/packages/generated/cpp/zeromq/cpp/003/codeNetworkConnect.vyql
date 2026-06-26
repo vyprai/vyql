@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma6751493;
+
+binding networkConnect3 {
+  requires {
+    dependency("zeromq")
+  }
+  query pattern callExpr where callee.method == "zmq_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

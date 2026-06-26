@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "owned_ttf_parser" {
-    sink method "from_vec" -> code.Deserialization
-  }
-}

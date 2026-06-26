@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbb3524f5;
+
+binding commandExecution1 {
+  requires {
+    dependency("esbuild")
+  }
+  query pattern callExpr where callee.method == "install_and_run"
+  emit sink code.CommandExecution at args[0]
+}

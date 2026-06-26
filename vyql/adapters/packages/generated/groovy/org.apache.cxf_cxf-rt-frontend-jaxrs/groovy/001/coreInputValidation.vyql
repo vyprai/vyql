@@ -1,0 +1,14 @@
+module bindings.groovy.migration.m88ed018c;
+
+binding inputValidation1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-frontend-jaxrs")
+  }
+  query pattern callExpr where callee.method == "parseAcceptEnc"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

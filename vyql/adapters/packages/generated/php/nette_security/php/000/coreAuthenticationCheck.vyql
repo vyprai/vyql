@@ -1,0 +1,14 @@
+module bindings.php.migration.m7db2c217;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("nette/security")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

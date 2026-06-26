@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m7046b0a8;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.easytesting:fest-assert-core")
+  }
+  query pattern callExpr where callee.method == "isDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

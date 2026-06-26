@@ -1,0 +1,9 @@
+module bindings.python.migration.m3a3e5811;
+
+binding filePathAccess0 {
+  requires {
+    dependency("altgraph")
+  }
+  query pattern callExpr where callee.method == "save_dot"
+  emit sink code.FilePathAccess at args[0]
+}

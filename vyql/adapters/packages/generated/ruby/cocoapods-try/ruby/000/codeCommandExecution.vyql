@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma3487ced;
+
+binding commandExecution0 {
+  requires {
+    dependency("cocoapods-try")
+  }
+  query pattern callExpr where callee.method == "install_podfile"
+  emit sink code.CommandExecution at args[0]
+}

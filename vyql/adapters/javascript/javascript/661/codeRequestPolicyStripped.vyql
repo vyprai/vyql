@@ -1,0 +1,7 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding requestPolicyStripped661 {
+  query pattern callExpr where callee.method == "newRequest" and args.any.literal contains "headers" and not args.any.literal contains "redirect"
+  emit sink code.RequestPolicyStrippedSink at args[1].collection
+  emit issue code.RequestPolicyStripped at call
+}

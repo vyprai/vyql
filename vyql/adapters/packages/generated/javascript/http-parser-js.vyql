@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter javascript {
-  package "http-parser-js" {
-    source method "HTTPParser.prototype.execute" -> code.NetworkData
-  }
-}

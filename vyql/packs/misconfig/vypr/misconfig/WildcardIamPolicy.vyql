@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule WildcardIamPolicy {
+  meta {
+    cwe: [CWE_284]
+    id: "VYQL-CFG-013"
+    severity: high
+  }
+  issue code.WildcardIamPolicy as w
+}

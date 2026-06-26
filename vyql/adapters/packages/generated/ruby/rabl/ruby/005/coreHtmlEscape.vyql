@@ -1,0 +1,14 @@
+module bindings.ruby.migration.maec902d9;
+
+binding htmlEscape5 {
+  requires {
+    dependency("rabl")
+  }
+  query pattern callExpr where callee.method == "escape_value"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

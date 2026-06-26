@@ -1,0 +1,9 @@
+module bindings.rust.migration.m798bf7ec;
+
+binding codeEval1 {
+  requires {
+    dependency("gloo-timers")
+  }
+  query pattern callExpr where callee.method == "set_interval"
+  emit sink code.CodeEval at args[0]
+}

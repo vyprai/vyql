@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma8f0dd43;
+
+binding userControlledData0 {
+  requires {
+    dependency("ueberauth_slack")
+  }
+  query pattern callExpr where callee.method == "handle_callback!"
+  emit source core.UserControlledData at call.result
+}

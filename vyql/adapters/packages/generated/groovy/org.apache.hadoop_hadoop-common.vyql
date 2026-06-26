@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter groovy {
-  package "org.apache.hadoop:hadoop-common" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

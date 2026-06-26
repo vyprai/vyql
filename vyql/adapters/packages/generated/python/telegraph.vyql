@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-adapter python {
-  package "telegraph" {
-    sink method "create_account" -> code.NetworkSend
-    sink method "create_page" -> code.NetworkSend
-    sink method "edit_page" -> code.NetworkSend
-  }
-}

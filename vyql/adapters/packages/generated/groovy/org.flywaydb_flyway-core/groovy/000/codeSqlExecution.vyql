@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me97dae55;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.flywaydb:flyway-core")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit sink code.SqlExecution at args[0]
+}

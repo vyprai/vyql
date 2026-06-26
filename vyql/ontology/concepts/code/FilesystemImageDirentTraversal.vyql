@@ -1,0 +1,11 @@
+module code;
+
+concept FilesystemImageDirentTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "a crafted filesystem image can provide directory entry names containing '.', '..', or path separators"
+  reviewCategory: path
+  reviewCondition: "filesystem image directory entry names are appended to extraction paths without rejecting traversal components or path separators"
+  reviewConfidence: high
+  reviewEvidence: "filesystem image extraction context {pattern} copies an image-supplied entry name into a path buffer before recursive extraction"
+  vulnerableTo: [path.PathTraversal]
+}

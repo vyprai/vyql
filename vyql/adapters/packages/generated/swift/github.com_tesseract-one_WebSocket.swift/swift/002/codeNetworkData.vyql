@@ -1,0 +1,9 @@
+module bindings.swift.migration.mbb53f57a;
+
+binding networkData2 {
+  requires {
+    dependency("github.com/tesseract-one/WebSocket.swift")
+  }
+  query pattern callExpr where callee.method == "onData"
+  emit source code.NetworkData at call.result
+}

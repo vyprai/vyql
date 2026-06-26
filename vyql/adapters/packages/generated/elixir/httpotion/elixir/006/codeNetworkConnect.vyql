@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma152eb54;
+
+binding networkConnect6 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}

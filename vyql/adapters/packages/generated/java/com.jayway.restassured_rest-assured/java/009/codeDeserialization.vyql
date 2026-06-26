@@ -1,0 +1,9 @@
+module bindings.java.migration.m676afa76;
+
+binding deserialization9 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "registerParser"
+  emit sink code.Deserialization at args[0]
+}

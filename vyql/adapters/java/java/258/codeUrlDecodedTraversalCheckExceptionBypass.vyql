@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding urlDecodedTraversalCheckExceptionBypass258 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:URLDecoder.decode" and node.token contains "call_path:PARENT_DIRECTORY_REGEX.matcher" and node.token contains "call_path:PARENT_DIRECTORY_REGEX.matcher.find" and node.token contains "catch_type:UnsupportedEncodingException" and not (node.token contains "catch_type:IllegalArgumentException")
+  emit issue code.UrlDecodedTraversalCheckExceptionBypass at node
+}

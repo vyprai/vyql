@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me316e0b2;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.sun.jersey:jersey-bundle")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding httpInput5 {
+  requires {
+    dependency("io.javalin")
+  }
+  query pattern callExpr where callee.path ~= ".queryParam"
+  emit source code.HttpInput at call.result
+}

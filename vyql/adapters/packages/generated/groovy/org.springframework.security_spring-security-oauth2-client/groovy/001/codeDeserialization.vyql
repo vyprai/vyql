@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9645677a;
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework.security:spring-security-oauth2-client")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

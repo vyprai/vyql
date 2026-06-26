@@ -1,0 +1,9 @@
+module bindings.go.migration.mf4d208b3;
+
+binding networkData2 {
+  requires {
+    dependency("github.com/hashicorp/yamux")
+  }
+  query pattern callExpr where callee.method == "Client"
+  emit source code.NetworkData at call.result
+}

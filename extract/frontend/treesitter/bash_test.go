@@ -53,3 +53,73 @@ func TestBashModuleContextIncludesRawAndCompactText(t *testing.T) {
 		}
 	}
 }
+
+func TestBashNestedDefaultExpansionKeepsSourceVar(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "case.sh")
+	src := `payload="${BenchmarkTest00006:-${QUERY_STRING:-}}"
+cmd="echo $payload"
+eval "$cmd"
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractBash([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("got %d modules, want 1", len(prog.Modules))
+	}
+	if !moduleHasCallPath(prog.Modules[0], "shell_input") {
+		t.Fatalf("nested QUERY_STRING default expansion did not emit shell_input: %#v", prog.Modules[0].Body)
+	}
+}
+
+func moduleHasCallPath(mod nir.Module, path string) bool {
+	var exprHasCallPath func(nir.Expr) bool
+	exprHasCallPath = func(e nir.Expr) bool {
+		switch v := e.(type) {
+		case nir.Call:
+			if v.Path == path {
+				return true
+			}
+			for _, arg := range v.Args {
+				if exprHasCallPath(arg) {
+					return true
+				}
+			}
+		case nir.Format:
+			for _, part := range v.Parts {
+				if exprHasCallPath(part) {
+					return true
+				}
+			}
+		case nir.Seq:
+			for _, part := range v.Parts {
+				if exprHasCallPath(part) {
+					return true
+				}
+			}
+		case nir.BinOp:
+			return exprHasCallPath(v.Left) || exprHasCallPath(v.Right)
+		case nir.Unary:
+			return exprHasCallPath(v.Operand)
+		}
+		return false
+	}
+	for _, st := range mod.Body {
+		switch v := st.(type) {
+		case nir.Assign:
+			if exprHasCallPath(v.Value) {
+				return true
+			}
+		case nir.ExprStmt:
+			if exprHasCallPath(v.Value) {
+				return true
+			}
+		}
+	}
+	return false
+}

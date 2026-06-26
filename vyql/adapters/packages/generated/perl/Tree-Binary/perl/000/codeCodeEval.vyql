@@ -1,0 +1,9 @@
+module bindings.perl.migration.m0175ef3d;
+
+binding codeEval0 {
+  requires {
+    dependency("Tree-Binary")
+  }
+  query pattern callExpr where callee.method == "Tree::Binary::VisitorFactory.get"
+  emit sink code.CodeEval at args[0]
+}

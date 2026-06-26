@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf8094bb3;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Realm")
+  }
+  query pattern callExpr where callee.method == "RLMPredicateToQuery"
+  emit sink code.SqlExecution at args[0]
+}

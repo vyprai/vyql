@@ -1,5 +1,0 @@
-adapter groovy {
-  package "xmlunit:xmlunit" {
-    control method "validate" -> core.InputValidation
-  }
-}

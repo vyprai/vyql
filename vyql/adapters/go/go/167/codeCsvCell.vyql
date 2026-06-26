@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding csvCell167 {
+  query pattern callExpr where callee.path ~= "csvWriter.Write"
+  emit sink code.CsvCell at args.any.collection
+}

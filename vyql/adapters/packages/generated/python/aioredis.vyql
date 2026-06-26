@@ -1,6 +1,0 @@
-adapter python {
-  package "aioredis" {
-    sink method "get" -> code.NosqlQuery
-    sink method "update" -> code.StoredDataWrite
-  }
-}

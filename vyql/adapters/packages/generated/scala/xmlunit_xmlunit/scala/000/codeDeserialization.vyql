@@ -1,0 +1,9 @@
+module bindings.scala.migration.m926a0945;
+
+binding deserialization0 {
+  requires {
+    dependency("xmlunit:xmlunit")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding redirectTarget450 {
+  query pattern callExpr where callee.path ~= "res.redirect"
+  emit sink code.RedirectTargetSink at args[0]
+}

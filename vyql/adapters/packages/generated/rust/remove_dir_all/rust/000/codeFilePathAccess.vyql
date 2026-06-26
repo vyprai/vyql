@@ -1,0 +1,9 @@
+module bindings.rust.migration.madbd5906;
+
+binding filePathAccess0 {
+  requires {
+    dependency("remove_dir_all")
+  }
+  query pattern callExpr where callee.method == "remove_dir_contents"
+  emit sink code.FilePathAccess at args[0]
+}

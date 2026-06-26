@@ -1,0 +1,11 @@
+module code;
+
+concept FileCheck : issue {
+  cwe: [CWE_367]
+  review_assumption: "an attacker can change the path target between check and use"
+  reviewCategory: race
+  reviewCondition: "filesystem state is checked before a later use"
+  reviewConfidence: medium
+  reviewEvidence: "check primitive {pattern} observes path state"
+  vulnerableTo: [concurrency.Toctou]
+}

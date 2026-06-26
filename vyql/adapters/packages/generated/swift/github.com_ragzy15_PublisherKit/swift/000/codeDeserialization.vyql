@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma9fcac2a;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/ragzy15/PublisherKit")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

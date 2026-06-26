@@ -1,0 +1,9 @@
+module bindings.swift.migration.md8392a0c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/NextLevel/NextLevelSessionExporter")
+  }
+  query pattern callExpr where callee.method == "export"
+  emit sink code.FilePathAccess at args[0]
+}

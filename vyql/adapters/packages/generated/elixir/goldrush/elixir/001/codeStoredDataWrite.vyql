@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mb12ac73f;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("goldrush")
+  }
+  query pattern callExpr where callee.method == "insert"
+  emit sink code.StoredDataWrite at args[0]
+}

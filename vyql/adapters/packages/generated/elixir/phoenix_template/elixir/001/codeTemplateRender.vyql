@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m302dee95;
+
+binding templateRender1 {
+  requires {
+    dependency("phoenix_template")
+  }
+  query pattern callExpr where callee.method == "render_to_iodata"
+  emit sink code.TemplateRender at args[0]
+}

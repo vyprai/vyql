@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m20c0bd0f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("write-file-atomic")
+  }
+  query pattern callExpr where callee.method == "writeFileSync"
+  emit sink code.FilePathAccess at args[0]
+}

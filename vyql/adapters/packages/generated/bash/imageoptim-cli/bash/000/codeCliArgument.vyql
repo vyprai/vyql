@@ -1,0 +1,9 @@
+module bindings.bash.migration.m257f89cb;
+
+binding cliArgument0 {
+  requires {
+    dependency("imageoptim-cli")
+  }
+  query pattern callExpr where callee.path ~= "imageoptim-cli.argv"
+  emit source code.CliArgument at call.result
+}

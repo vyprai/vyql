@@ -1,0 +1,9 @@
+module bindings.python.migration.m19a1ba9a;
+
+binding httpInput0 {
+  requires {
+    dependency("pyramid")
+  }
+  query pattern callExpr where callee.path ~= "handle_request"
+  emit source code.HttpInput at call.result
+}

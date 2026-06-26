@@ -1,7 +1,0 @@
-import core.{ShellEscape}
-
-adapter rust {
-  package "dirs-sys" {
-    control method "shell_unescape" -> core.ShellEscape
-  }
-}

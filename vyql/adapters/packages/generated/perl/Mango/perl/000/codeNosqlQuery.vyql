@@ -1,0 +1,9 @@
+module bindings.perl.migration.mdd99c35d;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("Mango")
+  }
+  query pattern callExpr where callee.method == "bson_doc"
+  emit sink code.NosqlQuery at args[0]
+}

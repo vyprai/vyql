@@ -1,6 +1,0 @@
-import code.{ArchiveEntryWrite}
-adapter ruby {
-  package "archive-zip" {
-    sink method "extract" -> code.ArchiveEntryWrite
-  }
-}

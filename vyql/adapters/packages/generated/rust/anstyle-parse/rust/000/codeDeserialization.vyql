@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6be07074;
+
+binding deserialization0 {
+  requires {
+    dependency("anstyle-parse")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.Deserialization at args[0]
+}

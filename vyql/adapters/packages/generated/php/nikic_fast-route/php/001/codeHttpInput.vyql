@@ -1,0 +1,9 @@
+module bindings.php.migration.mcbe74e61;
+
+binding httpInput1 {
+  requires {
+    dependency("nikic/fast-route")
+  }
+  query pattern callExpr where callee.method == "dispatch"
+  emit source code.HttpInput at call.result
+}

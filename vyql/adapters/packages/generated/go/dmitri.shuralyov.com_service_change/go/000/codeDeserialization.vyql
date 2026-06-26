@@ -1,0 +1,9 @@
+module bindings.go.migration.mffa4519e;
+
+binding deserialization0 {
+  requires {
+    dependency("dmitri.shuralyov.com/service/change")
+  }
+  query pattern callExpr where callee.method == "parseMessage"
+  emit sink code.Deserialization at args[0]
+}

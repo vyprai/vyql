@@ -1,0 +1,9 @@
+module bindings.perl.migration.m122dc239;
+
+binding commandExecution0 {
+  requires {
+    dependency("Riji")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

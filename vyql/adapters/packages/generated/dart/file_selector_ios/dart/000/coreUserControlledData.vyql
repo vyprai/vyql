@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb51c8bdf;
+
+binding userControlledData0 {
+  requires {
+    dependency("file_selector_ios")
+  }
+  query pattern callExpr where callee.method == "openFile"
+  emit source core.UserControlledData at call.result
+}

@@ -1,5 +1,0 @@
-adapter bash {
-  package "mcfly" {
-    source path "mcfly" -> code.CliArgument
-  }
-}

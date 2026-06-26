@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9ad49c10;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-yarn-client")
+  }
+  query pattern callExpr where callee.method == "shellToContainer"
+  emit sink code.CommandExecution at args[0]
+}

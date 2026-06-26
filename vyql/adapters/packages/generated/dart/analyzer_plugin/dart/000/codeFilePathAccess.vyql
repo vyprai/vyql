@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8dbe0c7b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("analyzer_plugin")
+  }
+  query pattern callExpr where callee.method == "analyzeFiles"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m6331c3af;
+
+binding storedDataRead3 {
+  requires {
+    dependency("hive")
+  }
+  query pattern callExpr where callee.method == "BoxImpl.get"
+  emit source code.StoredDataRead at call.result
+}

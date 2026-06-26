@@ -1,0 +1,9 @@
+module bindings.php.migration.m830e51f2;
+
+binding commandExecution0 {
+  requires {
+    dependency("amphp/parallel")
+  }
+  query pattern callExpr where callee.method == "Amp\\Parallel\\Context\\ProcessContext::start"
+  emit sink code.CommandExecution at args[0]
+}

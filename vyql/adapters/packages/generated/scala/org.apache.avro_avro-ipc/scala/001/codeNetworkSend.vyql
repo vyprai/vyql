@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3f3458d2;
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.avro:avro-ipc")
+  }
+  query pattern callExpr where callee.method == "org.apache.avro.ipc.SocketTransceiver.writeBuffers"
+  emit sink code.NetworkSend at args[0]
+}

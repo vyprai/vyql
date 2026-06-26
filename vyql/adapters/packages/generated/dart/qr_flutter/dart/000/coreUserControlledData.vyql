@@ -1,0 +1,9 @@
+module bindings.dart.migration.m19df2643;
+
+binding userControlledData0 {
+  requires {
+    dependency("qr_flutter")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit source core.UserControlledData at call.result
+}

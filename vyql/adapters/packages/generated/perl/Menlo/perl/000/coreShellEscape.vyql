@@ -1,0 +1,14 @@
+module bindings.perl.migration.mda2db370;
+
+binding shellEscape0 {
+  requires {
+    dependency("Menlo")
+  }
+  query pattern callExpr where callee.method == "Menlo::Util::shell_quote"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4d5a2158;
+
+binding sqlExecution1 {
+  requires {
+    dependency("commanded_ecto_projections")
+  }
+  query pattern callExpr where callee.method == "transaction"
+  emit sink code.SqlExecution at args[0]
+}

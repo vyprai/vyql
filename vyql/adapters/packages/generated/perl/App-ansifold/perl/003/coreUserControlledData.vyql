@@ -1,0 +1,9 @@
+module bindings.perl.migration.mac97a6e3;
+
+binding userControlledData3 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "ansicut"
+  emit source core.UserControlledData at call.result
+}

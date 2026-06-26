@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4cd96b0a;
+
+binding networkSend11 {
+  requires {
+    dependency("activeresource")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

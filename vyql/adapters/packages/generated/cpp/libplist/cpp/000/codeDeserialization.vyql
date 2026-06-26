@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9c5b7e08;
+
+binding deserialization0 {
+  requires {
+    dependency("libplist")
+  }
+  query pattern callExpr where callee.method == "plist_from_xml"
+  emit sink code.Deserialization at args[0]
+}

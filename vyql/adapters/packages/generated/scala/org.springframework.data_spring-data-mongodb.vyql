@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.springframework.data:spring-data-mongodb" {
-    sink method "query" -> code.NosqlQuery
-  }
-}

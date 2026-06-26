@@ -1,0 +1,9 @@
+module bindings.php.migration.mde571bb4;
+
+binding networkConnect10 {
+  requires {
+    dependency("pusher/pusher-php-server")
+  }
+  query pattern callExpr where callee.method == "terminateUserConnectionsAsync"
+  emit sink code.NetworkConnectSink at args[0]
+}

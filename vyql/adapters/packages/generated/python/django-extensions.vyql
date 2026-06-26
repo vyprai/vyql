@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter python {
-  package "django-extensions" {
-    sink method "loads" -> code.Deserialization
-    sink method "parse_mysql_cnf" -> code.FilePathAccess
-  }
-}

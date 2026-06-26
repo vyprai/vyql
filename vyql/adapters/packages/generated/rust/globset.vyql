@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "globset" {
-    sink method "parse" -> code.Deserialization
-  }
-}

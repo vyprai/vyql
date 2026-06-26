@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m61f32e4d;
+
+binding deserialization0 {
+  requires {
+    dependency("thin")
+  }
+  query pattern callExpr where callee.method == "thin_http_parser_execute"
+  emit sink code.Deserialization at args[0]
+}

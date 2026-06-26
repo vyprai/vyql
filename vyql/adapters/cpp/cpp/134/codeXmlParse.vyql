@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding xmlParse134 {
+  query pattern callExpr where callee.path ~= "xmlReadDoc"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma42d46c1;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/steipete/InterposeKit")
+  }
+  query pattern callExpr where callee.method == "apply"
+  emit sink code.CodeEval at args[0]
+}

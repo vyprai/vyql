@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter ruby {
-  package "ruby-debug19" {
-    sink method "debug_eval" -> code.CodeEval
-    sink method "debug_silent_eval" -> code.CodeEval
-  }
-}

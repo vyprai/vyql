@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3af02c1f;
+
+binding networkData0 {
+  requires {
+    dependency("fast_tls")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

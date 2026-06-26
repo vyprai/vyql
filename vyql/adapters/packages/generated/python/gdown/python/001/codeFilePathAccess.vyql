@@ -1,0 +1,9 @@
+module bindings.python.migration.mbd84b515;
+
+binding filePathAccess1 {
+  requires {
+    dependency("gdown")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.FilePathAccess at args[0]
+}

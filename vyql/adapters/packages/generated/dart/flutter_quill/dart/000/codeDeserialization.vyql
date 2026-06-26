@@ -1,0 +1,9 @@
+module bindings.dart.migration.m2ef16bbb;
+
+binding deserialization0 {
+  requires {
+    dependency("flutter_quill")
+  }
+  query pattern callExpr where callee.method == "Delta.fromHtml"
+  emit sink code.Deserialization at args[0]
+}

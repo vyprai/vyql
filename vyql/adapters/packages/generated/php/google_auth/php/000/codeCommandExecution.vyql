@@ -1,0 +1,9 @@
+module bindings.php.migration.m3a3bc648;
+
+binding commandExecution0 {
+  requires {
+    dependency("google/auth")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

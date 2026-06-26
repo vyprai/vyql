@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "partd" {
-    sink method "loads" -> code.Deserialization
-    sink method "parse_dtype" -> code.Deserialization
-  }
-}

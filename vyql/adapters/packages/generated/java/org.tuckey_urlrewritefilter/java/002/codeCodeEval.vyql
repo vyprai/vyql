@@ -1,0 +1,9 @@
+module bindings.java.migration.m92153007;
+
+binding codeEval2 {
+  requires {
+    dependency("org.tuckey:urlrewritefilter")
+  }
+  query pattern callExpr where callee.method == "Run.invokeRunMethod"
+  emit sink code.CodeEval at args[0]
+}

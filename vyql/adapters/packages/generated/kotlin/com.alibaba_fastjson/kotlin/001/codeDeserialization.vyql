@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m19a9baf1;
+
+binding deserialization1 {
+  requires {
+    dependency("com.alibaba:fastjson")
+  }
+  query pattern callExpr where callee.method == "parseObject"
+  emit sink code.Deserialization at args[0]
+}

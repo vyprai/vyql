@@ -1,0 +1,9 @@
+module bindings.php.migration.m9b329d65;
+
+binding fileUse3 {
+  requires {
+    dependency("barryvdh/laravel-dompdf")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.FileUseSink at args[0]
+}

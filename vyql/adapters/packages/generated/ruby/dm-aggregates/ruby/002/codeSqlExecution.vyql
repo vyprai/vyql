@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m6d4a3af2;
+
+binding sqlExecution2 {
+  requires {
+    dependency("dm-aggregates")
+  }
+  query pattern callExpr where callee.method == "min"
+  emit sink code.SqlExecution at args[0]
+}

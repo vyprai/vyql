@@ -1,8 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-adapter kotlin {
-  package "org.glassfish.jaxb:jaxb-runtime" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

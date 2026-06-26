@@ -1,0 +1,9 @@
+module bindings.go.migration.m8307f267;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/GoogleCloudPlatform/cloudsql-proxy")
+  }
+  query pattern callExpr where callee.method == "ParseInstanceConnectionName"
+  emit source core.UserControlledData at call.result
+}

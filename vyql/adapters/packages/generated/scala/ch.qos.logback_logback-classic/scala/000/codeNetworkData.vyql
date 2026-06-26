@@ -1,0 +1,9 @@
+module bindings.scala.migration.m24e292a4;
+
+binding networkData0 {
+  requires {
+    dependency("ch.qos.logback:logback-classic")
+  }
+  query pattern callExpr where callee.method == "SocketNode"
+  emit source code.NetworkData at call.result
+}

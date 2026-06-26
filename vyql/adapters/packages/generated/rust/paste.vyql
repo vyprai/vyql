@@ -1,5 +1,0 @@
-adapter rust {
-  package "paste" {
-    source method "pasted_to_tokens" -> code.SecretValue
-  }
-}

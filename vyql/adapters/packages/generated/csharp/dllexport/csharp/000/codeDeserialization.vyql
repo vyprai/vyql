@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m72c0b643;
+
+binding deserialization0 {
+  requires {
+    dependency("dllexport")
+  }
+  query pattern callExpr where callee.method == "Parse"
+  emit sink code.Deserialization at args[0]
+}

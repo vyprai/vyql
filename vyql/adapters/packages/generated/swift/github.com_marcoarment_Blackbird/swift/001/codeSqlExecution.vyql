@@ -1,0 +1,9 @@
+module bindings.swift.migration.m27c3090a;
+
+binding sqlExecution1 {
+  requires {
+    dependency("github.com/marcoarment/Blackbird")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

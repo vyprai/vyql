@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter perl {
-  package "Config-Parser-ldap" {
-    sink method "new" -> code.FilePathAccess
-    source method "parse" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb80e1451;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding backendServiceResourceTraversal91 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=handleServiceRequest" and node.token contains "$resource" and node.token contains "ServiceManager::handleServiceRequest" and not (node.token contains "str_replace(['..'],'',$resource)") and not (node.token contains "str_replace(array('..'),'',$resource)") and not (node.token contains "PathAccessCheck")
+  emit issue code.BackendServiceResourceTraversal at node
+}

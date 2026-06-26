@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "jekyll-sass-converter" {
-    sink method "convert" -> code.CodeEval
-  }
-}

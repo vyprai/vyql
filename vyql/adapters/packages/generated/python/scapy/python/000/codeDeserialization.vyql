@@ -1,0 +1,9 @@
+module bindings.python.migration.m346f7414;
+
+binding deserialization0 {
+  requires {
+    dependency("scapy")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

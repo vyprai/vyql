@@ -1,0 +1,9 @@
+module bindings.perl.migration.mac62402d;
+
+binding urlFetch0 {
+  requires {
+    dependency("API-Google")
+  }
+  query pattern callExpr where callee.method == "api_query"
+  emit sink code.UrlFetch at args[0]
+}

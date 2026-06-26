@@ -1,0 +1,9 @@
+module bindings.perl.migration.m18d6b6ba;
+
+binding networkSend1 {
+  requires {
+    dependency("Memcached-RateLimit")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter rust {
-  package "addr2line" {
-    sink method "new" -> code.FilePathAccess
-    sink method "new_with_sup" -> code.FilePathAccess
-  }
-}

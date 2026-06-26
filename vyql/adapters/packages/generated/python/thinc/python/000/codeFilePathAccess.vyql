@@ -1,0 +1,9 @@
+module bindings.python.migration.m5c4bccbe;
+
+binding filePathAccess0 {
+  requires {
+    dependency("thinc")
+  }
+  query pattern callExpr where callee.method == "to_disk"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{InputValidation}
-
-adapter php {
-  package "spatie/laravel-backup" {
-    control method "FileSelection::sanitize" -> core.InputValidation
-    sink path "file_put_contents" -> code.FilePathAccess
-  }
-}

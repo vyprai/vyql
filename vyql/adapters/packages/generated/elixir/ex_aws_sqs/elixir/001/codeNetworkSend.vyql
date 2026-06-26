@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf9c7ee04;
+
+binding networkSend1 {
+  requires {
+    dependency("ex_aws_sqs")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.NetworkSend at args[0]
+}

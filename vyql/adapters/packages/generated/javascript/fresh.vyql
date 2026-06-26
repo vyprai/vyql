@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter javascript {
-  package "fresh" {
-    source method "fresh" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.mdc258509;
+
+binding userControlledData1 {
+  requires {
+    dependency("oboe")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source core.UserControlledData at call.result
+}

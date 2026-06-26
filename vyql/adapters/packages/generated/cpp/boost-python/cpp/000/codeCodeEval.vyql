@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc2915133;
+
+binding codeEval0 {
+  requires {
+    dependency("boost-python")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CodeEval at args[0]
+}

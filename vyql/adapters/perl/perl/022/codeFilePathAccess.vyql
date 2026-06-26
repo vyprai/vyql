@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding filePathAccess22 {
+  query pattern callExpr where callee.path ~= "sysopen"
+  emit sink code.FilePathAccess at args.any
+}

@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "bootstrap-sass" {
-    control method "sanitizeHtml" -> core.HtmlEscape
-  }
-}

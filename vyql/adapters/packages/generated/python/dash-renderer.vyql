@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "dash-renderer" {
-    sink method "parse" -> code.Deserialization
-  }
-}

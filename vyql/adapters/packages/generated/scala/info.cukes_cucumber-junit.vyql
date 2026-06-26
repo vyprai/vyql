@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter scala {
-  package "info.cukes:cucumber-junit" {
-    source method "parse" -> code.CliArgument
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mc68437fe;
+
+binding fileUse0 {
+  requires {
+    dependency("infyomlabs/laravel-generator")
+  }
+  query pattern callExpr where callee.method == "getFile"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m0efc5269;
+
+binding networkSend5 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkSend at args[0]
+}

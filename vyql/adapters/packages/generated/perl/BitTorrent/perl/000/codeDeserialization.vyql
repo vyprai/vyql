@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcfeb0590;
+
+binding deserialization0 {
+  requires {
+    dependency("BitTorrent")
+  }
+  query pattern callExpr where callee.method == "bdecode"
+  emit sink code.Deserialization at args[0]
+}

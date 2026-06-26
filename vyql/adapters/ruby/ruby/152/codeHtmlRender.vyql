@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding htmlRender152 {
+  query pattern callExpr where callee.path ~= "raw"
+  emit sink code.HtmlRender at args[0]
+}

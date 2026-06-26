@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter cpp {
-  package "berkeleydb" {
-    sink method "do_parse" -> code.SqlExecution
-  }
-}

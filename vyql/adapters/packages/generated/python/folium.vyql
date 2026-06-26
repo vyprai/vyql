@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter python {
-  package "folium" {
-    sink method "get_geojson_from_web" -> code.UrlFetch
-  }
-}

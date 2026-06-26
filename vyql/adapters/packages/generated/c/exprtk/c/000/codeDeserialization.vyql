@@ -1,0 +1,9 @@
+module bindings.c.migration.m4b5c92c9;
+
+binding deserialization0 {
+  requires {
+    dependency("exprtk")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.Deserialization at args[0]
+}

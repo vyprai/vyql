@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m96e347f7;
+
+binding htmlRender2 {
+  requires {
+    dependency("domhandler")
+  }
+  query pattern callExpr where callee.method == "oncomment"
+  emit sink code.HtmlRender at args[0]
+}

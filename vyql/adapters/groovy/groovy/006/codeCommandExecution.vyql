@@ -1,0 +1,6 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding commandExecution6 {
+  query pattern callExpr where callee.path ~= "bat"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding optionalClientSignatureVerification378 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["function_name:authenticate", "function_name:verify", "function_name:validate", "function_name:check"]) and node.token contains "call:getSignature" and node.token contains "call_path:Signature.getInstance" and node.token contains "call:initVerify" and node.token contains "call:verify" and containsAny(node.token, ["expr:signature!=null", "expr:sigBytes!=null", "expr:clientSignature!=null"]) and not (containsAny(node.token, ["expr:signature==null", "expr:sigBytes==null", "expr:clientSignature==null"])) and not (node.token contains "literal:Client signature required") and not (node.token contains "literal:signature required") and not (node.token contains "literal:missing signature")
+  emit issue code.OptionalClientSignatureVerification at node
+}

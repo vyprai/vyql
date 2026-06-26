@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m261450d9;
+
+binding networkData3 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-server")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

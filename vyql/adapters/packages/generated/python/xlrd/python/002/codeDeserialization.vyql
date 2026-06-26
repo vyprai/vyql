@@ -1,0 +1,9 @@
+module bindings.python.migration.mfd2e419c;
+
+binding deserialization2 {
+  requires {
+    dependency("xlrd")
+  }
+  query pattern callExpr where callee.method == "biff2_8_load"
+  emit sink code.Deserialization at args[0]
+}

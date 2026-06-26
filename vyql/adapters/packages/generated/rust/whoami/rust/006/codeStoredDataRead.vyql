@@ -1,0 +1,9 @@
+module bindings.rust.migration.m8c380b71;
+
+binding storedDataRead6 {
+  requires {
+    dependency("whoami")
+  }
+  query pattern callExpr where callee.method == "hostname"
+  emit source code.StoredDataRead at call.result
+}

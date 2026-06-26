@@ -1,0 +1,9 @@
+module bindings.swift.migration.meb48b266;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/devxoul/URLNavigator")
+  }
+  query pattern callExpr where callee.method == "urlStringValue"
+  emit source core.UserControlledData at call.result
+}

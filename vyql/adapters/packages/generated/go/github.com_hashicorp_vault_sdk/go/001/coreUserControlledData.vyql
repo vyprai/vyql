@@ -1,0 +1,9 @@
+module bindings.go.migration.mca7d478e;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/hashicorp/vault/sdk")
+  }
+  query pattern callExpr where callee.method == "ContextOriginalBodyValue"
+  emit source core.UserControlledData at call.result
+}

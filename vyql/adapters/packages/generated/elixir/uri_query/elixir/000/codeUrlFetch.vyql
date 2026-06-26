@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m71388d4a;
+
+binding urlFetch0 {
+  requires {
+    dependency("uri_query")
+  }
+  query pattern callExpr where callee.method == "params"
+  emit sink code.UrlFetch at args[0]
+}

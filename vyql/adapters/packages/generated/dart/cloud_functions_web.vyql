@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-adapter dart {
-  package "cloud_functions_web" {
-    sink method "call" -> code.NetworkSend
-    sink method "stream" -> code.NetworkSend
-  }
-}

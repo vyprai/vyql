@@ -1,5 +1,0 @@
-adapter perl {
-  package "Socket6" {
-    sink method "freeaddrinfo" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,11 @@
+module bindings.cpp.migration.m4e783366;
+
+binding zeroValueExclusion99 {
+  query pattern callExpr where callee.path ~= "analysis.guard.value_exclusion" and args.any.literal contains "value=0"
+  emit check core.ZeroValueExclusion at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

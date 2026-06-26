@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0581fd14;
+
+binding logOutput0 {
+  requires {
+    dependency("lumberjack")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.LogOutput at args[0]
+}

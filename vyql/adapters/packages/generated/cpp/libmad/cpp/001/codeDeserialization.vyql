@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mad68249a;
+
+binding deserialization1 {
+  requires {
+    dependency("libmad")
+  }
+  query pattern callExpr where callee.method == "mad_stream_buffer"
+  emit sink code.Deserialization at args[0]
+}

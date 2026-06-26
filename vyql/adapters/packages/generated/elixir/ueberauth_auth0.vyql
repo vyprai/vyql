@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter elixir {
-  package "ueberauth_auth0" {
-    sink method "authorize_url!" -> code.NetworkConnect
-    sink method "get_token!" -> code.NetworkConnect
-    sink method "get_token!" -> code.NetworkSend
-  }
-}

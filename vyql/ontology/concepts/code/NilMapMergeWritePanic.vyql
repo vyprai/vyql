@@ -1,0 +1,11 @@
+module code;
+
+concept NilMapMergeWritePanic : issue {
+  cwe: [CWE_248, CWE_400]
+  review_assumption: "a user-controlled bundle with Helm valuesFrom and no base values can repeatedly trigger a nil-map assignment panic during deployment"
+  reviewCategory: resource
+  reviewCondition: "optional Helm values are merged into a map that can still be nil"
+  reviewConfidence: high
+  reviewEvidence: "values merge context {pattern} assigns values from optional Helm data and calls mergeValues over ValuesFrom without an empty-map guard"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

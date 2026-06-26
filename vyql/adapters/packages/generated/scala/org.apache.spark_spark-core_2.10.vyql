@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.spark:spark-core_2.10" {
-    sink method "testCommandAvailable" -> code.CommandExecution
-  }
-}

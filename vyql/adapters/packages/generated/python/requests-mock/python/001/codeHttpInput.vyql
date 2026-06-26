@@ -1,0 +1,9 @@
+module bindings.python.migration.mad97f1d3;
+
+binding httpInput1 {
+  requires {
+    dependency("requests-mock")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

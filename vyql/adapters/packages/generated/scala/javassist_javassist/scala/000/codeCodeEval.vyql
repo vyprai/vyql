@@ -1,0 +1,9 @@
+module bindings.scala.migration.m245919c1;
+
+binding codeEval0 {
+  requires {
+    dependency("javassist:javassist")
+  }
+  query pattern callExpr where callee.method == "toClass"
+  emit sink code.CodeEval at args[0]
+}

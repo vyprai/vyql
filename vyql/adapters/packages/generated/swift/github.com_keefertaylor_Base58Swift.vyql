@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/keefertaylor/Base58Swift" {
-    sink method "base58CheckDecode" -> code.Deserialization
-    sink method "base58Decode" -> code.Deserialization
-  }
-}

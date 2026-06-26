@@ -1,0 +1,9 @@
+module bindings.c.migration.mc5f1cd3a;
+
+binding networkConnect6 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

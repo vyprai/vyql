@@ -1,0 +1,14 @@
+module bindings.rust.migration.m222602a5;
+
+binding xmlHardening40 {
+  requires {
+    dependency("quick-xml")
+  }
+  query pattern callExpr where callee.path ~= "quick_xml.Reader"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

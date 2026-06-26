@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mca980e10;
+
+binding networkSend1 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload!"
+  emit sink code.NetworkSend at args[0]
+}

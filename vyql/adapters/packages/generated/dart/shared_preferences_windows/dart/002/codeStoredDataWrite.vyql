@@ -1,0 +1,9 @@
+module bindings.dart.migration.m30cff533;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "clear"
+  emit sink code.StoredDataWrite at args[0]
+}

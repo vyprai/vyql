@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb81e8809;
+
+binding fileUse7 {
+  requires {
+    dependency("pathutil")
+  }
+  query pattern callExpr where callee.method == "readlines"
+  emit sink code.FileUseSink at args[0]
+}

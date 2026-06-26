@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "zstd" {
-    sink method "compress_to_buffer" -> code.Deserialization
-    sink method "decompress_to_buffer" -> code.Deserialization
-    sink method "with_dictionary" -> code.Deserialization
-  }
-}

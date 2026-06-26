@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m62b94c62;
+
+binding deserialization1 {
+  requires {
+    dependency("color-string")
+  }
+  query pattern callExpr where callee.method == "hsl"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m35a2f451;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.google.zxing:javase")
+  }
+  query pattern callExpr where callee.method == "readImage"
+  emit source core.UserControlledData at call.result
+}

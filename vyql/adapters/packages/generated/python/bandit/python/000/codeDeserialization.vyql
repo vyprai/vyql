@@ -1,0 +1,9 @@
+module bindings.python.migration.mcff4d9cc;
+
+binding deserialization0 {
+  requires {
+    dependency("bandit")
+  }
+  query pattern callExpr where callee.method == "yaml_load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m30f24e66;
+
+binding filePathAccess0 {
+  requires {
+    dependency("tzinfo")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

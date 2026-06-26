@@ -1,0 +1,9 @@
+module bindings.python.migration.me8205133;
+
+binding filePathAccess0 {
+  requires {
+    dependency("backports.zoneinfo")
+  }
+  query pattern callExpr where callee.method == "load_tzdata"
+  emit sink code.FilePathAccess at args[0]
+}

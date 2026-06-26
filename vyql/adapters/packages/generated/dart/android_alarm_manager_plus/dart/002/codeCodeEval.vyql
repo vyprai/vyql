@@ -1,0 +1,9 @@
+module bindings.dart.migration.m4b67a307;
+
+binding codeEval2 {
+  requires {
+    dependency("android_alarm_manager_plus")
+  }
+  query pattern callExpr where callee.method == "periodic"
+  emit sink code.CodeEval at args[0]
+}

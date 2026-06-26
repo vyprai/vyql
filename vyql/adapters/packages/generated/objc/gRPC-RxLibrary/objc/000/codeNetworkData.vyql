@@ -1,0 +1,9 @@
+module bindings.objc.migration.m13dabcde;
+
+binding networkData0 {
+  requires {
+    dependency("gRPC-RxLibrary")
+  }
+  query pattern callExpr where callee.method == "grpc_byte_buffer_reader_next"
+  emit source code.NetworkData at call.result
+}

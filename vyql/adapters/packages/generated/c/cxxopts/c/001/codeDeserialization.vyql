@@ -1,0 +1,9 @@
+module bindings.c.migration.m908e68cc;
+
+binding deserialization1 {
+  requires {
+    dependency("cxxopts")
+  }
+  query pattern callExpr where callee.method == "Value"
+  emit sink code.Deserialization at args[0]
+}

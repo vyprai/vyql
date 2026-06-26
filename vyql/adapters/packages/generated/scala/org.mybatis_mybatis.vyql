@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.mybatis:mybatis" {
-    sink method "query" -> code.SqlExecution
-  }
-}

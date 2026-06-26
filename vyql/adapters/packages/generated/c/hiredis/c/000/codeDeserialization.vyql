@@ -1,0 +1,9 @@
+module bindings.c.migration.m9fcabd2b;
+
+binding deserialization0 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisReaderFeed"
+  emit sink code.Deserialization at args[0]
+}

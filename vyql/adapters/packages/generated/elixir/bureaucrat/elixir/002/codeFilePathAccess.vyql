@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m99226009;
+
+binding filePathAccess2 {
+  requires {
+    dependency("bureaucrat")
+  }
+  query pattern callExpr where callee.method == "Bureaucrat.ApiBlueprintWriter.write"
+  emit sink code.FilePathAccess at args[0]
+}

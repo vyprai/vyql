@@ -1,0 +1,9 @@
+module bindings.java.migration.mcf337d65;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "GenerationTool.load"
+  emit source core.UserControlledData at call.result
+}

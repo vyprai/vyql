@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "membrane_raw_audio_format" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

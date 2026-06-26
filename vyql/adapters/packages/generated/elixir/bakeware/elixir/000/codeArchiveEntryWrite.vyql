@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m84182253;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("bakeware")
+  }
+  query pattern callExpr where callee.method == "cpio_extract_all"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

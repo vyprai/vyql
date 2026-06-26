@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "arc_ecto" {
-    source method "Arc.Ecto.Type.cast" -> core.UserControlledData
-    source method "Arc.Ecto.Type.load" -> core.UserControlledData
-    source method "Arc.Ecto.Type.dump" -> core.UserControlledData
-  }
-}

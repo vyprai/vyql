@@ -1,0 +1,8 @@
+module code;
+
+review code.WerkzeugDebugConsoleExposure {
+  category: code_execution
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review Flask/Werkzeug debug servers bound to external interfaces unless the eval console is disabled"
+}

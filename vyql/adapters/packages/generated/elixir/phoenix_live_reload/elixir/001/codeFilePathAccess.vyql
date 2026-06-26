@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0d12ae5f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("phoenix_live_reload")
+  }
+  query pattern callExpr where callee.method == "PhoenixLiveReload.Channel.handle_in"
+  emit sink code.FilePathAccess at args[0]
+}

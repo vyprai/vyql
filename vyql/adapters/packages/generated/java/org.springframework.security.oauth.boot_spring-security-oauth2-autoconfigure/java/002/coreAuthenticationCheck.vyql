@@ -1,0 +1,14 @@
+module bindings.java.migration.m2eb95697;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure")
+  }
+  query pattern callExpr where callee.method == "UserInfoTokenServices"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

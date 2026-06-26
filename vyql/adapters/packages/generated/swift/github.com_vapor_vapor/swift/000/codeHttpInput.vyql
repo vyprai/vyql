@@ -1,0 +1,9 @@
+module bindings.swift.migration.m049334c9;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/vapor/vapor")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

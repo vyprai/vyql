@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me91e92d2;
+
+binding codeEval3 {
+  requires {
+    dependency("shiftmedia-libgpg-error")
+  }
+  query pattern callExpr where callee.method == "scheme_eval"
+  emit sink code.CodeEval at args[0]
+}

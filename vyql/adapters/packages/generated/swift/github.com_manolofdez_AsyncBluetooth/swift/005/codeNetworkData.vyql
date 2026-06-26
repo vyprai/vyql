@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcfba857c;
+
+binding networkData5 {
+  requires {
+    dependency("github.com/manolofdez/AsyncBluetooth")
+  }
+  query pattern callExpr where callee.method == "retrieveConnectedPeripherals"
+  emit source code.NetworkData at call.result
+}

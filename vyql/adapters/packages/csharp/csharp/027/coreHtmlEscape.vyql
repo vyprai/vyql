@@ -1,0 +1,14 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding htmlEscape27 {
+  requires {
+    dependency("System.Text.Encodings.Web")
+  }
+  query pattern callExpr where callee.path ~= "HtmlEncoder.Encode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

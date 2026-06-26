@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding deserialization15 {
+  requires {
+    dependency("Newtonsoft.Json")
+  }
+  query pattern callExpr where callee.method == "DeserializeObject"
+  emit sink code.Deserialization at args[0]
+}

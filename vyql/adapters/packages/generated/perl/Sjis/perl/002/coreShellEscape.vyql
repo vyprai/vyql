@@ -1,0 +1,14 @@
+module bindings.perl.migration.m25682e96;
+
+binding shellEscape2 {
+  requires {
+    dependency("Sjis")
+  }
+  query pattern callExpr where callee.method == "_escapeshellcmd_MacOS"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

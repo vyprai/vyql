@@ -1,0 +1,11 @@
+module code;
+
+concept CodeRedProtectedMediaPathTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "logged-in users can supply protected media path segments containing encoded traversal components"
+  reviewCategory: path
+  reviewCondition: "CodeRed protected-media route joins a request path under PROTECTED_MEDIA_ROOT without canonical containment"
+  reviewConfidence: high
+  reviewEvidence: "serve_protected_file context {pattern} joins the route path, checks isfile, and opens the resulting path before the patched abspath/startswith containment"
+  vulnerableTo: [path.PathTraversal]
+}

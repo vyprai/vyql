@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7305584f;
+
+binding fileUse1 {
+  requires {
+    dependency("Deliantra")
+  }
+  query pattern callExpr where callee.method == "write_file"
+  emit sink code.FileUseSink at args[0]
+}

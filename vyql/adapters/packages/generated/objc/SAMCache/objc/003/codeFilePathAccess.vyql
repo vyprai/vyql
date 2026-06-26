@@ -1,0 +1,9 @@
+module bindings.objc.migration.m9393c253;
+
+binding filePathAccess3 {
+  requires {
+    dependency("SAMCache")
+  }
+  query pattern callExpr where callee.method == "pathForKey:"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf4c31fe6;
+
+binding cliArgument1 {
+  requires {
+    dependency("launchy")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

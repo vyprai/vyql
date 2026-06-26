@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter go {
-  package "github.com/googleapis/gax-go" {
-    sink method "Invoke" -> code.CodeEval
-  }
-}

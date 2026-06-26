@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.meedcb198;
+
+binding htmlEscape0 {
+  requires {
+    dependency("org.glassfish.web:jstl-impl")
+  }
+  query pattern callExpr where callee.method == "org.apache.taglibs.standard.functions.Functions.escapeXml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter swift {
-  package "github.com/kateinoigakukun/swift-indexstore" {
-    sink method "open(url:)" -> code.CodeEval
-  }
-}

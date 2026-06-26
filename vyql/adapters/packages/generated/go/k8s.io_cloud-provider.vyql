@@ -1,6 +1,0 @@
-import code.{Deserialization, FilePathAccess, CommandExecution}
-adapter go {
-  package "k8s.io/cloud-provider" {
-    sink method "parseRequest" -> code.Deserialization
-  }
-}

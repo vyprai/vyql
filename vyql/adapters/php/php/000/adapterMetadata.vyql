@@ -1,0 +1,12 @@
+module bindings.php.migration.mfbe84119;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "php"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

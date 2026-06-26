@@ -89,6 +89,36 @@ rule ActorToCapability {
 	}
 }
 
+func TestGrantEscalationUsesGrantWitness(t *testing.T) {
+	src := `
+package test;
+rule ActorToCapability {
+  meta { id: "TEST-GRANT", severity: critical }
+  grant custom.Actor -> custom.Capability
+}
+`
+	onto := solverContractOntology()
+	decls, _ := parser.Parse(src)
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor", Props: map[string]string{"loc": "actor"}})
+	s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
+	s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability"})
+	s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+	s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "capability", Props: map[string]string{"ability": "delegated"}})
+
+	fs, _ := New(onto, s).Evaluate(compiled[0])
+	if len(fs) != 1 {
+		t.Fatalf("expected 1 grant finding, got %d", len(fs))
+	}
+	if fs[0].WitnessKind != "grant" {
+		t.Fatalf("WitnessKind = %q, want grant", fs[0].WitnessKind)
+	}
+}
+
 func TestAssumeMinLevelComesFromOntology(t *testing.T) {
 	src := `
 module custom;

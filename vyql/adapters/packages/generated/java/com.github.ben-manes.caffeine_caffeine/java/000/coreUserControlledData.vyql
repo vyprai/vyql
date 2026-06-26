@@ -1,0 +1,9 @@
+module bindings.java.migration.m9c9bf51b;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.github.ben-manes.caffeine:caffeine")
+  }
+  query pattern callExpr where callee.method == "CaffeineSpec.parse"
+  emit source core.UserControlledData at call.result
+}

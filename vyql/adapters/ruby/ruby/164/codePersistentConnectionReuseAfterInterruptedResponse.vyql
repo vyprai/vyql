@@ -1,0 +1,10 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding persistentConnectionReuseAfterInterruptedResponse164 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=request" and node.token contains "datum=response(datum)" and node.token contains "datum[:persistent]" and node.token contains "reset" and not (node.token contains "@persistent_socket_reusable")
+  emit issue code.PersistentConnectionReuseAfterInterruptedResponse at node
+}

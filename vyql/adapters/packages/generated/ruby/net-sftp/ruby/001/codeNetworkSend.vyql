@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m2f77b2d5;
+
+binding networkSend1 {
+  requires {
+    dependency("net-sftp")
+  }
+  query pattern callExpr where callee.method == "upload!"
+  emit sink code.NetworkSend at args[0]
+}

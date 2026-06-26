@@ -1,0 +1,11 @@
+module code;
+
+concept FreePbxContactManagerGroupLinkXss : issue {
+  cwe: [CWE_79]
+  review_assumption: "the ajax grid request can include attacker-controlled group markup that is reflected in HTML action links"
+  reviewCategory: xss
+  reviewCondition: "FreePBX Contactmanager renders the request group parameter into generated action links without narrowing it first"
+  reviewConfidence: high
+  reviewEvidence: "Contactmanager ajaxHandler context {pattern} concatenates $_REQUEST['group'] into contactmanager action URLs before the patched integer cast"
+  vulnerableTo: [injection.Xss]
+}

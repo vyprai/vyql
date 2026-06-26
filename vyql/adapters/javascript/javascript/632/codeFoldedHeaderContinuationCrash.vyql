@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding foldedHeaderContinuationCrash632 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "this.buffer.split(RE_CRLF)" and node.token contains "lines[i][0]" and node.token contains "RE_HDR.exec(lines[i])" and node.token contains "this.header[h]" and node.token contains "lines[i]" and not (node.token contains "if(h)") and not (node.token contains "if(h!==undefined)") and not (node.token contains "if(h!=null)")
+  emit issue code.FoldedHeaderContinuationCrash at node
+}

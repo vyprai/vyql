@@ -1,0 +1,9 @@
+module bindings.java.migration.m4ec29cf1;
+
+binding filePathAccess3 {
+  requires {
+    dependency("com.google.zxing:javase")
+  }
+  query pattern callExpr where callee.method == "writeToPath"
+  emit sink code.FilePathAccess at args[0]
+}

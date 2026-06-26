@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m0c3bde5d;
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_fwrite"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

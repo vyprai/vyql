@@ -1,5 +1,0 @@
-adapter java {
-  package "org.bouncycastle:bcpkix-jdk15on" {
-    sink method "parseNonEmptyASN1" -> code.Deserialization
-  }
-}

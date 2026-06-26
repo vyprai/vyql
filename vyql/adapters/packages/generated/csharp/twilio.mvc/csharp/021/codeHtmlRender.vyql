@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m20f5be65;
+
+binding htmlRender21 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "TwiML"
+  emit sink code.HtmlRender at args[0]
+}

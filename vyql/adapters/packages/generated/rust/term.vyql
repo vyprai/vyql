@@ -1,7 +1,0 @@
-import code.{Deserialization, CommandExecution}
-adapter rust {
-  package "term" {
-    sink method "parse" -> code.Deserialization
-    sink method "expand" -> code.CodeEval
-  }
-}

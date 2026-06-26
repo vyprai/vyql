@@ -1,0 +1,8 @@
+module profiles;
+
+profile mobile_android {
+  detect: ["file:AndroidManifest.xml", "file:app/src/main/AndroidManifest.xml", "dep:com.android.tools.build", "dep:androidx", "dep:com.android.application"]
+  entrypoints: [IntentInput, ExternalApiResponse, DatabaseRead, StoredDataRead, SecretValue, ComputedSizeValue, ArchiveEntryName]
+  priority: "90"
+  title: "Mobile app — Android"
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m17bf1cf2;
+
+binding deserialization1 {
+  requires {
+    dependency("parse-zoneinfo")
+  }
+  query pattern callExpr where callee.method == "TimeSpec::from_str"
+  emit sink code.Deserialization at args[0]
+}

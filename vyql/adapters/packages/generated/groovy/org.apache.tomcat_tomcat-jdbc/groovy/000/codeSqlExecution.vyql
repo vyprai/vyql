@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mab4f6d39;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jdbc")
+  }
+  query pattern callExpr where callee.method == "setValidationQuery"
+  emit sink code.SqlExecution at args[0]
+}

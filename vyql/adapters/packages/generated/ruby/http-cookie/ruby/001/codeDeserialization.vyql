@@ -1,0 +1,9 @@
+module bindings.ruby.migration.meb3abca7;
+
+binding deserialization1 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::CookieJar.load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m24f722ab;
+
+binding templateRender6 {
+  requires {
+    dependency("github.com/eknkc/amber")
+  }
+  query pattern callExpr where callee.method == "MustCompileDir"
+  emit sink code.TemplateRender at args[0]
+}

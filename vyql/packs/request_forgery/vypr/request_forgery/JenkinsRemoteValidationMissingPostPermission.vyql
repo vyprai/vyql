@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule JenkinsRemoteValidationMissingPostPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352, CWE_862, CWE_918]
+    id: "VYQL-RF-023"
+    severity: medium
+  }
+  issue code.JenkinsRemoteValidationMissingPostPermission as endpoint
+}

@@ -1,8 +1,0 @@
-import code.{CommandExecution, StdinInput}
-
-adapter rust {
-  package "crossterm_winapi" {
-    source method "read_single_input_event" -> code.StdinInput
-    source method "read_console_input" -> code.StdinInput
-  }
-}

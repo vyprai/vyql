@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb32d0a46;
+
+binding userControlledData10 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "getBoolean"
+  emit source core.UserControlledData at call.result
+}

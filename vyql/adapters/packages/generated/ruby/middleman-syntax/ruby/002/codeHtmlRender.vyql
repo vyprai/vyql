@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m647613ff;
+
+binding htmlRender2 {
+  requires {
+    dependency("middleman-syntax")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb728015e;
+
+binding deserialization7 {
+  requires {
+    dependency("fixnum")
+  }
+  query pattern callExpr where callee.method == "Int64.tryParseRadix"
+  emit sink code.Deserialization at args[0]
+}

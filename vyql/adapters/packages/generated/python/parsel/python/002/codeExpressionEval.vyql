@@ -1,0 +1,9 @@
+module bindings.python.migration.mb369e269;
+
+binding expressionEval2 {
+  requires {
+    dependency("parsel")
+  }
+  query pattern callExpr where callee.method == "css"
+  emit sink code.ExpressionEval at args[0]
+}

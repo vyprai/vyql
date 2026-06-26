@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding deserialization282 {
+  query pattern callExpr where callee.path ~= "cryo.parse"
+  emit sink code.Deserialization at args[0]
+}

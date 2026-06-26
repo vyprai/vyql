@@ -1,0 +1,9 @@
+module bindings.rust.migration.m15531163;
+
+binding filePathAccess2 {
+  requires {
+    dependency("filetime")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

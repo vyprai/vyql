@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding sizeComputation71 {
+  query pattern callExpr where callee.path ~= "calloc"
+  emit sink code.SizeComputation at args.any
+}

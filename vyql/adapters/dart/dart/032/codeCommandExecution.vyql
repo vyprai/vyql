@@ -1,0 +1,7 @@
+module bindings.dart.migration.m1c398214;
+
+binding commandExecution32 {
+  query pattern callExpr where callee.path ~= "Process.runSync"
+  emit sink code.CommandExecution at args.any
+  emit sink code.CommandExecution at args.any.collection
+}

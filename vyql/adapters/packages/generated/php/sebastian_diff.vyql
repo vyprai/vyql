@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "sebastian/diff" {
-    sink method "parse" -> code.Deserialization
-  }
-}

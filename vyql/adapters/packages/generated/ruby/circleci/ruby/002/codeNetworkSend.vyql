@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb8c3abe4;
+
+binding networkSend2 {
+  requires {
+    dependency("circleci")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

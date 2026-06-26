@@ -1,0 +1,10 @@
+module vypr.smartcontract;
+
+rule TxOriginAuth {
+  meta {
+    cwe: [CWE_477]
+    id: "VYQL-SC-003"
+    severity: high
+  }
+  issue code.TxOriginAuth
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3f5d51a7;
+
+binding deserialization0 {
+  requires {
+    dependency("facter")
+  }
+  query pattern callExpr where callee.method == "Facter::CustomFacts::Util::Parser.parse"
+  emit sink code.Deserialization at args[0]
+}

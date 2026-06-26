@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-
-adapter dart {
-  package "pubspec" {
-    sink method "PubSpec.load" -> code.FilePathAccess
-    sink method "PubSpec.loadFile" -> code.FilePathAccess
-    sink method "parseJson" -> code.Deserialization
-  }
-}

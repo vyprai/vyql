@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter cpp {
-  package "azure-umqtt-c" {
-    source method "onBytesReceived" -> code.NetworkData
-    sink method "sendPacketItem" -> code.NetworkSend
-  }
-}

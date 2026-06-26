@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m3378656a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("@nodelib/fs.scandir")
+  }
+  query pattern callExpr where callee.method == "scandirSync"
+  emit sink code.FilePathAccess at args[0]
+}

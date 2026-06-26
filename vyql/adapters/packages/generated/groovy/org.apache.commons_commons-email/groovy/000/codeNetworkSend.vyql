@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m77308004;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

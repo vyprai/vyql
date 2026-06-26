@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7a3c38f3;
+
+binding userControlledData1 {
+  requires {
+    dependency("Mozilla-Mechanize-GUITester")
+  }
+  query pattern callExpr where callee.method == "set_confirm_result"
+  emit source core.UserControlledData at call.result
+}

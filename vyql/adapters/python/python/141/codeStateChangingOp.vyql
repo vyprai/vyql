@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding stateChangingOp141 {
+  query pattern callExpr where callee.method == "make_admin"
+  emit sink code.StateChangingOpSink at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "numba" {
-    sink path "subprocess.run" -> code.CommandExecution
-    sink method "run_command" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1a655534;
+
+binding networkData2 {
+  requires {
+    dependency("portaudio")
+  }
+  query pattern callExpr where callee.method == "Pa_ReadStream"
+  emit source code.NetworkData at call.result
+}

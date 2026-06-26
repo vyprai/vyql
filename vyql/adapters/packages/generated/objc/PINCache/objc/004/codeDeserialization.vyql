@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7dbf77d3;
+
+binding deserialization4 {
+  requires {
+    dependency("PINCache")
+  }
+  query pattern callExpr where callee.method == "setObject:forKey:withAgeLimit:fileURL:"
+  emit sink code.Deserialization at args[0]
+}

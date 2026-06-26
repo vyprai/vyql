@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.samskivert:jmustache" {
-    sink method "compile" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

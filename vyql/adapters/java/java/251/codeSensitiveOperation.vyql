@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding sensitiveOperation251 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:doConfigure" and node.token contains "call:configure" and node.token contains "call:save" and not (node.scopeCall.any contains "checkPermission")
+  emit issue code.SensitiveOperation at node
+}

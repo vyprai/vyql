@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

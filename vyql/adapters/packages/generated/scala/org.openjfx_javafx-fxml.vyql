@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.openjfx:javafx-fxml" {
-    source method "Token" -> code.SecretValue
-  }
-}

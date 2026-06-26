@@ -1,0 +1,9 @@
+module bindings.go.migration.mbe0b1310;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/spf13/cobra")
+  }
+  query pattern callExpr where callee.method == "NoArgs"
+  emit source code.CliArgument at call.result
+}

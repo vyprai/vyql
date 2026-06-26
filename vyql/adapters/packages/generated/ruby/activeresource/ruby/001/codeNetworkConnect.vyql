@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4cd96b0a;
+
+binding networkConnect1 {
+  requires {
+    dependency("activeresource")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

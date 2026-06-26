@@ -1,0 +1,9 @@
+module bindings.dart.migration.mc6cb5636;
+
+binding userControlledData1 {
+  requires {
+    dependency("video_player_android")
+  }
+  query pattern callExpr where callee.method == "fromRemoteUrl"
+  emit source core.UserControlledData at call.result
+}

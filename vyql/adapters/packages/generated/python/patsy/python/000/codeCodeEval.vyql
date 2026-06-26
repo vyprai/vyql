@@ -1,0 +1,9 @@
+module bindings.python.migration.m0febc391;
+
+binding codeEval0 {
+  requires {
+    dependency("patsy")
+  }
+  query pattern callExpr where callee.method == "patsy.eval.EvalEnvironment.eval"
+  emit sink code.CodeEval at args[0]
+}

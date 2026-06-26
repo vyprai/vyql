@@ -1,0 +1,9 @@
+module bindings.python.migration.m0a803d21;
+
+binding deserialization1 {
+  requires {
+    dependency("arrow")
+  }
+  query pattern callExpr where callee.method == "strptime"
+  emit sink code.Deserialization at args[0]
+}

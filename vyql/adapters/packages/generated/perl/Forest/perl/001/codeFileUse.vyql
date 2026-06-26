@@ -1,0 +1,9 @@
+module bindings.perl.migration.mf7cfc876;
+
+binding fileUse1 {
+  requires {
+    dependency("Forest")
+  }
+  query pattern callExpr where callee.method == "Forest::Tree::Reader::SimpleTextFile.read"
+  emit sink code.FileUseSink at args[0]
+}

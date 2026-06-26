@@ -1,0 +1,9 @@
+module bindings.perl.migration.mfbf57d0e;
+
+binding commandExecution0 {
+  requires {
+    dependency("Rex")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

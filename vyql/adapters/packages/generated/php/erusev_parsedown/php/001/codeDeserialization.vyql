@@ -1,0 +1,9 @@
+module bindings.php.migration.m113ff9f6;
+
+binding deserialization1 {
+  requires {
+    dependency("erusev/parsedown")
+  }
+  query pattern callExpr where callee.method == "inlines"
+  emit sink code.Deserialization at args[0]
+}

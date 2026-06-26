@@ -1,0 +1,9 @@
+module bindings.objc.migration.mca543c21;
+
+binding filePathAccess2 {
+  requires {
+    dependency("YYWebImage")
+  }
+  query pattern callExpr where callee.method == "imageWithContentsOfFile:"
+  emit sink code.FilePathAccess at args[0]
+}

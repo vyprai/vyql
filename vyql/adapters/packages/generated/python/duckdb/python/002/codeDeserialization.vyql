@@ -1,0 +1,9 @@
+module bindings.python.migration.m0f9e9c43;
+
+binding deserialization2 {
+  requires {
+    dependency("duckdb")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

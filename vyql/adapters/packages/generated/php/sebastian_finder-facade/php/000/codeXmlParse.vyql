@@ -1,0 +1,9 @@
+module bindings.php.migration.m2e277996;
+
+binding xmlParse0 {
+  requires {
+    dependency("sebastian/finder-facade")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

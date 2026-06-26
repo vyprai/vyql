@@ -1,0 +1,14 @@
+module bindings.swift.migration.m664d8be8;
+
+binding redirectTarget1 {
+  requires {
+    dependency("github.com/facebook/facebook-ios-sdk")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "openURLWithSafariViewController"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

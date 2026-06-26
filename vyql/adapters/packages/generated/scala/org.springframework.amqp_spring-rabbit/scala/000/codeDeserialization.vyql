@@ -1,0 +1,9 @@
+module bindings.scala.migration.m26729f2d;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.amqp:spring-rabbit")
+  }
+  query pattern callExpr where callee.method == "parseArguments"
+  emit sink code.Deserialization at args[0]
+}

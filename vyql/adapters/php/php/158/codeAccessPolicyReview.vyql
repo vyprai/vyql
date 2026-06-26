@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding accessPolicyReview158 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "bp_groupblog_create_screen_save" and node.token contains "default-administrator" and node.token contains "default-moderator" and node.token contains "default-member" and node.token contains "groupblog_edit_base_settings" and not (node.token contains "bp_groupblog_is_role_allowed") and not (node.token contains "current_user_can_for_blog")
+  emit issue code.AccessPolicyReview at node
+}

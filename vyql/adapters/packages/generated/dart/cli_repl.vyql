@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "cli_repl" {
-    source method "Repl.run" -> core.UserControlledData
-    source method "Repl.runAsync" -> core.UserControlledData
-  }
-}

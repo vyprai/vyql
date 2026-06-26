@@ -1,0 +1,9 @@
+module bindings.php.migration.mfcc3a662;
+
+binding filePathAccess4 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "importFiles"
+  emit sink code.FilePathAccess at args[0]
+}

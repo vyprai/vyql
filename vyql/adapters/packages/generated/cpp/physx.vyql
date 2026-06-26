@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-
-adapter cpp {
-  package "physx" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.StoredDataWrite
-  }
-}

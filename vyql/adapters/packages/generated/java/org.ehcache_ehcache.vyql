@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter java {
-  package "org.ehcache:ehcache" {
-    sink method "parse" -> code.XmlParse
-  }
-}

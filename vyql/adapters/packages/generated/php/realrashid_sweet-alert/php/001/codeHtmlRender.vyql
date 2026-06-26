@@ -1,0 +1,9 @@
+module bindings.php.migration.m0d9c05cb;
+
+binding htmlRender1 {
+  requires {
+    dependency("realrashid/sweet-alert")
+  }
+  query pattern callExpr where callee.method == "view"
+  emit sink code.HtmlRender at args[0]
+}

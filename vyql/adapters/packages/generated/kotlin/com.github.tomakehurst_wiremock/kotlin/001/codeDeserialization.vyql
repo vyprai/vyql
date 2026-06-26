@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m09907f60;
+
+binding deserialization1 {
+  requires {
+    dependency("com.github.tomakehurst:wiremock")
+  }
+  query pattern callExpr where callee.method == "mapToObject"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.mc0f55790;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "createStatement"
+  emit sink code.SqlExecution at args[0]
+}

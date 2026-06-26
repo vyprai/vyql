@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m676b3c51;
+
+binding networkBind0 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothServer::listen"
+  emit sink code.NetworkBind at args[0]
+}

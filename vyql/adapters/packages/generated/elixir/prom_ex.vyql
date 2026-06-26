@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter elixir {
-  package "prom_ex" {
-    source method "PromEx.Plug.call" -> code.HttpInput
-  }
-}

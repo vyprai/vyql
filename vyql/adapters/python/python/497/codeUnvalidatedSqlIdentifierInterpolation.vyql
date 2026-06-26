@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding unvalidatedSqlIdentifierInterpolation497 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=update_profile" and node.token contains "literal:UPDATE users SET" and node.token contains "subscript:field[0]" and node.token contains "call_path:nonquery" and not (node.token contains "expr:field[0]in[\"firstname\",\"lastname\"]")
+  emit issue code.UnvalidatedSqlIdentifierInterpolation at node
+}

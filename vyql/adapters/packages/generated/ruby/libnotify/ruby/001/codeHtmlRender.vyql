@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1d9c0c0a;
+
+binding htmlRender1 {
+  requires {
+    dependency("libnotify")
+  }
+  query pattern callExpr where callee.method == "show"
+  emit sink code.HtmlRender at args[0]
+}

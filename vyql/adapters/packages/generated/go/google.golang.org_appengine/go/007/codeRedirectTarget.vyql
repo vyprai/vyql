@@ -1,0 +1,14 @@
+module bindings.go.migration.md6dcc4ff;
+
+binding redirectTarget7 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "LogoutURL"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

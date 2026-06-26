@@ -1,0 +1,6 @@
+module core;
+
+concept Assumption : check {
+  analysis_role: neutralizer_assumption
+  covers: [dominates, path]
+}

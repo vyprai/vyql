@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "fog-openstack" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

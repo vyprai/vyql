@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma223b0d8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ObjectiveDropboxOfficial")
+  }
+  query pattern callExpr where callee.method == "search:"
+  emit sink code.FilePathAccess at args[0]
+}

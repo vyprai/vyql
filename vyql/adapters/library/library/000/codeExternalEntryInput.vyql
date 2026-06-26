@@ -1,0 +1,6 @@
+module bindings.library.migration.m699b14a0;
+
+binding externalEntryInput0 {
+  query param as param
+  emit source code.ExternalEntryInput at param
+}

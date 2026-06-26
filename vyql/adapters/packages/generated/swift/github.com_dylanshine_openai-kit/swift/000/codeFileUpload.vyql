@@ -1,0 +1,14 @@
+module bindings.swift.migration.m4f97ace3;
+
+binding fileUpload0 {
+  requires {
+    dependency("github.com/dylanshine/openai-kit")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "upload"
+  emit issue code.FileUpload at node
+  emit source code.FileUploadSource at node
+}

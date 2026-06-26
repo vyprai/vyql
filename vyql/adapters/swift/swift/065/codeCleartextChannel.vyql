@@ -1,0 +1,10 @@
+module bindings.swift.migration.m388f23d0;
+
+binding cleartextChannel65 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "URL" and node.token contains "http://" and not (node.token contains "127.0")
+  emit issue code.CleartextChannel at node
+}

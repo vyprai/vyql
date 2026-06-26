@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "graphviz" {
-    sink method "run_check" -> code.CommandExecution
-    sink method "command" -> code.CommandExecution
-  }
-}

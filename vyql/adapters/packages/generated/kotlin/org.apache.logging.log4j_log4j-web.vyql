@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter kotlin {
-  package "org.apache.logging.log4j:log4j-web" {
-    source method "doFilter" -> code.HttpInput
-  }
-}

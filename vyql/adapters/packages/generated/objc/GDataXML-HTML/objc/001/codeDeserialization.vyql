@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf91e3ece;
+
+binding deserialization1 {
+  requires {
+    dependency("GDataXML-HTML")
+  }
+  query pattern callExpr where callee.method == "initWithHTMLString:error:"
+  emit sink code.Deserialization at args[0]
+}

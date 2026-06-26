@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m6b02cad0;
+
+binding filePathAccess1 {
+  requires {
+    dependency("alsa")
+  }
+  query pattern callExpr where callee.method == "snd_pcm_open_lconf"
+  emit sink code.FilePathAccess at args[0]
+}

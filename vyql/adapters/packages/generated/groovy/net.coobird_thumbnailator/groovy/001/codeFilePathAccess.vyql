@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc37866e4;
+
+binding filePathAccess1 {
+  requires {
+    dependency("net.coobird:thumbnailator")
+  }
+  query pattern callExpr where callee.method == "toFiles"
+  emit sink code.FilePathAccess at args[0]
+}

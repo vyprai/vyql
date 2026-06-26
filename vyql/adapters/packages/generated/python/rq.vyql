@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "rq" {
-    sink method "loads" -> code.Deserialization
-    sink method "restore" -> code.Deserialization
-  }
-}

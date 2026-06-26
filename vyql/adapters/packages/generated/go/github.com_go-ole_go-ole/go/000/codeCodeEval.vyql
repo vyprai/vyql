@@ -1,0 +1,9 @@
+module bindings.go.migration.m9ae4d1ea;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/go-ole/go-ole")
+  }
+  query pattern callExpr where callee.method == "GetObject"
+  emit sink code.CodeEval at args[0]
+}

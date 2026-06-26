@@ -1,7 +1,0 @@
-import code.{UrlFetch, FilePathAccess}
-adapter swift {
-  package "github.com/avito-tech/Emcee" {
-    sink method "fetchResource" -> code.UrlFetch
-    sink method "deleteResource" -> code.FilePathAccess
-  }
-}

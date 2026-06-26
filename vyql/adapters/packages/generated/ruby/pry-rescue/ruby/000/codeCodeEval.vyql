@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0a8c6833;
+
+binding codeEval0 {
+  requires {
+    dependency("pry-rescue")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}

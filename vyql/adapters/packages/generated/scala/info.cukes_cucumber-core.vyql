@@ -1,5 +1,0 @@
-adapter scala {
-  package "info.cukes:cucumber-core" {
-    control method "htmlEscape" -> core.HtmlEscape
-  }
-}

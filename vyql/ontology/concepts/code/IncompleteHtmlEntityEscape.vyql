@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteHtmlEntityEscape : issue {
+  cwe: [CWE_79]
+  review_assumption: "attacker-controlled text can be interpreted by the browser when later rendered as HTML"
+  reviewCategory: xss
+  reviewCondition: "input is stripped of literal HTML tags but not entity-escaped before browser rendering"
+  reviewConfidence: medium
+  reviewEvidence: "HTML feedback context {pattern} uses incomplete entity escaping"
+  vulnerableTo: [injection.Xss]
+}

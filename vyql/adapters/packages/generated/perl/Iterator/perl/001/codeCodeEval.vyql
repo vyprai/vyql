@@ -1,0 +1,9 @@
+module bindings.perl.migration.maa70195b;
+
+binding codeEval1 {
+  requires {
+    dependency("Iterator")
+  }
+  query pattern callExpr where callee.method == "value"
+  emit sink code.CodeEval at args[0]
+}

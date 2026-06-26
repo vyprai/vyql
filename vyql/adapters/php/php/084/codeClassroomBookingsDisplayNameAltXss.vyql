@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding classroomBookingsDisplayNameAltXss84 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "foreach($global_menuas$idx=>$item)" and node.token contains "$icon=img(asset_url('assets/images/ui/'.$item['icon']),FALSE" and node.token contains "align='top'alt='{$item['label']}'"
+  emit issue code.ClassroomBookingsDisplayNameAltXss at node
+}

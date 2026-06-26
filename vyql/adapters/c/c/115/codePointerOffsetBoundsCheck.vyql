@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding pointerOffsetBoundsCheck115 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "start+len+1>end" and node.token contains "start+=len" and not (node.token contains "buff_size") and not (node.token contains "end-start-1")
+  emit issue code.PointerOffsetBoundsCheck at node
+}

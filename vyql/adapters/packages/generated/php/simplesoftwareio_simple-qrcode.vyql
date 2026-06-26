@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter php {
-  package "simplesoftwareio/simple-qrcode" {
-    sink method "generate" -> code.FilePathAccess
-    sink method "merge" -> code.FilePathAccess
-    sink method "mergeString" -> code.FilePathAccess
-  }
-}

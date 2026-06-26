@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m07b39768;
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("org.zeroturnaround:zt-zip")
+  }
+  query pattern callExpr where callee.method == "pack"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

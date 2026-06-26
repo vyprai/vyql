@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md237ae6d;
+
+binding userControlledData2 {
+  requires {
+    dependency("javax.ws.rs:jsr311-api")
+  }
+  query pattern callExpr where callee.method == "getPathParameters"
+  emit source core.UserControlledData at call.result
+}

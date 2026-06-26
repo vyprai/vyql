@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.springdoc:springdoc-openapi-starter-webmvc-ui" {
-    sink method "transform" -> code.Deserialization
-  }
-}

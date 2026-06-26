@@ -1,0 +1,13 @@
+module bindings.scala.migration.m06d0685b;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "scala"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

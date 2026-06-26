@@ -1,0 +1,9 @@
+module bindings.scala.migration.maf6a4921;
+
+binding codeEval5 {
+  requires {
+    dependency("net.java.dev.jna:jna")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}

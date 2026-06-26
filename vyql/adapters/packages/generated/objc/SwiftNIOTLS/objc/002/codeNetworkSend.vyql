@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc0faafde;
+
+binding networkSend2 {
+  requires {
+    dependency("SwiftNIOTLS")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

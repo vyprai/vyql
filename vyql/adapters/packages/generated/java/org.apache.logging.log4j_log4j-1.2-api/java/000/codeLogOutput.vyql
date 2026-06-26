@@ -1,0 +1,9 @@
+module bindings.java.migration.mda3f7b35;
+
+binding logOutput0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-1.2-api")
+  }
+  query pattern callExpr where callee.method == "doAppend"
+  emit sink code.LogOutput at args[0]
+}

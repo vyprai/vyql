@@ -1,0 +1,13 @@
+module bindings.go.migration.m48a985c1;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "go"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

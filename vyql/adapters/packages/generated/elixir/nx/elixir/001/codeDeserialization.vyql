@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc3f23c29;
+
+binding deserialization1 {
+  requires {
+    dependency("nx")
+  }
+  query pattern callExpr where callee.method == "load_numpy!"
+  emit sink code.Deserialization at args[0]
+}

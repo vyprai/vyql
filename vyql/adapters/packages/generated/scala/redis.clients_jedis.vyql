@@ -1,6 +1,0 @@
-import code.{NosqlQuery}
-adapter scala {
-  package "redis.clients:jedis" {
-    sink method "exec" -> code.NosqlQuery
-  }
-}

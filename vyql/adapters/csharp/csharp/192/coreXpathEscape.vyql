@@ -1,0 +1,11 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding xpathEscape192 {
+  query pattern callExpr where callee.path ~= "escapeXPath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

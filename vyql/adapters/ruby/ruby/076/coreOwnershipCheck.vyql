@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding ownershipCheck76 {
+  query pattern callExpr where callee.path ~= "require_owner"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

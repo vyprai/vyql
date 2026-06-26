@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me258466a;
+
+binding deserialization1 {
+  requires {
+    dependency("saxy")
+  }
+  query pattern callExpr where callee.method == "parse_string"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.AuthenticodeSignaturePathBindingBypass {
+  category: crypto
+  expected: [core.CertificateValidation, core.InputValidation]
+  kind: attention
+  text: "review Authenticode update verification for comparing Get-AuthenticodeSignature data.Path with the intended update file before accepting publisher names"
+}

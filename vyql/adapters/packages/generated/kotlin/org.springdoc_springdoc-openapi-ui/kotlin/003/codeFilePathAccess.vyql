@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m50a4674c;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "resolveResource"
+  emit sink code.FilePathAccess at args[0]
+}

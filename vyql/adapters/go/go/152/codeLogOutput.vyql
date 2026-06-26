@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding logOutput152 {
+  query pattern callExpr where callee.path ~= "log.Print"
+  emit sink code.LogOutput at args.any
+}

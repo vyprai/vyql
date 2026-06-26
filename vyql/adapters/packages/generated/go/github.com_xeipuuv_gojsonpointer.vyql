@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/xeipuuv/gojsonpointer" {
-    sink method "NewJsonPointer" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "kramdown" {
-    control method "Kramdown::Utils::Html.escape_html" -> core.HtmlEscape
-  }
-}

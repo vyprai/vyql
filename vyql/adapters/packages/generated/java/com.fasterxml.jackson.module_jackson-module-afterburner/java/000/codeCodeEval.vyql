@@ -1,0 +1,9 @@
+module bindings.java.migration.m13784a5c;
+
+binding codeEval0 {
+  requires {
+    dependency("com.fasterxml.jackson.module:jackson-module-afterburner")
+  }
+  query pattern callExpr where callee.method == "loadAndResolve"
+  emit sink code.CodeEval at args[0]
+}

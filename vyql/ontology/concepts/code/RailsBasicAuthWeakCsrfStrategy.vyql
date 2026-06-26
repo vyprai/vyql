@@ -1,0 +1,11 @@
+module code;
+
+concept RailsBasicAuthWeakCsrfStrategy : issue {
+  cwe: [CWE_352]
+  review_assumption: "the controller authenticates browser-reachable non-session requests where null-session fallback would not fail closed"
+  reviewCategory: csrf
+  reviewCondition: "Rails controller uses HTTP Basic authentication with protect_from_forgery but does not force exception strategy"
+  reviewConfidence: high
+  reviewEvidence: "Ruby controller context {pattern} calls protect_from_forgery and http_basic_authenticate_with without protect_from_forgery with: :exception"
+  vulnerableTo: [request_forgery.Csrf]
+}

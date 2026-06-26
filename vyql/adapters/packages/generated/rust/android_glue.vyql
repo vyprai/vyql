@@ -1,7 +1,0 @@
-import code.{FilePathAccess, LogOutput}
-adapter rust {
-  package "android_glue" {
-    sink method "write_log" -> code.LogOutput
-    sink method "load_asset" -> code.FilePathAccess
-  }
-}

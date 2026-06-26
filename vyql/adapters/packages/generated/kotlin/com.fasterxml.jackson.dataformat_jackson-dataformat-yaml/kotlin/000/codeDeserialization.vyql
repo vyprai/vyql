@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mdb69a72a;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+  }
+  query pattern callExpr where callee.method == "createParser"
+  emit sink code.Deserialization at args[0]
+}

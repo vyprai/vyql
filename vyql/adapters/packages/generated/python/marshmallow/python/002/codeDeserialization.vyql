@@ -1,0 +1,9 @@
+module bindings.python.migration.m09cac5cb;
+
+binding deserialization2 {
+  requires {
+    dependency("marshmallow")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

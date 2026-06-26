@@ -1,0 +1,9 @@
+module bindings.javascript.migration.md539d220;
+
+binding htmlRender0 {
+  requires {
+    dependency("ansi-html")
+  }
+  query pattern callExpr where callee.method == "ansiHTML"
+  emit sink code.HtmlRender at args[0]
+}

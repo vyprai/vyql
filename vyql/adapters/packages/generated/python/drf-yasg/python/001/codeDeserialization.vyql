@@ -1,0 +1,9 @@
+module bindings.python.migration.m4cae9bbb;
+
+binding deserialization1 {
+  requires {
+    dependency("drf-yasg")
+  }
+  query pattern callExpr where callee.method == "yaml_sane_load"
+  emit sink code.Deserialization at args[0]
+}

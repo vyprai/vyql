@@ -1,0 +1,9 @@
+module bindings.perl.migration.me1aa2d6f;
+
+binding deserialization2 {
+  requires {
+    dependency("ZMQ")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

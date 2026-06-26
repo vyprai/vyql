@@ -1,0 +1,9 @@
+module bindings.java.migration.m8406d31a;
+
+binding userControlledData4 {
+  requires {
+    dependency("org.twitter4j:twitter4j-stream")
+  }
+  query pattern callExpr where callee.method == "language"
+  emit source core.UserControlledData at call.result
+}

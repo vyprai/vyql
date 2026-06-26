@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule CsrfDisabled {
+  meta {
+    cwe: [CWE_352]
+    id: "VYQL-CFG-001"
+    severity: high
+  }
+  issue code.CsrfDisabled as c
+}

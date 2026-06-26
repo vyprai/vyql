@@ -1,0 +1,6 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding httpInput2 {
+  query pattern callExpr where callee.path ~= "request.getParameter"
+  emit source code.HttpInput at call.result
+}

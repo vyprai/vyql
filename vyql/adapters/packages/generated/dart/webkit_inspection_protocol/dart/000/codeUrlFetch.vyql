@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma6b87b6b;
+
+binding urlFetch0 {
+  requires {
+    dependency("webkit_inspection_protocol")
+  }
+  query pattern callExpr where callee.method == "navigate"
+  emit sink code.UrlFetch at args[0]
+}

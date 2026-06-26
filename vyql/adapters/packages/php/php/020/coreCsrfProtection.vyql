@@ -1,0 +1,14 @@
+module bindings.php.migration.mc5601031;
+
+binding csrfProtection20 {
+  requires {
+    dependency("laravel/framework")
+  }
+  query pattern callExpr where callee.path ~= "csrf_field"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

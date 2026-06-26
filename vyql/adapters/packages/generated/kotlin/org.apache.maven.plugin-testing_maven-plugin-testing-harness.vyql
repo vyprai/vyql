@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter kotlin {
-  package "org.apache.maven.plugin-testing:maven-plugin-testing-harness" {
-    sink method "getTestFile" -> code.FilePathAccess
-    sink method "getTestPath" -> code.FilePathAccess
-  }
-}

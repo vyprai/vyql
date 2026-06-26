@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter groovy {
-  package "com.google.guava:guava" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

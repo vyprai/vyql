@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m47da9b45;
+
+binding nosqlQuery22 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_time_to_live"
+  emit sink code.NosqlQuery at args[0]
+}

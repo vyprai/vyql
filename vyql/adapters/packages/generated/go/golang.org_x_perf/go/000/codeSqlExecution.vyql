@@ -1,0 +1,9 @@
+module bindings.go.migration.m81bfab7d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("golang.org/x/perf")
+  }
+  query pattern callExpr where callee.method == "OpenSQL"
+  emit sink code.SqlExecution at args[0]
+}

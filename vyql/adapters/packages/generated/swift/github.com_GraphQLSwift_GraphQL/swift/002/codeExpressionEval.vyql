@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6a41e85e;
+
+binding expressionEval2 {
+  requires {
+    dependency("github.com/GraphQLSwift/GraphQL")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.ExpressionEval at args[0]
+}

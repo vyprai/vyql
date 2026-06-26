@@ -1,0 +1,9 @@
+module bindings.swift.migration.mbfcd6d28;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/kewlbear/Python-iOS")
+  }
+  query pattern callExpr where callee.method == "runSimpleString"
+  emit sink code.CodeEval at args[0]
+}

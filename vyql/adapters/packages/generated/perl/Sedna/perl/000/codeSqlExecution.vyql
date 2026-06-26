@@ -1,0 +1,9 @@
+module bindings.perl.migration.m340e4174;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Sedna")
+  }
+  query pattern callExpr where callee.method == "find_api"
+  emit sink code.SqlExecution at args[0]
+}

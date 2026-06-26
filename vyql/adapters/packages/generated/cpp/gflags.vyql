@@ -1,8 +1,0 @@
-import code.{CliArgument}
-
-adapter cpp {
-  package "gflags" {
-    source method "ParseFrom" -> code.CliArgument
-    source method "TryParseLocked" -> code.CliArgument
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9fb2d9e9;
+
+binding codeEval1 {
+  requires {
+    dependency("dotenvy")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}

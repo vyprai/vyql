@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m9839db87;
+
+binding deserialization1 {
+  requires {
+    dependency("websocket-driver")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

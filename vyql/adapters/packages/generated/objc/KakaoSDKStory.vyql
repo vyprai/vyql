@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-
-adapter objc {
-  package "KakaoSDKStory" {
-    sink method "postLink" -> code.UrlFetch
-    sink method "postPhoto" -> code.UrlFetch
-  }
-}

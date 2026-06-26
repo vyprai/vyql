@@ -1,9 +1,0 @@
-adapter php {
-  package "nikic/fast-route" {
-    source method "parse" -> core.UserControlledData
-    source method "dispatch" -> code.HttpInput
-    sink method "writeToFile" -> code.FilePathAccess
-    sink method "readFileContents" -> code.FilePathAccess
-    source method "forRoute" -> core.UserControlledData
-  }
-}

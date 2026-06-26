@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/nats-io/jwt" {
-    sink method "Decode" -> code.Deserialization
-    sink method "DecodeUserClaims" -> code.Deserialization
-    sink method "ParseDecoratedJWT" -> code.Deserialization
-  }
-}

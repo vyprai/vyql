@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdcbba98f;
+
+binding networkSend3 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "POST:parametersOrMultipartFormData:error:"
+  emit sink code.NetworkSend at args[0]
+}

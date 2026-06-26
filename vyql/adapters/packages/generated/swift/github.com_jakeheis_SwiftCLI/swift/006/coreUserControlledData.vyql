@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb6ad3d2c;
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/jakeheis/SwiftCLI")
+  }
+  query pattern callExpr where callee.method == "readBool"
+  emit source core.UserControlledData at call.result
+}

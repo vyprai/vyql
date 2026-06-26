@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "yet_another_json_isolate" {
-    sink method "decode" -> code.Deserialization
-    sink method "jsonDecode" -> code.Deserialization
-  }
-}

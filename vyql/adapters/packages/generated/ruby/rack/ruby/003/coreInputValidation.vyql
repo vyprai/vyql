@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m0ec26ebd;
+
+binding inputValidation3 {
+  requires {
+    dependency("rack")
+  }
+  query pattern callExpr where callee.method == "Rack::Utils.unescape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

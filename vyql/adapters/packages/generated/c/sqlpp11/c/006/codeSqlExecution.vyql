@@ -1,0 +1,9 @@
+module bindings.c.migration.m205edcff;
+
+binding sqlExecution6 {
+  requires {
+    dependency("sqlpp11")
+  }
+  query pattern callExpr where callee.method == "run_prepared_update"
+  emit sink code.SqlExecution at args[0]
+}

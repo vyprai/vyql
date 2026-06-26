@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc78f49c6;
+
+binding deserialization0 {
+  requires {
+    dependency("toml_datetime")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

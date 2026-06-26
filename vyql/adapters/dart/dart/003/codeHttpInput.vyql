@@ -1,0 +1,6 @@
+module bindings.dart.migration.m1c398214;
+
+binding httpInput3 {
+  query pattern callExpr where callee.path ~= "request.params"
+  emit source code.HttpInput at call.result
+}

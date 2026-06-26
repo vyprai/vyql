@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter kotlin {
-  package "com.fasterxml.jackson.module:jackson-module-afterburner" {
-    control method "setUseOptimizedBeanDeserializer" -> core.InputValidation
-  }
-}

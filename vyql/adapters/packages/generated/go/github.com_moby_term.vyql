@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/moby/term" {
-    source method "NewEscapeProxy" -> core.UserControlledData
-  }
-}

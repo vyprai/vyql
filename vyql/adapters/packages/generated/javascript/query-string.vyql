@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "query-string" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseUrl" -> code.Deserialization
-  }
-}

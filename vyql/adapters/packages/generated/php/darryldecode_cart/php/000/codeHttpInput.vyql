@@ -1,0 +1,9 @@
+module bindings.php.migration.me6c7bef7;
+
+binding httpInput0 {
+  requires {
+    dependency("darryldecode/cart")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}

@@ -1,5 +1,0 @@
-adapter php {
-  package "illuminate/validation" {
-    control method "Illuminate\Validation\Factory::validate" -> core.InputValidation
-  }
-}

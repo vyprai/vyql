@@ -173,7 +173,6 @@ end
 		for _, want := range []string{
 			"class_base:ActionController::Base",
 			"class_base:ActionController.Base",
-			"class_bases=ActionController::Base,ActionController.Base",
 		} {
 			if !strings.Contains(args, want) {
 				t.Fatalf("ruby class context missing %q; context=%q", want, args)

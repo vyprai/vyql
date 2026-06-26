@@ -1,0 +1,9 @@
+module bindings.rust.migration.m4485cc53;
+
+binding filePathAccess0 {
+  requires {
+    dependency("tar")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

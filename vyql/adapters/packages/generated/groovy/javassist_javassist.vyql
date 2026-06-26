@@ -1,7 +1,0 @@
-import code.{CodeEval, FilePathAccess}
-adapter groovy {
-  package "javassist:javassist" {
-    sink method "toClass" -> code.CodeEval
-    sink method "writeFile" -> code.FilePathAccess
-  }
-}

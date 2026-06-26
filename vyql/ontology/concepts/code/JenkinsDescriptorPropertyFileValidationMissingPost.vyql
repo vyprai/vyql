@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsDescriptorPropertyFileValidationMissingPost : issue {
+  cwe: [CWE_352, CWE_918, CWE_22]
+  review_assumption: "a browser-backed request can invoke descriptor validation endpoints with attacker-controlled property-file paths or URLs"
+  reviewCategory: request_forgery
+  reviewCondition: "Jenkins descriptor property-file validation endpoint loads a request-supplied file or URL without requiring POST"
+  reviewConfidence: high
+  reviewEvidence: "Jenkins descriptor endpoint context {pattern} accepts QueryParameter property-file values, constructs File or URL inputs, and executes property loading before an observed @POST/@RequirePOST guard"
+  vulnerableTo: [request_forgery.Csrf, request_forgery.Ssrf, path.PathTraversal]
+}

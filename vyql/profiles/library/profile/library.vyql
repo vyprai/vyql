@@ -1,0 +1,8 @@
+module profiles;
+
+profile library {
+  detect: ["file:setup.py", "file:pyproject.toml", "npm:publishable", "dep:rollup", "dep:tsup", "manifest:publishable"]
+  entrypoints: [UserControlledData, ExternalEntryInput, DomInput, ExternalApiResponse, HttpInput, PatternOptionInput, DatabaseRead, SecretValue, ComputedSizeValue, ArchiveEntryName]
+  priority: "40"
+  title: "Library / SDK"
+}

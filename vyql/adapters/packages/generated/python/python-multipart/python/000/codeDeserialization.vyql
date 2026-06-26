@@ -1,0 +1,9 @@
+module bindings.python.migration.mdfe453b7;
+
+binding deserialization0 {
+  requires {
+    dependency("python-multipart")
+  }
+  query pattern callExpr where callee.method == "parse_form"
+  emit sink code.Deserialization at args[0]
+}

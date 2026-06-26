@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m26182671;
+
+binding networkSend2 {
+  requires {
+    dependency("libsoundio")
+  }
+  query pattern callExpr where callee.method == "soundio_outstream_begin_write"
+  emit sink code.NetworkSend at args[0]
+}

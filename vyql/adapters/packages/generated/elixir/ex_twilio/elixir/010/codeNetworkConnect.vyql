@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbfdf81eb;
+
+binding networkConnect10 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

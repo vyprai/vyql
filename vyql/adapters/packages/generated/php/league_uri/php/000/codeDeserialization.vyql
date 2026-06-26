@@ -1,0 +1,9 @@
+module bindings.php.migration.m44e3f8e6;
+
+binding deserialization0 {
+  requires {
+    dependency("league/uri")
+  }
+  query pattern callExpr where callee.method == "Uri::parse"
+  emit sink code.Deserialization at args[0]
+}

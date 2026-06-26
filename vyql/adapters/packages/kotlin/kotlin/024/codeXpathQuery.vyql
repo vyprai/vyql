@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1457a768;
+
+binding xpathQuery24 {
+  requires {
+    dependency("javax.xml.xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}

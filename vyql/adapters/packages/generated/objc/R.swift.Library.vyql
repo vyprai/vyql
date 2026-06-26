@@ -1,5 +1,0 @@
-adapter objc {
-  package "R.swift.Library" {
-    control method "validate" -> core.InputValidation
-  }
-}

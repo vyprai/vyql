@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5a46a91e;
+
+binding sqlExecution10 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "sql_exec_async"
+  emit sink code.SqlExecution at args[0]
+}

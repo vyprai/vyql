@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m941efb0e;
+
+binding networkSend1 {
+  requires {
+    dependency("libp7client")
+  }
+  query pattern callExpr where callee.method == "Send"
+  emit sink code.NetworkSend at args[0]
+}

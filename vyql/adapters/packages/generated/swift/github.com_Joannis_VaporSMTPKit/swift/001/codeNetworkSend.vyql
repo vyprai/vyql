@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc9aa154f;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/Joannis/VaporSMTPKit")
+  }
+  query pattern callExpr where callee.method == "sendMails"
+  emit sink code.NetworkSend at args[0]
+}

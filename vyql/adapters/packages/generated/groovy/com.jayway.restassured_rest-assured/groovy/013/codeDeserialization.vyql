@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mdd83f6f4;
+
+binding deserialization13 {
+  requires {
+    dependency("com.jayway.restassured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "registerParser"
+  emit sink code.Deserialization at args[0]
+}

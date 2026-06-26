@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc6b388cf;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/Building42/Telegraph")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

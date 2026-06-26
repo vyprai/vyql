@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9c81201c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/fluent-kit")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

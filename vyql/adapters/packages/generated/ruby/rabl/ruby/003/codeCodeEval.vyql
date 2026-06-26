@@ -1,0 +1,9 @@
+module bindings.ruby.migration.maec902d9;
+
+binding codeEval3 {
+  requires {
+    dependency("rabl")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

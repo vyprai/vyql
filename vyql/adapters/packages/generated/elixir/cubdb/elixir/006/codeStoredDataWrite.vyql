@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m50eb1b2d;
+
+binding storedDataWrite6 {
+  requires {
+    dependency("cubdb")
+  }
+  query pattern callExpr where callee.method == "delete_multi"
+  emit sink code.StoredDataWrite at args[0]
+}

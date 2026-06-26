@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2ab085a4;
+
+binding cliArgument1 {
+  requires {
+    dependency("org.apache.ant:ant")
+  }
+  query pattern callExpr where callee.method == "processArgs"
+  emit source code.CliArgument at call.result
+}

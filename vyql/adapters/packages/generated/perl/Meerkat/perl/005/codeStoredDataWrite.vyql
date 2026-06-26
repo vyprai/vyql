@@ -1,0 +1,9 @@
+module bindings.perl.migration.m77118eb6;
+
+binding storedDataWrite5 {
+  requires {
+    dependency("Meerkat")
+  }
+  query pattern callExpr where callee.method == "reinsert"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1ddd4c05;
+
+binding sqlExecution0 {
+  requires {
+    dependency("activerecord-import")
+  }
+  query pattern callExpr where callee.method == "bulk_import"
+  emit sink code.SqlExecution at args[0]
+}

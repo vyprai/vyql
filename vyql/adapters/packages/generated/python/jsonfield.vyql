@@ -1,5 +1,0 @@
-adapter python {
-  package "jsonfield" {
-    sink method "checked_loads" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter ruby {
-  package "facter" {
-    sink method "Facter::CustomFacts::Util::Parser.parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,11 @@
+module bindings.python.migration.m21017d75;
+
+binding inputValidation185 {
+  query pattern callExpr where callee.method == "check_password"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

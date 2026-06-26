@@ -1,0 +1,11 @@
+module code;
+
+concept PluginManagementMissingAuthorization : issue {
+  cwe: [CWE_862]
+  review_assumption: "non-privileged authenticated users or API clients can invoke the plugin management endpoint directly"
+  reviewCategory: auth
+  reviewCondition: "plugin-management controller operations install or uninstall plugins without an operation-specific authorization guard"
+  reviewConfidence: high
+  reviewEvidence: "plugin management endpoint {pattern} invokes install or uninstall service logic without a permission annotation or guard"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

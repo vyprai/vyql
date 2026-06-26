@@ -1,0 +1,11 @@
+module code;
+
+concept ConfigExposureReview : issue {
+  cwe: [CWE_200, CWE_312, CWE_522, CWE_532]
+  review_assumption: "repository, keyring, credential, or diagnostic fields may contain inline credentials"
+  reviewCategory: secret
+  reviewCondition: "configuration or diagnostic serialization may expose inline secrets without an observed redaction path"
+  reviewConfidence: possibility
+  reviewEvidence: "config-like serialization site {pattern} lacks a matching redaction control"
+  vulnerableTo: [secrets.SecretLeak, crypto.CleartextStorage]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m71dd539d;
+
+binding filePathAccess2 {
+  requires {
+    dependency("@nodelib/fs.walk")
+  }
+  query pattern callExpr where callee.method == "walkStream"
+  emit sink code.FilePathAccess at args[0]
+}

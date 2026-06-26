@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mea9e392b;
+
+binding networkSend0 {
+  requires {
+    dependency("com.squareup.retrofit:retrofit")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}

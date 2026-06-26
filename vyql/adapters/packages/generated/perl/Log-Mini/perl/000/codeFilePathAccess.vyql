@@ -1,0 +1,9 @@
+module bindings.perl.migration.mfcf9a8bf;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Log-Mini")
+  }
+  query pattern callExpr where callee.method == "_open_log_file"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter javascript {
-  package "micromatch" {
-    flag code.RegexCompile on any {
-      method "micromatch"
-    }
-  }
-}

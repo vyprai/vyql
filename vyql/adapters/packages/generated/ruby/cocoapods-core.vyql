@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter ruby {
-  package "cocoapods-core" {
-    sink method "from_file" -> code.FilePathAccess
-    sink method "from_ruby" -> code.Deserialization
-    sink method "from_yaml" -> code.Deserialization
-    sink method "from_hash" -> code.Deserialization
-  }
-}

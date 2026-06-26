@@ -1,9 +1,0 @@
-import code.{RedirectTarget}
-
-adapter objc {
-  package "TUSafariActivity" {
-    flag code.RedirectTarget on any {
-      method "performActivity"
-    }
-  }
-}

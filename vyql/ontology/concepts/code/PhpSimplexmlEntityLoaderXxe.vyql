@@ -1,0 +1,11 @@
+module code;
+
+concept PhpSimplexmlEntityLoaderXxe : issue {
+  cwe: [CWE_611]
+  review_assumption: "the XML string can be influenced by request, file, or integration input and libxml external entity loading is enabled in the runtime"
+  reviewCategory: xml
+  reviewCondition: "PHP code parses XML with simplexml_load_string without disabling external entity loading"
+  reviewConfidence: medium
+  reviewEvidence: "PHP XML parsing context {pattern} calls simplexml_load_string without libxml_disable_entity_loader(true) in the same function"
+  vulnerableTo: [deserialization.Xxe]
+}

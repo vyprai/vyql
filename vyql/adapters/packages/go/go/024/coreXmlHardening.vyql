@@ -1,0 +1,14 @@
+module bindings.go.migration.m39efcd29;
+
+binding xmlHardening24 {
+  requires {
+    dependency("encoding/xml")
+  }
+  query pattern callExpr where callee.path ~= "xml.NewDecoder"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mdb01b7ff;
+
+binding deserialization0 {
+  requires {
+    dependency("ex_rlp")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

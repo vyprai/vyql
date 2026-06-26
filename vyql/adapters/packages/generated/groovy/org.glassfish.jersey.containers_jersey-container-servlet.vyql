@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter groovy {
-  package "org.glassfish.jersey.containers:jersey-container-servlet" {
-    source method "createDelegate" -> code.HttpInput
-  }
-}

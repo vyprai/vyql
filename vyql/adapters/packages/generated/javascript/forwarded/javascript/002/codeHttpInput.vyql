@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mdd2d8125;
+
+binding httpInput2 {
+  requires {
+    dependency("forwarded")
+  }
+  query pattern callExpr where callee.method == "getSocketAddr"
+  emit source code.HttpInput at call.result
+}

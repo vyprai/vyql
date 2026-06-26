@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "go.mozilla.org/pkcs7" {
-    sink method "Parse" -> code.Deserialization
-    sink method "parseEnvelopedData" -> code.Deserialization
-    sink method "parseEncryptedData" -> code.Deserialization
-    sink method "parseSignedData" -> code.Deserialization
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.me41dc015;
+
+binding sessionId3 {
+  requires {
+    dependency("javax.servlet.jsp:javax.servlet.jsp-api")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "getSession"
+  emit issue code.SessionId at node
+  emit sink code.SessionIdSink at node
+}

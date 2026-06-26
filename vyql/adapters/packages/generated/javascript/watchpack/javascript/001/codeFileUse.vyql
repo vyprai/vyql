@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m728d77d3;
+
+binding fileUse1 {
+  requires {
+    dependency("watchpack")
+  }
+  query pattern callExpr where callee.method == "watch"
+  emit sink code.FileUseSink at args[0]
+}

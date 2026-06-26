@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m66399872;
+
+binding networkSend0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-client")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

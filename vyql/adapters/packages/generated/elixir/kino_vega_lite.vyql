@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "kino_vega_lite" {
-    sink method "parse_value" -> code.Deserialization
-  }
-}

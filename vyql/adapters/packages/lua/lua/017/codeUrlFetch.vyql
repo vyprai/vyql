@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding urlFetch17 {
+  requires {
+    dependency("lua-resty-http")
+  }
+  query pattern callExpr where callee.path ~= "resty.http.request_uri"
+  emit sink code.UrlFetch at args[0]
+}

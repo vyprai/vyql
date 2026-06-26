@@ -1,0 +1,9 @@
+module bindings.swift.migration.mab0c3409;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/dreymonde/Shallows")
+  }
+  query pattern callExpr where callee.method == "clear"
+  emit sink code.FilePathAccess at args[0]
+}

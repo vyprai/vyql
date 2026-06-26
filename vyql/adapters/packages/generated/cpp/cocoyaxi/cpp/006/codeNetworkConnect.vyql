@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2661708c;
+
+binding networkConnect6 {
+  requires {
+    dependency("cocoyaxi")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

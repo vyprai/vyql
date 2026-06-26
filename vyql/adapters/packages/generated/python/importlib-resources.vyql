@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "importlib-resources" {
-    sink method "open_text" -> code.FilePathAccess
-    sink method "read_binary" -> code.FilePathAccess
-    sink method "path" -> code.FilePathAccess
-    sink method "open" -> code.FilePathAccess
-  }
-}

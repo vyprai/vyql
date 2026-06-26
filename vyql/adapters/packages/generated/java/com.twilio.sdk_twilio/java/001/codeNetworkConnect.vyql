@@ -1,0 +1,9 @@
+module bindings.java.migration.m0d138574;
+
+binding networkConnect1 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "AccountCreator.create"
+  emit sink code.NetworkConnectSink at args[0]
+}

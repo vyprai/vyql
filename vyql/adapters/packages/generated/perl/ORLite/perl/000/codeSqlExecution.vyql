@@ -1,0 +1,9 @@
+module bindings.perl.migration.m944f6fb6;
+
+binding sqlExecution0 {
+  requires {
+    dependency("ORLite")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.SqlExecution at args[0]
+}

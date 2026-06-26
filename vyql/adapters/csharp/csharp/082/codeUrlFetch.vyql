@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding urlFetch82 {
+  query pattern callExpr where callee.path ~= "WebClient"
+  emit sink code.UrlFetch at args[0]
+}

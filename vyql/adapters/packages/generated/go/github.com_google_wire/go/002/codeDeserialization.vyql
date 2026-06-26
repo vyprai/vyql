@@ -1,0 +1,9 @@
+module bindings.go.migration.mce4c1644;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processStructLiteralProvider"
+  emit sink code.Deserialization at args[0]
+}

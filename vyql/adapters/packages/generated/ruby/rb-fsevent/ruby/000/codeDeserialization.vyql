@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m92ab0abc;
+
+binding deserialization0 {
+  requires {
+    dependency("rb-fsevent")
+  }
+  query pattern callExpr where callee.method == "FSEvent.parse"
+  emit sink code.Deserialization at args[0]
+}

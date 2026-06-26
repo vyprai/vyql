@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m501d669e;
+
+binding deserialization0 {
+  requires {
+    dependency("waffle_ecto")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

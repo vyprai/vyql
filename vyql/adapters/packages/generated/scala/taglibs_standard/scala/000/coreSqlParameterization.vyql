@@ -1,0 +1,14 @@
+module bindings.scala.migration.md0905ee8;
+
+binding sqlParameterization0 {
+  requires {
+    dependency("taglibs:standard")
+  }
+  query pattern callExpr where callee.method == "addSQLParameter"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

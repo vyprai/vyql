@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mff89069b;
+
+binding networkSend0 {
+  requires {
+    dependency("gnat")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

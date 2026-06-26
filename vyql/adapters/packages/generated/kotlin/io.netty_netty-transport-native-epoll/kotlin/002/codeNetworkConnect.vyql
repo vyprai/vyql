@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma64e1e1b;
+
+binding networkConnect2 {
+  requires {
+    dependency("io.netty:netty-transport-native-epoll")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

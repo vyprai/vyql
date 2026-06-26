@@ -1,0 +1,9 @@
+module bindings.dart.migration.mf886b3e1;
+
+binding httpInput11 {
+  requires {
+    dependency("shelf_router")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit source code.HttpInput at call.result
+}

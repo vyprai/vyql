@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m11f9a242;
+
+binding deserialization4 {
+  requires {
+    dependency("org.springframework:spring-webmvc-portlet")
+  }
+  query pattern callExpr where callee.method == "parseLongs"
+  emit sink code.Deserialization at args[0]
+}

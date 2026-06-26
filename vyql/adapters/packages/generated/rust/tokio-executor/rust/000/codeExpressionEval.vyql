@@ -1,0 +1,9 @@
+module bindings.rust.migration.m897f6a26;
+
+binding expressionEval0 {
+  requires {
+    dependency("tokio-executor")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.ExpressionEval at args[0]
+}

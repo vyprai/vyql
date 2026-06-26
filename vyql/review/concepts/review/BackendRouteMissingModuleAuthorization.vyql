@@ -1,0 +1,8 @@
+module code;
+
+review code.BackendRouteMissingModuleAuthorization {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify backend AJAX routes inherit or enforce permissions from the owning backend module"
+}

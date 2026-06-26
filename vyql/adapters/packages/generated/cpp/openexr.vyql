@@ -1,9 +1,0 @@
-import code.{Deserialization, ArchiveEntryWrite}
-adapter cpp {
-  package "openexr" {
-    sink method "readPixels" -> code.Deserialization
-    sink method "readValueFrom" -> code.Deserialization
-    sink method "writePixels" -> code.ArchiveEntryWrite
-    sink method "writeValueTo" -> code.ArchiveEntryWrite
-  }
-}

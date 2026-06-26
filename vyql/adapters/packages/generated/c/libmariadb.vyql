@@ -1,6 +1,0 @@
-adapter c {
-  package "libmariadb" {
-    sink method "mysql_query" -> code.SqlExecution
-    control method "mysql_stmt_prepare_start" -> core.SqlParameterization
-  }
-}

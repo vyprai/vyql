@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "jekyll-commonmark" {
-    sink method "convert" -> code.Deserialization
-  }
-}

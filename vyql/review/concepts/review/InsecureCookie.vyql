@@ -1,0 +1,8 @@
+module code;
+
+review code.InsecureCookie {
+  category: cookie
+  expected: [core.CookieSecureFlag]
+  kind: target
+  text: "ensure sensitive cookies are set with the Secure flag from configuration or an explicit true value"
+}

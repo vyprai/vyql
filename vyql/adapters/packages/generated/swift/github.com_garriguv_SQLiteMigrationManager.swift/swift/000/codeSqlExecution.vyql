@@ -1,0 +1,9 @@
+module bindings.swift.migration.m215449c2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/garriguv/SQLiteMigrationManager.swift")
+  }
+  query pattern callExpr where callee.method == "migrateDatabase"
+  emit sink code.SqlExecution at args[0]
+}

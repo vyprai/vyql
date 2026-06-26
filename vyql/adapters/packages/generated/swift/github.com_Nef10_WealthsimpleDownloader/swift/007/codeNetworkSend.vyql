@@ -1,0 +1,9 @@
+module bindings.swift.migration.m576d6c73;
+
+binding networkSend7 {
+  requires {
+    dependency("github.com/Nef10/WealthsimpleDownloader")
+  }
+  query pattern callExpr where callee.method == "getPositions"
+  emit sink code.NetworkSend at args[0]
+}

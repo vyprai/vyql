@@ -1,0 +1,14 @@
+module bindings.dart.migration.m39dfc37b;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("local_auth_android")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

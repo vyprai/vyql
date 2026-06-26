@@ -1,0 +1,9 @@
+module bindings.swift.migration.m7b506522;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/zcash/ZcashLightClientKit")
+  }
+  query pattern callExpr where callee.method == "debugDatabase"
+  emit sink code.SqlExecution at args[0]
+}

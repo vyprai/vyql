@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mb289d269;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ini-parser")
+  }
+  query pattern callExpr where callee.method == "IniParser.FileIniDataParser.ReadFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mdc1ba520;
+
+binding filePathAccess6 {
+  requires {
+    dependency("thecodingmachine/safe")
+  }
+  query pattern callExpr where callee.method == "eio_mknod"
+  emit sink code.FilePathAccess at args[0]
+}

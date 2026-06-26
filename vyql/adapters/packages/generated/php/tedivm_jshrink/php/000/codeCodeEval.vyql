@@ -1,0 +1,9 @@
+module bindings.php.migration.ma4f1a5c9;
+
+binding codeEval0 {
+  requires {
+    dependency("tedivm/jshrink")
+  }
+  query pattern callExpr where callee.method == "minify"
+  emit sink code.CodeEval at args[0]
+}

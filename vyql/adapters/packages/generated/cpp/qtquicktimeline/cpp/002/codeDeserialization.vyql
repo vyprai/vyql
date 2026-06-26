@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mdf9fd4f8;
+
+binding deserialization2 {
+  requires {
+    dependency("qtquicktimeline")
+  }
+  query pattern callExpr where callee.method == "qQuickKeyframeReadProperty"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{HttpInput}
-import core.{InputValidation}
-adapter objc {
-  package "libevent" {
-    source method "evhttp_parse_firstline_" -> code.HttpInput
-    source method "evhttp_parse_headers_" -> code.HttpInput
-    control method "evhttp_decode_uri_internal" -> core.InputValidation
-  }
-}

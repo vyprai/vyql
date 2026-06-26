@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m53c45cc2;
+
+binding deserialization0 {
+  requires {
+    dependency("jmespath")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.Deserialization at args[0]
+}

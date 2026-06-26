@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/bradfitz/gomemcache" {
-    sink method "parseGetResponse" -> code.Deserialization
-    sink method "scanGetResponseLine" -> code.Deserialization
-  }
-}

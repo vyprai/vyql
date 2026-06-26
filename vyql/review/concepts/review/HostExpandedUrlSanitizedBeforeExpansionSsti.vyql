@@ -1,0 +1,8 @@
+module code;
+
+review code.HostExpandedUrlSanitizedBeforeExpansionSsti {
+  category: code_execution
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review canonical URL helpers for sanitizing the full host-expanded URL after request Host or protocol metadata is added"
+}

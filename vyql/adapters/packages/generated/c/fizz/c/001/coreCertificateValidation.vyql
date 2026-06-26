@@ -1,0 +1,14 @@
+module bindings.c.migration.md3928364;
+
+binding certificateValidation1 {
+  requires {
+    dependency("fizz")
+  }
+  query pattern callExpr where callee.method == "FizzClient"
+  emit check core.CertificateValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

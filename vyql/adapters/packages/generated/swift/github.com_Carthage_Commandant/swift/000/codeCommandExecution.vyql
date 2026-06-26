@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma3c98058;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/Carthage/Commandant")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

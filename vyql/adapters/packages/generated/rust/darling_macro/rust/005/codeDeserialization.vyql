@@ -1,0 +1,9 @@
+module bindings.rust.migration.m65fd720a;
+
+binding deserialization5 {
+  requires {
+    dependency("darling_macro")
+  }
+  query pattern callExpr where callee.method == "derive_type_param"
+  emit sink code.Deserialization at args[0]
+}

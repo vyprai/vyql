@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcc73f8cb;
+
+binding userControlledData0 {
+  requires {
+    dependency("Proc-WaitStat")
+  }
+  query pattern callExpr where callee.method == "close_die"
+  emit source core.UserControlledData at call.result
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter javascript {
-  package "eslint" {
-    sink method "spawnExternalCommand" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m5d6a286e;
+
+binding storedDataRead12 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_i64readfilebin"
+  emit source code.StoredDataRead at call.result
+}

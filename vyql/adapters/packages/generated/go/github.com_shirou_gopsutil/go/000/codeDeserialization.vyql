@@ -1,0 +1,9 @@
+module bindings.go.migration.m5beafe11;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/shirou/gopsutil")
+  }
+  query pattern callExpr where callee.method == "parseSwapctlOutput"
+  emit sink code.Deserialization at args[0]
+}

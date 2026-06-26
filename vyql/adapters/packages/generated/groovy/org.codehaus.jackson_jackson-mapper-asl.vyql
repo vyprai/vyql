@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.codehaus.jackson:jackson-mapper-asl" {
-    sink method "readValue" -> code.Deserialization
-    sink method "readTree" -> code.Deserialization
-  }
-}

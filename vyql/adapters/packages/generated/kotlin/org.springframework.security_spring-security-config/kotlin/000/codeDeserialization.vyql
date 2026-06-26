@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2ec40f34;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.security:spring-security-config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

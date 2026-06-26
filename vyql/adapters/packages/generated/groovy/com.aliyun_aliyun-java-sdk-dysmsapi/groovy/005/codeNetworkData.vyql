@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mefcfcfd3;
+
+binding networkData5 {
+  requires {
+    dependency("com.aliyun:aliyun-java-sdk-dysmsapi")
+  }
+  query pattern callExpr where callee.method == "setShortUrlName"
+  emit source code.NetworkData at call.result
+}

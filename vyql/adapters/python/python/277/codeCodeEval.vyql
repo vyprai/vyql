@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding codeEval277 {
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,6 +1,0 @@
-adapter javascript {
-  package "http-deceiver" {
-    sink method "parserOnHeadersComplete" -> code.UrlFetch
-    sink method "parserOnHeadersComplete" -> code.Deserialization
-  }
-}

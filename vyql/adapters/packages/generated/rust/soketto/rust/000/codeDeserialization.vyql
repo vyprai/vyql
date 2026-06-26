@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3b4b7843;
+
+binding deserialization0 {
+  requires {
+    dependency("soketto")
+  }
+  query pattern callExpr where callee.method == "decode_header"
+  emit sink code.Deserialization at args[0]
+}

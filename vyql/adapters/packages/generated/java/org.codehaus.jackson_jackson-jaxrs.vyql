@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "org.codehaus.jackson:jackson-jaxrs" {
-    sink method "readFrom" -> code.Deserialization
-  }
-}

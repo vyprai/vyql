@@ -1,0 +1,9 @@
+module bindings.objc.migration.mfecd0fc9;
+
+binding deserialization1 {
+  requires {
+    dependency("YYText")
+  }
+  query pattern callExpr where callee.method == "yy_unarchiveFromData"
+  emit sink code.Deserialization at args[0]
+}

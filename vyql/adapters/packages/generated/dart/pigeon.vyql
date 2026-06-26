@@ -1,7 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-adapter dart {
-  package "pigeon" {
-    sink method "parseFile" -> code.FilePathAccess
-    source method "parseArgs" -> code.CliArgument
-  }
-}

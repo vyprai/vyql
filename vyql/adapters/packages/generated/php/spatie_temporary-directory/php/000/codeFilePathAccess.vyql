@@ -1,0 +1,9 @@
+module bindings.php.migration.mfa2f56a4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spatie/temporary-directory")
+  }
+  query pattern callExpr where callee.method == "mkdir"
+  emit sink code.FilePathAccess at args[0]
+}

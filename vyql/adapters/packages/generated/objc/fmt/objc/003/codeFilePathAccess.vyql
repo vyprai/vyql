@@ -1,0 +1,9 @@
+module bindings.objc.migration.m73c6e28b;
+
+binding filePathAccess3 {
+  requires {
+    dependency("fmt")
+  }
+  query pattern callExpr where callee.method == "fdopen"
+  emit sink code.FilePathAccess at args[0]
+}

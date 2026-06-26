@@ -1,0 +1,9 @@
+module bindings.python.migration.m0792ec30;
+
+binding commandExecution2 {
+  requires {
+    dependency("ffmpeg-python")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

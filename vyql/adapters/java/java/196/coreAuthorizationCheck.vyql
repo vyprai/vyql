@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding authorizationCheck196 {
+  query pattern callExpr where callee.path ~= "hasAuthority"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

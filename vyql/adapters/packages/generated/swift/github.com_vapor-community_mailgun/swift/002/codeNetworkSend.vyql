@@ -1,0 +1,9 @@
+module bindings.swift.migration.medb631f6;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/vapor-community/mailgun")
+  }
+  query pattern callExpr where callee.method == "createTemplate"
+  emit sink code.NetworkSend at args[0]
+}

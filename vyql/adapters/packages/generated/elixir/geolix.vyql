@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter elixir {
-  package "geolix" {
-    source method "Geolix.lookup" -> code.NetworkData
-    source method "Geolix.metadata" -> code.NetworkData
-  }
-}

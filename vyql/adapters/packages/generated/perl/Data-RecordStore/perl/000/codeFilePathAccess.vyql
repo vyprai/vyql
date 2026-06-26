@@ -1,0 +1,9 @@
+module bindings.perl.migration.m8be816f0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Data-RecordStore")
+  }
+  query pattern callExpr where callee.method == "open_store"
+  emit sink code.FilePathAccess at args[0]
+}

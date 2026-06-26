@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/docker/cli" {
-    source method "ValidateEnv" -> core.UserControlledData
-  }
-}

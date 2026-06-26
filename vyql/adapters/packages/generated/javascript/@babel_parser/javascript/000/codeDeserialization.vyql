@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mf343b71f;
+
+binding deserialization0 {
+  requires {
+    dependency("@babel/parser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

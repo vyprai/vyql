@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m57518e21;
+
+binding sqlExecution2 {
+  requires {
+    dependency("sqlite_ecto2")
+  }
+  query pattern callExpr where callee.method == "update_all"
+  emit sink code.SqlExecution at args[0]
+}

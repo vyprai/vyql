@@ -1,0 +1,9 @@
+module bindings.python.migration.m5eede96e;
+
+binding networkSend2 {
+  requires {
+    dependency("ndg-httpsclient")
+  }
+  query pattern callExpr where callee.method == "sendall"
+  emit sink code.NetworkSend at args[0]
+}

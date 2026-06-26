@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding unescapedChartTooltipDataName107 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=formatTooltip" and node.token contains "call_arg:itemModel.get:name" and node.token contains "identifier:name" and node.token contains "call_arg:createTooltipMarkup:nameValue" and not (node.token contains "prop:name=itemName") and not (node.token contains "call_arg:encodeHTML:name") and not (node.token contains "call_arg:escapeHTML:name") and not (node.token contains "call_arg:escapeHtml:name")
+  emit issue code.UnescapedChartTooltipDataName at node
+}

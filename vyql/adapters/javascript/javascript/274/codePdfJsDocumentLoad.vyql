@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding pdfJsDocumentLoad274 {
+  query pattern callExpr where callee.path ~= "pdfjs.getDocument"
+  emit sink code.PdfJsDocumentLoad at args[0]
+}

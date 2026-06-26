@@ -1,8 +1,0 @@
-import code.{HtmlRender}
-
-adapter dart {
-  package "signature" {
-    sink method "toRawSVG" -> code.HtmlRender
-    sink method "toSVG" -> code.HtmlRender
-  }
-}

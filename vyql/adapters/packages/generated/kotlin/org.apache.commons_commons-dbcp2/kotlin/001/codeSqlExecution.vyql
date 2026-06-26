@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb7a3f668;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.apache.commons:commons-dbcp2")
+  }
+  query pattern callExpr where callee.method == "setValidationQuery"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "qt5-svg" {
-    sink method "QSvgRenderer::load" -> code.Deserialization
-  }
-}

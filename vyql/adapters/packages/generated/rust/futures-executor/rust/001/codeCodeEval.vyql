@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9a3ec488;
+
+binding codeEval1 {
+  requires {
+    dependency("futures-executor")
+  }
+  query pattern callExpr where callee.method == "spawn_local_obj"
+  emit sink code.CodeEval at args[0]
+}

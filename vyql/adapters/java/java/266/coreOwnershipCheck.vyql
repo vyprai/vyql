@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding ownershipCheck266 {
+  query pattern callExpr where callee.method == "isOwner"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

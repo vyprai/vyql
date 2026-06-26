@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m4117d2bd;
+
+binding deserialization0 {
+  requires {
+    dependency("fsreveal")
+  }
+  query pattern callExpr where callee.method == "GetPresentationFromScriptString"
+  emit sink code.Deserialization at args[0]
+}

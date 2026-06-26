@@ -1,0 +1,9 @@
+module bindings.rust.migration.m00b63c50;
+
+binding networkData0 {
+  requires {
+    dependency("tokio-native-tls")
+  }
+  query pattern callExpr where callee.method == "poll_read"
+  emit source code.NetworkData at call.result
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter rust {
-  package "cranelift-codegen" {
-    sink method "Context.compile" -> code.CodeEval
-  }
-}

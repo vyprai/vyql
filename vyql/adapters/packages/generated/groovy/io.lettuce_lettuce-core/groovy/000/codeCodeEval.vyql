@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mdf088dd3;
+
+binding codeEval0 {
+  requires {
+    dependency("io.lettuce:lettuce-core")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

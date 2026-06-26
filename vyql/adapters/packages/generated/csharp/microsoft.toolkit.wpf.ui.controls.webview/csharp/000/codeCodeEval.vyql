@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m3c797cdd;
+
+binding codeEval0 {
+  requires {
+    dependency("microsoft.toolkit.wpf.ui.controls.webview")
+  }
+  query pattern callExpr where callee.method == "AddPreLoadedScript"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/mattn/go-zglob" {
-    sink method "Glob" -> code.FilePathAccess
-    sink method "GlobFollowSymlinks" -> code.FilePathAccess
-    sink method "Match" -> code.FilePathAccess
-  }
-}

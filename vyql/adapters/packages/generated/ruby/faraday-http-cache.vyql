@@ -1,8 +1,0 @@
-import code.{HttpInput}
-
-adapter ruby {
-  package "faraday-http-cache" {
-    source method "call" -> code.HttpInput
-    source method "parse" -> code.HttpInput
-  }
-}

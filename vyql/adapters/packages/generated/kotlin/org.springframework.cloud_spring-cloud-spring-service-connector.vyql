@@ -1,8 +1,0 @@
-import code.{DatabaseRead, NosqlQuery}
-
-adapter kotlin {
-  package "org.springframework.cloud:spring-cloud-spring-service-connector" {
-    sink method "createPooledDataSource" -> code.DatabaseRead
-    sink method "doParse" -> code.NosqlQuery
-  }
-}

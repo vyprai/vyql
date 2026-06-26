@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "EFQRCode" {
-    source method "recognize" -> core.UserControlledData
-  }
-}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter rust {
-  package "tauri" {
-    sink method "get" -> code.FilePathAccess
-    sink method "get_for_scheme" -> code.FilePathAccess
-  }
-}

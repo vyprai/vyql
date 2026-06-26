@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-adapter javascript {
-  package "he" {
-    control method "escape" -> core.HtmlEscape
-    control method "encode" -> core.HtmlEscape
-  }
-}

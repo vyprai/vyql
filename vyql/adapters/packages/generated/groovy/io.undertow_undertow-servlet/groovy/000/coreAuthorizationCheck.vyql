@@ -1,0 +1,14 @@
+module bindings.groovy.migration.md570f727;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("io.undertow:undertow-servlet")
+  }
+  query pattern callExpr where callee.method == "isUserInRole"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

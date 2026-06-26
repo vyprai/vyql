@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.springframework:spring-oxm" {
-    sink method "unmarshal" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

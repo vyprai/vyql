@@ -1,0 +1,9 @@
+module bindings.go.migration.m0bb99a41;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/containers/ocicrypt")
+  }
+  query pattern callExpr where callee.method == "runGPGGetOutput"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,12 @@
+module bindings.python.migration.m21017d75;
+
+binding pathAccessCheck555 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "binop" and node.path == "__binop.in" and operand(node, where: operand.path == "__object_literal")
+  emit check core.PathAccessCheck at node {
+    advisory: true
+  }
+}

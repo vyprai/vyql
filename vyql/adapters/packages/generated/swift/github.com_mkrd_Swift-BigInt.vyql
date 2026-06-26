@@ -1,8 +1,0 @@
-import code.{StdinInput}
-
-adapter swift {
-  package "github.com/mkrd/Swift-BigInt" {
-    source method "getKeyboardInput" -> code.StdinInput
-    source method "getKeyboardInputAsInt" -> code.StdinInput
-  }
-}

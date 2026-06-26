@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf3a75d05;
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/kelvin13/swift-png")
+  }
+  query pattern callExpr where callee.method == "push"
+  emit sink code.Deserialization at args[0]
+}

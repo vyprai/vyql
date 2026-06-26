@@ -1,0 +1,9 @@
+module bindings.rust.migration.m88f957a1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("prost-build")
+  }
+  query pattern callExpr where callee.method == "compile_protos"
+  emit sink code.FilePathAccess at args[0]
+}

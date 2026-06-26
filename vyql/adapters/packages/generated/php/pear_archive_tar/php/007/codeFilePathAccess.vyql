@@ -1,0 +1,9 @@
+module bindings.php.migration.m1c54f9a5;
+
+binding filePathAccess7 {
+  requires {
+    dependency("pear/archive_tar")
+  }
+  query pattern callExpr where callee.method == "extractInString"
+  emit sink code.FilePathAccess at args[0]
+}

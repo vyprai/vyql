@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter groovy {
-  package "com.aventstack:extentreports" {
-    sink method "createDomainFromJsonArchive" -> code.Deserialization
-    sink method "JsonDeserializer" -> code.Deserialization
-  }
-}

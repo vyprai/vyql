@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mc283524e;
+
+binding htmlRender0 {
+  requires {
+    dependency("formatwith")
+  }
+  query pattern callExpr where callee.method == "FormatWith"
+  emit sink code.HtmlRender at args[0]
+}

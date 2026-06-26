@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5e8670ca;
+
+binding deserialization1 {
+  requires {
+    dependency("ff")
+  }
+  query pattern callExpr where callee.method == "from_uniform_bytes"
+  emit sink code.Deserialization at args[0]
+}

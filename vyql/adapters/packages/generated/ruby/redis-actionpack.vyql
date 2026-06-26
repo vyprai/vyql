@@ -1,7 +1,0 @@
-import code.{Cookie, StoredDataRead, StoredDataWrite}
-adapter ruby {
-  package "redis-actionpack" {
-    source method "set_cookie" -> code.Cookie
-    source method "get_cookie" -> code.Cookie
-  }
-}

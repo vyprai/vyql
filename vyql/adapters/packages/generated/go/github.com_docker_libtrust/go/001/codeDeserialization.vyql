@@ -1,0 +1,9 @@
+module bindings.go.migration.m802ba669;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/docker/libtrust")
+  }
+  query pattern callExpr where callee.method == "UnmarshalPublicKeyPEMBundle"
+  emit sink code.Deserialization at args[0]
+}

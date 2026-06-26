@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "reverse_markdown" {
-    sink method "convert" -> code.Deserialization
-  }
-}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "TOML" {
-    sink method "from_toml" -> code.Deserialization
-  }
-}

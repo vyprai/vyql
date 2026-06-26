@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding xpathQuery24 {
+  requires {
+    dependency("lua-xml")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.XpathQuery at args[0]
+}

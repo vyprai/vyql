@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter elixir {
-  package "licensir" {
-    sink method "analyze" -> code.FilePathAccess
-  }
-}

@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/pelletier/go-toml" {
-    sink method "Load" -> code.Deserialization
-  }
-}

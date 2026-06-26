@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "botocore" {
-    sink method "parse" -> code.Deserialization
-  }
-}

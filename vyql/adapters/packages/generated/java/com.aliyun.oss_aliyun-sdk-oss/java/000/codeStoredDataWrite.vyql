@@ -1,0 +1,9 @@
+module bindings.java.migration.m9457f182;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("com.aliyun.oss:aliyun-sdk-oss")
+  }
+  query pattern callExpr where callee.method == "putObject"
+  emit sink code.StoredDataWrite at args[0]
+}

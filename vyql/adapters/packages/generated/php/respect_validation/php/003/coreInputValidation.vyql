@@ -1,0 +1,14 @@
+module bindings.php.migration.mf3aa1cae;
+
+binding inputValidation3 {
+  requires {
+    dependency("respect/validation")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

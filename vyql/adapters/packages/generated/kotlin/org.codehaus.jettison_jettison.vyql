@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.codehaus.jettison:jettison" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,5 +1,0 @@
-adapter ruby {
-  package "ipaddress" {
-    sink method "IPAddress::parse" -> code.Deserialization
-  }
-}

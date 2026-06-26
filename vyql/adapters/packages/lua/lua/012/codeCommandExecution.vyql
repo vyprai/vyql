@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding commandExecution12 {
+  requires {
+    dependency("lua")
+  }
+  query pattern callExpr where callee.path ~= "io.popen"
+  emit sink code.CommandExecution at args[0]
+}

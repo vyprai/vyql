@@ -1,0 +1,9 @@
+module bindings.objc.migration.mbbb7a8dd;
+
+binding networkData1 {
+  requires {
+    dependency("HappyDNS")
+  }
+  query pattern callExpr where callee.method == "onNetworkChange:"
+  emit source code.NetworkData at call.result
+}

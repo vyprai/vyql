@@ -1,0 +1,9 @@
+module bindings.c.migration.m4fe0baa5;
+
+binding cliArgument0 {
+  requires {
+    dependency("cli11")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

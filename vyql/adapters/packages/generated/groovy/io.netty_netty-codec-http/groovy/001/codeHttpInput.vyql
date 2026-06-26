@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md2683009;
+
+binding httpInput1 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}

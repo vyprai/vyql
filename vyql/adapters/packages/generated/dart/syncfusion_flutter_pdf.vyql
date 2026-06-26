@@ -1,6 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter dart {
-  package "syncfusion_flutter_pdf" {
-    sink method "decodeXMLConversion" -> code.Deserialization
-  }
-}

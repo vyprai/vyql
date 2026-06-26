@@ -1,0 +1,9 @@
+module bindings.scala.migration.m76a9764d;
+
+binding templateRender1 {
+  requires {
+    dependency("org.apache.velocity:velocity")
+  }
+  query pattern callExpr where callee.method == "merge"
+  emit sink code.TemplateRender at args[0]
+}

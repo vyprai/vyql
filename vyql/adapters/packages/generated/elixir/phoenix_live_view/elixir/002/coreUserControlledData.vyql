@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md4a63e53;
+
+binding userControlledData2 {
+  requires {
+    dependency("phoenix_live_view")
+  }
+  query pattern callExpr where callee.method == "handle_event"
+  emit source core.UserControlledData at call.result
+}

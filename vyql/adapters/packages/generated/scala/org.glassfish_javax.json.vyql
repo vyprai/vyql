@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "org.glassfish:javax.json" {
-    sink method "read" -> code.Deserialization
-  }
-}

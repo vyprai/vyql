@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "@istanbuljs/load-nyc-config" {
-    sink method "loadFile" -> code.FilePathAccess
-    sink method "actualLoad" -> code.FilePathAccess
-    sink method "applyExtends" -> code.FilePathAccess
-    sink method "loadNycConfig" -> code.FilePathAccess
-  }
-}

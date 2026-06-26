@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbe60d0c5;
+
+binding userControlledData3 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "get_credentials"
+  emit source core.UserControlledData at call.result
+}

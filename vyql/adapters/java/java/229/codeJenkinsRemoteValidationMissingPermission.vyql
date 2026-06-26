@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding jenkinsRemoteValidationMissingPermission229 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:doTestConnection" and containsAny(node.token, ["call_path:getClient", "call_path:buildClient", "call_path:testConnection"]) and containsAny(node.token, ["call_path:getCurrentUser", "call_path:getProjects", "call_path:getSystemProfiles", "call_path:testConnection"]) and containsAny(node.token, ["identifier:url", "identifier:host", "identifier:endpoint", "identifier:apiTokenId", "identifier:credentialsId", "identifier:clientBuilderId", "identifier:ignoreCertificateErrors"]) and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPermission at node
+}

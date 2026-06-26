@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "share_plus" {
-    source method "share" -> core.UserControlledData
-    source method "shareXFiles" -> core.UserControlledData
-  }
-}

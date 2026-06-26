@@ -1,0 +1,9 @@
+module bindings.scala.migration.m350b2443;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.flywaydb:flyway-core")
+  }
+  query pattern callExpr where callee.method == "runCommand"
+  emit sink code.SqlExecution at args[0]
+}

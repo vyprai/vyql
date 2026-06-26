@@ -1,0 +1,9 @@
+module bindings.dart.migration.m4d3ee093;
+
+binding networkData1 {
+  requires {
+    dependency("just_audio_web")
+  }
+  query pattern callExpr where callee.method == "DashAudioSourcePlayer"
+  emit source code.NetworkData at call.result
+}

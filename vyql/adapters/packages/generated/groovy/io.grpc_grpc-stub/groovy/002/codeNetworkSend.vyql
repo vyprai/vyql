@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m727ae6bc;
+
+binding networkSend2 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "blockingBidiStreamingCall"
+  emit sink code.NetworkSend at args[0]
+}

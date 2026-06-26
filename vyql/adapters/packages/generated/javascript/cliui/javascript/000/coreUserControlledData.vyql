@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m59dd1a59;
+
+binding userControlledData0 {
+  requires {
+    dependency("cliui")
+  }
+  query pattern callExpr where callee.method == "ui"
+  emit source core.UserControlledData at call.result
+}

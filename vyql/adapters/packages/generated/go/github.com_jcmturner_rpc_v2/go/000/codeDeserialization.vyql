@@ -1,0 +1,9 @@
+module bindings.go.migration.m628a4fe4;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/jcmturner/rpc/v2")
+  }
+  query pattern callExpr where callee.method == "NewDecoder"
+  emit sink code.Deserialization at args[0]
+}

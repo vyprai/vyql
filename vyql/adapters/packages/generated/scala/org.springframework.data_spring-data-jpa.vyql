@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter scala {
-  package "org.springframework.data:spring-data-jpa" {
-    sink method "rewrite" -> code.SqlExecution
-  }
-}

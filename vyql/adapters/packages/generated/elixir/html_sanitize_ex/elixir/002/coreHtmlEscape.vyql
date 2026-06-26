@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m5599724e;
+
+binding htmlEscape2 {
+  requires {
+    dependency("html_sanitize_ex")
+  }
+  query pattern callExpr where callee.method == "basic_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

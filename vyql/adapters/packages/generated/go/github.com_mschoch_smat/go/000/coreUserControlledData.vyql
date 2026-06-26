@@ -1,0 +1,9 @@
+module bindings.go.migration.m1aff07e6;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/mschoch/smat")
+  }
+  query pattern callExpr where callee.method == "Fuzz"
+  emit source core.UserControlledData at call.result
+}

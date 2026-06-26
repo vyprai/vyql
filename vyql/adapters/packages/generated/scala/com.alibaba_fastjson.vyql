@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.alibaba:fastjson" {
-    sink method "parse" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-    sink method "parseObject" -> code.Deserialization
-    sink method "parseArray" -> code.Deserialization
-  }
-}

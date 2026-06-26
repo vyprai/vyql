@@ -1,0 +1,11 @@
+module bindings.python.migration.m21017d75;
+
+binding xpathEscape537 {
+  query pattern callExpr where callee.path ~= "xpath_literal"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

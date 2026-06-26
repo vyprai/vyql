@@ -1,0 +1,9 @@
+module bindings.rust.migration.m4485cc53;
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("tar")
+  }
+  query pattern callExpr where callee.method == "unpack_dir"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

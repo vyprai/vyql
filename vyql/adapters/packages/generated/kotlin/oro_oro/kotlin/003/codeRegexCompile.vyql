@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.ma8d6c5d2;
+
+binding regexCompile3 {
+  requires {
+    dependency("oro:oro")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "substitute"
+  emit issue code.RegexCompile at node
+  emit sink code.RegexCompileSink at node
+}

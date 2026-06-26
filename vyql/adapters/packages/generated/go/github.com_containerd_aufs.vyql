@@ -1,7 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-
-adapter go {
-  package "github.com/containerd/aufs" {
-    sink method "New" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.migration.mfc452233;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.curator:curator-recipes")
+  }
+  query pattern callExpr where callee.method == "ChildData.getData"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.mb3c377ba;
+
+binding expressionEval3 {
+  requires {
+    dependency("deranged")
+  }
+  query pattern callExpr where callee.method == "unchecked_mul"
+  emit sink code.ExpressionEval at args[0]
+}

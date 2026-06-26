@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8ee7330f;
+
+binding commandExecution0 {
+  requires {
+    dependency("jekyll")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

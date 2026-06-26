@@ -1,5 +1,0 @@
-adapter perl {
-  package "Wx" {
-    sink method "AUTOLOAD" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mb2853851;
+
+binding userControlledData0 {
+  requires {
+    dependency("ixwebsocket")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m78741b33;
+
+binding sqlExecution9 {
+  requires {
+    dependency("sqlite-net-pcl")
+  }
+  query pattern callExpr where callee.method == "DropTable``1"
+  emit sink code.SqlExecution at args[0]
+}

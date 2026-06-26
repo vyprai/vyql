@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "cucumber" {
-    sink method "parse" -> code.Deserialization
-  }
-}

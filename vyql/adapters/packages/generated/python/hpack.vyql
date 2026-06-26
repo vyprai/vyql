@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "hpack" {
-    sink method "Decoder.decode" -> code.Deserialization
-  }
-}

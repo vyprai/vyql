@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter objc {
-  package "Swifter" {
-    sink method "shareFile" -> code.FilePathAccess
-    sink method "shareFilesFromDirectory" -> code.FilePathAccess
-    sink method "directoryBrowser" -> code.FilePathAccess
-  }
-}

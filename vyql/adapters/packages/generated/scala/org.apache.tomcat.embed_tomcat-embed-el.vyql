@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.tomcat.embed:tomcat-embed-el" {
-    sink method "parse" -> code.ExpressionEval
-  }
-}

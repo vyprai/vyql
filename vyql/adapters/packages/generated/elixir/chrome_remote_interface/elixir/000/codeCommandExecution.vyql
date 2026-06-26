@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9e3329fe;
+
+binding commandExecution0 {
+  requires {
+    dependency("chrome_remote_interface")
+  }
+  query pattern callExpr where callee.method == "execute_command"
+  emit sink code.CommandExecution at args[0]
+}

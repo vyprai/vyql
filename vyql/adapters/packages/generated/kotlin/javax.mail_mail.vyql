@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "javax.mail:mail" {
-    sink method "parse" -> code.Deserialization
-  }
-}

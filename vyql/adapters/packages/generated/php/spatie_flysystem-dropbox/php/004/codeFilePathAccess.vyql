@@ -1,0 +1,9 @@
+module bindings.php.migration.m3b3da65e;
+
+binding filePathAccess4 {
+  requires {
+    dependency("spatie/flysystem-dropbox")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}

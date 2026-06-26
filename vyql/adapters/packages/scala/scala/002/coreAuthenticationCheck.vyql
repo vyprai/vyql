@@ -1,0 +1,14 @@
+module bindings.scala.migration.m3608f193;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("playframework")
+  }
+  query pattern callExpr where callee.path ~= "Security.Authenticated"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

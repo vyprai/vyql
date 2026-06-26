@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.eclipse.jetty:jetty-webapp" {
-    sink method "parse" -> code.Deserialization
-  }
-}

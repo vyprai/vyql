@@ -1,0 +1,9 @@
+module bindings.rust.migration.mff40dc02;
+
+binding filePathAccess12 {
+  requires {
+    dependency("dirs")
+  }
+  query pattern callExpr where callee.method == "document_dir"
+  emit sink code.FilePathAccess at args[0]
+}

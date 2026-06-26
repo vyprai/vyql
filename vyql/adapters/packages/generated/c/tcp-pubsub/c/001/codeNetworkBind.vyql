@@ -1,0 +1,9 @@
+module bindings.c.migration.me6cbb240;
+
+binding networkBind1 {
+  requires {
+    dependency("tcp-pubsub")
+  }
+  query pattern callExpr where callee.method == "Publisher.Publisher"
+  emit sink code.NetworkBind at args[0]
+}

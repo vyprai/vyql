@@ -1,0 +1,9 @@
+module bindings.python.migration.m005cda50;
+
+binding deserialization2 {
+  requires {
+    dependency("spacy-legacy")
+  }
+  query pattern callExpr where callee.method == "TransitionBasedParser_v1"
+  emit sink code.Deserialization at args[0]
+}

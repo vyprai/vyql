@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter elixir {
-  package "kerosene" {
-    sink method "paginate" -> code.SqlExecution
-  }
-}

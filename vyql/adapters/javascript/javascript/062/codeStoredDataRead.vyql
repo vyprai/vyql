@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding storedDataRead62 {
+  query pattern callExpr where callee.path ~= "child_process.execSync.toString.split.map"
+  emit source code.StoredDataRead at call.result
+}

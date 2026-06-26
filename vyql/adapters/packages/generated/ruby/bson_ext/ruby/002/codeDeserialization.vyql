@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma96f0f9a;
+
+binding deserialization2 {
+  requires {
+    dependency("bson_ext")
+  }
+  query pattern callExpr where callee.method == "method_deserialize"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept WorldCoordinateSafeRangeMissing : issue {
+  cwe: [CWE_400, CWE_20]
+  review_assumption: "users can select or trigger coordinates outside the engine's safe world range and force expensive or crashing world/chunk operations"
+  reviewCategory: resource
+  reviewCondition: "world or chunk operations accept high-magnitude coordinates without a safe world-border range guard"
+  reviewConfidence: high
+  reviewEvidence: "world-coordinate context {pattern} consumes BlockVector3 coordinates in world access calls without testCoords or an equivalent +/- 30,000,000 guard"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

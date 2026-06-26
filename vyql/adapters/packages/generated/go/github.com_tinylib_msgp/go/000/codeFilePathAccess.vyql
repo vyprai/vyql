@@ -1,0 +1,9 @@
+module bindings.go.migration.m8161627a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/tinylib/msgp")
+  }
+  query pattern callExpr where callee.method == "ReadFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "ex_money" {
-    sink method "Money.parse" -> code.Deserialization
-  }
-}

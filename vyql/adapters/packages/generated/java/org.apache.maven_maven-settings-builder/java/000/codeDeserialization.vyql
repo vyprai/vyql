@@ -1,0 +1,9 @@
+module bindings.java.migration.m56e24193;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "org.apache.maven.settings.io.DefaultSettingsReader.read"
+  emit sink code.Deserialization at args[0]
+}

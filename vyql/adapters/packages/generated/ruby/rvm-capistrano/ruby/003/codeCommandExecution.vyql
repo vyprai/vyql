@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdf341254;
+
+binding commandExecution3 {
+  requires {
+    dependency("rvm-capistrano")
+  }
+  query pattern callExpr where callee.method == "command_with_shell"
+  emit sink code.CommandExecution at args[0]
+}

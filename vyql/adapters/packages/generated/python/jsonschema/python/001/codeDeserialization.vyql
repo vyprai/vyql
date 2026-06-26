@@ -1,0 +1,9 @@
+module bindings.python.migration.me74e77bd;
+
+binding deserialization1 {
+  requires {
+    dependency("jsonschema")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "better_player" {
-    sink method "parse" -> code.Deserialization
-  }
-}

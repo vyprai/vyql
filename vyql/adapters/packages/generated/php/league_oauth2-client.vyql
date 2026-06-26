@@ -1,5 +1,0 @@
-adapter php {
-  package "league/oauth2-client" {
-    source method "setRefreshToken" -> code.SecretValue
-  }
-}

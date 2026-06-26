@@ -1,5 +1,0 @@
-adapter rust {
-  package "ciborium" {
-    sink method "new" -> code.Deserialization
-  }
-}

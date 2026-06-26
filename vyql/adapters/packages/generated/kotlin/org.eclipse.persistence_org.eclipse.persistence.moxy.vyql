@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.eclipse.persistence:org.eclipse.persistence.moxy" {
-    sink method "unmarshal" -> code.Deserialization
-  }
-}

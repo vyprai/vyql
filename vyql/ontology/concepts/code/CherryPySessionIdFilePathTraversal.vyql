@@ -1,0 +1,11 @@
+module code;
+
+concept CherryPySessionIdFilePathTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "the session id can be supplied by the request cookie and reused for session file reads, writes, or deletes"
+  reviewCategory: path
+  reviewCondition: "cookie-controlled CherryPy session ids are joined into filesystem paths without canonical containment"
+  reviewConfidence: high
+  reviewEvidence: "CherryPy FileSession path context {pattern} joins self.id under the session storage path"
+  vulnerableTo: [path.PathTraversal]
+}

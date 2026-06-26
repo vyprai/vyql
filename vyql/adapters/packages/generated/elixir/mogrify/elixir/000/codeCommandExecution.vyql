@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3ac9ed92;
+
+binding commandExecution0 {
+  requires {
+    dependency("mogrify")
+  }
+  query pattern callExpr where callee.method == "Mogrify.run_command"
+  emit sink code.CommandExecution at args[0]
+}

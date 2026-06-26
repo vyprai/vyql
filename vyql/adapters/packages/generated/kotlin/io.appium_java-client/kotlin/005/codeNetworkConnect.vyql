@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mfab11f84;
+
+binding networkConnect5 {
+  requires {
+    dependency("io.appium:java-client")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

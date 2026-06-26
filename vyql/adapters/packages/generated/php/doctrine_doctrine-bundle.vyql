@@ -1,9 +1,0 @@
-import code.{HtmlRender, SqlExecution}
-
-adapter php {
-  package "doctrine/doctrine-bundle" {
-    sink method "replaceQueryParameters" -> code.SqlExecution
-    sink method "prettifySql" -> code.HtmlRender
-    sink method "formatSql" -> code.HtmlRender
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m98e0c31b;
+
+binding commandExecution0 {
+  requires {
+    dependency("detours")
+  }
+  query pattern callExpr where callee.method == "DetourCreateProcessWithDllA"
+  emit sink code.CommandExecution at args[0]
+}

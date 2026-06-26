@@ -1,0 +1,11 @@
+module code;
+
+concept RubyCgiEscapeHtmlLengthOverflow : issue {
+  cwe: [CWE_190, CWE_787]
+  review_assumption: "a very large string on platforms with narrower long arithmetic can wrap the allocation size before copy expansion"
+  reviewCategory: numeric
+  reviewCondition: "Ruby CGI HTML escaping allocates from string length multiplied by maximum expansion before allocator overflow checks"
+  reviewConfidence: high
+  reviewEvidence: "CGI escape context {pattern} allocates ALLOCV_N(char, ..., RSTRING_LEN(str) * HTML_ESCAPE_MAX_LEN)"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobWrite]
+}

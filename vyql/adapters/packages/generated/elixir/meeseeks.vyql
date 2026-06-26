@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "meeseeks" {
-    sink method "Meeseeks.parse" -> code.Deserialization
-  }
-}

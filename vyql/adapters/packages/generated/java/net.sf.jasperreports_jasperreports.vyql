@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "net.sf.jasperreports:jasperreports" {
-    sink method "getQuery" -> code.SqlExecution
-  }
-}

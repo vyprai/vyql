@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m7bd69ab9;
+
+binding deserialization1 {
+  requires {
+    dependency("webrobots")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

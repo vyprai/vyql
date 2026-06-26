@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter cpp {
-  package "cpu-features" {
-    sink method "CpuFeatures_OpenFile" -> code.FilePathAccess
-  }
-}

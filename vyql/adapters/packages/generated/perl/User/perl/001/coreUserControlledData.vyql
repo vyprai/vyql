@@ -1,0 +1,9 @@
+module bindings.perl.migration.m35add0b4;
+
+binding userControlledData1 {
+  requires {
+    dependency("User")
+  }
+  query pattern callExpr where callee.method == "Login"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m0acdd377;
+
+binding deserialization0 {
+  requires {
+    dependency("org.mapdb:mapdb")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

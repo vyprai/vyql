@@ -1,0 +1,9 @@
+module bindings.swift.migration.medf098a0;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/konkab/AlamofireNetworkActivityLogger")
+  }
+  query pattern callExpr where callee.method == "startLogging"
+  emit source code.NetworkData at call.result
+}

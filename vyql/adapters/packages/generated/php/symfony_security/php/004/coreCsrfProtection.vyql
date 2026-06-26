@@ -1,0 +1,14 @@
+module bindings.php.migration.m86f7686e;
+
+binding csrfProtection4 {
+  requires {
+    dependency("symfony/security")
+  }
+  query pattern callExpr where callee.method == "refreshToken"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding urlFetch24 {
+  requires {
+    dependency("requests")
+  }
+  query pattern callExpr where callee.path ~= "requests.get"
+  emit sink code.UrlFetch at args[0]
+}

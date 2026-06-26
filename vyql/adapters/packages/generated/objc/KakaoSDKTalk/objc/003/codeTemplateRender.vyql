@@ -1,0 +1,9 @@
+module bindings.objc.migration.m29559e25;
+
+binding templateRender3 {
+  requires {
+    dependency("KakaoSDKTalk")
+  }
+  query pattern callExpr where callee.method == "sendScrapMemo"
+  emit sink code.TemplateRender at args[0]
+}

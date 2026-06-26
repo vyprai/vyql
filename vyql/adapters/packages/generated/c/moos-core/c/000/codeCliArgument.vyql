@@ -1,0 +1,9 @@
+module bindings.c.migration.m734b81f3;
+
+binding cliArgument0 {
+  requires {
+    dependency("moos-core")
+  }
+  query pattern callExpr where callee.method == "CMOOSApp::Run"
+  emit source code.CliArgument at call.result
+}

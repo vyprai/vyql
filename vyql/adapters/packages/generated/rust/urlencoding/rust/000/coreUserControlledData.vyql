@@ -1,0 +1,9 @@
+module bindings.rust.migration.m83fbeeb2;
+
+binding userControlledData0 {
+  requires {
+    dependency("urlencoding")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

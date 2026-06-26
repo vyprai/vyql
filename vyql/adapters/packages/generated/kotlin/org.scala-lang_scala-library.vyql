@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter kotlin {
-  package "org.scala-lang:scala-library" {
-    control method "processEscapes" -> core.InputValidation
-  }
-}

@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/containerd/fifo" {
-    sink method "OpenFifoDup2" -> code.FilePathAccess
-    sink method "OpenFifo" -> code.FilePathAccess
-    sink method "IsFifo" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mfb751f63;
+
+binding networkSend0 {
+  requires {
+    dependency("spatie/ray")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

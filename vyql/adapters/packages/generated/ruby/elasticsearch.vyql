@@ -1,7 +1,0 @@
-import code.{NosqlQuery}
-
-adapter ruby {
-  package "elasticsearch" {
-    sink method "query" -> code.NosqlQuery
-  }
-}

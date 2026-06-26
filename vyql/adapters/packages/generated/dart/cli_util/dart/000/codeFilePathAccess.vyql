@@ -1,0 +1,9 @@
+module bindings.dart.migration.m32bb9c80;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cli_util")
+  }
+  query pattern callExpr where callee.method == "applicationConfigHome"
+  emit sink code.FilePathAccess at args[0]
+}

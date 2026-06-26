@@ -1,0 +1,11 @@
+module code;
+
+concept StateCommitBeforeExternalWriteAccounting : issue {
+  cwe: [CWE_696, CWE_755]
+  review_assumption: "a failing external accounting hook can return an error after the durable create substate has already been committed"
+  reviewCategory: lifecycle
+  reviewCondition: "state commit occurs before fallible external write accounting or metering succeeds"
+  reviewConfidence: high
+  reviewEvidence: "create-cleanup context {pattern} exits the substate as succeeded before recording the external write operation"
+  vulnerableTo: [business_logic.BusinessLogic]
+}

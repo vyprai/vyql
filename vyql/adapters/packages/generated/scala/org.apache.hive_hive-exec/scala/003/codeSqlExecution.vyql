@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbab0fda3;
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.apache.hive:hive-exec")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

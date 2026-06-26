@@ -1,0 +1,9 @@
+module bindings.python.migration.m1a8e7585;
+
+binding codeEval0 {
+  requires {
+    dependency("decorator")
+  }
+  query pattern callExpr where callee.method == "make"
+  emit sink code.CodeEval at args[0]
+}

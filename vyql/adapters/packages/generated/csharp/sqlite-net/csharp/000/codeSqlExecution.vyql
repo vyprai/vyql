@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m46c40b45;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlite-net")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit sink code.SqlExecution at args[0]
+}

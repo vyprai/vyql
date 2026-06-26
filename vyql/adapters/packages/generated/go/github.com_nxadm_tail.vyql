@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/nxadm/tail" {
-    sink method "TailFile" -> code.FilePathAccess
-  }
-}

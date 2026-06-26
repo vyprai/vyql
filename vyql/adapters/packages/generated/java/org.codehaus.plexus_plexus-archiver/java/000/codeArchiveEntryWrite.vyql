@@ -1,0 +1,9 @@
+module bindings.java.migration.m8f123f42;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("org.codehaus.plexus:plexus-archiver")
+  }
+  query pattern callExpr where callee.method == "createArchive"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

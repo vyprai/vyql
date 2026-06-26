@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9cdbf558;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ruby-prof")
+  }
+  query pattern callExpr where callee.method == "Rack::RubyProf#initialize"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m4996c30b;
+
+binding networkBind0 {
+  requires {
+    dependency("github.com/bradfitz/go-smtpd")
+  }
+  query pattern callExpr where callee.method == "ListenAndServe"
+  emit sink code.NetworkBind at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m49d40bc5;
+
+binding networkSend4 {
+  requires {
+    dependency("SocketRocket")
+  }
+  query pattern callExpr where callee.method == "sendDataNoCopy:error:"
+  emit sink code.NetworkSend at args[0]
+}

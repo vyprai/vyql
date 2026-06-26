@@ -1,0 +1,9 @@
+module bindings.php.migration.m7a180ebe;
+
+binding filePathAccess2 {
+  requires {
+    dependency("oyejorge/less.php")
+  }
+  query pattern callExpr where callee.method == "compileFile"
+  emit sink code.FilePathAccess at args[0]
+}

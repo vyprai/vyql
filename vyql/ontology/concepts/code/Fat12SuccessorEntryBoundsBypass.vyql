@@ -1,0 +1,11 @@
+module code;
+
+concept Fat12SuccessorEntryBoundsBypass : issue {
+  cwe: [CWE_125, CWE_787, CWE_193]
+  review_assumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
+  reviewCategory: memory
+  reviewCondition: "FAT12 even-entry writes read the successor FAT entry using a cluster bound that excludes the reserved FAT entries"
+  reviewConfidence: high
+  reviewEvidence: "FAT12 set_fat context {pattern} reads cluster + 1 after checking cluster against fs->clusters - 1 instead of the total FAT entry upper bound"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

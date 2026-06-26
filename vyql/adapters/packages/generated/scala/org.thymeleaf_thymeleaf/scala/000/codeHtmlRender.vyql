@@ -1,0 +1,9 @@
+module bindings.scala.migration.m65a14211;
+
+binding htmlRender0 {
+  requires {
+    dependency("org.thymeleaf:thymeleaf")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.HtmlRender at args[0]
+}

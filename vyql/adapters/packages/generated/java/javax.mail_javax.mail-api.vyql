@@ -1,5 +1,0 @@
-adapter java {
-  package "javax.mail:javax.mail-api" {
-    sink method "parse" -> code.Deserialization
-  }
-}

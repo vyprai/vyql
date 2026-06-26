@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb11bb70f;
+
+binding cliArgument0 {
+  requires {
+    dependency("markdownlint-cli")
+  }
+  query pattern callExpr where callee.path ~= "markdownlint-cli.argv"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6aa10232;
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/CreateAPI/URLQueryEncoder")
+  }
+  query pattern callExpr where callee.method == "percentEncodedQuery"
+  emit source core.UserControlledData at call.result
+}

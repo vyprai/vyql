@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m3815eab7;
+
+binding deserialization5 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.getDoubleValue"
+  emit sink code.Deserialization at args[0]
+}

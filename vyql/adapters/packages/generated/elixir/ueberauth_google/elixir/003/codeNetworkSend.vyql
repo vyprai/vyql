@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m86ad4718;
+
+binding networkSend3 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

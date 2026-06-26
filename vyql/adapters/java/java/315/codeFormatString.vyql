@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding formatString315 {
+  query pattern callExpr where callee.path ~= "String.format"
+  emit sink code.FormatString at args[0]
+}

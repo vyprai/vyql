@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "toml_datetime" {
-    sink method "from_str" -> code.Deserialization
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.scala.migration.m78d7afeb;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("org.hibernate:hibernate-core")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

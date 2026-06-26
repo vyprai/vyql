@@ -1,8 +1,0 @@
-adapter elixir {
-  package "ex_abi" {
-    sink method "decode" -> code.Deserialization
-    sink method "find_and_decode" -> code.Deserialization
-    sink method "parse_specification" -> code.Deserialization
-    sink method "parse!" -> code.Deserialization
-  }
-}

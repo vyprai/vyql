@@ -1,5 +1,0 @@
-adapter dart {
-  package "video_compress" {
-    sink method "compressVideo" -> code.FileUse
-  }
-}

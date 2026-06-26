@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding insecurePermission587 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "mkdir" and node.token contains "parents=True" and node.token contains "exist_ok=True" and not (node.token contains "mode=")
+  emit issue code.InsecurePermission at node
+}

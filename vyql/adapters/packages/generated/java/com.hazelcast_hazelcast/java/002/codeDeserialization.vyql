@@ -1,0 +1,9 @@
+module bindings.java.migration.mf41c86b4;
+
+binding deserialization2 {
+  requires {
+    dependency("com.hazelcast:hazelcast")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

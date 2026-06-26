@@ -1,0 +1,14 @@
+module bindings.csharp.migration.m3060eca4;
+
+binding htmlEscape0 {
+  requires {
+    dependency("mustache.js")
+  }
+  query pattern callExpr where callee.method == "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

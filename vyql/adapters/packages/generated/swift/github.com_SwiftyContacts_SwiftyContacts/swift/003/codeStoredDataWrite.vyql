@@ -1,0 +1,9 @@
+module bindings.swift.migration.m252f3369;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("github.com/SwiftyContacts/SwiftyContacts")
+  }
+  query pattern callExpr where callee.method == "deleteContact"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter javascript {
-  package "parseurl" {
-    source method "parseurl" -> core.UserControlledData
-    source method "originalurl" -> core.UserControlledData
-    source method "fastparse" -> core.UserControlledData
-  }
-}

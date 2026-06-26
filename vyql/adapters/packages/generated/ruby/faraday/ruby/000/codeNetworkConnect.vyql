@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdb706b1a;
+
+binding networkConnect0 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.method == "Faraday::Connection.new"
+  emit sink code.NetworkConnectSink at args[0]
+}

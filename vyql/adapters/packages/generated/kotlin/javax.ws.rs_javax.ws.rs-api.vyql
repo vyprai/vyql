@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "javax.ws.rs:javax.ws.rs-api" {
-    source path "javax.ws.rs.javax.ws.rs.api.cookie" -> code.HttpInput
-    sink method "getContextClassLoader" -> code.XmlParse
-  }
-}

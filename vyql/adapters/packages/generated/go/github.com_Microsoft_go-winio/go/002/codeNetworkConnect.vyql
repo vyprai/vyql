@@ -1,0 +1,9 @@
+module bindings.go.migration.m600cfa6d;
+
+binding networkConnect2 {
+  requires {
+    dependency("github.com/Microsoft/go-winio")
+  }
+  query pattern callExpr where callee.method == "DialPipeAccess"
+  emit sink code.NetworkConnectSink at args[0]
+}

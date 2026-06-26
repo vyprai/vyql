@@ -1,0 +1,9 @@
+module bindings.swift.migration.mce8ff240;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/apple/swift-openapi-runtime")
+  }
+  query pattern callExpr where callee.method == "getResponseBodyAsXML"
+  emit sink code.Deserialization at args[0]
+}

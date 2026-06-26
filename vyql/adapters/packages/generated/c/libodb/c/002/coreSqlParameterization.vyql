@@ -1,0 +1,14 @@
+module bindings.c.migration.mce355dd5;
+
+binding sqlParameterization2 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "prepared_already_cached"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

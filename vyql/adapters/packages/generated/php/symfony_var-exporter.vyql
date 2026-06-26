@@ -1,5 +1,0 @@
-adapter php {
-  package "symfony/var-exporter" {
-    sink method "deepClone" -> code.Deserialization
-  }
-}

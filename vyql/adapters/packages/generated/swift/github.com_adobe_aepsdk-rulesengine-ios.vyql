@@ -1,8 +1,0 @@
-import code.{ExpressionEval, TemplateRender}
-
-adapter swift {
-  package "github.com/adobe/aepsdk-rulesengine-ios" {
-    sink method "evaluate" -> code.ExpressionEval
-    sink method "render" -> code.TemplateRender
-  }
-}

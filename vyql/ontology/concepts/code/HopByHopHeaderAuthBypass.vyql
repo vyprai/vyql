@@ -1,0 +1,11 @@
+module code;
+
+concept HopByHopHeaderAuthBypass : issue {
+  cwe: [CWE_287]
+  review_assumption: "the backend or reverse proxy path honors the Connection header by dropping named forwarded headers"
+  reviewCategory: auth
+  reviewCondition: "a reverse proxy sets privileged backend authentication or impersonation headers without first removing client-controlled hop-by-hop header tokens"
+  reviewConfidence: medium
+  reviewEvidence: "proxy impersonation context {pattern} writes Authorization or Impersonate-* headers but lacks Connection-header stripping"
+  vulnerableTo: [authentication.ImproperAuthentication, access_control.IncorrectAuthorization]
+}

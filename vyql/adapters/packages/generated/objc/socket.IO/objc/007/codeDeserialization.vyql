@@ -1,0 +1,9 @@
+module bindings.objc.migration.m00ed25c5;
+
+binding deserialization7 {
+  requires {
+    dependency("socket.IO")
+  }
+  query pattern callExpr where callee.method == "objectFromJSONData:error:"
+  emit sink code.Deserialization at args[0]
+}

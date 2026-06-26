@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "jwt_decoder" {
-    sink method "decode" -> code.Deserialization
-    sink method "tryDecode" -> code.Deserialization
-  }
-}

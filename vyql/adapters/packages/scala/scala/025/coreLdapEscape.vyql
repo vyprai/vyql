@@ -1,0 +1,14 @@
+module bindings.scala.migration.m3608f193;
+
+binding ldapEscape25 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.path ~= "LdapEncoder.filterEncode"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

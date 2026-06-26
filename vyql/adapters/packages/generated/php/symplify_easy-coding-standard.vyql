@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter php {
-  package "symplify/easy-coding-standard" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

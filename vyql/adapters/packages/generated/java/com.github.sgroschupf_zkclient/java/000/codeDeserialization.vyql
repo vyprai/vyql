@@ -1,0 +1,9 @@
+module bindings.java.migration.m136e762d;
+
+binding deserialization0 {
+  requires {
+    dependency("com.github.sgroschupf:zkclient")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

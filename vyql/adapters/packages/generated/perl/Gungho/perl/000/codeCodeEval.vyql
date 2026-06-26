@@ -1,0 +1,9 @@
+module bindings.perl.migration.m46fef183;
+
+binding codeEval0 {
+  requires {
+    dependency("Gungho")
+  }
+  query pattern callExpr where callee.method == "sprintf"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding stateChangingOp140 {
+  query pattern callExpr where callee.method == "grant_role"
+  emit sink code.StateChangingOpSink at args[0]
+}

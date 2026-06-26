@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding ownershipCheck178 {
+  query pattern callExpr where callee.path ~= "checkOwnership"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

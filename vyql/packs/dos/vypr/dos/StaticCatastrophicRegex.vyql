@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule StaticCatastrophicRegex {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_1333, CWE_400]
+    id: "VYQL-DOS-003"
+    severity: medium
+  }
+  issue code.CatastrophicRegex as r
+}

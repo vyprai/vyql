@@ -1,0 +1,9 @@
+module bindings.swift.migration.mad2e399d;
+
+binding networkSend5 {
+  requires {
+    dependency("github.com/serhii-londar/BaseAPI")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

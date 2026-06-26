@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6dfd3bf0;
+
+binding sqlExecution1 {
+  requires {
+    dependency("github.com/SwiftORM/MySQL-StORM")
+  }
+  query pattern callExpr where callee.method == "sqlRows"
+  emit sink code.SqlExecution at args[0]
+}

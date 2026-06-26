@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1e2c8c6e;
+
+binding cliArgument1 {
+  requires {
+    dependency("sidekiq")
+  }
+  query pattern callExpr where callee.method == "parse_options"
+  emit source code.CliArgument at call.result
+}

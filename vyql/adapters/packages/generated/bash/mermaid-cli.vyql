@@ -1,5 +1,0 @@
-adapter bash {
-  package "mermaid-cli" {
-    source path "mermaid-cli.argv" -> code.CliArgument
-  }
-}

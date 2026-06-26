@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mef70b88d;
+
+binding networkSend3 {
+  requires {
+    dependency("net-ldap")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

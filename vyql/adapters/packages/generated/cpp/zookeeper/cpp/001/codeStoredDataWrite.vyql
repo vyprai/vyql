@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma2ac2d73;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("zookeeper")
+  }
+  query pattern callExpr where callee.method == "zoo_set"
+  emit sink code.StoredDataWrite at args[0]
+}

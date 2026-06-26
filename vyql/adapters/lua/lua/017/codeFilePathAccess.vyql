@@ -1,0 +1,6 @@
+module bindings.lua.migration.ma99d12f7;
+
+binding filePathAccess17 {
+  query pattern callExpr where callee.path ~= "io.open"
+  emit sink code.FilePathAccess at args[0]
+}

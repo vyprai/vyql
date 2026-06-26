@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter perl {
-  package "Paranoid" {
-    sink method "popen" -> code.CommandExecution
-  }
-}

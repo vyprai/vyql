@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding deflateDecompressionMaxSafeIntegerLimit631 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "call" and node.path ~= "decompressDeflateRawWithLimit" and operand(node, where: operand.path ~= "Number.MAX_SAFE_INTEGER")
+  emit issue code.DeflateDecompressionMaxSafeIntegerLimit at node
+}

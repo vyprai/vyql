@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me3853743;
+
+binding filePathAccess9 {
+  requires {
+    dependency("webdrivers")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization, NetworkConnect}
-adapter csharp {
-  package "knockoutjs" {
-    sink method "parseJson" -> code.Deserialization
-    sink method "postJson" -> code.NetworkConnect
-  }
-}

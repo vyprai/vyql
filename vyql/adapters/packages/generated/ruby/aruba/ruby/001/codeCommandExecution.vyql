@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma3c5565d;
+
+binding commandExecution1 {
+  requires {
+    dependency("aruba")
+  }
+  query pattern callExpr where callee.method == "run_command_and_stop"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m2ea76b0f;
+
+binding commandExecution1 {
+  requires {
+    dependency("git")
+  }
+  query pattern callExpr where callee.method == "runCommand"
+  emit sink code.CommandExecution at args[0]
+}

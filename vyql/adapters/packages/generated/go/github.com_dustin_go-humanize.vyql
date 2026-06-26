@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/dustin/go-humanize" {
-    sink method "ParseSI" -> code.Deserialization
-    sink method "ParseBytes" -> code.Deserialization
-    sink method "ParseBigBytes" -> code.Deserialization
-  }
-}

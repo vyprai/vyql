@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me859b561;
+
+binding sqlExecution1 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "create_schema"
+  emit sink code.SqlExecution at args[0]
+}

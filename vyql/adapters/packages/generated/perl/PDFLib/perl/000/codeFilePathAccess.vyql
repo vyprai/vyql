@@ -1,0 +1,9 @@
+module bindings.perl.migration.mae86382a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("PDFLib")
+  }
+  query pattern callExpr where callee.method == "filename"
+  emit sink code.FilePathAccess at args[0]
+}

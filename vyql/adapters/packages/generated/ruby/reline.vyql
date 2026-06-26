@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter ruby {
-  package "reline" {
-    source method "readline" -> core.UserControlledData
-    source method "readmultiline" -> core.UserControlledData
-  }
-}

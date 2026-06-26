@@ -1,0 +1,9 @@
+module bindings.objc.migration.m6e3df7af;
+
+binding commandExecution5 {
+  requires {
+    dependency("LetsMove")
+  }
+  query pattern callExpr where callee.method == "ShellQuotedString"
+  emit sink code.CommandExecution at args[0]
+}

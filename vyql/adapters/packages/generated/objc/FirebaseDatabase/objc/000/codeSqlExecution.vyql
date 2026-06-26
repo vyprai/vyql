@@ -1,0 +1,9 @@
+module bindings.objc.migration.m3a9b3b56;
+
+binding sqlExecution0 {
+  requires {
+    dependency("FirebaseDatabase")
+  }
+  query pattern callExpr where callee.method == "Update"
+  emit sink code.SqlExecution at args[0]
+}

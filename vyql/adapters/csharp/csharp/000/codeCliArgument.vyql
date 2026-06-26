@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding cliArgument0 {
+  query pattern callExpr where callee.path ~= "Environment.GetCommandLineArgs"
+  emit source code.CliArgument at call.result
+}

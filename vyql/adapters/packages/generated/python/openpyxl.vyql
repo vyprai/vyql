@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "openpyxl" {
-    sink method "read" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

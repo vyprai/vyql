@@ -1,0 +1,9 @@
+module bindings.php.migration.m881ac389;
+
+binding urlFetch2 {
+  requires {
+    dependency("padraic/humbug_get_contents")
+  }
+  query pattern callExpr where callee.method == "HumbugFileGetContents.get"
+  emit sink code.UrlFetch at args[0]
+}

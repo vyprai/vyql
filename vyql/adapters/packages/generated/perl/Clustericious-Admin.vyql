@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-
-adapter perl {
-  package "Clustericious-Admin" {
-    sink method "ssh_command" -> code.CommandExecution
-    sink method "server_command" -> code.CommandExecution
-    sink method "command" -> code.CommandExecution
-  }
-}

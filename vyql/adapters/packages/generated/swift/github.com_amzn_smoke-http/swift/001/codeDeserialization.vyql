@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc507311d;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/amzn/smoke-http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.me24e9b91;
+
+binding deserialization0 {
+  requires {
+    dependency("hpack")
+  }
+  query pattern callExpr where callee.method == "Decoder.decode"
+  emit sink code.Deserialization at args[0]
+}

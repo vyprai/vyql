@@ -1,0 +1,9 @@
+module bindings.rust.migration.m1e6d61dd;
+
+binding filePathAccess2 {
+  requires {
+    dependency("proc-macro2")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

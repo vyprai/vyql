@@ -1,0 +1,9 @@
+module bindings.objc.migration.mac6d4867;
+
+binding networkConnect0 {
+  requires {
+    dependency("SwiftNIO")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

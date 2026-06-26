@@ -1,0 +1,9 @@
+module bindings.objc.migration.m61c6ea32;
+
+binding networkSend0 {
+  requires {
+    dependency("WebRTC-SDK")
+  }
+  query pattern callExpr where callee.method == "sendData:"
+  emit sink code.NetworkSend at args[0]
+}

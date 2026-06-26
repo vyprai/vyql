@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m65321687;
+
+binding userControlledData1 {
+  requires {
+    dependency("tr46")
+  }
+  query pattern callExpr where callee.method == "toUnicode"
+  emit source core.UserControlledData at call.result
+}

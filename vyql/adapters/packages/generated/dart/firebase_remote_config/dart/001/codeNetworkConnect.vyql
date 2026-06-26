@@ -1,0 +1,9 @@
+module bindings.dart.migration.m38547978;
+
+binding networkConnect1 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4e338abf;
+
+binding networkConnect2 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "setHTTPProxy"
+  emit sink code.NetworkConnectSink at args[0]
+}

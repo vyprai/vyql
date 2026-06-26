@@ -1,0 +1,9 @@
+module bindings.java.migration.mf27d1696;
+
+binding filePathAccess0 {
+  requires {
+    dependency("io.springfox:springfox-boot-starter")
+  }
+  query pattern callExpr where callee.method == "addResourceHandlers"
+  emit sink code.FilePathAccess at args[0]
+}

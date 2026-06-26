@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbd2c5ae5;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-compiler-plugin")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

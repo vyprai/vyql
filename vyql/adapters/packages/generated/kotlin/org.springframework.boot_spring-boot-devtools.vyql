@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter kotlin {
-  package "org.springframework.boot:spring-boot-devtools" {
-    sink method "addSourceDirectory" -> code.FilePathAccess
-  }
-}

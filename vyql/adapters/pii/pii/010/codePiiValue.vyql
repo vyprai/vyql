@@ -1,0 +1,6 @@
+module bindings.pii.migration.m24e11c07;
+
+binding piiValue10 {
+  query pattern callExpr where callee.method == "bank_account"
+  emit source code.PiiValue at call.result
+}

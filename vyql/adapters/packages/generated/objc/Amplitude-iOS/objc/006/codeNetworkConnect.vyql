@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7ce48b31;
+
+binding networkConnect6 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "sendAsynchronousRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

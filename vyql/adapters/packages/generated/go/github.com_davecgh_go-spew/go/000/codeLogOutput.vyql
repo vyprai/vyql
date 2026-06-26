@@ -1,0 +1,9 @@
+module bindings.go.migration.m80404178;
+
+binding logOutput0 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Errorf"
+  emit sink code.LogOutput at args[0]
+}

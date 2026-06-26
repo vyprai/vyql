@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me2ad5ae9;
+
+binding userControlledData0 {
+  requires {
+    dependency("jekyll-watch")
+  }
+  query pattern callExpr where callee.method == "watch"
+  emit source core.UserControlledData at call.result
+}

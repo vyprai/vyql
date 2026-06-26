@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3608f193;
+
+binding xpathQuery23 {
+  requires {
+    dependency("javax.xml.xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}

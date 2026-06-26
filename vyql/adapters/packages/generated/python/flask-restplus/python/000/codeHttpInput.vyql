@@ -1,0 +1,9 @@
+module bindings.python.migration.m2d42f0ca;
+
+binding httpInput0 {
+  requires {
+    dependency("flask-restplus")
+  }
+  query pattern callExpr where callee.method == "RequestParser.parse_args"
+  emit source code.HttpInput at call.result
+}

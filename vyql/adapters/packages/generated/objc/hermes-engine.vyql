@@ -1,7 +1,0 @@
-import code.{CodeEval, Deserialization}
-adapter objc {
-  package "hermes-engine" {
-    sink method "evaluateJavaScript" -> code.CodeEval
-    sink method "createValueFromJsonUtf8" -> code.Deserialization
-  }
-}

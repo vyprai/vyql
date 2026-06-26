@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "com.fasterxml.jackson.datatype:jackson-datatype-json-org" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

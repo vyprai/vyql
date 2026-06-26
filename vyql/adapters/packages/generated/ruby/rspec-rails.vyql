@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter ruby {
-  package "rspec-rails" {
-    sink method "target_path" -> code.FilePathAccess
-  }
-}

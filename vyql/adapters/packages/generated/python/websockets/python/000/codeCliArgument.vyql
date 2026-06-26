@@ -1,0 +1,9 @@
+module bindings.python.migration.m9256f70a;
+
+binding cliArgument0 {
+  requires {
+    dependency("websockets")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

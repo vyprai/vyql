@@ -1,0 +1,11 @@
+module code;
+
+concept AuthFailureResponseReview : issue {
+  cwe: [CWE_287]
+  review_assumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
+  reviewCategory: auth
+  reviewCondition: "authentication verification error handling returns a generic failure response instead of an observed fail-closed unauthorized response"
+  reviewConfidence: possibility
+  reviewEvidence: "auth verification error path {pattern} handles malformed forwarded target data with a generic error response"
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

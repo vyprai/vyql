@@ -1,0 +1,9 @@
+module bindings.cpp.migration.md4505975;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-date-time")
+  }
+  query pattern callExpr where callee.method == "load_from_stream"
+  emit sink code.Deserialization at args[0]
+}

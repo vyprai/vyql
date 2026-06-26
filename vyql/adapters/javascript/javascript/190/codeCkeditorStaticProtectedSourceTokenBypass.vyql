@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding ckeditorStaticProtectedSourceTokenBypass190 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=protectSource" and node.token contains "protectedHtml" and node.token contains "cke_tempcomment" and node.token contains "/cke_temp(comment)?/" and node.token contains "'<!--{cke_temp}'" and not (node.token contains "randomNumber") and not (node.token contains "cke_temp_")
+  emit issue code.CkeditorStaticProtectedSourceTokenBypass at node
+}

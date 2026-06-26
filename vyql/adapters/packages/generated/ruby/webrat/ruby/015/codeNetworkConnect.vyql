@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0d1769df;
+
+binding networkConnect15 {
+  requires {
+    dependency("webrat")
+  }
+  query pattern callExpr where callee.method == "do_request"
+  emit sink code.NetworkConnectSink at args[0]
+}

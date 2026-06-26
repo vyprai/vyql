@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc350ebe7;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/JohnSundell/ShellOut")
+  }
+  query pattern callExpr where callee.method == "shellOut"
+  emit sink code.CommandExecution at args[0]
+}

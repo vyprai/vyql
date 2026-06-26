@@ -1,0 +1,8 @@
+module code;
+
+review code.ExportDefaultPublicFilesystemDisk {
+  category: secret
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review export filesystem disk selection and remap public default disks to a private disk unless public export storage is explicit"
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m92fa51a6;
+
+binding deserialization0 {
+  requires {
+    dependency("xmltodict")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

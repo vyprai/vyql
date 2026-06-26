@@ -1,0 +1,9 @@
+module bindings.go.migration.m7030a193;
+
+binding deserialization3 {
+  requires {
+    dependency("go.mozilla.org/pkcs7")
+  }
+  query pattern callExpr where callee.method == "parseSignedData"
+  emit sink code.Deserialization at args[0]
+}

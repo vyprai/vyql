@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding commandExecution13 {
+  requires {
+    dependency("System.Diagnostics.Process")
+  }
+  query pattern callExpr where callee.path ~= "Process.Start"
+  emit sink code.CommandExecution at args[0]
+}

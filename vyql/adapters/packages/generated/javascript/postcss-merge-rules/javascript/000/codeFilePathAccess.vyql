@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m940d22ef;
+
+binding filePathAccess0 {
+  requires {
+    dependency("postcss-merge-rules")
+  }
+  query pattern callExpr where callee.method == "pluginCreator"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf86738b3;
+
+binding databaseRead3 {
+  requires {
+    dependency("redis-namespace")
+  }
+  query pattern callExpr where callee.method == "method_missing"
+  emit sink code.DatabaseReadSink at args[0]
+}

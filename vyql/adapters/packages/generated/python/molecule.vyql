@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "molecule" {
-    sink method "run_command" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m93336494;
+
+binding networkData3 {
+  requires {
+    dependency("File-FDpasser")
+  }
+  query pattern callExpr where callee.method == "recv_fh"
+  emit source code.NetworkData at call.result
+}

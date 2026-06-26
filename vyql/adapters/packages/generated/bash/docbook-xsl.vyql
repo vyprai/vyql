@@ -1,7 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter bash {
-  package "docbook-xsl" {
-    source path "dbtoepub" -> code.CliArgument
-    sink path "docbook-xsl-update" -> code.CommandExecution
-  }
-}

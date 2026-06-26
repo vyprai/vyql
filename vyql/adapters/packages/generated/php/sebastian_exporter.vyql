@@ -1,8 +1,0 @@
-adapter php {
-  package "sebastian/exporter" {
-    source method "export" -> core.UserControlledData
-    source method "shortenedExport" -> core.UserControlledData
-    source method "shortenedRecursiveExport" -> core.UserControlledData
-    source method "toArray" -> core.UserControlledData
-  }
-}

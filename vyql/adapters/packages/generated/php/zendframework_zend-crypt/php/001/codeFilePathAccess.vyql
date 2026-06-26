@@ -1,0 +1,9 @@
+module bindings.php.migration.m1275784e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("zendframework/zend-crypt")
+  }
+  query pattern callExpr where callee.method == "ZendCryptFileCipher::decrypt"
+  emit sink code.FilePathAccess at args[0]
+}

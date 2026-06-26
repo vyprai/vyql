@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding sizeComputation39 {
+  query pattern callExpr where callee.path ~= "calloc"
+  emit sink code.SizeComputation at args.any
+}

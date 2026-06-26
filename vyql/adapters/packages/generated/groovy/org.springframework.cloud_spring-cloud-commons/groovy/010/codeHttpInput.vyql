@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m130d45c7;
+
+binding httpInput10 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source code.HttpInput at call.result
+}

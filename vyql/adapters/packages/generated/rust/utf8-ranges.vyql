@@ -1,7 +1,0 @@
-adapter rust {
-  package "utf8-ranges" {
-    flag code.RegexCompile on any {
-      method "matches"
-    }
-  }
-}

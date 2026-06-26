@@ -1,0 +1,9 @@
+module bindings.php.migration.m09de1213;
+
+binding deserialization1 {
+  requires {
+    dependency("facebook/webdriver")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.Deserialization at args[0]
+}

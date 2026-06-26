@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m70d3d45f;
+
+binding deserialization1 {
+  requires {
+    dependency("activejob")
+  }
+  query pattern callExpr where callee.method == "deserialize_argument"
+  emit sink code.Deserialization at args[0]
+}

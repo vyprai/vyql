@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4ed26539;
+
+binding deserialization18 {
+  requires {
+    dependency("LUKeychainAccess")
+  }
+  query pattern callExpr where callee.method == "lu_unarchiveObjectWithData:"
+  emit sink code.Deserialization at args[0]
+}

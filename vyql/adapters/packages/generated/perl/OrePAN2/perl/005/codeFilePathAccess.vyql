@@ -1,0 +1,9 @@
+module bindings.perl.migration.me25953b6;
+
+binding filePathAccess5 {
+  requires {
+    dependency("OrePAN2")
+  }
+  query pattern callExpr where callee.method == "list_archive_files"
+  emit sink code.FilePathAccess at args[0]
+}

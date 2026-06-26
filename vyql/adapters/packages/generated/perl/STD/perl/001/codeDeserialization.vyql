@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7b7b62ac;
+
+binding deserialization1 {
+  requires {
+    dependency("STD")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

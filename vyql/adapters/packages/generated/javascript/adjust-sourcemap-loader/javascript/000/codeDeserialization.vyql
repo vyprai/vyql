@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mef761836;
+
+binding deserialization0 {
+  requires {
+    dependency("adjust-sourcemap-loader")
+  }
+  query pattern callExpr where callee.method == "loader"
+  emit sink code.Deserialization at args[0]
+}

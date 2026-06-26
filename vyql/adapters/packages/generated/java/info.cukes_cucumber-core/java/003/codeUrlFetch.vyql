@@ -1,0 +1,9 @@
+module bindings.java.migration.m490e28e4;
+
+binding urlFetch3 {
+  requires {
+    dependency("info.cukes:cucumber-core")
+  }
+  query pattern callExpr where callee.method == "cucumber.runtime.Utils.toURL"
+  emit sink code.UrlFetch at args[0]
+}

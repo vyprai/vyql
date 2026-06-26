@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc70908b8;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("SwiftNIOHTTP1")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter java {
-  package "org.seleniumhq.selenium:selenium-server" {
-    source method "GridLauncherV3.parse" -> code.CliArgument
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.swift.migration.mc6005d88;
+
+binding safeDeserialization18 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "JSONDecoder.decode"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.med5b2857;
+
+binding networkConnect1 {
+  requires {
+    dependency("async-io")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit sink code.NetworkConnectSink at args[0]
+}

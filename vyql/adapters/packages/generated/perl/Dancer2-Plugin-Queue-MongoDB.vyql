@@ -1,9 +1,0 @@
-import code.{StoredDataWrite, StoredDataRead}
-
-adapter perl {
-  package "Dancer2-Plugin-Queue-MongoDB" {
-    sink method "add_msg" -> code.StoredDataWrite
-    source method "get_msg" -> code.StoredDataRead
-    sink method "remove_msg" -> code.StoredDataWrite
-  }
-}

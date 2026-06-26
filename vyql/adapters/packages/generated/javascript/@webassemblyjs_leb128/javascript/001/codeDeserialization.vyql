@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mf88fa75b;
+
+binding deserialization1 {
+  requires {
+    dependency("@webassemblyjs/leb128")
+  }
+  query pattern callExpr where callee.method == "decodeInt32"
+  emit sink code.Deserialization at args[0]
+}

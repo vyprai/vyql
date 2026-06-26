@@ -1,0 +1,9 @@
+module bindings.groovy.migration.ma4c9cd1e;
+
+binding networkConnect2 {
+  requires {
+    dependency("io.netty:netty-handler")
+  }
+  query pattern callExpr where callee.method == "SslHandler"
+  emit sink code.NetworkConnectSink at args[0]
+}

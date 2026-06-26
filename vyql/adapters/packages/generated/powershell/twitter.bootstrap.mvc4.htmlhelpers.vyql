@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter powershell {
-  package "twitter.bootstrap.mvc4.htmlhelpers" {
-    sink method "ActionLinkWithGlyphIcon" -> code.HtmlRender
-  }
-}

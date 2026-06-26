@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "stackprof" {
-    sink method "StackProf::Report.parse_json" -> code.Deserialization
-  }
-}

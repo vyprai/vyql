@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/xeipuuv/gojsonreference" {
-    source method "NewJsonReference" -> core.UserControlledData
-  }
-}

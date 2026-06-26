@@ -1,0 +1,6 @@
+module threat;
+
+concept CharFilter : check {
+  analysis_role: char_filter
+  covers: [path]
+}

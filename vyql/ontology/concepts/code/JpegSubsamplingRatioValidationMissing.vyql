@@ -1,0 +1,11 @@
+module code;
+
+concept JpegSubsamplingRatioValidationMissing : issue {
+  cwe: [CWE_125, CWE_787]
+  review_assumption: "a crafted JPEG frame can choose sampling factors that produce fractional resampling ratios and inconsistent component dimensions"
+  reviewCategory: memory
+  reviewCondition: "JPEG component sampling factors divide the maximum horizontal and vertical sampling factors before component dimensions are derived"
+  reviewConfidence: high
+  reviewEvidence: "JPEG frame-header context {pattern} derives component dimensions from h_max/v_max and allocates component buffers without observed modulo-ratio validation"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

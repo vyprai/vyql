@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5bbff6cc;
+
+binding deserialization0 {
+  requires {
+    dependency("configparser_ex")
+  }
+  query pattern callExpr where callee.method == "parse_file"
+  emit sink code.Deserialization at args[0]
+}

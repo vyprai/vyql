@@ -1,8 +1,0 @@
-import code.{Deserialization, UrlFetch}
-
-adapter python {
-  package "pyquery" {
-    sink method "fromstring" -> code.Deserialization
-    sink method "url_opener" -> code.UrlFetch
-  }
-}

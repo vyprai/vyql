@@ -1,0 +1,14 @@
+module bindings.python.migration.m45dd8f7b;
+
+binding fileUpload1 {
+  requires {
+    dependency("boto3")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "upload_fileobj"
+  emit issue code.FileUpload at node
+  emit source code.FileUploadSource at node
+}

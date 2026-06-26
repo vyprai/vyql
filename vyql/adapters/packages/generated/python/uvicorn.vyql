@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "uvicorn" {
-    sink method "get_subprocess" -> code.CommandExecution
-    sink method "subprocess_started" -> code.CommandExecution
-  }
-}

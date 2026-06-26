@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2830a609;
+
+binding templateRender4 {
+  requires {
+    dependency("Squatting")
+  }
+  query pattern callExpr where callee.method == "AUTOLOAD"
+  emit sink code.TemplateRender at args[0]
+}

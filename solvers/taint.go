@@ -106,6 +106,22 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	if len(srcs) == 0 {
 		return nil, nil
 	}
+	sinkSet := map[string]bool{}
+	for c := range sinkConcepts {
+		ids, _ := store.NodesWithConcept(c)
+		for _, id := range ids {
+			sinkSet[id] = true
+		}
+	}
+	if len(sinkSet) == 0 {
+		return nil, nil
+	}
+	sinks := make([]string, 0, len(sinkSet))
+	for s := range sinkSet {
+		sinks = append(sinks, s)
+	}
+	sort.Strings(sinks)
+
 	// isKill: a node neutralizes taint if it carries a kill control, or a char-filter whose
 	// bounded output alphabet provably excludes the sink's excluded chars. killOf also returns
 	// the concept for near-miss detail. Memoized — each node's labels are scanned once.
@@ -119,6 +135,9 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			return false, ""
 		}
 		for _, l := range labelsOf(id) {
+			if l.Detail["advisory"] == "true" {
+				continue
+			}
 			if killControls[l.Concept] {
 				killMemo[id], killConcept[id] = 1, l.Concept
 				return true, l.Concept
@@ -202,19 +221,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	}
 
 	// emit one flow per tainted live sink (findings dedup to one per (rule, sink) anyway);
-	// sinks sorted for determinism, witness source = the recorded path's root.
-	sinkSet := map[string]bool{}
-	for c := range sinkConcepts {
-		ids, _ := store.NodesWithConcept(c)
-		for _, id := range ids {
-			sinkSet[id] = true
-		}
-	}
-	sinks := make([]string, 0, len(sinkSet))
-	for s := range sinkSet {
-		sinks = append(sinks, s)
-	}
-	sort.Strings(sinks)
+	// witness source = the recorded path's root.
 	nm := dedupPairs(nearMiss)
 	for _, sink := range sinks {
 		if !tainted[sink] {
@@ -254,6 +261,22 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 	sort.Slice(srcs, func(a, b int) bool { return srcs[a] < srcs[b] })
 
+	// sink indices (sorted, deduped). No sink means no possible finding, so avoid the fixpoint.
+	sinkSet := map[int32]bool{}
+	for c := range sinkConcepts {
+		for _, i := range g.ConceptNodes(c) {
+			sinkSet[i] = true
+		}
+	}
+	if len(sinkSet) == 0 {
+		return nil
+	}
+	sinks := make([]int32, 0, len(sinkSet))
+	for i := range sinkSet {
+		sinks = append(sinks, i)
+	}
+	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
+
 	// memoized kill check on a node index.
 	killMemo := make([]int8, n) // 0 unknown, 1 kill, 2 not-kill
 	killConcept := map[int32]string{}
@@ -265,6 +288,9 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			return false, ""
 		}
 		for _, l := range g.LabelsAt(i) {
+			if l.Detail["advisory"] == "true" {
+				continue
+			}
 			if killControls[l.Concept] {
 				killMemo[i] = 1
 				killConcept[i] = l.Concept
@@ -329,18 +355,7 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		return out
 	}
 
-	// sinks (sorted) → one flow per tainted live sink.
-	sinkSet := map[int32]bool{}
-	for c := range sinkConcepts {
-		for _, i := range g.ConceptNodes(c) {
-			sinkSet[i] = true
-		}
-	}
-	sinks := make([]int32, 0, len(sinkSet))
-	for i := range sinkSet {
-		sinks = append(sinks, i)
-	}
-	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
+	// one flow per tainted live sink.
 	nm := dedupPairs(nearMiss)
 	var out []TaintFlow
 	for _, sink := range sinks {

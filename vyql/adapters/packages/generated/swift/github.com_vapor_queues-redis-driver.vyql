@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter swift {
-  package "github.com/vapor/queues-redis-driver" {
-    source method "redis" -> code.NetworkData
-  }
-}

@@ -1,7 +1,0 @@
-adapter java {
-  package "org.scala-lang:scala-reflect" {
-    control method "escape" -> core.HtmlEscape
-    sink method "writeReplace" -> code.Deserialization
-    sink method "readResolve" -> code.Deserialization
-  }
-}

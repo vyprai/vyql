@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedPrototypeConfigKey : issue {
+  cwe: [CWE_1321]
+  review_assumption: "a package, project, or build configuration can supply keys such as __proto__ or constructor"
+  reviewCategory: prototype_pollution
+  reviewCondition: "configuration object keys are copied into plain object properties without filtering prototype-mutating names"
+  reviewConfidence: medium
+  reviewEvidence: "prototype-sensitive config-key copy context {pattern} writes dynamic keys into output objects"
+  vulnerableTo: [injection.PrototypePollution]
+}

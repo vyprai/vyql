@@ -1,0 +1,9 @@
+module bindings.php.migration.ma81f61c1;
+
+binding networkData6 {
+  requires {
+    dependency("grpc/grpc")
+  }
+  query pattern callExpr where callee.method == "ServerStreamingCall"
+  emit source code.NetworkData at call.result
+}

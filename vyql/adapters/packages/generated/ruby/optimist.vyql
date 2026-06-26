@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter ruby {
-  package "optimist" {
-    source method "parse" -> code.CliArgument
-  }
-}

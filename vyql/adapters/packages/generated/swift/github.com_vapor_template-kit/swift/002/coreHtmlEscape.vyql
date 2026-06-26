@@ -1,0 +1,14 @@
+module bindings.swift.migration.m4cfc762c;
+
+binding htmlEscape2 {
+  requires {
+    dependency("github.com/vapor/template-kit")
+  }
+  query pattern callExpr where callee.method == "htmlEscaped"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

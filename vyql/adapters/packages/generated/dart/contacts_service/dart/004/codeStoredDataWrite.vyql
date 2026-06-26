@@ -1,0 +1,9 @@
+module bindings.dart.migration.m3ee45a62;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("contacts_service")
+  }
+  query pattern callExpr where callee.method == "deleteContact"
+  emit sink code.StoredDataWrite at args[0]
+}

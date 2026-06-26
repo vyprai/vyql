@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me83d46b5;
+
+binding networkSend21 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.method == "patch!"
+  emit sink code.NetworkSend at args[0]
+}

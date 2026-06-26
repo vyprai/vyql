@@ -1,0 +1,10 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding timeBoundAccessTokenReview169 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "BlobSasBuilder" and node.token contains "ExpiresOn" and node.token contains "AddHours(1)" and node.token contains "GenerateSasUri" and not (node.token contains "AddMinutes(tokenDuration)")
+  emit issue code.TimeBoundAccessTokenReview at node
+}

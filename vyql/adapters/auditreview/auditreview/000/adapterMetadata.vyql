@@ -1,0 +1,14 @@
+module bindings.auditreview.migration.mbf0d19ec;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "auditreview"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "syntactic"
+    }
+  }
+}

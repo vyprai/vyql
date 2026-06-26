@@ -1,8 +1,0 @@
-import code.{Deserialization, HttpInput}
-
-adapter groovy {
-  package "org.glassfish.jersey.core:jersey-common" {
-    sink method "decode" -> code.Deserialization
-    source method "isReadable" -> code.HttpInput
-  }
-}

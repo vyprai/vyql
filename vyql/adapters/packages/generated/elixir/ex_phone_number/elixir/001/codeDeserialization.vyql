@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m92824e1f;
+
+binding deserialization1 {
+  requires {
+    dependency("ex_phone_number")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

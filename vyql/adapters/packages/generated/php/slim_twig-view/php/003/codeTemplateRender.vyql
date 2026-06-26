@@ -1,0 +1,9 @@
+module bindings.php.migration.md811e02f;
+
+binding templateRender3 {
+  requires {
+    dependency("slim/twig-view")
+  }
+  query pattern callExpr where callee.method == "fetchFromString"
+  emit sink code.TemplateRender at args[0]
+}

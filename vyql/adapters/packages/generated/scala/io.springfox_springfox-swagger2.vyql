@@ -1,5 +1,0 @@
-adapter scala {
-  package "io.springfox:springfox-swagger2" {
-    sink method "mapXml" -> code.XmlParse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m2e5d60e3;
+
+binding cliArgument0 {
+  requires {
+    dependency("nunomaduro/collision")
+  }
+  query pattern callExpr where callee.method == "ArgumentFormatter.format"
+  emit source code.CliArgument at call.result
+}

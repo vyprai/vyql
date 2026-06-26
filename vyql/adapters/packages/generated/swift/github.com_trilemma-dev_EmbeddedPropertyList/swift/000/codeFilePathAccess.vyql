@@ -1,0 +1,9 @@
+module bindings.swift.migration.m78ecc433;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/trilemma-dev/EmbeddedPropertyList")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m12f6fb11;
+
+binding filePathAccess4 {
+  requires {
+    dependency("temp")
+  }
+  query pattern callExpr where callee.method == "track_file"
+  emit sink code.FilePathAccess at args[0]
+}

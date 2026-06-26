@@ -1,0 +1,9 @@
+module bindings.perl.migration.m439280a5;
+
+binding commandExecution0 {
+  requires {
+    dependency("App-Devel-MAT-Explorer-GTK")
+  }
+  query pattern callExpr where callee.method == "invoke_command"
+  emit sink code.CommandExecution at args[0]
+}

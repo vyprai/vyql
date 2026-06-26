@@ -1,0 +1,11 @@
+module bindings.go.migration.m48a985c1;
+
+binding xpathEscape183 {
+  query pattern callExpr where callee.path ~= "support.XPathLiteral"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9932ebb4;
+
+binding deserialization0 {
+  requires {
+    dependency("raxx")
+  }
+  query pattern callExpr where callee.method == "parse_request"
+  emit sink code.Deserialization at args[0]
+}

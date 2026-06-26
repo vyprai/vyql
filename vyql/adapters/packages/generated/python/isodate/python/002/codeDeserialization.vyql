@@ -1,0 +1,9 @@
+module bindings.python.migration.m4a42a501;
+
+binding deserialization2 {
+  requires {
+    dependency("isodate")
+  }
+  query pattern callExpr where callee.method == "parse_datetime"
+  emit sink code.Deserialization at args[0]
+}

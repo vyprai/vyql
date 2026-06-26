@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9ceef9fb;
+
+binding networkConnect3 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

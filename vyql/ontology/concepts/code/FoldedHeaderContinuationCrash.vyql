@@ -1,0 +1,11 @@
+module code;
+
+concept FoldedHeaderContinuationCrash : issue {
+  cwe: [CWE_248, CWE_400]
+  review_assumption: "a remote peer can send a malformed header block whose first non-empty line is a folded continuation"
+  reviewCategory: resource
+  reviewCondition: "a header parser handles folded continuation lines before proving a current header field exists"
+  reviewConfidence: high
+  reviewEvidence: "header parser context {pattern} appends leading-whitespace lines into the current header bucket without an observed current-header guard"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

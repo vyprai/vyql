@@ -1,0 +1,9 @@
+module bindings.python.migration.m5ee83b68;
+
+binding networkData4 {
+  requires {
+    dependency("sanic")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m1ef4170a;
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/jcmturner/gofork")
+  }
+  query pattern callExpr where callee.method == "parseBase128Int"
+  emit sink code.Deserialization at args[0]
+}

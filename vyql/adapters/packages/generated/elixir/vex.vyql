@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter elixir {
-  package "vex" {
-    control method "validate" -> core.InputValidation
-  }
-}

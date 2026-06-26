@@ -1,6 +1,0 @@
-adapter groovy {
-  package "com.github.stefanbirkner:system-rules" {
-    source method "EnvironmentVariables.set" -> core.UserControlledData
-    source method "ProvideSystemProperty.setProperty" -> core.UserControlledData
-  }
-}

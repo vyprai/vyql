@@ -1,8 +1,0 @@
-adapter php {
-  package "symfony/polyfill-intl-icu" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseCurrency" -> code.Deserialization
-    sink method "parseLocale" -> code.Deserialization
-    source method "acceptFromHttp" -> code.HttpInput
-  }
-}

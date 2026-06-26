@@ -1,0 +1,9 @@
+module bindings.php.migration.m9cf19f89;
+
+binding filePathAccess0 {
+  requires {
+    dependency("zendframework/zend-code")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

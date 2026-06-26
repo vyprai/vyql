@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m10f99b48;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("rack-ssl")
+  }
+  query pattern callExpr where callee.method == "flag_cookies_as_secure!"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

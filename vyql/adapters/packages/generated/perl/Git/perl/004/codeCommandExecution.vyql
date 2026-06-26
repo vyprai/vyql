@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc4f12def;
+
+binding commandExecution4 {
+  requires {
+    dependency("Git")
+  }
+  query pattern callExpr where callee.method == "command_close_pipe"
+  emit sink code.CommandExecution at args[0]
+}

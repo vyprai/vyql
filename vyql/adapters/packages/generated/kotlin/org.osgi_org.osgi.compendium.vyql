@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter kotlin {
-  package "org.osgi:org.osgi.compendium" {
-    sink method "open" -> code.NetworkConnect
-  }
-}

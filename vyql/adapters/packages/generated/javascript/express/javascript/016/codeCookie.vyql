@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5103d1c9;
+
+binding cookie16 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.cookie"
+  emit source code.Cookie at call.result
+}

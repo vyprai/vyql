@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding allowlistValidation202 {
+  query pattern callExpr where callee.path ~= "isUrlSafeToOpen"
+  emit check core.AllowlistValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

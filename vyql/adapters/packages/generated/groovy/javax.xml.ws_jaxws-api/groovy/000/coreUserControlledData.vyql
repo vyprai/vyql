@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md539988c;
+
+binding userControlledData0 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "LogicalMessage.getPayload"
+  emit source core.UserControlledData at call.result
+}

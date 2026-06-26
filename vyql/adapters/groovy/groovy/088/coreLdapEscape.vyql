@@ -1,0 +1,11 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding ldapEscape88 {
+  query pattern callExpr where callee.path ~= "encodeForLDAP"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

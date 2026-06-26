@@ -1,0 +1,9 @@
+module bindings.java.migration.mc483f2d2;
+
+binding deserialization0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-webapp")
+  }
+  query pattern callExpr where callee.method == "Descriptor.parse"
+  emit sink code.Deserialization at args[0]
+}

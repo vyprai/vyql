@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libmad" {
-    sink method "mad_decoder_run" -> code.Deserialization
-    sink method "mad_stream_buffer" -> code.Deserialization
-  }
-}

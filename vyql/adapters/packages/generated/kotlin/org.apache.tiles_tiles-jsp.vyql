@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{CodeEval}
-
-adapter kotlin {
-  package "org.apache.tiles:tiles-jsp" {
-    source method "getPreparer" -> core.UserControlledData
-    sink method "setPreparer" -> code.CodeEval
-  }
-}

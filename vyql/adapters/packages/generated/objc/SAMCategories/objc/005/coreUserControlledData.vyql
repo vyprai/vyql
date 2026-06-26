@@ -1,0 +1,9 @@
+module bindings.objc.migration.m0cb6a173;
+
+binding userControlledData5 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_stringByUnescapingFromURLQuery"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m7cd5c635;
+
+binding urlFetch0 {
+  requires {
+    dependency("io.undertow:undertow-core")
+  }
+  query pattern callExpr where callee.method == "requestLimitingHandler"
+  emit sink code.UrlFetch at args[0]
+}

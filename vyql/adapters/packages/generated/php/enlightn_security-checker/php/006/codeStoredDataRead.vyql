@@ -1,0 +1,9 @@
+module bindings.php.migration.me4f39690;
+
+binding storedDataRead6 {
+  requires {
+    dependency("enlightn/security-checker")
+  }
+  query pattern callExpr where callee.method == "getCacheFile"
+  emit source code.StoredDataRead at call.result
+}

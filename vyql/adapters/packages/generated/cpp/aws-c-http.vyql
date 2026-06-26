@@ -1,5 +1,0 @@
-adapter cpp {
-  package "aws-c-http" {
-    sink method "aws_strutil_is_http_request_target" -> code.UrlFetch
-  }
-}

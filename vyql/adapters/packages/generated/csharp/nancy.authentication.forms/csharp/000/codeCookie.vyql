@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mf90978f3;
+
+binding cookie0 {
+  requires {
+    dependency("nancy.authentication.forms")
+  }
+  query pattern callExpr where callee.method == "GetAuthenticatedUserFromCookie"
+  emit source code.Cookie at call.result
+}

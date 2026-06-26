@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter php {
-  package "livewire/livewire" {
-    control method "escapeStringForHtml" -> core.HtmlEscape
-  }
-}

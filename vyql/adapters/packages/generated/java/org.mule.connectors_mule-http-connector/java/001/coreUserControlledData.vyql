@@ -1,0 +1,9 @@
+module bindings.java.migration.md5711d48;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.mule.connectors:mule-http-connector")
+  }
+  query pattern callExpr where callee.method == "getRequestUri"
+  emit source core.UserControlledData at call.result
+}

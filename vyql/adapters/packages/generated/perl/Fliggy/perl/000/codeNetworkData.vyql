@@ -1,0 +1,9 @@
+module bindings.perl.migration.m89d86a1f;
+
+binding networkData0 {
+  requires {
+    dependency("Fliggy")
+  }
+  query pattern callExpr where callee.method == "_try_read_headers"
+  emit source code.NetworkData at call.result
+}

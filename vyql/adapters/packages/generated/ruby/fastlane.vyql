@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "fastlane" {
-    sink method "parse" -> code.Deserialization
-  }
-}

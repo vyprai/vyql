@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding deserialization21 {
+  requires {
+    dependency("jackson-databind")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

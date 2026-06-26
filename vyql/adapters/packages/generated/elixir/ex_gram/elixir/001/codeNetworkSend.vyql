@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5f1d42d6;
+
+binding networkSend1 {
+  requires {
+    dependency("ex_gram")
+  }
+  query pattern callExpr where callee.method == "ExGram.Adapter.Req.custom_encode"
+  emit sink code.NetworkSend at args[0]
+}

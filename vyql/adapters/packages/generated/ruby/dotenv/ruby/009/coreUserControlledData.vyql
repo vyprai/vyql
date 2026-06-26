@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mab3c1daa;
+
+binding userControlledData9 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "overwrite!"
+  emit source core.UserControlledData at call.result
+}

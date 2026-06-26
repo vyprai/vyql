@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, NetworkSend}
-
-adapter ruby {
-  package "payjp" {
-    sink method "request" -> code.NetworkSend
-    sink method "request" -> code.NetworkConnect
-    source method "request" -> code.NetworkData
-  }
-}

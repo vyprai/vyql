@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding dockerCliProgramDataPluginSearchPath234 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path == "filepath.Join" and node.token contains "ProgramData" and node.token contains "Docker" and node.token contains "cli-plugins" and not (node.token contains "ProgramFiles")
+  emit issue code.DockerCliProgramDataPluginSearchPath at node
+}

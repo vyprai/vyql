@@ -1,0 +1,9 @@
+module bindings.php.migration.mb7514d44;
+
+binding deserialization2 {
+  requires {
+    dependency("doctrine/persistence")
+  }
+  query pattern callExpr where callee.method == "loadMetadataForClass"
+  emit sink code.Deserialization at args[0]
+}

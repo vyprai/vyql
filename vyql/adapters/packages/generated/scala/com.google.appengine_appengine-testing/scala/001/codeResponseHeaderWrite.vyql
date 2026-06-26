@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb841fbde;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("com.google.appengine:appengine-testing")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

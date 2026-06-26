@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf8e9a956;
+
+binding deserialization1 {
+  requires {
+    dependency("graphql")
+  }
+  query pattern callExpr where callee.method == "GraphQL.Lang.Lexer.tokenize"
+  emit sink code.Deserialization at args[0]
+}

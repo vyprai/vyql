@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding uncheckedFfiLengthNarrowing19 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "avail_in=input.len()asc_uint" and node.token contains "avail_out=output.len()asc_uint" and node.token contains "BZ2_bz" and not (node.token contains ".min(c_uint::MAXasusize)asc_uint")
+  emit issue code.UncheckedFfiLengthNarrowing at node
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding httpInput2 {
+  requires {
+    dependency("jakarta.servlet")
+  }
+  query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m41fb7b29;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/google/martian")
+  }
+  query pattern callExpr where callee.method == "NewContext"
+  emit source code.HttpInput at call.result
+}

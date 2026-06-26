@@ -1,0 +1,9 @@
+module bindings.python.migration.mf63958f9;
+
+binding networkData2 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "handle_error_response"
+  emit source code.NetworkData at call.result
+}

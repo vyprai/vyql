@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding htmlRender128 {
+  query pattern callExpr where callee.path ~= "Writer.Write"
+  emit sink code.HtmlRender at args[0]
+}

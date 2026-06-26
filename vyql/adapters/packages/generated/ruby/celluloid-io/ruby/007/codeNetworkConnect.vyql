@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8593331a;
+
+binding networkConnect7 {
+  requires {
+    dependency("celluloid-io")
+  }
+  query pattern callExpr where callee.method == "create_socket"
+  emit sink code.NetworkConnectSink at args[0]
+}

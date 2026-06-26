@@ -1,6 +1,0 @@
-import code.{LogOutput}
-adapter swift {
-  package "github.com/DaveWoodCom/XCGLogger" {
-    sink method "write" -> code.LogOutput
-  }
-}

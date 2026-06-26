@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mef5f9370;
+
+binding filePathAccess0 {
+  requires {
+    dependency("netrc")
+  }
+  query pattern callExpr where callee.method == "Netrc.read"
+  emit sink code.FilePathAccess at args[0]
+}

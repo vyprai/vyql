@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter cpp {
-  package "kf5i18n" {
-    control method "Kuit::escape" -> core.HtmlEscape
-  }
-}

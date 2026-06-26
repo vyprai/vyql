@@ -1,0 +1,9 @@
+module bindings.perl.migration.mbe603286;
+
+binding networkSend12 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "get_request_token"
+  emit sink code.NetworkSend at args[0]
+}

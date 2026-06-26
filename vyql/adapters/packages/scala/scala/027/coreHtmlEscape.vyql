@@ -1,0 +1,14 @@
+module bindings.scala.migration.m3608f193;
+
+binding htmlEscape27 {
+  requires {
+    dependency("twirl")
+  }
+  query pattern callExpr where callee.path ~= "HtmlFormat.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

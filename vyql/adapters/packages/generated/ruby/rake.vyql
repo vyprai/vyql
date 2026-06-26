@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "rake" {
-    sink method "Rake::Application#run" -> code.CommandExecution
-    sink method "Rake::FileUtils#create_shell_runner" -> code.CommandExecution
-  }
-}

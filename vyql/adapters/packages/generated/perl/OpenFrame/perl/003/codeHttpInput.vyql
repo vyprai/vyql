@@ -1,0 +1,9 @@
+module bindings.perl.migration.mce95b754;
+
+binding httpInput3 {
+  requires {
+    dependency("OpenFrame")
+  }
+  query pattern callExpr where callee.method == "cookies"
+  emit source code.HttpInput at call.result
+}

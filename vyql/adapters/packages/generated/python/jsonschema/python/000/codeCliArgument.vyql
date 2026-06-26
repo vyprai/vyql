@@ -1,0 +1,9 @@
+module bindings.python.migration.me74e77bd;
+
+binding cliArgument0 {
+  requires {
+    dependency("jsonschema")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.springframework.security:spring-security-core" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

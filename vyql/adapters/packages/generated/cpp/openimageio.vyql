@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "openimageio" {
-    sink method "ImageInput::open" -> code.FilePathAccess
-    sink method "ImageBuf::read" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding centreonMyAccountContactXss82 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "RowMenu_name" and node.token contains "RowMenu_desc" and node.token contains "contact_name" and node.token contains "contact_alias" and node.token contains "html_entity_decode" and not (node.token contains "ESCAPE_ILLEGAL_CHARS")
+  emit issue code.CentreonMyAccountContactXss at node
+}

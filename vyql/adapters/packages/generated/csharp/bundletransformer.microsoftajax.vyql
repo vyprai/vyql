@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter csharp {
-  package "bundletransformer.microsoftajax" {
-    sink method "BundleTransformer.MicrosoftAjax.Minifiers.MicrosoftAjaxCssMinifier.Minify" -> code.Deserialization
-    sink method "BundleTransformer.MicrosoftAjax.Minifiers.MicrosoftAjaxJsMinifier.Minify" -> code.Deserialization
-    sink method "BundleTransformer.MicrosoftAjax.Minifiers.MicrosoftAjaxMinifierBase.Minify" -> code.Deserialization
-  }
-}

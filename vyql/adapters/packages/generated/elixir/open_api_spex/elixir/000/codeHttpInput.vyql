@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2ad324d3;
+
+binding httpInput0 {
+  requires {
+    dependency("open_api_spex")
+  }
+  query pattern callExpr where callee.method == "body_params"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m0f8b4816;
+
+binding commandExecution0 {
+  requires {
+    dependency("Padre-Plugin-LaTeX")
+  }
+  query pattern callExpr where callee.method == "get_command"
+  emit sink code.CommandExecution at args[0]
+}

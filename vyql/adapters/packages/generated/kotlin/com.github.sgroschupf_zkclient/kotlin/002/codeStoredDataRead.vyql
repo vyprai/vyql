@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m15ccde74;
+
+binding storedDataRead2 {
+  requires {
+    dependency("com.github.sgroschupf:zkclient")
+  }
+  query pattern callExpr where callee.method == "subscribeDataChanges"
+  emit source code.StoredDataRead at call.result
+}

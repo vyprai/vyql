@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding filePathAccess32 {
+  query pattern callExpr where callee.path ~= "unlink"
+  emit sink code.FilePathAccess at args[0]
+}

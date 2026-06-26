@@ -1,0 +1,8 @@
+module code;
+
+review code.DesktopProtocolRedirectWithoutAllowlist {
+  category: request_forgery
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  kind: attention
+  text: "review desktop deep-link redirects for an explicit trusted protocol allowlist before assigning window.location"
+}

@@ -1,0 +1,14 @@
+module bindings.python.migration.m3cb4d2c2;
+
+binding htmlEscape1 {
+  requires {
+    dependency("mako")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

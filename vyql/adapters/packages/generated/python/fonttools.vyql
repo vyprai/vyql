@@ -1,5 +1,0 @@
-adapter python {
-  package "fonttools" {
-    sink method "read" -> code.FilePathAccess
-  }
-}

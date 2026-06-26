@@ -1,8 +1,0 @@
-import code.{SecretValue}
-
-adapter groovy {
-  package "org.jolokia:jolokia-core" {
-    source method "decodePublicKey" -> code.SecretValue
-    source method "decodePrivateKey" -> code.SecretValue
-  }
-}

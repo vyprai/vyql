@@ -1,0 +1,9 @@
+module bindings.go.migration.m8b54f450;
+
+binding networkSend1 {
+  requires {
+    dependency("cloud.google.com/go/iam")
+  }
+  query pattern callExpr where callee.method == "executeHTTPRequestWithResponse"
+  emit sink code.NetworkSend at args[0]
+}

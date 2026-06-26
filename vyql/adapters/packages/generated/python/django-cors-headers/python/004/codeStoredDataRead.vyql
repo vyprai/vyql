@@ -1,0 +1,9 @@
+module bindings.python.migration.m3efd800e;
+
+binding storedDataRead4 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "CORS_ALLOW_ALL_ORIGINS"
+  emit source code.StoredDataRead at call.result
+}

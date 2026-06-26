@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf8afdae7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rspec-rails")
+  }
+  query pattern callExpr where callee.method == "target_path"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "org.springframework:spring-orm" {
-    sink method "applyTransactionTimeout" -> code.SqlExecution
-  }
-}

@@ -1,5 +1,0 @@
-adapter java {
-  package "org.freemarker:freemarker" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

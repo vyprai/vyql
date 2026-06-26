@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "dockerpty" {
-    sink method "exec_command" -> code.CommandExecution
-  }
-}

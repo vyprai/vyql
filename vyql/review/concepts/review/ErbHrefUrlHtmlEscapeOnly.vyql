@@ -1,0 +1,8 @@
+module code;
+
+review code.ErbHrefUrlHtmlEscapeOnly {
+  category: xss
+  expected: [core.InputValidation]
+  kind: target
+  text: "validate or URI-encode URL-like values before rendering them into ERB href attributes; HTML escaping alone does not make a URL safe"
+}

@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter perl {
-  package "Crypt-GCrypt" {
-    source method "setkey" -> code.SecretValue
-    source method "setiv" -> code.SecretValue
-  }
-}

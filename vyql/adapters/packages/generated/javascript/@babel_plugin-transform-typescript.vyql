@@ -1,8 +1,0 @@
-adapter javascript {
-  package "@babel/plugin-transform-typescript" {
-    sink method "transpileEnum" -> code.Deserialization
-    sink method "evaluateRef" -> code.ExpressionEval
-    sink method "evalUnaryExpression" -> code.ExpressionEval
-    sink method "evalBinaryExpression" -> code.ExpressionEval
-  }
-}

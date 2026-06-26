@@ -1,0 +1,9 @@
+module bindings.php.migration.mea96e034;
+
+binding htmlRender0 {
+  requires {
+    dependency("doctrine/sql-formatter")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.HtmlRender at args[0]
+}

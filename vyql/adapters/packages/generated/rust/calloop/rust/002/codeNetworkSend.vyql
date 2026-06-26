@@ -1,0 +1,9 @@
+module bindings.rust.migration.m8e94cf14;
+
+binding networkSend2 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_write"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,5 +1,0 @@
-adapter cpp {
-  package "kf5solid" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

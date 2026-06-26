@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter cpp {
-  package "simpleini" {
-    sink method "LoadFile" -> code.FilePathAccess
-  }
-}

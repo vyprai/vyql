@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.github.tomakehurst:wiremock" {
-    sink method "read" -> code.Deserialization
-    sink method "mapToObject" -> code.Deserialization
-  }
-}

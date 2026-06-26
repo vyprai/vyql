@@ -1,0 +1,9 @@
+module bindings.swift.migration.m7292326d;
+
+binding networkSend17 {
+  requires {
+    dependency("github.com/dduan/Just")
+  }
+  query pattern callExpr where callee.method == "synthesizeRequest"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m31d0168f;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "removeAllMessages"
+  emit sink code.StoredDataWrite at args[0]
+}

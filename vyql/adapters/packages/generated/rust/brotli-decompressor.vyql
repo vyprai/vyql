@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "brotli-decompressor" {
-    sink method "brotli_decode_prealloc" -> code.Deserialization
-    sink method "brotli_decode" -> code.Deserialization
-  }
-}

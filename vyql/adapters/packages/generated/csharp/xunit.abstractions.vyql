@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter csharp {
-  package "xunit.abstractions" {
-    sink method "Deserialize" -> code.Deserialization
-  }
-}

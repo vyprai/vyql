@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter rust {
-  package "gio" {
-    source method "read" -> code.NetworkData
-    sink method "write" -> code.NetworkSend
-  }
-}

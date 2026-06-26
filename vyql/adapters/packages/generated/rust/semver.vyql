@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "semver" {
-    sink method "parse" -> code.Deserialization
-  }
-}

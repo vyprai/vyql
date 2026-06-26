@@ -1,0 +1,9 @@
+module bindings.objc.migration.m3a1fb0a0;
+
+binding deserialization0 {
+  requires {
+    dependency("Gloss")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

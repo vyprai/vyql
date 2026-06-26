@@ -1,7 +1,0 @@
-adapter javascript {
-  package "hsl-regex" {
-    flag code.RegexCompile on any {
-      method "module.exports"
-    }
-  }
-}

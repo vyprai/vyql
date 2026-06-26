@@ -1,0 +1,9 @@
+module bindings.dart.migration.macfed050;
+
+binding deserialization2 {
+  requires {
+    dependency("_fe_analyzer_shared")
+  }
+  query pattern callExpr where callee.method == "endMetadataStar"
+  emit sink code.Deserialization at args[0]
+}

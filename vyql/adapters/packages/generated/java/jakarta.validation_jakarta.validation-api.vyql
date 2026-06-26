@@ -1,5 +1,0 @@
-adapter java {
-  package "jakarta.validation:jakarta.validation-api" {
-    control method "validate" -> core.InputValidation
-  }
-}

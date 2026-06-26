@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter rust {
-  package "ndk" {
-    sink method "open" -> code.FilePathAccess
-    sink method "open_dir" -> code.FilePathAccess
-  }
-}

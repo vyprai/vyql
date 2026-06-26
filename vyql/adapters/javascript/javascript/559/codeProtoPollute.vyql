@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding protoPollute559 {
+  query pattern callExpr where callee.path ~= "lodash.merge"
+  emit sink code.ProtoPollute at args[1]
+}

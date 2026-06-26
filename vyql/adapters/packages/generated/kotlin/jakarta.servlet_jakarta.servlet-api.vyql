@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "jakarta.servlet:jakarta.servlet-api" {
-    source method "Cookie" -> code.HttpInput
-  }
-}

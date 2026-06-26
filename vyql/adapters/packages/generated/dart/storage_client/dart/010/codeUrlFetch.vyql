@@ -1,0 +1,9 @@
+module bindings.dart.migration.medf6299a;
+
+binding urlFetch10 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf833161e;
+
+binding networkConnect2 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-backend-lwjgl")
+  }
+  query pattern callExpr where callee.method == "newClientSocket"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m73c6e28b;
+
+binding filePathAccess2 {
+  requires {
+    dependency("fmt")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

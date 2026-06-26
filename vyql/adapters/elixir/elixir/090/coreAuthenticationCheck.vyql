@@ -1,0 +1,11 @@
+module bindings.elixir.migration.m728b8a72;
+
+binding authenticationCheck90 {
+  query pattern callExpr where callee.path ~= "authenticated?"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

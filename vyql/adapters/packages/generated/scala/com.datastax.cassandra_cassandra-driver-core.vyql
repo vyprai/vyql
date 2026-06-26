@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "com.datastax.cassandra:cassandra-driver-core" {
-    sink method "execute" -> code.SqlExecution
-    sink method "executeAsync" -> code.SqlExecution
-    sink method "prepare" -> code.SqlExecution
-    sink method "prepareAsync" -> code.SqlExecution
-  }
-}

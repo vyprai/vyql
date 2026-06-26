@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding formatString166 {
+  query pattern callExpr where callee.path ~= "vprintf"
+  emit sink code.FormatString at args[0]
+}

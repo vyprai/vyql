@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3f105c19;
+
+binding httpInput1 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "collateBody"
+  emit source code.HttpInput at call.result
+}

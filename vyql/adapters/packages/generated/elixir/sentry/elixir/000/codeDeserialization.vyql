@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9438c686;
+
+binding deserialization0 {
+  requires {
+    dependency("sentry")
+  }
+  query pattern callExpr where callee.method == "Sentry.Dsn.parse"
+  emit sink code.Deserialization at args[0]
+}

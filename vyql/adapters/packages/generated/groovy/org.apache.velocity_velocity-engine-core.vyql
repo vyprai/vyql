@@ -1,6 +1,0 @@
-import code.{TemplateRender}
-adapter groovy {
-  package "org.apache.velocity:velocity-engine-core" {
-    sink method "merge" -> code.TemplateRender
-  }
-}

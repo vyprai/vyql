@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m44d8665a;
+
+binding deserialization0 {
+  requires {
+    dependency("onnx")
+  }
+  query pattern callExpr where callee.method == "ParseProtoFromBytes"
+  emit sink code.Deserialization at args[0]
+}

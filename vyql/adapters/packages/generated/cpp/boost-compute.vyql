@@ -1,8 +1,0 @@
-import code.{CodeEval}
-adapter cpp {
-  package "boost-compute" {
-    sink method "create_with_source_file" -> code.CodeEval
-    sink method "create_with_binary_file" -> code.CodeEval
-    sink method "create_with_il_file" -> code.CodeEval
-  }
-}

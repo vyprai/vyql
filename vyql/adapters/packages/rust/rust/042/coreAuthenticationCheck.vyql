@@ -1,0 +1,14 @@
+module bindings.rust.migration.m222602a5;
+
+binding authenticationCheck42 {
+  requires {
+    dependency("actix-identity")
+  }
+  query pattern callExpr where callee.method == "from_request"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

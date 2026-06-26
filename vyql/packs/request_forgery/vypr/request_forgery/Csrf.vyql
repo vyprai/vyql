@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule Csrf {
+  meta {
+    cwe: [CWE_352]
+    id: "VYQL-RF-003"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.StateChangingOpSink
+  unless endpoint coveredBy core.CsrfProtection
+}

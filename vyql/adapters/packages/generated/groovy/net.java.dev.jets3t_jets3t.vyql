@@ -1,9 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter groovy {
-  package "net.java.dev.jets3t:jets3t" {
-    sink method "getTotalPutRequests" -> code.StoredDataWrite
-    sink method "getTotalDeleteRequests" -> code.StoredDataWrite
-    sink method "getTotalCopyRequests" -> code.StoredDataWrite
-    source method "getTotalCopyRequests" -> code.StoredDataRead
-  }
-}

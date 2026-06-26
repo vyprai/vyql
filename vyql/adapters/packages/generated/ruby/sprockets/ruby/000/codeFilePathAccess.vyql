@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m03b931f4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sprockets")
+  }
+  query pattern callExpr where callee.method == "file_digest"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m83c9b6d6;
+
+binding expressionEval0 {
+  requires {
+    dependency("cucumber-expressions")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.ExpressionEval at args[0]
+}

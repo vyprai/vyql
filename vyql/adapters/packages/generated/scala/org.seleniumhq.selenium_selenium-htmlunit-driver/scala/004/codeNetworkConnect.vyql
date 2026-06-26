@@ -1,0 +1,9 @@
+module bindings.scala.migration.mfea80497;
+
+binding networkConnect4 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "setAutoProxy"
+  emit sink code.NetworkConnectSink at args[0]
+}

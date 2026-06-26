@@ -1,6 +1,0 @@
-adapter perl {
-  package "Daemonise" {
-    sink method "find_job" -> code.NosqlQuery
-    sink method "_setup_rabbit_connection" -> code.StoredDataWrite
-  }
-}

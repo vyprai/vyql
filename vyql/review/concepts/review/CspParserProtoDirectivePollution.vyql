@@ -1,0 +1,8 @@
+module code;
+
+review code.CspParserProtoDirectivePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review CSP parser directive storage for Map/null-prototype results or __proto__ rejection"
+}

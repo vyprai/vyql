@@ -1,0 +1,9 @@
+module bindings.perl.migration.mec2866d1;
+
+binding codeEval0 {
+  requires {
+    dependency("autouse")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.CodeEval at args[0]
+}

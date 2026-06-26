@@ -1,7 +1,0 @@
-import core.{InputValidation}
-adapter python {
-  package "rfc3986" {
-    control method "normalize_uri" -> core.InputValidation
-    control method "urlparse" -> core.InputValidation
-  }
-}

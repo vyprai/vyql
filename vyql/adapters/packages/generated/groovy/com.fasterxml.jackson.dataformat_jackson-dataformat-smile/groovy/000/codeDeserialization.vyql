@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m8e859670;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+  }
+  query pattern callExpr where callee.method == "createParser"
+  emit sink code.Deserialization at args[0]
+}

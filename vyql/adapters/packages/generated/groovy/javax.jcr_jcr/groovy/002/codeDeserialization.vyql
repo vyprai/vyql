@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb2829d39;
+
+binding deserialization2 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "importXML"
+  emit sink code.Deserialization at args[0]
+}

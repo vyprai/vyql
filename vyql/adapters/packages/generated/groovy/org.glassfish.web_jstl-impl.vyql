@@ -1,9 +1,0 @@
-import code.{Deserialization, SqlExecution, FilePathAccess}
-
-adapter groovy {
-  package "org.glassfish.web:jstl-impl" {
-    sink method "setXml" -> code.Deserialization
-    sink method "setSystemId" -> code.FilePathAccess
-    sink method "setSql" -> code.SqlExecution
-  }
-}

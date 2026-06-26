@@ -1,0 +1,9 @@
+module bindings.scala.migration.m6d77f342;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
+  }
+  query pattern callExpr where callee.method == "configureSettingsFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mea29fe20;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("Starlet")
+  }
+  query pattern callExpr where callee.path ~= "_handle_response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

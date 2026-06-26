@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7e340447;
+
+binding filePathAccess0 {
+  requires {
+    dependency("file")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

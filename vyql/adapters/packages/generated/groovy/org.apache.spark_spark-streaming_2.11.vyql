@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.spark:spark-streaming_2.11" {
-    sink method "deserialize" -> code.Deserialization
-    sink method "loads" -> code.Deserialization
-  }
-}

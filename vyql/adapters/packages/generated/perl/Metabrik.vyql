@@ -1,7 +1,0 @@
-adapter perl {
-  package "Metabrik" {
-    sink method "cmd" -> code.CommandExecution
-    sink method "cmd_to_code" -> code.CommandExecution
-    sink method "run_code" -> code.CodeEval
-  }
-}

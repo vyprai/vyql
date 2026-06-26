@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-
-adapter javascript {
-  package "workbox-core" {
-    sink method "cacheMatchIgnoreParams" -> code.UrlFetch
-    sink method "getFriendlyURL" -> code.UrlFetch
-  }
-}

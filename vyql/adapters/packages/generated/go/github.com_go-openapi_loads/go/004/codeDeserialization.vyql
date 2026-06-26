@@ -1,0 +1,9 @@
+module bindings.go.migration.m8d30004a;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/go-openapi/loads")
+  }
+  query pattern callExpr where callee.method == "Embedded"
+  emit sink code.Deserialization at args[0]
+}

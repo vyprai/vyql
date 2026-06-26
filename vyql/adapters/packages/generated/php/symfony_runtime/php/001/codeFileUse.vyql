@@ -1,0 +1,9 @@
+module bindings.php.migration.m9d2acc18;
+
+binding fileUse1 {
+  requires {
+    dependency("symfony/runtime")
+  }
+  query pattern callExpr where callee.method == "updateAutoloadFile"
+  emit sink code.FileUseSink at args[0]
+}

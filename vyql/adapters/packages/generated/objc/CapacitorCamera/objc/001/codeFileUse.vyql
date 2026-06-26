@@ -1,0 +1,9 @@
+module bindings.objc.migration.m77cc40e3;
+
+binding fileUse1 {
+  requires {
+    dependency("CapacitorCamera")
+  }
+  query pattern callExpr where callee.method == "saveTemporaryImage"
+  emit sink code.FileUseSink at args[0]
+}

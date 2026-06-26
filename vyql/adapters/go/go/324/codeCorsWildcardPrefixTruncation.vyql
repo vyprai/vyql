@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding corsWildcardPrefixTruncation324 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:parseWildcardRules" and node.token contains "selector:c.AllowOrigins" and node.token contains "selector:c.AllowWildcard" and node.token contains "call_path:strings.Index" and node.token contains "call_path:append" and node.token contains "slice:o::i-1"
+  emit issue code.CorsWildcardPrefixTruncation at node
+}

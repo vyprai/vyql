@@ -1,0 +1,9 @@
+module bindings.rust.migration.mfc2a02cb;
+
+binding filePathAccess1 {
+  requires {
+    dependency("tauri")
+  }
+  query pattern callExpr where callee.method == "get_for_scheme"
+  emit sink code.FilePathAccess at args[0]
+}

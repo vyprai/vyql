@@ -1,0 +1,11 @@
+module code;
+
+concept DeviceStatusStateMachineBypass : issue {
+  cwe: [CWE_20, CWE_841, CWE_787]
+  review_assumption: "a guest or peer can write arbitrary status bits and downstream device behavior trusts the stored status state"
+  reviewCategory: input_validation
+  reviewCondition: "guest- or device-controlled status writes update device state directly instead of enforcing the required state-machine transition"
+  reviewConfidence: high
+  reviewEvidence: "device status write context {pattern} handles a status register arm and assigns the driver/device status field from the supplied value without a validation helper"
+  vulnerableTo: [validation.ImproperInputValidation, business_logic.BusinessLogic, memory.OobWrite]
+}

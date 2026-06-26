@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m2a76ca55;
+
+binding filePathAccess0 {
+  requires {
+    dependency("google-cloud-storage")
+  }
+  query pattern callExpr where callee.method == "File"
+  emit sink code.FilePathAccess at args[0]
+}

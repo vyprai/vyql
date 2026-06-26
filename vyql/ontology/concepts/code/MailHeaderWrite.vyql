@@ -1,0 +1,7 @@
+module code;
+
+concept MailHeaderWrite : sink {
+  cwe: [CWE_93]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.CrlfInjection]
+}

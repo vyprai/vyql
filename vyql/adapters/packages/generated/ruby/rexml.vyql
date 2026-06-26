@@ -1,5 +1,0 @@
-adapter ruby {
-  package "rexml" {
-    sink method "decode" -> code.XmlParse
-  }
-}

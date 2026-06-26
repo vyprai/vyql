@@ -162,7 +162,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					v = c.expr(val)
 				}
 				if name != nil {
-					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Type: declType})
+					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Type: declType, Decl: true})
 				}
 			}
 		}

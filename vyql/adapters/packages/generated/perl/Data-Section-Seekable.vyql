@@ -1,9 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter perl {
-  package "Data-Section-Seekable" {
-    source method "read_part" -> code.StoredDataRead
-    source method "read_extra" -> code.StoredDataRead
-    sink method "add_part" -> code.StoredDataWrite
-    sink method "header" -> code.StoredDataWrite
-  }
-}

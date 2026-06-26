@@ -1,0 +1,8 @@
+module code;
+
+concept CommandExecution : sink {
+  cwe: [CWE_78]
+  enabledBy: [taint.UntrustedData]
+  excluded_chars: ";|&$<>()"
+  vulnerableTo: [injection.CommandInjection]
+}

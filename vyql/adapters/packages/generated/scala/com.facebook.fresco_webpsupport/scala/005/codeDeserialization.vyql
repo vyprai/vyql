@@ -1,0 +1,9 @@
+module bindings.scala.migration.m6be95ccf;
+
+binding deserialization5 {
+  requires {
+    dependency("com.facebook.fresco:webpsupport")
+  }
+  query pattern callExpr where callee.method == "decodeByteArray"
+  emit sink code.Deserialization at args[0]
+}

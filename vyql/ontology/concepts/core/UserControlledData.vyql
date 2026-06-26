@@ -1,0 +1,6 @@
+module core;
+
+concept UserControlledData : source {
+  coverage_reserved_source: true
+  taint: [taint.UntrustedData]
+}

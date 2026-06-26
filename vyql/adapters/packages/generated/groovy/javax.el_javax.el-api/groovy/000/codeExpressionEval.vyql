@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m00c2c7f4;
+
+binding expressionEval0 {
+  requires {
+    dependency("javax.el:javax.el-api")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.ExpressionEval at args[0]
+}

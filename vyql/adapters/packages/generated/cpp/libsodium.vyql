@@ -1,5 +1,0 @@
-adapter cpp {
-  package "libsodium" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

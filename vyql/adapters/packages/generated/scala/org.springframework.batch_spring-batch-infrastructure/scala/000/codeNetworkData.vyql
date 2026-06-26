@@ -1,0 +1,9 @@
+module bindings.scala.migration.mde0459e2;
+
+binding networkData0 {
+  requires {
+    dependency("org.springframework.batch:spring-batch-infrastructure")
+  }
+  query pattern callExpr where callee.method == "JmsItemReader.read"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule FilesystemImageDirentTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-026"
+    severity: high
+  }
+  issue code.FilesystemImageDirentTraversal as sink
+}

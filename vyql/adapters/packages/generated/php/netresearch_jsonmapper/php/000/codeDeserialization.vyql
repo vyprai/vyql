@@ -1,0 +1,9 @@
+module bindings.php.migration.mda1defce;
+
+binding deserialization0 {
+  requires {
+    dependency("netresearch/jsonmapper")
+  }
+  query pattern callExpr where callee.method == "map"
+  emit sink code.Deserialization at args[0]
+}

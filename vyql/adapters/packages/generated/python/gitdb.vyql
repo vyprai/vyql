@@ -1,7 +1,0 @@
-import code.{FileUse, StoredDataRead}
-adapter python {
-  package "gitdb" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.FileUse
-  }
-}

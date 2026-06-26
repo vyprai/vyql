@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m464a36f7;
+
+binding networkSend0 {
+  requires {
+    dependency("pobox")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

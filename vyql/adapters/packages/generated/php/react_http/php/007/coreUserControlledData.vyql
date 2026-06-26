@@ -1,0 +1,9 @@
+module bindings.php.migration.mf5e68596;
+
+binding userControlledData7 {
+  requires {
+    dependency("react/http")
+  }
+  query pattern callExpr where callee.method == "ReactHttpIoMultipartParser.parse"
+  emit source core.UserControlledData at call.result
+}

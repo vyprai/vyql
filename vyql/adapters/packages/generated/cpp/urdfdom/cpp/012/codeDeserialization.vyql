@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m8db168f8;
+
+binding deserialization12 {
+  requires {
+    dependency("urdfdom")
+  }
+  query pattern callExpr where callee.method == "parseGeometry"
+  emit sink code.Deserialization at args[0]
+}

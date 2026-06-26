@@ -1,0 +1,9 @@
+module bindings.perl.migration.m0d175cb8;
+
+binding userControlledData0 {
+  requires {
+    dependency("Mojolicious-Plugin-PlackMiddleware")
+  }
+  query pattern callExpr where callee.method == "psgi_env_to_mojo_req"
+  emit source core.UserControlledData at call.result
+}

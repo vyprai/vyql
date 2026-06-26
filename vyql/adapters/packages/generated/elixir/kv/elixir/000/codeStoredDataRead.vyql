@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbc210538;
+
+binding storedDataRead0 {
+  requires {
+    dependency("kv")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.StoredDataRead at call.result
+}

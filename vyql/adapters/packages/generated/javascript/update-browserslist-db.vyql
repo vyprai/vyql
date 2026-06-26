@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization, FilePathAccess}
-adapter javascript {
-  package "update-browserslist-db" {
-    sink method "module.exports" -> code.FilePathAccess
-    sink method "module.exports" -> code.Deserialization
-    sink method "updateWith" -> code.CommandExecution
-  }
-}

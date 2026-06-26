@@ -1,0 +1,9 @@
+module bindings.perl.migration.mf3d3c1f8;
+
+binding deserialization2 {
+  requires {
+    dependency("Google-Data-JSON")
+  }
+  query pattern callExpr where callee.method == "gdata"
+  emit sink code.Deserialization at args[0]
+}

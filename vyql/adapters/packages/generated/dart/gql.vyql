@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{Deserialization}
-
-adapter dart {
-  package "gql" {
-    source method "tokenize" -> core.UserControlledData
-    sink method "parse" -> code.Deserialization
-  }
-}

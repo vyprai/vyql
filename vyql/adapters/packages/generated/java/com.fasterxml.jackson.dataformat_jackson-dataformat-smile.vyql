@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.fasterxml.jackson.dataformat:jackson-dataformat-smile" {
-    sink method "nextToken" -> code.Deserialization
-    sink method "readBinaryValue" -> code.Deserialization
-  }
-}

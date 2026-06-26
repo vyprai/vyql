@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "exirc" {
-    sink method "ExIRC.Client.cmd" -> code.CommandExecution
-  }
-}

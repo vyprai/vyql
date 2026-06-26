@@ -1,0 +1,8 @@
+module code;
+
+review code.FlarumTranslatorRawStringParameterXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review Flarum translator parameter preprocessing for text-node wrapping before rich ICU rendering"
+}

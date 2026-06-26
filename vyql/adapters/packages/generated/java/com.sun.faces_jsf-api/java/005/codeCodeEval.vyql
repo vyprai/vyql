@@ -1,0 +1,9 @@
+module bindings.java.migration.m314d4390;
+
+binding codeEval5 {
+  requires {
+    dependency("com.sun.faces:jsf-api")
+  }
+  query pattern callExpr where callee.method == "javax.faces.component.UICommand.setActionListener"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m5d25796b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("onnx")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

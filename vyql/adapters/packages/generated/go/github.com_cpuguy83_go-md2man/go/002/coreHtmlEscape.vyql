@@ -1,0 +1,14 @@
+module bindings.go.migration.mba77e09e;
+
+binding htmlEscape2 {
+  requires {
+    dependency("github.com/cpuguy83/go-md2man")
+  }
+  query pattern callExpr where callee.method == "escapeSpecialChars"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

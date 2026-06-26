@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7983ff90;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}

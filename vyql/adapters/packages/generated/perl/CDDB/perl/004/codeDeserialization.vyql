@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc51f2d06;
+
+binding deserialization4 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "parse_xmcd_file"
+  emit sink code.Deserialization at args[0]
+}

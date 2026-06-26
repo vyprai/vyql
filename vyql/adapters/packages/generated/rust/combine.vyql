@@ -1,6 +1,0 @@
-adapter rust {
-  package "combine" {
-    source method "Token" -> code.SecretValue
-    sink method "parse" -> code.Deserialization
-  }
-}

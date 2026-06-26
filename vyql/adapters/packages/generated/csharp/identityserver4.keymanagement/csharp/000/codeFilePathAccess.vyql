@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m7bbf023a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("identityserver4.keymanagement")
+  }
+  query pattern callExpr where callee.method == "PersistKeysToFileSystem"
+  emit sink code.FilePathAccess at args[0]
+}

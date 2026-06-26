@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m27eca931;
+
+binding htmlRender1 {
+  requires {
+    dependency("letter_opener_web")
+  }
+  query pattern callExpr where callee.method == "LettersController.show"
+  emit sink code.HtmlRender at args[0]
+}

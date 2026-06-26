@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf605d96d;
+
+binding deserialization0 {
+  requires {
+    dependency("geocoder")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}

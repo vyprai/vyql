@@ -1,9 +1,0 @@
-import code.{HttpInput, NetworkConnect, NetworkSend}
-
-adapter dart {
-  package "postgrest" {
-    sink method "send" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-    source method "send" -> code.HttpInput
-  }
-}

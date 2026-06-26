@@ -1,0 +1,9 @@
+module bindings.python.migration.me0dce8aa;
+
+binding sqlExecution1 {
+  requires {
+    dependency("mysql-connector")
+  }
+  query pattern callExpr where callee.method == "executemany"
+  emit sink code.SqlExecution at args[0]
+}

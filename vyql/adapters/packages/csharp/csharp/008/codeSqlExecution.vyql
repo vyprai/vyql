@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding sqlExecution8 {
+  requires {
+    dependency("Dapper")
+  }
+  query pattern callExpr where callee.method == "Query"
+  emit sink code.SqlExecution at args[0]
+}

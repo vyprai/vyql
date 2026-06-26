@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "fluent_ui" {
-    sink method "defaultParse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m86f69a8e;
+
+binding deserialization1 {
+  requires {
+    dependency("com.opencsv:opencsv")
+  }
+  query pattern callExpr where callee.method == "readNext"
+  emit sink code.Deserialization at args[0]
+}

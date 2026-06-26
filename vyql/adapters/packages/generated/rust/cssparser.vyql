@@ -1,5 +1,0 @@
-adapter rust {
-  package "cssparser" {
-    sink method "get_string" -> code.Deserialization
-  }
-}

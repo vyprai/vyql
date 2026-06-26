@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb3b3eb92;
+
+binding userControlledData3 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamAsString"
+  emit source core.UserControlledData at call.result
+}

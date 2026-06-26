@@ -1,0 +1,11 @@
+module code;
+
+concept SamlFirstSignatureOnlyBypass : issue {
+  cwe: [CWE_287, CWE_347]
+  review_assumption: "an attacker can submit a SAML response containing an attacker-chosen signed element before unsigned or differently signed assertion data"
+  reviewCategory: auth
+  reviewCondition: "SAML response verification checks only the first XML signature instead of all signatures on the response"
+  reviewConfidence: high
+  reviewEvidence: "SAML signature verification context {pattern} loads nodeList[0] before CheckSignature"
+  vulnerableTo: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+}

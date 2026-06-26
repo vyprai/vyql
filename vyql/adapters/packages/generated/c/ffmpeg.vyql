@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter c {
-  package "ffmpeg" {
-    source method "ffmpeg_parse_options" -> code.CliArgument
-  }
-}

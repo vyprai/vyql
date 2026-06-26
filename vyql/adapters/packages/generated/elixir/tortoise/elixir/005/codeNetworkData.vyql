@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8b8d5b9a;
+
+binding networkData5 {
+  requires {
+    dependency("tortoise")
+  }
+  query pattern callExpr where callee.method == "Tortoise.Handler.handle_message"
+  emit source code.NetworkData at call.result
+}

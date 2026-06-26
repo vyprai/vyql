@@ -1,0 +1,7 @@
+module code;
+
+review code.PythonUnicodeEscapeWideUnderallocation {
+  category: memory
+  kind: attention
+  text: "review Python unicode escape allocation for wide-build maximum escape expansion before writing \\U00xxxxxx sequences"
+}

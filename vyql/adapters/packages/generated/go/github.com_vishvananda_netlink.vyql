@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter go {
-  package "github.com/vishvananda/netlink" {
-    sink method "ParseAddr" -> code.Deserialization
-    sink method "ParseIPNet" -> code.Deserialization
-  }
-}

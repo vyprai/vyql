@@ -1,0 +1,9 @@
+module bindings.php.migration.m04dacb44;
+
+binding deserialization1 {
+  requires {
+    dependency("phar-io/manifest")
+  }
+  query pattern callExpr where callee.method == "ManifestLoader::fromPhar"
+  emit sink code.Deserialization at args[0]
+}

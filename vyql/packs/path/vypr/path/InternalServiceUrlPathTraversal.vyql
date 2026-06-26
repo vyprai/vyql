@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule InternalServiceUrlPathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-030"
+    severity: high
+  }
+  issue code.InternalServiceUrlPathTraversal as sink
+}

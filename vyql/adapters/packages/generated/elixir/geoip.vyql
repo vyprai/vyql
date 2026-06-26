@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter elixir {
-  package "geoip" {
-    source method "lookup" -> code.NetworkData
-  }
-}

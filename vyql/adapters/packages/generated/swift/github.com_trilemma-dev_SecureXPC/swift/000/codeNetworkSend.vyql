@@ -1,0 +1,9 @@
+module bindings.swift.migration.m13dcfc20;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/trilemma-dev/SecureXPC")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

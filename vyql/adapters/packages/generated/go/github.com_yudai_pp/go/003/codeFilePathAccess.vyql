@@ -1,0 +1,9 @@
+module bindings.go.migration.mb3984e9a;
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/yudai/pp")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit sink code.FilePathAccess at args[0]
+}

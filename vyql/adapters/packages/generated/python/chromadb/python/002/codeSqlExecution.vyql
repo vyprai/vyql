@@ -1,0 +1,9 @@
+module bindings.python.migration.m21853922;
+
+binding sqlExecution2 {
+  requires {
+    dependency("chromadb")
+  }
+  query pattern callExpr where callee.method == "executemany"
+  emit sink code.SqlExecution at args[0]
+}

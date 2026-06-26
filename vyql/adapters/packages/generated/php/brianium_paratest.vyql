@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "brianium/paratest" {
-    sink method "ParaTest\\WrapperRunner\\WrapperWorker::start" -> code.CommandExecution
-  }
-}

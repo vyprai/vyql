@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "http-range-header" {
-    sink method "parse_range_header" -> code.Deserialization
-  }
-}

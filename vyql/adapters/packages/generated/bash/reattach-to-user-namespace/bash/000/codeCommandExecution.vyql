@@ -1,0 +1,9 @@
+module bindings.bash.migration.m030371ee;
+
+binding commandExecution0 {
+  requires {
+    dependency("reattach-to-user-namespace")
+  }
+  query pattern callExpr where callee.path ~= "reattach-to-user-namespace"
+  emit sink code.CommandExecution at args[0]
+}

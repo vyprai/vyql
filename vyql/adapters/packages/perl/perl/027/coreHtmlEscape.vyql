@@ -1,0 +1,14 @@
+module bindings.perl.migration.ma164dcec;
+
+binding htmlEscape27 {
+  requires {
+    dependency("HTML::Entities")
+  }
+  query pattern callExpr where callee.path ~= "HTML.Entities.encode_entities"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

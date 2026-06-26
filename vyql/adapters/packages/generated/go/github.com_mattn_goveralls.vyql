@@ -1,7 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter go {
-  package "github.com/mattn/goveralls" {
-    sink method "runCommand" -> code.CommandExecution
-  }
-}

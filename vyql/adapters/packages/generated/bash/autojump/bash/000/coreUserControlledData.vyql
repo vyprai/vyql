@@ -1,0 +1,9 @@
+module bindings.bash.migration.m228ae2a7;
+
+binding userControlledData0 {
+  requires {
+    dependency("autojump")
+  }
+  query pattern callExpr where callee.path ~= "autojump"
+  emit source core.UserControlledData at call.result
+}

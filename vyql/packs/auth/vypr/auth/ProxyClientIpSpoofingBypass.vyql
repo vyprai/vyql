@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ProxyClientIpSpoofingBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287, CWE_348]
+    id: "VYQL-AUTH-012"
+    severity: high
+  }
+  issue code.ProxyClientIpSpoofingBypass as proxy
+}

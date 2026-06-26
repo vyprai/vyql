@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3d3d1864;
+
+binding sqlExecution0 {
+  requires {
+    dependency("database_cleaner-core")
+  }
+  query pattern callExpr where callee.method == "cleaning"
+  emit sink code.SqlExecution at args[0]
+}

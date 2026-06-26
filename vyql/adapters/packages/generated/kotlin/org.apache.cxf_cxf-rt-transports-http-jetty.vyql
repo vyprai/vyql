@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.apache.cxf:cxf-rt-transports-http-jetty" {
-    sink method "service" -> code.NetworkSend
-  }
-}

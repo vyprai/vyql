@@ -1,5 +1,0 @@
-adapter python {
-  package "schedule" {
-    sink method "run" -> code.CodeEval
-  }
-}

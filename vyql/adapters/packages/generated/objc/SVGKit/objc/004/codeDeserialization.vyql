@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc241a9f8;
+
+binding deserialization4 {
+  requires {
+    dependency("SVGKit")
+  }
+  query pattern callExpr where callee.method == "imageParserWithDataAsynchronously"
+  emit sink code.Deserialization at args[0]
+}

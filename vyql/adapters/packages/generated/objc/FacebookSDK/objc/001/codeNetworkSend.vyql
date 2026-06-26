@@ -1,0 +1,9 @@
+module bindings.objc.migration.m9a11c632;
+
+binding networkSend1 {
+  requires {
+    dependency("FacebookSDK")
+  }
+  query pattern callExpr where callee.method == "startGraphRequestWithGraphPath"
+  emit sink code.NetworkSend at args[0]
+}

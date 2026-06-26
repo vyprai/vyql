@@ -1,5 +1,0 @@
-adapter javascript {
-  package "media-typer" {
-    sink method "parse" -> code.Deserialization
-  }
-}

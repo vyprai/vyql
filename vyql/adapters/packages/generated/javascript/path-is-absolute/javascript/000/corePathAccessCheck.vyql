@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m1d6366bf;
+
+binding pathAccessCheck0 {
+  requires {
+    dependency("path-is-absolute")
+  }
+  query pattern callExpr where callee.method == "posix"
+  emit check core.PathAccessCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

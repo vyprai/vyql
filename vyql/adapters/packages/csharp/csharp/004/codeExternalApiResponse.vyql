@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding externalApiResponse4 {
+  requires {
+    dependency("System.Net.Http")
+  }
+  query pattern callExpr where callee.method == "ReadAsStringAsync"
+  emit source code.ExternalApiResponse at call.result
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "percent-encoding" {
-    sink method "percent_decode_str" -> code.Deserialization
-    sink method "percent_decode" -> code.Deserialization
-    sink method "decode_utf8" -> code.Deserialization
-    sink method "decode_utf8_lossy" -> code.Deserialization
-  }
-}

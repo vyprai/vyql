@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m10806729;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rb-fchange")
+  }
+  query pattern callExpr where callee.method == "Notifier.watch"
+  emit sink code.FilePathAccess at args[0]
+}

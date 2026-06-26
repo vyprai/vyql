@@ -1,0 +1,9 @@
+module bindings.perl.migration.m33814bd0;
+
+binding cookie5 {
+  requires {
+    dependency("Prancer")
+  }
+  query pattern callExpr where callee.method == "cookies"
+  emit source code.Cookie at call.result
+}

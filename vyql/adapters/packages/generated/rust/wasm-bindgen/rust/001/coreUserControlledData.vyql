@@ -1,0 +1,9 @@
+module bindings.rust.migration.me28a0fc4;
+
+binding userControlledData1 {
+  requires {
+    dependency("wasm-bindgen")
+  }
+  query pattern callExpr where callee.method == "bigint_from_str"
+  emit source core.UserControlledData at call.result
+}

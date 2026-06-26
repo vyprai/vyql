@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "unf" {
-    control method "normalize" -> core.InputValidation
-  }
-}

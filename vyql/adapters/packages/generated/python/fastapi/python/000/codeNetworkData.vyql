@@ -1,0 +1,9 @@
+module bindings.python.migration.m6291d0c4;
+
+binding networkData0 {
+  requires {
+    dependency("fastapi")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.NetworkData at call.result
+}

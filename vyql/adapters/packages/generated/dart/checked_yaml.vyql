@@ -1,6 +1,0 @@
-adapter dart {
-  package "checked_yaml" {
-    source method "ParsedYamlException" -> core.UserControlledData
-    source method "toParsedYamlException" -> core.UserControlledData
-  }
-}

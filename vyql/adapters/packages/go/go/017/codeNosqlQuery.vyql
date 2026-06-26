@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding nosqlQuery17 {
+  requires {
+    dependency("go.mongodb.org/mongo-driver")
+  }
+  query pattern callExpr where callee.method == "Find"
+  emit sink code.NosqlQuery at args[0]
+}

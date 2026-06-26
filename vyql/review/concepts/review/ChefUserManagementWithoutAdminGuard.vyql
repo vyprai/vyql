@@ -1,0 +1,8 @@
+module code;
+
+review code.ChefUserManagementWithoutAdminGuard {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review Chef user-management routes for an admin-only controller guard before create, update, or destroy"
+}

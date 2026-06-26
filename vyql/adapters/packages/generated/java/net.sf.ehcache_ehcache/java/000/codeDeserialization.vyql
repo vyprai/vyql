@@ -1,0 +1,9 @@
+module bindings.java.migration.m660c5765;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "MimeType"
+  emit sink code.Deserialization at args[0]
+}

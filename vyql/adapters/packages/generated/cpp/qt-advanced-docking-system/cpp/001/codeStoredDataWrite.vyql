@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mad63a117;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("qt-advanced-docking-system")
+  }
+  query pattern callExpr where callee.method == "saveState"
+  emit sink code.StoredDataWrite at args[0]
+}

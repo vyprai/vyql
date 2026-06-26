@@ -1,0 +1,9 @@
+module bindings.c.migration.m2e732851;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("functions-framework-cpp")
+  }
+  query pattern callExpr where callee.method == "HttpResponse.set_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m706d3eab;
+
+binding codeEval0 {
+  requires {
+    dependency("stealthy-require")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit sink code.CodeEval at args[0]
+}

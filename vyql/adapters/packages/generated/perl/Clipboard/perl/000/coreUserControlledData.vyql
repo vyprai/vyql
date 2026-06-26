@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2344a481;
+
+binding userControlledData0 {
+  requires {
+    dependency("Clipboard")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit source core.UserControlledData at call.result
+}

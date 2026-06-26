@@ -1,0 +1,9 @@
+module bindings.python.migration.mf506b953;
+
+binding fileUse0 {
+  requires {
+    dependency("xlwt")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

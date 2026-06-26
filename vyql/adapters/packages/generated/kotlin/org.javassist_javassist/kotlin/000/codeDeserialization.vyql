@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma3419fce;
+
+binding deserialization0 {
+  requires {
+    dependency("org.javassist:javassist")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

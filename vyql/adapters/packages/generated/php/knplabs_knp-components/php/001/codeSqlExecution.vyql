@@ -1,0 +1,9 @@
+module bindings.php.migration.m18b3e5f4;
+
+binding sqlExecution1 {
+  requires {
+    dependency("knplabs/knp-components")
+  }
+  query pattern callExpr where callee.method == "Knp\\Component\\Pager\\Event\\Subscriber\\Paginate\\Doctrine\\ORM\\QuerySubscriber::items"
+  emit sink code.SqlExecution at args[0]
+}

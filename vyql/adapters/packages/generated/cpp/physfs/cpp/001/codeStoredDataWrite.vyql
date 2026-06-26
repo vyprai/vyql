@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m35718952;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("physfs")
+  }
+  query pattern callExpr where callee.method == "PHYSFS_openWrite"
+  emit sink code.StoredDataWrite at args[0]
+}

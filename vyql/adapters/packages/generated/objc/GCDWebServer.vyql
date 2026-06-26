@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter objc {
-  package "GCDWebServer" {
-    control method "shouldUploadFileAtPath" -> core.InputValidation
-  }
-}

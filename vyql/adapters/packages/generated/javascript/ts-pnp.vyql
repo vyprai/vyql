@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "ts-pnp" {
-    sink method "resolveModuleName" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,11 @@
+module code;
+
+concept ConnectCmsCodestudiesPluginCodeExecution : issue {
+  cwe: [CWE_94, CWE_78]
+  review_assumption: "authenticated users with the plugin's reporter role can submit code_text and trigger the run action"
+  reviewCategory: "code-injection"
+  reviewCondition: "Connect-CMS Code Study plugin saves user-submitted code and executes the saved PHP or Java program on the server"
+  reviewConfidence: high
+  reviewEvidence: "CodestudiesPlugin class context {pattern} persists request code_text, writes it under storage, and invokes php/javac/java with exec"
+  vulnerableTo: [injection.CodeInjection, injection.CommandInjection]
+}

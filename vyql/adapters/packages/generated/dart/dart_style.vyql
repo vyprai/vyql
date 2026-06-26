@@ -1,5 +1,0 @@
-adapter dart {
-  package "dart_style" {
-    sink method "formatPaths" -> code.FilePathAccess
-  }
-}

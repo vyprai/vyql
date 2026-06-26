@@ -1,8 +1,0 @@
-adapter perl {
-  package "JSAN" {
-    source method "_read_script" -> code.NetworkData
-    sink method "_connected_to" -> code.NetworkConnect
-    sink path "jsan" arg all -> code.FilePathAccess
-    sink method "_read_script" -> code.ArchiveEntryWrite
-  }
-}

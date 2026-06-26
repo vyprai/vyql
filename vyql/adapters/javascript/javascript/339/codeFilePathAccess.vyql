@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding filePathAccess339 {
+  query pattern callExpr where callee.path ~= "existsSync"
+  emit sink code.FilePathAccess at args[0]
+}

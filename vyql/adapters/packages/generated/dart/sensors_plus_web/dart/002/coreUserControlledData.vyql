@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0b519c66;
+
+binding userControlledData2 {
+  requires {
+    dependency("sensors_plus_web")
+  }
+  query pattern callExpr where callee.method == "userAccelerometerEvents"
+  emit source core.UserControlledData at call.result
+}

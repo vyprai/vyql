@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m64b918b7;
+
+binding httpInput0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-http")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.HttpInput at call.result
+}

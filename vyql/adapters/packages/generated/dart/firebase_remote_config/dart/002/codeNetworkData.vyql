@@ -1,0 +1,9 @@
+module bindings.dart.migration.m38547978;
+
+binding networkData2 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetchAndActivate"
+  emit source code.NetworkData at call.result
+}

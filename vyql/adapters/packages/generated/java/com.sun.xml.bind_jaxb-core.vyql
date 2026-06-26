@@ -1,5 +1,0 @@
-adapter java {
-  package "com.sun.xml.bind:jaxb-core" {
-    sink method "parse" -> code.XmlParse
-  }
-}

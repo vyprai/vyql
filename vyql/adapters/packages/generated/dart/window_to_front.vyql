@@ -1,9 +1,0 @@
-import code.{PrivilegedOp}
-
-adapter dart {
-  package "window_to_front" {
-    flag code.PrivilegedOp on any {
-      method "activate"
-    }
-  }
-}

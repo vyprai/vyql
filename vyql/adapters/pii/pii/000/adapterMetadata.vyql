@@ -1,0 +1,14 @@
+module bindings.pii.migration.m24e11c07;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "pii"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m1b55bf2c;
+
+binding networkSend0 {
+  requires {
+    dependency("org.springframework:spring-messaging")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m41829530;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-yarn-client")
+  }
+  query pattern callExpr where callee.method == "SCMAdmin.run"
+  emit source core.UserControlledData at call.result
+}

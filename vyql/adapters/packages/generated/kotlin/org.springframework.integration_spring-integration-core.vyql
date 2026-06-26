@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkSend}
-
-adapter kotlin {
-  package "org.springframework.integration:spring-integration-core" {
-    sink method "decode" -> code.Deserialization
-    sink method "send" -> code.NetworkSend
-  }
-}

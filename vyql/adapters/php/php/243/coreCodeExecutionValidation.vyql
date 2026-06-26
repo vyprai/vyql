@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding codeExecutionValidation243 {
+  query pattern callExpr where callee.path ~= "preg_replace" and args.any.literal contains ")\\W*\\w+.*$"
+  emit check core.CodeExecutionValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

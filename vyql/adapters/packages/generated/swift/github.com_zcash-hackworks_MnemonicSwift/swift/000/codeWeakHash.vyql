@@ -1,0 +1,13 @@
+module bindings.swift.migration.m929ccd9f;
+
+binding weakHash0 {
+  requires {
+    dependency("github.com/zcash-hackworks/MnemonicSwift")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "PKCS5.PBKDF2SHA512"
+  emit issue code.WeakHash at node
+}

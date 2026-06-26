@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3f2c2607;
+
+binding networkData3 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "get_object_edge"
+  emit source code.NetworkData at call.result
+}

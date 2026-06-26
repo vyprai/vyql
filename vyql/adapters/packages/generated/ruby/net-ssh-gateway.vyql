@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-
-adapter ruby {
-  package "net-ssh-gateway" {
-    sink method "open" -> code.NetworkConnect
-  }
-}

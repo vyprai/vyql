@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m26768a6c;
+
+binding filePathAccess5 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_shapefile_ex2"
+  emit sink code.FilePathAccess at args[0]
+}

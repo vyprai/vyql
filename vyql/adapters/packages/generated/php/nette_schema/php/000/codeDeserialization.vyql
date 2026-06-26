@@ -1,0 +1,9 @@
+module bindings.php.migration.mbd78a9e0;
+
+binding deserialization0 {
+  requires {
+    dependency("nette/schema")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.Deserialization at args[0]
+}

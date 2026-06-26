@@ -1,8 +1,0 @@
-adapter ruby {
-  package "html-proofer" {
-    source method "run" -> code.CliArgument
-    sink method "check_file" -> code.FilePathAccess
-    source method "add_internal" -> core.UserControlledData
-    source method "add_external" -> core.UserControlledData
-  }
-}

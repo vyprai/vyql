@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding protocolCommandInjection119 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=dispatch_cmd" and node.token contains "OP_PUT" and node.token contains "body_size=strtoul" and node.token contains "body_size>job_data_size_limit" and node.token contains "reply_msg(c,MSG_JOB_TOO_BIG)" and not (node.token contains "skip(c,body_size+2,MSG_JOB_TOO_BIG)")
+  emit issue code.ProtocolCommandInjection at node
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2661708c;
+
+binding commandExecution5 {
+  requires {
+    dependency("cocoyaxi")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

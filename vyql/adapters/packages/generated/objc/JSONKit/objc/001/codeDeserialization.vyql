@@ -1,0 +1,9 @@
+module bindings.objc.migration.m3ccc533c;
+
+binding deserialization1 {
+  requires {
+    dependency("JSONKit")
+  }
+  query pattern callExpr where callee.method == "parseJSONData"
+  emit sink code.Deserialization at args[0]
+}

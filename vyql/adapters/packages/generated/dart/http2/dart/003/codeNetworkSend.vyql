@@ -1,0 +1,9 @@
+module bindings.dart.migration.mdbd356fd;
+
+binding networkSend3 {
+  requires {
+    dependency("http2")
+  }
+  query pattern callExpr where callee.method == "sendData"
+  emit sink code.NetworkSend at args[0]
+}

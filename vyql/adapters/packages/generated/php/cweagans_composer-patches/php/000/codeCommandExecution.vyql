@@ -1,0 +1,9 @@
+module bindings.php.migration.m9fb40991;
+
+binding commandExecution0 {
+  requires {
+    dependency("cweagans/composer-patches")
+  }
+  query pattern callExpr where callee.method == "executeCommand"
+  emit sink code.CommandExecution at args[0]
+}

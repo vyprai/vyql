@@ -1,0 +1,9 @@
+module bindings.objc.migration.m0493f4e7;
+
+binding networkConnect2 {
+  requires {
+    dependency("PonyDebugger")
+  }
+  query pattern callExpr where callee.method == "autoConnectToBonjourServiceNamed:"
+  emit sink code.NetworkConnectSink at args[0]
+}

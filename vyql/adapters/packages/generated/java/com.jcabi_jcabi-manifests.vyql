@@ -1,9 +1,0 @@
-import code.{FilePathAccess, StoredDataRead}
-
-adapter java {
-  package "com.jcabi:jcabi-manifests" {
-    source method "read" -> code.StoredDataRead
-    sink method "fetch" -> code.FilePathAccess
-    source method "fetch" -> code.StoredDataRead
-  }
-}

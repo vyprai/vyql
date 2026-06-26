@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "kf5configwidgets" {
-    sink method "KTipDatabase" -> code.Deserialization
-  }
-}

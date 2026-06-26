@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m53b1fcd4;
+
+binding deserialization1 {
+  requires {
+    dependency("multi_json")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

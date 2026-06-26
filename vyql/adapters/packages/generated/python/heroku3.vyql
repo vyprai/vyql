@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter python {
-  package "heroku3" {
-    sink method "run_command_on_app" -> code.CommandExecution
-  }
-}

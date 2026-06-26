@@ -1,9 +1,0 @@
-import code.{UrlFetch}
-
-adapter swift {
-  package "github.com/jellyfin/jellyfin-sdk-swift" {
-    sink method "send" -> code.UrlFetch
-    sink method "data" -> code.UrlFetch
-    sink method "download" -> code.UrlFetch
-  }
-}

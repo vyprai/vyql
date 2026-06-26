@@ -1,0 +1,9 @@
+module bindings.php.migration.m2bfc241b;
+
+binding userControlledData0 {
+  requires {
+    dependency("symfonycasts/verify-email-bundle")
+  }
+  query pattern callExpr where callee.method == "generateSignature"
+  emit source core.UserControlledData at call.result
+}

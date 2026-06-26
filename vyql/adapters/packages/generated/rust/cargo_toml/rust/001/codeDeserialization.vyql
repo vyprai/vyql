@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7f9d1c19;
+
+binding deserialization1 {
+  requires {
+    dependency("cargo_toml")
+  }
+  query pattern callExpr where callee.method == "complete_from_path"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcf5af6e9;
+
+binding deserialization0 {
+  requires {
+    dependency("org.powermock:powermock-classloading-xstream")
+  }
+  query pattern callExpr where callee.method == "clone"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m6e96d314;
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/clbanning/x2j")
+  }
+  query pattern callExpr where callee.method == "BytePathForTagShortest"
+  emit sink code.Deserialization at args[0]
+}

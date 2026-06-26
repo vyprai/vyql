@@ -1,5 +1,0 @@
-adapter ruby {
-  package "active_hash" {
-    sink method "reload" -> code.Deserialization
-  }
-}

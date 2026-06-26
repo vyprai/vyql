@@ -1,0 +1,9 @@
+module bindings.c.migration.m46370342;
+
+binding networkData2 {
+  requires {
+    dependency("qt5-websockets")
+  }
+  query pattern callExpr where callee.method == "QWebSocket::textMessageReceived"
+  emit source code.NetworkData at call.result
+}

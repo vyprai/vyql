@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-adapter c {
-  package "icu" {
-    sink method "Qp0zSystem" -> code.CommandExecution
-    sink method "runcmd" -> code.CommandExecution
-  }
-}

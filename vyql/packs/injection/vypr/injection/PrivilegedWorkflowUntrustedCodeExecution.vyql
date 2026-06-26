@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule PrivilegedWorkflowUntrustedCodeExecution {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_94, CWE_95]
+    id: "VYQL-INJ-044"
+    severity: critical
+  }
+  issue code.PrivilegedWorkflowUntrustedCodeExecution as sink
+}

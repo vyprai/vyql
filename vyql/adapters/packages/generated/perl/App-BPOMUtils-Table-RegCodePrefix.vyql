@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter perl {
-  package "App-BPOMUtils-Table-RegCodePrefix" {
-    source method "bpom_list_reg_code_prefixes" -> core.UserControlledData
-  }
-}

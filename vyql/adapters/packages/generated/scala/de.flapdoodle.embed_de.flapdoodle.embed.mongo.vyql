@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter scala {
-  package "de.flapdoodle.embed:de.flapdoodle.embed.mongo" {
-    source method "query" -> code.CliArgument
-    source method "queryFile" -> code.CliArgument
-  }
-}

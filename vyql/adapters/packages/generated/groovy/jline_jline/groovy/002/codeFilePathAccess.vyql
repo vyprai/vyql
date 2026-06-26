@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m7e18dae7;
+
+binding filePathAccess2 {
+  requires {
+    dependency("jline:jline")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "cloud.google.com/go" {
-    sink method "ParseDate" -> code.Deserialization
-    sink method "ParseTime" -> code.Deserialization
-    sink method "ParseDateTime" -> code.Deserialization
-  }
-}

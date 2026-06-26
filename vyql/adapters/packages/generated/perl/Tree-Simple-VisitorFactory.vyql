@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Tree-Simple-VisitorFactory" {
-    sink method "get" -> code.CodeEval
-  }
-}

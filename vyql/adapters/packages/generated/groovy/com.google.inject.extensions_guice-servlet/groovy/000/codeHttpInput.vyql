@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m95390b03;
+
+binding httpInput0 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.HttpInput at call.result
+}

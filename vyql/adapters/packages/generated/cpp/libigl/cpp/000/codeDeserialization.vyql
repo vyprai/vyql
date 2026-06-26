@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc9ecae10;
+
+binding deserialization0 {
+  requires {
+    dependency("libigl")
+  }
+  query pattern callExpr where callee.method == "parse_nodes"
+  emit sink code.Deserialization at args[0]
+}

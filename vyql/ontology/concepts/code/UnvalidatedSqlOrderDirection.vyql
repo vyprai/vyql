@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedSqlOrderDirection : issue {
+  cwe: [CWE_89]
+  review_assumption: "application callers can pass request-controlled sort direction values into the query builder"
+  reviewCategory: sql
+  reviewCondition: "query builder concatenates caller-controlled ORDER BY direction tokens without allowlisting ASC/DESC"
+  reviewConfidence: high
+  reviewEvidence: "ORDER BY builder context {pattern} appends a stored direction value into SQL without normalizing it to allowed constants"
+  vulnerableTo: [injection.SqlInjection]
+}

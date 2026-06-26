@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb1fc3a64;
+
+binding deserialization4 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

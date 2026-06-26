@@ -1,0 +1,9 @@
+module bindings.scala.migration.m7f88aff1;
+
+binding networkSend2 {
+  requires {
+    dependency("org.apache.activemq:activemq-core")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

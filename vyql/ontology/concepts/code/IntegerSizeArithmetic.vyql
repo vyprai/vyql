@@ -1,0 +1,12 @@
+module code;
+
+concept IntegerSizeArithmetic : issue {
+  cwe: [CWE_190]
+  enabledBy: [taint.UntrustedData]
+  review_assumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
+  reviewCategory: numeric
+  reviewCondition: "attacker-controlled value participates in size-sensitive arithmetic"
+  reviewConfidence: low
+  reviewEvidence: "arithmetic operation {pattern} receives tainted input"
+  vulnerableTo: [memory.IntegerOverflow]
+}

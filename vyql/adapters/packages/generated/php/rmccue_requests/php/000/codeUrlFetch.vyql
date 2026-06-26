@@ -1,0 +1,9 @@
+module bindings.php.migration.m5e3eed42;
+
+binding urlFetch0 {
+  requires {
+    dependency("rmccue/requests")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

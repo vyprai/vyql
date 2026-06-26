@@ -1,0 +1,9 @@
+module bindings.rust.migration.m64bae933;
+
+binding fileUse1 {
+  requires {
+    dependency("png")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

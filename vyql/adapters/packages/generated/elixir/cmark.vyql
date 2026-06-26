@@ -1,5 +1,0 @@
-adapter elixir {
-  package "cmark" {
-    sink method "cmark_parser_free" -> code.Deserialization
-  }
-}

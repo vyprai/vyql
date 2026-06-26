@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "fog-powerdns" {
-    sink method "request" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m3c9b5592;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-chrome-driver")
+  }
+  query pattern callExpr where callee.method == "getAdditionalCommands"
+  emit sink code.CommandExecution at args[0]
+}

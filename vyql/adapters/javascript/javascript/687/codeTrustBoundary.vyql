@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding trustBoundary687 {
+  query pattern callExpr where callee.path ~= "authContext"
+  emit sink code.TrustBoundary at args[0]
+}

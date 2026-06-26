@@ -1,6 +1,0 @@
-import core.{AuthenticationCheck}
-adapter python {
-  package "bcrypt" {
-    control method "checkpw" -> core.AuthenticationCheck
-  }
-}

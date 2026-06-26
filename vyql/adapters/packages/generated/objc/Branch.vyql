@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter objc {
-  package "Branch" {
-    source method "handleDeepLink:" -> core.UserControlledData
-    source method "handleDeepLinkWithNewSession:" -> core.UserControlledData
-  }
-}

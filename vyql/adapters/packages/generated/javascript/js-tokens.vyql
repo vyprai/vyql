@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "js-tokens" {
-    sink method "jsTokens" -> code.Deserialization
-  }
-}

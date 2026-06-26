@@ -1,0 +1,14 @@
+module bindings.go.migration.ma2dd4563;
+
+binding inputValidation8 {
+  requires {
+    dependency("github.com/gobwas/ws")
+  }
+  query pattern callExpr where callee.method == "CheckHeader"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

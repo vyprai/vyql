@@ -1,0 +1,9 @@
+module bindings.php.migration.ma1b14515;
+
+binding sqlExecution1 {
+  requires {
+    dependency("robmorgan/phinx")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

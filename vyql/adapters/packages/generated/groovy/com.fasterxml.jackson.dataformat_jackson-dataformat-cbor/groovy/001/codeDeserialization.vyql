@@ -1,0 +1,9 @@
+module bindings.groovy.migration.ma146939c;
+
+binding deserialization1 {
+  requires {
+    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor")
+  }
+  query pattern callExpr where callee.method == "readBinaryValue"
+  emit sink code.Deserialization at args[0]
+}

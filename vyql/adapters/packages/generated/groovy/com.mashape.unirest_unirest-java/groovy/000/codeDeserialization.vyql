@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m26e194b2;
+
+binding deserialization0 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

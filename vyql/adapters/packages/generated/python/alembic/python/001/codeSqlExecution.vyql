@@ -1,0 +1,9 @@
+module bindings.python.migration.m62a74517;
+
+binding sqlExecution1 {
+  requires {
+    dependency("alembic")
+  }
+  query pattern callExpr where callee.method == "downgrade"
+  emit sink code.SqlExecution at args[0]
+}

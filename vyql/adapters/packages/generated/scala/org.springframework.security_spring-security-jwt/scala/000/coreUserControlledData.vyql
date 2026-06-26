@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcd9ab0bc;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.springframework.security:spring-security-jwt")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

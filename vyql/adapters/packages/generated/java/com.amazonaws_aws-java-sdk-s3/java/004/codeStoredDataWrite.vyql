@@ -1,0 +1,9 @@
+module bindings.java.migration.md4870d71;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-s3")
+  }
+  query pattern callExpr where callee.method == "putObject"
+  emit sink code.StoredDataWrite at args[0]
+}

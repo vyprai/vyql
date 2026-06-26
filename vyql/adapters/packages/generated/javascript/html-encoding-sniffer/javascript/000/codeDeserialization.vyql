@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m4151c0d0;
+
+binding deserialization0 {
+  requires {
+    dependency("html-encoding-sniffer")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit sink code.Deserialization at args[0]
+}

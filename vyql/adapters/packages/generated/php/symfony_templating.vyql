@@ -1,9 +1,0 @@
-import code.{TemplateRender}
-import core.{HtmlEscape}
-
-adapter php {
-  package "symfony/templating" {
-    control method "escape" -> core.HtmlEscape
-    sink method "render" -> code.TemplateRender
-  }
-}

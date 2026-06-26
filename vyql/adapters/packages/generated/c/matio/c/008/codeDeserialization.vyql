@@ -1,0 +1,9 @@
+module bindings.c.migration.m1b9b358f;
+
+binding deserialization8 {
+  requires {
+    dependency("matio")
+  }
+  query pattern callExpr where callee.method == "Mat_VarReadNextInfo73"
+  emit sink code.Deserialization at args[0]
+}

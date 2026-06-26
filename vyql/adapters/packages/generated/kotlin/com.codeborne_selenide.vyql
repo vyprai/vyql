@@ -1,9 +1,0 @@
-import code.{CodeEval, UrlFetch}
-
-adapter kotlin {
-  package "com.codeborne:selenide" {
-    sink method "open" -> code.UrlFetch
-    sink method "executeJavaScript" -> code.CodeEval
-    sink method "download" -> code.UrlFetch
-  }
-}

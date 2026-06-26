@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma959295a;
+
+binding codeEval2 {
+  requires {
+    dependency("version_tasks")
+  }
+  query pattern callExpr where callee.method == "VersionTasks.Shell.raise"
+  emit sink code.CodeEval at args[0]
+}

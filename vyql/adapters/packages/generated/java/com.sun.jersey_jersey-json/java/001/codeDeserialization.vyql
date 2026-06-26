@@ -1,0 +1,9 @@
+module bindings.java.migration.mbebeef99;
+
+binding deserialization1 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "unmarshalJAXBElementFromJSON"
+  emit sink code.Deserialization at args[0]
+}

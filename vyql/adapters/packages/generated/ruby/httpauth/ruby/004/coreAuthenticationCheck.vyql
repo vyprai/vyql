@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m25311c92;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("httpauth")
+  }
+  query pattern callExpr where callee.method == "unpack_challenge"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

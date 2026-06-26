@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding httpInput8 {
+  query pattern callExpr where callee.path ~= "request.query_parameters"
+  emit source code.HttpInput at call.result
+}

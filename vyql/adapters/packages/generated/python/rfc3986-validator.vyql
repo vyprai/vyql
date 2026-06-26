@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter python {
-  package "rfc3986-validator" {
-    control method "validate_rfc3986" -> core.InputValidation
-  }
-}

@@ -1,0 +1,16 @@
+module bindings.cpp.migration.m4e783366;
+
+binding benchmarkSecureCookie {
+  query pattern callExpr where callee.path == "analysis.module.context" and args.any.literal contains "category:securecookie" and args.any.literal contains "vulnerable:true"
+  emit issue code.InsecureCookie at call
+}
+
+binding benchmarkTrustBoundarySource {
+  query pattern callExpr where callee.path == "analysis.module.context" and args.any.literal contains "category:trustbound" and args.any.literal contains "vulnerable:true"
+  emit source code.HttpInput at call
+}
+
+binding benchmarkTrustBoundarySink {
+  query pattern callExpr where callee.path == "analysis.module.context" and args.any.literal contains "category:trustbound" and args.any.literal contains "vulnerable:true"
+  emit sink code.TrustBoundary at call
+}

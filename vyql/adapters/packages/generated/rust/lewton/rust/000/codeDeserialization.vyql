@@ -1,0 +1,9 @@
+module bindings.rust.migration.m85b8b969;
+
+binding deserialization0 {
+  requires {
+    dependency("lewton")
+  }
+  query pattern callExpr where callee.method == "lewton_decode_packet"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter cpp {
-  package "mhook" {
-    sink method "Mhook_SetHook" -> code.CodeEval
-  }
-}

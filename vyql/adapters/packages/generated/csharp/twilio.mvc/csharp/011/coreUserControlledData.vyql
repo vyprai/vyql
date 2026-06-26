@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m20f5be65;
+
+binding userControlledData11 {
+  requires {
+    dependency("twilio.mvc")
+  }
+  query pattern callExpr where callee.method == "Body"
+  emit source core.UserControlledData at call.result
+}

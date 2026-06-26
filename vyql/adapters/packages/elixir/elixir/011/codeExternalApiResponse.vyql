@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding externalApiResponse11 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}

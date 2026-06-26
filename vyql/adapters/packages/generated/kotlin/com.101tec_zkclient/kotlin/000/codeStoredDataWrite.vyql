@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m348ae5bd;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "createPersistent"
+  emit sink code.StoredDataWrite at args[0]
+}

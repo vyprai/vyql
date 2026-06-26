@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding idorPolicyReview649 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "prisma.accounts.update" and node.token contains "where:{id}" and node.token contains "passwordHash" and node.token contains "originalPassword" and not (node.token contains "currentUserId") and not (node.token contains "ctx.id")
+  emit issue code.IdorPolicyReview at node
+}

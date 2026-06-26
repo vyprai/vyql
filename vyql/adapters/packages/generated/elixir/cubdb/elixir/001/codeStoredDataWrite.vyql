@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m50eb1b2d;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("cubdb")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.StoredDataWrite at args[0]
+}

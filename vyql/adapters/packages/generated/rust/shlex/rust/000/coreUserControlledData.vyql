@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9f81cdf6;
+
+binding userControlledData0 {
+  requires {
+    dependency("shlex")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit source core.UserControlledData at call.result
+}

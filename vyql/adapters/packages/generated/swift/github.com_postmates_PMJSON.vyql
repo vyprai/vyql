@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/postmates/PMJSON" {
-    sink method "decode" -> code.Deserialization
-    sink method "decodeStream" -> code.Deserialization
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.swift.migration.m59574965;
+
+binding authorizationCheck3 {
+  requires {
+    dependency("github.com/trilemma-dev/Authorized")
+  }
+  query pattern callExpr where callee.method == "destroyRights"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

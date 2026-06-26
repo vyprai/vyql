@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mbfff24d4;
+
+binding logOutput0 {
+  requires {
+    dependency("serilog.aspnetcore")
+  }
+  query pattern callExpr where callee.method == "SerilogApplicationBuilderExtensions.UseSerilogRequestLogging"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter csharp {
-  package "propertytools.wpf" {
-    sink method "InputFilePathAttribute" -> code.FilePathAccess
-    sink method "OutputFilePathAttribute" -> code.FilePathAccess
-  }
-}

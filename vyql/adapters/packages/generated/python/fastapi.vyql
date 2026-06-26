@@ -1,8 +1,0 @@
-adapter python {
-  package "fastapi" {
-    source method "handle" -> code.NetworkData
-    sink method "send_notification" -> code.NetworkSend
-    source method "Cookie" -> code.HttpInput
-    sink method "read" -> code.FilePathAccess
-  }
-}

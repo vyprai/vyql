@@ -1,7 +1,0 @@
-import code.{CodeEval, FilePathAccess}
-adapter perl {
-  package "ReleaseAction" {
-    sink method "chdir" -> code.FilePathAccess
-    sink method "on_release" -> code.CodeEval
-  }
-}

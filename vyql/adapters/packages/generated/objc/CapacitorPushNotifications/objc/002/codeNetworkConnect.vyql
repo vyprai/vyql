@@ -1,0 +1,9 @@
+module bindings.objc.migration.me0ac8fde;
+
+binding networkConnect2 {
+  requires {
+    dependency("CapacitorPushNotifications")
+  }
+  query pattern callExpr where callee.method == "translatedConnection"
+  emit sink code.NetworkConnectSink at args[0]
+}

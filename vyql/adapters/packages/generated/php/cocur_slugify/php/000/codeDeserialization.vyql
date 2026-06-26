@@ -1,0 +1,9 @@
+module bindings.php.migration.mc39519b6;
+
+binding deserialization0 {
+  requires {
+    dependency("cocur/slugify")
+  }
+  query pattern callExpr where callee.method == "getRules"
+  emit sink code.Deserialization at args[0]
+}

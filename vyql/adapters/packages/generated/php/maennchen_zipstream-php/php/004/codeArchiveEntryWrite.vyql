@@ -1,0 +1,9 @@
+module bindings.php.migration.mcf2cb2a6;
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("maennchen/zipstream-php")
+  }
+  query pattern callExpr where callee.method == "addFileFromCallback"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

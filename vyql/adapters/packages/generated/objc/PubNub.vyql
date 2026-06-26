@@ -1,9 +1,0 @@
-import code.{FilePathAccess, SecretValue}
-adapter objc {
-  package "PubNub" {
-    sink method "encryptFileAtURL" -> code.FilePathAccess
-    sink method "decryptFileAtURL" -> code.FilePathAccess
-    source method "parseAuthToken" -> code.SecretValue
-    source method "setAuthToken" -> code.SecretValue
-  }
-}

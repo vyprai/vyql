@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m99702a2a;
+
+binding networkData1 {
+  requires {
+    dependency("org.apache.activemq:activemq-core")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.mfcb84eea;
+
+binding userControlledData1 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "dispatch_command"
+  emit source core.UserControlledData at call.result
+}

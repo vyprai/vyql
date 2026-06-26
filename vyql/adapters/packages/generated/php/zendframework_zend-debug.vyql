@@ -1,5 +1,0 @@
-adapter php {
-  package "zendframework/zend-debug" {
-    sink method "dump" -> code.ExpressionEval
-  }
-}

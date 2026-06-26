@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7b26099b;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("SwiftyUserDefaults")
+  }
+  query pattern callExpr where callee.method == "subscript"
+  emit sink code.StoredDataWrite at args[0]
+}

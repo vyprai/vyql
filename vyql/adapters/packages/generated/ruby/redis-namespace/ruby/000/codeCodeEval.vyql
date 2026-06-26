@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf86738b3;
+
+binding codeEval0 {
+  requires {
+    dependency("redis-namespace")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

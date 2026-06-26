@@ -1,7 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter rust {
-  package "tokio-tls" {
-    source method "read" -> code.NetworkData
-    sink method "write" -> code.NetworkSend
-  }
-}

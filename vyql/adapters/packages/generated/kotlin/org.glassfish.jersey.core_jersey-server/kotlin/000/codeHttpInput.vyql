@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m971d5e41;
+
+binding httpInput0 {
+  requires {
+    dependency("org.glassfish.jersey.core:jersey-server")
+  }
+  query pattern callExpr where callee.method == "ContainerRequest.readEntity"
+  emit source code.HttpInput at call.result
+}

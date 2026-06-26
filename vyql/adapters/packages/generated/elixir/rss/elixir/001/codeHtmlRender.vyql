@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m218d4b15;
+
+binding htmlRender1 {
+  requires {
+    dependency("rss")
+  }
+  query pattern callExpr where callee.method == "item"
+  emit sink code.HtmlRender at args[0]
+}

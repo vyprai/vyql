@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma876466f;
+
+binding deserialization0 {
+  requires {
+    dependency("GzipSwift")
+  }
+  query pattern callExpr where callee.method == "gunzipped"
+  emit sink code.Deserialization at args[0]
+}

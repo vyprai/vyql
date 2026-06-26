@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule JenkinsPluginForkedDirectoryBrowserWithoutCsp {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-065"
+    severity: high
+  }
+  issue code.JenkinsPluginForkedDirectoryBrowserWithoutCsp as sink
+}

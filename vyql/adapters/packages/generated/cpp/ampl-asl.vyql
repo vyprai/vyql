@@ -1,5 +1,0 @@
-adapter cpp {
-  package "ampl-asl" {
-    sink method "file" -> code.FilePathAccess
-  }
-}

@@ -1,7 +1,0 @@
-adapter swift {
-  package "github.com/firebase/grpc-SwiftPM" {
-    source method "ProtoReadDependencies" -> code.NetworkData
-    sink method "SendMessageBenchmark" -> code.NetworkSend
-    sink method "ChannelConnectivityTest" -> code.NetworkConnect
-  }
-}

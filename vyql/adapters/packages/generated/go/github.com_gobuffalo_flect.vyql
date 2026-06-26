@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/gobuffalo/flect" {
-    sink method "LoadAcronyms" -> code.Deserialization
-    sink method "LoadInflections" -> code.Deserialization
-  }
-}

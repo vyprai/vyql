@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding cliArgument87 {
+  query pattern callExpr where callee.path ~= "sys.argv"
+  emit source code.CliArgument at call.result
+}

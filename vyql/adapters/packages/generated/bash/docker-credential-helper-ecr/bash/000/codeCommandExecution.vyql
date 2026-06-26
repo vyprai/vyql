@@ -1,0 +1,9 @@
+module bindings.bash.migration.m877c6a8c;
+
+binding commandExecution0 {
+  requires {
+    dependency("docker-credential-helper-ecr")
+  }
+  query pattern callExpr where callee.path ~= "docker-credential-ecr-login"
+  emit sink code.CommandExecution at args[0]
+}

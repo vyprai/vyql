@@ -1,0 +1,9 @@
+module bindings.swift.migration.md7a85c88;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/mysql-nio")
+  }
+  query pattern callExpr where callee.method == "simpleQuery"
+  emit sink code.SqlExecution at args[0]
+}

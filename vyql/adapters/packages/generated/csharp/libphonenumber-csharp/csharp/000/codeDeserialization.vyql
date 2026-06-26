@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m647415c1;
+
+binding deserialization0 {
+  requires {
+    dependency("libphonenumber-csharp")
+  }
+  query pattern callExpr where callee.method == "PhoneNumberUtil.Parse"
+  emit sink code.Deserialization at args[0]
+}

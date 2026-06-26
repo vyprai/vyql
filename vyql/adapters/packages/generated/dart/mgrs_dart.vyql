@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "mgrs_dart" {
-    sink method "decode" -> code.Deserialization
-  }
-}

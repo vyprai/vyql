@@ -1,0 +1,9 @@
+module bindings.objc.migration.m34256310;
+
+binding userControlledData0 {
+  requires {
+    dependency("KIF")
+  }
+  query pattern callExpr where callee.method == "enterText"
+  emit source core.UserControlledData at call.result
+}

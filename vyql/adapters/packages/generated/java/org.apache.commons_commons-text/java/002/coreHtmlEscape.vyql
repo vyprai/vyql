@@ -1,0 +1,14 @@
+module bindings.java.migration.m898fc9bf;
+
+binding htmlEscape2 {
+  requires {
+    dependency("org.apache.commons:commons-text")
+  }
+  query pattern callExpr where callee.method == "escapeJson"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

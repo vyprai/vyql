@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter swift {
-  package "github.com/eneko/MarkdownGenerator" {
-    sink method "write" -> code.FilePathAccess
-  }
-}

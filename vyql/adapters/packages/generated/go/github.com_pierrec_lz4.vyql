@@ -1,9 +1,0 @@
-adapter go {
-  package "github.com/pierrec/lz4" {
-    sink method "UncompressBlock" -> code.Deserialization
-    sink method "CompressBlock" -> code.Deserialization
-    sink method "CompressBlockHC" -> code.Deserialization
-    sink method "NewReader" -> code.Deserialization
-    sink method "NewWriter" -> code.Deserialization
-  }
-}

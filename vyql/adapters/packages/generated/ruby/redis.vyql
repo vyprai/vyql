@@ -1,7 +1,0 @@
-adapter ruby {
-  package "redis" {
-    sink method "send_command" -> code.NosqlQuery
-    sink method "call_v" -> code.NosqlQuery
-    sink method "blocking_call_v" -> code.NosqlQuery
-  }
-}

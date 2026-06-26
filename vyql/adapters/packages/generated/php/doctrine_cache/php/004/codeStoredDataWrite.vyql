@@ -1,0 +1,9 @@
+module bindings.php.migration.me1eb10cf;
+
+binding storedDataWrite4 {
+  requires {
+    dependency("doctrine/cache")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

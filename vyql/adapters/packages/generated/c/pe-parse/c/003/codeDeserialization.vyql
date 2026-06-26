@@ -1,0 +1,9 @@
+module bindings.c.migration.m6a5be51c;
+
+binding deserialization3 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "ParsePEFromBuffer"
+  emit sink code.Deserialization at args[0]
+}

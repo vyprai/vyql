@@ -1,0 +1,9 @@
+module bindings.perl.migration.mb8bb4688;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Image-Square")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.FilePathAccess at args[0]
+}

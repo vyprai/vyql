@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mdd93e840;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.pdfbox:pdfbox")
+  }
+  query pattern callExpr where callee.method == "loadPDF"
+  emit sink code.Deserialization at args[0]
+}

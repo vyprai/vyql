@@ -1,0 +1,14 @@
+module bindings.scala.migration.m3608f193;
+
+binding xmlHardening30 {
+  requires {
+    dependency("javax.xml.parsers")
+  }
+  query pattern callExpr where callee.path ~= "DocumentBuilderFactory.setFeature"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

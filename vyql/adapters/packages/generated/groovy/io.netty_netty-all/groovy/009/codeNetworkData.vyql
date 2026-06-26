@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1afc5a6b;
+
+binding networkData9 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "writeByte"
+  emit source code.NetworkData at call.result
+}

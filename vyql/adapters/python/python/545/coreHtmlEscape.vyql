@@ -1,0 +1,11 @@
+module bindings.python.migration.m21017d75;
+
+binding htmlEscape545 {
+  query pattern callExpr where callee.path ~= "django.utils.html.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

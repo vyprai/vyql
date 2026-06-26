@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedNullableResultDeref : issue {
+  cwe: [CWE_476]
+  review_assumption: "the callee can return null for attacker-controlled or unexpected protocol state"
+  reviewCategory: memory
+  reviewCondition: "nullable factory or callback result is dereferenced before an observed null guard"
+  reviewConfidence: medium
+  reviewEvidence: "nullable-result context {pattern} stores a result and dereferences it without a dominating null check"
+  vulnerableTo: [memory.NullDereference]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.ma4820db5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("commondir")
+  }
+  query pattern callExpr where callee.method == "module.exports"
+  emit sink code.FilePathAccess at args[0]
+}

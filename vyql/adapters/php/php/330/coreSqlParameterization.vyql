@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding sqlParameterization330 {
+  query pattern callExpr where callee.path ~= "mysqli_real_escape_string"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

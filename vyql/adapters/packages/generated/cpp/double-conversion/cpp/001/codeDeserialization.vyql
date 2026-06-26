@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m616ac445;
+
+binding deserialization1 {
+  requires {
+    dependency("double-conversion")
+  }
+  query pattern callExpr where callee.method == "Strtod"
+  emit sink code.Deserialization at args[0]
+}

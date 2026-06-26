@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "com.airbnb.android:lottie" {
-    sink method "parse" -> code.Deserialization
-  }
-}

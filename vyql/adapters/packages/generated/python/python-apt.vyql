@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "python-apt" {
-    sink method "parse" -> code.Deserialization
-  }
-}

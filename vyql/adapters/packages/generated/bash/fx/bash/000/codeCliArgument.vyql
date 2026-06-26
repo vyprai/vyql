@@ -1,0 +1,9 @@
+module bindings.bash.migration.m413eef58;
+
+binding cliArgument0 {
+  requires {
+    dependency("fx")
+  }
+  query pattern callExpr where callee.path ~= "fx.argv"
+  emit source code.CliArgument at call.result
+}

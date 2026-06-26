@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m79d12f8c;
+
+binding filePathAccess2 {
+  requires {
+    dependency("rsm-binary-io")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

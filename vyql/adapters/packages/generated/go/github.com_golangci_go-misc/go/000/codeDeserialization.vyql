@@ -1,0 +1,9 @@
+module bindings.go.migration.m6bf532ed;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/golangci/go-misc")
+  }
+  query pattern callExpr where callee.method == "ParsePattern"
+  emit sink code.Deserialization at args[0]
+}

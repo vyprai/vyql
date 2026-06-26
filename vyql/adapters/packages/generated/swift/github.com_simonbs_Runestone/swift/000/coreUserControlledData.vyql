@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma4377469;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/simonbs/Runestone")
+  }
+  query pattern callExpr where callee.method == "replace(_:withText:)"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding memberStoreMissingCreateAuthorization53 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=store" and node.token contains "call_path:$request.getParsedBody" and node.token contains "call_path:$member.setSelfMembership" and node.token contains "call_path:$member.canEdit" and node.token contains "call_path:$member.store" and node.token contains "call_path:$this.isSelfMembership" and not (node.token contains "call_path:$member.canCreate")
+  emit issue code.MemberStoreMissingCreateAuthorization at node
+}

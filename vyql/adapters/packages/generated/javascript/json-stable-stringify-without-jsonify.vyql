@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter javascript {
-  package "json-stable-stringify-without-jsonify" {
-    sink method "module.exports" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2e1ff025;
+
+binding responseHeaderWrite7 {
+  requires {
+    dependency("com.sun.jersey:jersey-servlet")
+  }
+  query pattern callExpr where callee.method == "writeStatus"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

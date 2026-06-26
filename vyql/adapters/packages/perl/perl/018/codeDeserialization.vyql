@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding deserialization18 {
+  requires {
+    dependency("Storable")
+  }
+  query pattern callExpr where callee.path ~= "Storable.thaw"
+  emit sink code.Deserialization at args[0]
+}

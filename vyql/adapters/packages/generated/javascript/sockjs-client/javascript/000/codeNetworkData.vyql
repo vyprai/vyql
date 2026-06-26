@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m6ce75792;
+
+binding networkData0 {
+  requires {
+    dependency("sockjs-client")
+  }
+  query pattern callExpr where callee.method == "SockJS"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m57ceca45;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/kevinburke/ssh_config")
+  }
+  query pattern callExpr where callee.method == "parseFile"
+  emit sink code.FilePathAccess at args[0]
+}

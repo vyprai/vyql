@@ -1,5 +1,0 @@
-adapter javascript {
-  package "on-headers" {
-    sink method "onHeaders" -> code.ResponseHeaderWrite
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb1fc3a64;
+
+binding networkSend2 {
+  requires {
+    dependency("mongo")
+  }
+  query pattern callExpr where callee.method == "send_initial_query"
+  emit sink code.NetworkSend at args[0]
+}

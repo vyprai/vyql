@@ -1,0 +1,9 @@
+module bindings.objc.migration.m6b2b1a9f;
+
+binding networkSend1 {
+  requires {
+    dependency("FacebookShare")
+  }
+  query pattern callExpr where callee.method == "sharerDidCancel"
+  emit sink code.NetworkSend at args[0]
+}

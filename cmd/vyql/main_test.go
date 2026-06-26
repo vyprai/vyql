@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vyprai/vyql/engine"
@@ -15,6 +16,84 @@ func TestScanPathsNoSource(t *testing.T) {
 	rules, _ := loadRules("")
 	if _, _, _, err := scanPaths([]string{t.TempDir()}, rules); err == nil {
 		t.Fatal("scanning a dir with no supported source should error")
+	}
+}
+
+func TestCompiledRulesForCachesRulesBySource(t *testing.T) {
+	compiledRulesCache = sync.Map{}
+	rules := `
+module rules.test;
+rule SqlInjection {
+  taint code.HttpInput -> code.SqlExecution
+}
+`
+	first, err := compiledRulesFor(rules)
+	if err != nil {
+		t.Fatalf("first compile: %v", err)
+	}
+	second, err := compiledRulesFor(rules)
+	if err != nil {
+		t.Fatalf("second compile: %v", err)
+	}
+	if len(first.compiled) != 1 || len(second.compiled) != 1 {
+		t.Fatalf("compiled rule counts = %d, %d; want 1, 1", len(first.compiled), len(second.compiled))
+	}
+	if first.onto != second.onto || first.compiled[0] != second.compiled[0] {
+		t.Fatalf("compiled rules were not reused from cache")
+	}
+}
+
+func TestCompiledRulesForRejectsLegacyRuntimeSyntax(t *testing.T) {
+	compiledRulesCache = sync.Map{}
+	rules := `
+module rules.test;
+rule LegacyPresence {
+  match code.DynamicCodeLoad as d
+}
+`
+	if _, err := compiledRulesFor(rules); err == nil || !strings.Contains(err.Error(), "v1 syntax") {
+		t.Fatalf("legacy compile = %v, want v2 syntax rejection", err)
+	}
+}
+
+func TestCompiledRulesForRunsV2CorpusValidation(t *testing.T) {
+	compiledRulesCache = sync.Map{}
+	rules := `
+module rules.bad;
+rule BadCoverageMode {
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.SqlParameterization
+}
+`
+	if _, err := compiledRulesFor(rules); err == nil || !strings.Contains(err.Error(), `coverage mode "endpoint" not declared in concept covers [path]`) {
+		t.Fatalf("compile = %v, want v2 corpus coverage validation", err)
+	}
+}
+
+func TestRuleActiveForProfileHonorsV2RequiredProfiles(t *testing.T) {
+	rules := `
+module rules.profiled;
+rule WebOnly {
+  issue code.LockAcquire as d
+  require profile web
+}
+`
+	compiled, err := compiledRulesFor(rules)
+	if err != nil {
+		t.Fatalf("compiledRulesFor: %v", err)
+	}
+	if len(compiled.compiled) != 1 {
+		t.Fatalf("compiled rules = %d, want 1", len(compiled.compiled))
+	}
+	cr := compiled.compiled[0]
+	if !ruleActiveForProfile(cr, "") {
+		t.Fatal("empty profile should preserve direct helper behavior")
+	}
+	if !ruleActiveForProfile(cr, "web") {
+		t.Fatal("web profile should activate web-required rule")
+	}
+	if ruleActiveForProfile(cr, "library") {
+		t.Fatal("library profile should not activate web-required rule")
 	}
 }
 
@@ -213,7 +292,7 @@ func TestDefaultPacksCompile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

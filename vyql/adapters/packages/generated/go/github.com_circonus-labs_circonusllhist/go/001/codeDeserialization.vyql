@@ -1,0 +1,9 @@
+module bindings.go.migration.macc16ee5;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/circonus-labs/circonusllhist")
+  }
+  query pattern callExpr where callee.method == "DeserializeWithOptions"
+  emit sink code.Deserialization at args[0]
+}

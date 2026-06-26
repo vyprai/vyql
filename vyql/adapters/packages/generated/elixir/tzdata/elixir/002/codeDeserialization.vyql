@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mec43e959;
+
+binding deserialization2 {
+  requires {
+    dependency("tzdata")
+  }
+  query pattern callExpr where callee.method == "process_tz_list"
+  emit sink code.Deserialization at args[0]
+}

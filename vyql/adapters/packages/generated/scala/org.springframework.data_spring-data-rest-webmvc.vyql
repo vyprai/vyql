@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.springframework.data:spring-data-rest-webmvc" {
-    sink method "read" -> code.Deserialization
-  }
-}

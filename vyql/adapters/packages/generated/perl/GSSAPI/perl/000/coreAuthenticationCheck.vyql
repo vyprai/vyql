@@ -1,0 +1,14 @@
+module bindings.perl.migration.m1b5fccea;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::init_sec_context"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

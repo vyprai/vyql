@@ -1,0 +1,6 @@
+module validation;
+
+threat TrustBoundary {
+  cwe: [CWE_501]
+  desc: "Untrusted data stored across a trust boundary (e.g. into the HTTP session)"
+}

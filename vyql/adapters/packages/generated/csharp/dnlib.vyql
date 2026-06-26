@@ -1,8 +1,0 @@
-import code.{Deserialization, CodeEval}
-
-adapter csharp {
-  package "dnlib" {
-    sink method "AssemblyDef.Load" -> code.Deserialization
-    sink method "AssemblyDef.Write" -> code.CodeEval
-  }
-}

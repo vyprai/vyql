@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6ba6921c;
+
+binding cliArgument1 {
+  requires {
+    dependency("Docopt")
+  }
+  query pattern callExpr where callee.method == "parse_argv"
+  emit source code.CliArgument at call.result
+}

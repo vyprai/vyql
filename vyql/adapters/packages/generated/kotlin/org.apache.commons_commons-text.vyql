@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.apache.commons:commons-text" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

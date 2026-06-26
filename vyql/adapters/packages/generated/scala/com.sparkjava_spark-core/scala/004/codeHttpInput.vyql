@@ -1,0 +1,9 @@
+module bindings.scala.migration.m852e8598;
+
+binding httpInput4 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit source code.HttpInput at call.result
+}

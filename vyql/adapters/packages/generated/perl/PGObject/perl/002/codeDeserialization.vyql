@@ -1,0 +1,9 @@
+module bindings.perl.migration.m23268abb;
+
+binding deserialization2 {
+  requires {
+    dependency("PGObject")
+  }
+  query pattern callExpr where callee.method == "deserializer"
+  emit sink code.Deserialization at args[0]
+}

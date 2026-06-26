@@ -1,0 +1,9 @@
+module bindings.objc.migration.mb118e0aa;
+
+binding codeEval2 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "overwriteConfig"
+  emit sink code.CodeEval at args[0]
+}

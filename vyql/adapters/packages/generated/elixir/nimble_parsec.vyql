@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "nimble_parsec" {
-    sink method "parsec" -> code.Deserialization
-  }
-}

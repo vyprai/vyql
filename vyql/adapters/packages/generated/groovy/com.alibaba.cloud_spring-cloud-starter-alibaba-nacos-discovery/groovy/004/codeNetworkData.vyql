@@ -1,0 +1,9 @@
+module bindings.groovy.migration.maf32f765;
+
+binding networkData4 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getNetworkInterface"
+  emit source code.NetworkData at call.result
+}

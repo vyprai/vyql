@@ -1,0 +1,9 @@
+module bindings.c.migration.mdee0b4cb;
+
+binding deserialization2 {
+  requires {
+    dependency("libconfuse")
+  }
+  query pattern callExpr where callee.method == "cfg_parse_buf"
+  emit sink code.Deserialization at args[0]
+}

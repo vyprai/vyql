@@ -1,0 +1,8 @@
+module code;
+
+review code.InternalAssetRoutePathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review internal static-asset handlers for realpath and root containment checks before serving package asset files"
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding filePathAccess343 {
+  query pattern callExpr where callee.path ~= "mkdirSync"
+  emit sink code.FilePathAccess at args[0]
+}

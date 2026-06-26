@@ -1,7 +1,0 @@
-import code.{HttpInput, NetworkSend}
-adapter javascript {
-  package "workbox-range-requests" {
-    source method "parseRangeHeader" -> code.HttpInput
-    sink method "createPartialResponse" -> code.NetworkSend
-  }
-}

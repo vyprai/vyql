@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbfa501c2;
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http")
+  }
+  query pattern callExpr where callee.method == "readFromConnection"
+  emit source code.HttpInput at call.result
+}

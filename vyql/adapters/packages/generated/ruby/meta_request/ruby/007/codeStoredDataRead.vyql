@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m426fc52d;
+
+binding storedDataRead7 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "events_json"
+  emit source code.StoredDataRead at call.result
+}

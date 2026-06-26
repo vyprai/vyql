@@ -1,0 +1,9 @@
+module bindings.rust.migration.m34488fae;
+
+binding deserialization0 {
+  requires {
+    dependency("plist")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

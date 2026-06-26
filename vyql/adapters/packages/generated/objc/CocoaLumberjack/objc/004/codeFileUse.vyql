@@ -1,0 +1,9 @@
+module bindings.objc.migration.m637e118b;
+
+binding fileUse4 {
+  requires {
+    dependency("CocoaLumberjack")
+  }
+  query pattern callExpr where callee.method == "rollLogFile"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{ExpressionEval}
-adapter groovy {
-  package "javax.el:javax.el-api" {
-    sink method "eval" -> code.ExpressionEval
-  }
-}

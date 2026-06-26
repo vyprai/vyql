@@ -1,0 +1,13 @@
+module bindings.rust.migration.m310ffdba;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("secp256k1-sys")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "secp256k1_context_randomize"
+  emit issue code.WeakRandomValue at node
+}

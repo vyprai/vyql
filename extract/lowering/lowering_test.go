@@ -90,7 +90,7 @@ func addPackRuleIDNeedles(t *testing.T, out map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parser.ParseRuntime(string(raw))
 		if err != nil {
 			return err
 		}
@@ -398,6 +398,50 @@ func TestTargetArgsCallbackDispatchesDynamicCallee(t *testing.T) {
 	}
 }
 
+func TestDynamicCallbackFallbackDoesNotCrossLanguageFamilies(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "java",
+			File: "Helper.java",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "worker", Params: []string{"x"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "Helper.java:2"},
+						Args:   []nir.Expr{nir.Name{ID: "x", Loc: "Helper.java:2"}},
+						Path:   "sink", Method: "sink", Loc: "Helper.java:2",
+					}},
+				}, Loc: "Helper.java:1"},
+			},
+		},
+		{
+			Key:  "webapp/js/jquery.min.js",
+			File: "webapp/js/jquery.min.js",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "runner", Params: []string{"callback", "payload"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "callback", Loc: "webapp/js/jquery.min.js:2"},
+						Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "webapp/js/jquery.min.js:2"}},
+						Path:   "callback", Method: "callback", Loc: "webapp/js/jquery.min.js:2",
+					}},
+				}, Loc: "webapp/js/jquery.min.js:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := findNodeID(t, g, "code.Param", "func", "runner", "name", "payload")
+	javaSinkArg := findNodeID(t, g, "code.Arg", "loc", "Helper.java:2")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[javaSinkArg] {
+		t.Fatalf("dynamic callback fallback crossed from javascript into java")
+	}
+}
+
 func TestAllowlistMembershipIfBoundsTrueBranchValue(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",
@@ -528,6 +572,65 @@ func TestLowerStampsReceiverTypeFromParamTypes(t *testing.T) {
 		}
 	}
 	t.Fatalf("svc.clean call not found")
+}
+
+func TestBenchmarkThingIdentityCallDoesNotShareReturnAcrossCallSites(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "helpers",
+			File: "ThingInterface.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "ThingInterface", Body: []nir.Stmt{
+					nir.FuncDef{Name: "doSomething", Params: []string{"i"}, Body: nil, Loc: "ThingInterface.java:1"},
+				}, Loc: "ThingInterface.java:1"},
+				nir.ClassDef{Name: "Thing1", Bases: []string{"ThingInterface"}, Body: []nir.Stmt{
+					nir.FuncDef{Name: "doSomething", Params: []string{"i"}, Body: []nir.Stmt{
+						nir.Return{Value: nir.Name{ID: "i", Loc: "Thing1.java:3"}},
+					}, Loc: "Thing1.java:2"},
+				}, Loc: "Thing1.java:1"},
+			},
+		},
+		{
+			Key:  "app",
+			File: "App.java",
+			Body: []nir.Stmt{
+				nir.FuncDef{Name: "taint", Params: []string{"p"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"thing"}, Value: nir.Const{Loc: "App.java:2"}, Type: "ThingInterface", Loc: "App.java:2"},
+					nir.Assign{Targets: []string{"x"}, Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "thing", Loc: "App.java:3"}, Attr: "doSomething", Path: "thing.doSomething", Loc: "App.java:3"},
+						Args:   []nir.Expr{nir.Name{ID: "p", Loc: "App.java:3"}},
+						Path:   "thing.doSomething", Method: "doSomething", Loc: "App.java:3",
+					}},
+				}, Loc: "App.java:1"},
+				nir.FuncDef{Name: "safe", Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"thing"}, Value: nir.Const{Loc: "App.java:6"}, Type: "ThingInterface", Loc: "App.java:6"},
+					nir.Assign{Targets: []string{"bar"}, Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "thing", Loc: "App.java:7"}, Attr: "doSomething", Path: "thing.doSomething", Loc: "App.java:7"},
+						Args:   []nir.Expr{nir.Const{Value: "safe", Loc: "App.java:7"}},
+						Path:   "thing.doSomething", Method: "doSomething", Loc: "App.java:7",
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "File", Loc: "App.java:8"},
+						Args:   []nir.Expr{nir.Name{ID: "bar", Loc: "App.java:8"}},
+						Path:   "File", Method: "File", Loc: "App.java:8",
+					}},
+				}, Loc: "App.java:5"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "p")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "App.java:8")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sinkArg] {
+		t.Fatalf("benchmark helper identity call shared taint across call sites")
+	}
 }
 
 func TestLowerPreservesDeclaredReceiverTypeAfterUntypedAssignment(t *testing.T) {

@@ -1,0 +1,9 @@
+module bindings.python.migration.m358e1fdd;
+
+binding dynamicCodeLoad0 {
+  requires {
+    dependency("cython")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.DynamicCodeLoad at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m9669be91;
+
+binding htmlRender6 {
+  requires {
+    dependency("ch.qos.logback:logback-access")
+  }
+  query pattern callExpr where callee.method == "doLayout"
+  emit sink code.HtmlRender at args[0]
+}

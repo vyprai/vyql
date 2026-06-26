@@ -1,8 +1,0 @@
-import code.{LogOutput}
-
-adapter java {
-  package "org.slf4j:slf4j-simple" {
-    sink method "write" -> code.LogOutput
-    sink method "innerHandleNormalizedLoggingCall" -> code.LogOutput
-  }
-}

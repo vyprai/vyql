@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8df885c9;
+
+binding filePathAccess6 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "_async_changes"
+  emit sink code.FilePathAccess at args[0]
+}

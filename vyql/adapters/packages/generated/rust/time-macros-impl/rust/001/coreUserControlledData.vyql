@@ -1,0 +1,9 @@
+module bindings.rust.migration.m786afc64;
+
+binding userControlledData1 {
+  requires {
+    dependency("time-macros-impl")
+  }
+  query pattern callExpr where callee.method == "time"
+  emit source core.UserControlledData at call.result
+}

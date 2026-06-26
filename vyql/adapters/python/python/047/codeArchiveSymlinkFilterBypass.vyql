@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding archiveSymlinkFilterBypass47 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=safe_extract" and node.token contains "tar.getmembers()" and node.token contains "os.path.join(path,member.name)" and node.token contains "is_within_directory(path,member_path)" and node.token contains "tar.extractall(path,members,numeric_owner=numeric_owner)" and not (node.token contains "member.issym()") and not (node.token contains "member.islnk()") and not (node.token contains "member.linkname")
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

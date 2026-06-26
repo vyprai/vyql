@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma7057190;
+
+binding commandExecution0 {
+  requires {
+    dependency("Plack")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

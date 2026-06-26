@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md3359d57;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find_one_and_replace"
+  emit sink code.NosqlQuery at args[0]
+}

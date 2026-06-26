@@ -1,0 +1,9 @@
+module bindings.perl.migration.m0b13d399;
+
+binding httpInput1 {
+  requires {
+    dependency("Corona")
+  }
+  query pattern callExpr where callee.method == "Corona::Server::process_request"
+  emit source code.HttpInput at call.result
+}

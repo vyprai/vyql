@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter ruby {
-  package "google-apis-playcustomapp_v1" {
-    source method "create_account_custom_app" -> core.UserControlledData
-  }
-}

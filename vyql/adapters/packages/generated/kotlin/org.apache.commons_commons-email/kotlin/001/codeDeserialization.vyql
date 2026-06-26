@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.md63bc553;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

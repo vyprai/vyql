@@ -1,0 +1,9 @@
+module bindings.php.migration.me3f15483;
+
+binding sqlExecution0 {
+  requires {
+    dependency("elasticsearch/elasticsearch")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

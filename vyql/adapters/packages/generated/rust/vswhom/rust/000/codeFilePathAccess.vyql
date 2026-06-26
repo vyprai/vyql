@@ -1,0 +1,9 @@
+module bindings.rust.migration.mfdecd0ea;
+
+binding filePathAccess0 {
+  requires {
+    dependency("vswhom")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.FilePathAccess at args[0]
+}

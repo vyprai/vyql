@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m40bbd9be;
+
+binding filePathAccess4 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "do_setxattr"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.ma1e8986c;
+
+binding deserialization4 {
+  requires {
+    dependency("itsdangerous")
+  }
+  query pattern callExpr where callee.method == "base64_decode"
+  emit sink code.Deserialization at args[0]
+}

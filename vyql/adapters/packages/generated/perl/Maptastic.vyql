@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-import code.{FileUse}
-adapter perl {
-  package "Maptastic" {
-    source method "readline" -> core.UserControlledData
-    sink method "slurp" -> code.FileUse
-  }
-}

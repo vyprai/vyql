@@ -1,0 +1,9 @@
+module bindings.php.migration.m93b01918;
+
+binding commandExecution0 {
+  requires {
+    dependency("nette/utils")
+  }
+  query pattern callExpr where callee.method == "NetteUtilsProcess::exec"
+  emit sink code.CommandExecution at args[0]
+}

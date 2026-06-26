@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mdddec266;
+
+binding filePathAccess2 {
+  requires {
+    dependency("jsdom")
+  }
+  query pattern callExpr where callee.method == "fromFile"
+  emit sink code.FilePathAccess at args[0]
+}

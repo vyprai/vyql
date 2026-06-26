@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter cpp {
-  package "boost-python" {
-    sink method "exec" -> code.CodeEval
-  }
-}

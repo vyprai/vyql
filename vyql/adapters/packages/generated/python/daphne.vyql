@@ -1,9 +1,0 @@
-import code.{HttpInput, NetworkSend}
-
-adapter python {
-  package "daphne" {
-    source method "process" -> code.HttpInput
-    source method "onMessage" -> code.HttpInput
-    sink method "serverSend" -> code.NetworkSend
-  }
-}

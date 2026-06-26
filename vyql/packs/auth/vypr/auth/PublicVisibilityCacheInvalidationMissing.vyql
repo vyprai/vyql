@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule PublicVisibilityCacheInvalidationMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863]
+    id: "VYQL-AUTH-036"
+    severity: high
+  }
+  issue code.PublicVisibilityCacheInvalidationMissing as cache
+}

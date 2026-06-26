@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter java {
-  package "org.seleniumhq.selenium:htmlunit-driver" {
-    sink method "get" -> code.UrlFetch
-  }
-}

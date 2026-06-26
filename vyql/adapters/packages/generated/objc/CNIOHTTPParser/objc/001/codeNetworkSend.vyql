@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma6dc1814;
+
+binding networkSend1 {
+  requires {
+    dependency("CNIOHTTPParser")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

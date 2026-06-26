@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb26cebfd;
+
+binding networkConnect5 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit sink code.NetworkConnectSink at args[0]
+}

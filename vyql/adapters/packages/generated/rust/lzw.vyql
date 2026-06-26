@@ -1,6 +1,0 @@
-adapter rust {
-  package "lzw" {
-    sink method "decode_bytes" -> code.Deserialization
-    source method "encode_bytes" -> core.UserControlledData
-  }
-}

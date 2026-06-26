@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding zeroStepSequenceExpansion629 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "Math.abs(numeric(n[2]))" and node.token contains "test(i,y)" and node.token contains "i+=incr" and not (node.token contains "Math.max(Math.abs(numeric(n[2])),1)")
+  emit issue code.ZeroStepSequenceExpansion at node
+}

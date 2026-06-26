@@ -1,7 +1,0 @@
-import code.{XmlParse}
-adapter java {
-  package "org.eclipse.jetty:jetty-xml" {
-    sink method "XmlParser.parse" -> code.XmlParse
-    sink method "XmlConfiguration.configure" -> code.XmlParse
-  }
-}

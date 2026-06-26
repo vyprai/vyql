@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding unneutralizedDiagnosticValue208 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=parsedkim" and node.token contains "_warnmsg" and node.token contains "Unknown DKIM key type" and node.token contains "dkim['k']" and not (node.token contains "_warnmsg(\"Unknown DKIM key type\")")
+  emit issue code.UnneutralizedDiagnosticValue at node
+}

@@ -1,5 +1,0 @@
-adapter objc {
-  package "CNIOBoringSSL" {
-    source method "boringssl_self_test_hmac_sha256" -> code.SecretValue
-  }
-}

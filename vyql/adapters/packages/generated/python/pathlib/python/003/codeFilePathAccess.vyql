@@ -1,0 +1,9 @@
+module bindings.python.migration.ma1401838;
+
+binding filePathAccess3 {
+  requires {
+    dependency("pathlib")
+  }
+  query pattern callExpr where callee.method == "replace"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter scala {
-  package "org.spockframework:spock-core" {
-    sink method "run" -> code.CodeEval
-  }
-}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter elixir {
-  package "ex_fontawesome" {
-    sink method "parse!" -> code.FilePathAccess
-  }
-}

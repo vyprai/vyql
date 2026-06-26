@@ -30,6 +30,9 @@ func ParseV2(src string) (prog *V2Program, err error) {
 		}
 	}()
 	prog = p.parseV2Program()
+	if verr := ValidateV2(prog); verr != nil {
+		return nil, verr
+	}
 	return prog, nil
 }
 
@@ -37,6 +40,7 @@ func (p *v2Parser) parseV2Program() *V2Program {
 	prog := &V2Program{}
 	var decls []V2Decl
 	moduleSeen := false
+	declSeen := false
 	for !p.at(tEOF) {
 		if p.at(tSemi) {
 			p.next()
@@ -44,8 +48,8 @@ func (p *v2Parser) parseV2Program() *V2Program {
 		}
 		switch {
 		case p.atWord("module"):
-			if moduleSeen {
-				p.fail("only one module declaration is allowed per VyQL v2 file")
+			if moduleSeen || declSeen || len(prog.Uses) > 0 {
+				p.fail("module declaration must appear once at the top of a VyQL v2 file")
 			}
 			moduleSeen = true
 			p.next()
@@ -55,8 +59,14 @@ func (p *v2Parser) parseV2Program() *V2Program {
 				p.next()
 			}
 		case p.atWord("uses"):
+			if !moduleSeen {
+				p.fail("uses declaration requires a preceding module declaration")
+			}
+			if declSeen {
+				p.fail("uses declarations must appear before VyQL v2 declarations")
+			}
 			p.next()
-			u := V2Use{Name: p.parseQName()}
+			u := V2Use{Name: p.parseV2UseName()}
 			if p.atWord("as") {
 				p.next()
 				u.Alias = p.expect(tWord, "uses alias").val
@@ -66,11 +76,12 @@ func (p *v2Parser) parseV2Program() *V2Program {
 				p.next()
 			}
 		case p.atWord("import"):
-			p.parseImportDecl()
-			if p.at(tSemi) {
-				p.next()
-			}
+			p.fail("v1 syntax %q is not supported in VyQL v2; use uses", p.peek().val)
 		default:
+			if !moduleSeen && !p.atWord("adapter") && !p.atWord("source") && !p.atWord("sink") && !p.atWord("flag") && !p.atWord("mark") && !p.atWord("filter") && !p.atWord("package") {
+				p.fail("VyQL v2 files require a module declaration before declarations")
+			}
+			declSeen = true
 			decls = append(decls, p.parseV2Decl())
 		}
 	}
@@ -109,6 +120,18 @@ func (p *v2Parser) parseV2Decl() V2Decl {
 	}
 	p.fail("unexpected v2 top-level token %q at %d", p.peek().val, p.peek().pos)
 	return nil
+}
+
+func (p *v2Parser) parseV2UseName() string {
+	name := p.expect(tWord, "uses name").val
+	for p.at(tDot) {
+		p.next()
+		if p.at(tStar) {
+			p.fail("wildcard uses imports are rejected in VyQL v2 production definitions")
+		}
+		name += "." + p.expect(tWord, "uses name part").val
+	}
+	return name
 }
 
 func (p *v2Parser) parseV2Concept() *V2ConceptDecl {
@@ -191,6 +214,11 @@ func (p *v2Parser) parseV2Binding() *V2BindingDecl {
 	p.expect(tLBrace, "{")
 	if p.atWord("requires") {
 		out.Requirements = p.parseV2Requires()
+	}
+	if p.atWord("unstable") {
+		p.next()
+		p.expect(tColon, ":")
+		out.Unstable = p.parseV2FieldBlock()
 	}
 	if !p.atWord("query") {
 		p.fail("binding %s requires query before outputs", out.Name)
@@ -357,7 +385,7 @@ func (p *v2Parser) parseV2RuleBody() V2RuleBody {
 	}
 	verb := p.expect(tWord, "rule verb").val
 	switch verb {
-	case "taint", "flow", "reach", "grant":
+	case "taint", "flow", "reach", "grant", "assume":
 		from := p.parseV2Endpoint()
 		p.expect(tArrow, "->")
 		return V2RuleBody{Verb: verb, From: from, To: p.parseV2Endpoint()}
@@ -422,12 +450,132 @@ func (p *v2Parser) parseV2Pack() *V2PackDecl {
 
 func (p *v2Parser) parseV2Mechanic() *V2MechanicDecl {
 	p.expectWord("mechanic")
-	return &V2MechanicDecl{Name: p.parseQName(), Fields: p.parseV2FieldBlock()}
+	return &V2MechanicDecl{
+		Kind:   p.expect(tWord, "mechanic kind").val,
+		Name:   p.expect(tWord, "mechanic name").val,
+		Module: p.module,
+		Items:  p.parseV2BlockItems(),
+	}
 }
 
 func (p *v2Parser) parseV2Policy() *V2PolicyDecl {
 	p.expectWord("policy")
-	return &V2PolicyDecl{Name: p.parseQName(), Fields: p.parseV2FieldBlock()}
+	return &V2PolicyDecl{
+		Kind:   p.expect(tWord, "policy kind").val,
+		Name:   p.expect(tWord, "policy name").val,
+		Module: p.module,
+		Items:  p.parseV2BlockItems(),
+	}
+}
+
+func (p *v2Parser) parseV2BlockItems() []V2BlockItem {
+	p.expect(tLBrace, "{")
+	var out []V2BlockItem
+	for !p.at(tRBrace) {
+		out = append(out, p.parseV2BlockItem())
+		p.consumeV2Separators()
+	}
+	p.expect(tRBrace, "}")
+	return out
+}
+
+func (p *v2Parser) parseV2BlockItem() V2BlockItem {
+	if p.atWord("when") {
+		p.next()
+		return V2BlockItem{Key: []string{"when"}, Value: p.parseV2LooseExprUntil(p.v2StopAtBlockItem)}
+	}
+	if p.atWord("emit") {
+		p.next()
+		item := V2BlockItem{Key: []string{"emit", p.expect(tWord, "emit kind").val}}
+		item.Block = p.parseV2BlockItems()
+		return item
+	}
+
+	first := p.expect(tWord, "block item").val
+	item := V2BlockItem{Key: []string{first}}
+	if p.at(tWord) && p.peek2().kind == tColon {
+		item.Key = append(item.Key, p.next().val)
+	}
+	if p.at(tWord) && p.peek2().kind == tLBrace {
+		item.Key = append(item.Key, p.next().val)
+		item.Block = p.parseV2BlockItems()
+		return item
+	}
+	if p.at(tColon) {
+		p.next()
+		item.Value = p.parseV2BlockValue()
+		return item
+	}
+	if p.at(tLBrace) {
+		item.Block = p.parseV2BlockItems()
+		return item
+	}
+	p.fail("expected ':' or block after %q at %d", first, p.peek().pos)
+	return item
+}
+
+func (p *v2Parser) parseV2BlockValue() any {
+	switch {
+	case p.at(tLBrack):
+		return p.parseV2AnyList()
+	case p.at(tLBrace):
+		return p.parseV2BlockItems()
+	case p.at(tString):
+		return V2LiteralExpr{Value: p.next().val}
+	case p.atWord("true"), p.atWord("false"):
+		return V2LiteralExpr{Value: p.parseV2Bool()}
+	case p.at(tWord) && isV2Number(p.peek().val):
+		n, _ := strconv.Atoi(p.next().val)
+		return V2LiteralExpr{Value: n}
+	default:
+		return p.parseV2LooseExprUntil(p.v2StopAtBlockItem)
+	}
+}
+
+func (p *v2Parser) parseV2AnyList() []any {
+	p.expect(tLBrack, "[")
+	var out []any
+	for !p.at(tRBrack) {
+		switch {
+		case p.at(tLBrace):
+			out = append(out, p.parseV2BlockItems())
+		case p.at(tString):
+			out = append(out, p.next().val)
+		case p.atWord("true"), p.atWord("false"):
+			out = append(out, p.parseV2Bool())
+		case p.at(tWord) && isV2Number(p.peek().val):
+			n, _ := strconv.Atoi(p.next().val)
+			out = append(out, n)
+		default:
+			out = append(out, p.parseV2Location())
+		}
+		if p.at(tComma) {
+			p.next()
+		}
+	}
+	p.expect(tRBrack, "]")
+	return out
+}
+
+func (p *v2Parser) parseV2LooseExprUntil(stop func(tok) bool) V2Expr {
+	var items []V2Expr
+	for !stop(p.peek()) {
+		start := p.i
+		items = append(items, p.parseV2ExprUntil(stop))
+		if p.i == start {
+			p.fail("unsupported v2 expression token %q at %d", p.peek().val, p.peek().pos)
+		}
+		if p.at(tComma) || stop(p.peek()) {
+			break
+		}
+		if !p.v2CanStartExpr(p.peek()) {
+			p.fail("unsupported v2 expression tail %q at %d", p.peek().val, p.peek().pos)
+		}
+	}
+	if len(items) == 1 {
+		return items[0]
+	}
+	return V2SequenceExpr{Items: items}
 }
 
 func (p *v2Parser) parseV2QueryExpr(stop func(tok) bool) V2QueryExpr {
@@ -553,7 +701,7 @@ func (p *v2Parser) parseV2Compare(stop func(tok) bool) V2Expr {
 	switch {
 	case p.at(tEq), p.at(tNe), p.at(tGe), p.at(tLe), p.at(tGt), p.at(tLt), p.at(tMatch):
 		op = p.next().val
-	case p.atWord("in"), p.atWord("contains"), p.atWord("is"):
+	case p.atWord("in"), p.atWord("contains"), p.atWord("startsWith"), p.atWord("endsWith"), p.atWord("matches"), p.atWord("is"):
 		op = p.next().val
 	case p.atWord("not") && p.peek2().kind == tWord && p.peek2().val == "in":
 		p.next()
@@ -595,14 +743,24 @@ func (p *v2Parser) parseV2Primary(stop func(tok) bool) V2Expr {
 		if p.at(tLParen) {
 			p.next()
 			var args []V2Expr
+			var namedArgs []V2NamedExprArg
 			for !p.at(tRParen) {
-				args = append(args, p.parseV2ExprUntil(func(t tok) bool { return t.kind == tComma || t.kind == tRParen }))
+				if p.at(tWord) && p.peek2().kind == tColon {
+					argName := p.next().val
+					p.next()
+					namedArgs = append(namedArgs, V2NamedExprArg{
+						Name: argName,
+						Expr: p.parseV2ExprUntil(func(t tok) bool { return t.kind == tComma || t.kind == tRParen }),
+					})
+				} else {
+					args = append(args, p.parseV2ExprUntil(func(t tok) bool { return t.kind == tComma || t.kind == tRParen }))
+				}
 				if p.at(tComma) {
 					p.next()
 				}
 			}
 			p.expect(tRParen, ")")
-			return V2CallExpr{Name: name, Args: args}
+			return V2CallExpr{Name: name, Args: args, NamedArgs: namedArgs}
 		}
 		return V2RefExpr{Name: name}
 	}
@@ -698,10 +856,40 @@ func v2StopAtQueryStepOr(stop func(tok) bool) func(tok) bool {
 		if stop(t) {
 			return true
 		}
-		return t.kind == tWord && (t.val == "contains" || t.val == "encloses" || t.val == "references" ||
+		return t.kind == tWord && (t.val == "encloses" || t.val == "references" ||
 			t.val == "declaredIn" || t.val == "importedBy" || t.val == "sameScope" || t.val == "sameReceiver" ||
 			t.val == "dominates" || t.val == "labeledAs" || t.val == "flowsTo" || t.val == "reaches" || t.val == "coveredBy")
 	}
+}
+
+func (p *v2Parser) v2CanStartExpr(t tok) bool {
+	return t.kind == tString || t.kind == tLBrack || t.kind == tLParen || t.kind == tWord
+}
+
+func (p *v2Parser) v2StopAtBlockItem(t tok) bool {
+	if t.kind == tRBrace || t.kind == tComma || t.kind == tSemi || t.kind == tEOF {
+		return true
+	}
+	if t.kind != tWord {
+		return false
+	}
+	if p.peek2().kind == tColon {
+		return true
+	}
+	if p.peek2().kind == tWord && p.peekN(2).kind == tColon {
+		return true
+	}
+	if p.peek2().kind == tWord && p.peekN(2).kind == tLBrace {
+		return true
+	}
+	return false
+}
+
+func (p *v2Parser) peekN(n int) tok {
+	if p.i+n >= len(p.toks) {
+		return p.toks[len(p.toks)-1]
+	}
+	return p.toks[p.i+n]
 }
 
 func (p *v2Parser) fail(format string, a ...any) {

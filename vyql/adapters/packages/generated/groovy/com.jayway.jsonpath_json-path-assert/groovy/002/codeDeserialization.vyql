@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m65f34f41;
+
+binding deserialization2 {
+  requires {
+    dependency("com.jayway.jsonpath:json-path-assert")
+  }
+  query pattern callExpr where callee.method == "JsonPathMatchers.isJsonFile"
+  emit sink code.Deserialization at args[0]
+}

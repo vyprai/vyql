@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding deserialization58 {
+  requires {
+    dependency("dill")
+  }
+  query pattern callExpr where callee.path ~= "dill.loads"
+  emit sink code.Deserialization at args[0]
+}

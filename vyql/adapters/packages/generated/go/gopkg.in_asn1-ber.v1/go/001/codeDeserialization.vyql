@@ -1,0 +1,9 @@
+module bindings.go.migration.mce96a778;
+
+binding deserialization1 {
+  requires {
+    dependency("gopkg.in/asn1-ber.v1")
+  }
+  query pattern callExpr where callee.method == "DecodePacket"
+  emit sink code.Deserialization at args[0]
+}

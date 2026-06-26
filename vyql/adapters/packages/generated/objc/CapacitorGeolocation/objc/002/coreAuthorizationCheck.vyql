@@ -1,0 +1,14 @@
+module bindings.objc.migration.m49aab0f0;
+
+binding authorizationCheck2 {
+  requires {
+    dependency("CapacitorGeolocation")
+  }
+  query pattern callExpr where callee.method == "requestPermissions"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

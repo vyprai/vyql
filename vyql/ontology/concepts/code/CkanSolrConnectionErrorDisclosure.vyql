@@ -1,0 +1,11 @@
+module code;
+
+concept CkanSolrConnectionErrorDisclosure : issue {
+  cwe: [CWE_209, CWE_200, CWE_522]
+  review_assumption: "Solr connection failures can include the configured Solr URL, including inline credentials, in the exception text"
+  reviewCategory: secret
+  reviewCondition: "CKAN package_search can return Solr connection errors containing internal Solr URLs or embedded credentials"
+  reviewConfidence: high
+  reviewEvidence: "search error context {pattern} catches pysolr.SolrError and wraps raw exception details in a SearchError before API serialization"
+  vulnerableTo: [secrets.SecretLeak]
+}

@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding responseHeaderWrite150 {
+  query pattern callExpr where callee.path ~= "Header.Set"
+  emit sink code.ResponseHeaderWrite at args[1]
+}

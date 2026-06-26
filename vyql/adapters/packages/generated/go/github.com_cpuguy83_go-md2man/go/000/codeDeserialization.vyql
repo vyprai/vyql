@@ -1,0 +1,9 @@
+module bindings.go.migration.mba77e09e;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/cpuguy83/go-md2man")
+  }
+  query pattern callExpr where callee.method == "Render"
+  emit sink code.Deserialization at args[0]
+}

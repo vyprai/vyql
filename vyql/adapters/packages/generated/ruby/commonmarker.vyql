@@ -1,7 +1,0 @@
-import code.{Deserialization, HtmlRender}
-adapter ruby {
-  package "commonmarker" {
-    sink method "parse" -> code.Deserialization
-    sink method "to_html" -> code.HtmlRender
-  }
-}

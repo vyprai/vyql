@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding externalApiResponse8 {
+  requires {
+    dependency("http-builder")
+  }
+  query pattern callExpr where callee.method == "getText"
+  emit source code.ExternalApiResponse at call.result
+}

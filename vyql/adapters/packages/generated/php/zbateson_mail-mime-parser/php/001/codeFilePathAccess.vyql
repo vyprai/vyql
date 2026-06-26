@@ -1,0 +1,9 @@
+module bindings.php.migration.m072731ef;
+
+binding filePathAccess1 {
+  requires {
+    dependency("zbateson/mail-mime-parser")
+  }
+  query pattern callExpr where callee.method == "addAttachmentPartFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

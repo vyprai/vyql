@@ -1,7 +1,0 @@
-adapter python {
-  package "sympy" {
-    flag code.WeakRandomValue on any {
-      path "sympy.random"
-    }
-  }
-}

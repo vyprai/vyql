@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/quasilyte/regex/syntax" {
-    flag code.RegexCompile on any {
-      method "NewParser"
-    }
-  }
-}

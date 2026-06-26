@@ -1,0 +1,9 @@
+module bindings.swift.migration.m586c3899;
+
+binding httpInput1 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}

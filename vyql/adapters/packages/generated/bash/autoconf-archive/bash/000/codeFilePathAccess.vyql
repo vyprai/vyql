@@ -1,0 +1,9 @@
+module bindings.bash.migration.m383778dc;
+
+binding filePathAccess0 {
+  requires {
+    dependency("autoconf-archive")
+  }
+  query pattern callExpr where callee.path ~= "autoconf-archive"
+  emit sink code.FilePathAccess at args.any
+}

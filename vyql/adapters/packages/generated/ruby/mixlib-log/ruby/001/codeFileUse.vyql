@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf23a26ca;
+
+binding fileUse1 {
+  requires {
+    dependency("mixlib-log")
+  }
+  query pattern callExpr where callee.method == "open_logfile"
+  emit sink code.FileUseSink at args[0]
+}

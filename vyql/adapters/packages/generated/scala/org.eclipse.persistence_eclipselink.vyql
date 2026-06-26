@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.eclipse.persistence:eclipselink" {
-    sink method "load" -> code.Deserialization
-  }
-}

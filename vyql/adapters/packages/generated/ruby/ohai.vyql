@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter ruby {
-  package "ohai" {
-    sink method "shell_out" -> code.CommandExecution
-  }
-}

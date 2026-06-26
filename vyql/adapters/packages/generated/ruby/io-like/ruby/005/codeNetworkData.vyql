@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mee840174;
+
+binding networkData5 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "sysread"
+  emit source code.NetworkData at call.result
+}

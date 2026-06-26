@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.lucene:lucene-queryparser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

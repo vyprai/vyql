@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m0d464934;
+
+binding deserialization2 {
+  requires {
+    dependency("html-entities")
+  }
+  query pattern callExpr where callee.method == "decodeEntity"
+  emit sink code.Deserialization at args[0]
+}

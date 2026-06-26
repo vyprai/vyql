@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcabe6480;
+
+binding fileUse1 {
+  requires {
+    dependency("Mmap")
+  }
+  query pattern callExpr where callee.method == "mmap"
+  emit sink code.FileUseSink at args[0]
+}

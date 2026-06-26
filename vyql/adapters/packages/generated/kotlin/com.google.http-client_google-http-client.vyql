@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.google.http-client:google-http-client" {
-    sink method "IOUtils.deserialize" -> code.Deserialization
-    sink method "JsonParser.parse" -> code.Deserialization
-  }
-}

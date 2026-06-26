@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7f118b22;
+
+binding deserialization6 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java-util")
+  }
+  query pattern callExpr where callee.method == "parseBool"
+  emit sink code.Deserialization at args[0]
+}

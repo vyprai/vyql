@@ -1,0 +1,9 @@
+module bindings.java.migration.mb2cdf2a7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "FileHandler"
+  emit sink code.FilePathAccess at args[0]
+}

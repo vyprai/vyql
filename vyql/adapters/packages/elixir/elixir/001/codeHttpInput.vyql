@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding httpInput1 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.path ~= "conn.params"
+  emit source code.HttpInput at call.result
+}

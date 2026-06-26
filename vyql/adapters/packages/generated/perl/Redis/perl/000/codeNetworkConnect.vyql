@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcf542a82;
+
+binding networkConnect0 {
+  requires {
+    dependency("Redis")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

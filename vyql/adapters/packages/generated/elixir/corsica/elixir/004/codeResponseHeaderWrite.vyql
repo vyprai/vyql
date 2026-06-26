@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m1bd8beb9;
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("corsica")
+  }
+  query pattern callExpr where callee.method == "put_common_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

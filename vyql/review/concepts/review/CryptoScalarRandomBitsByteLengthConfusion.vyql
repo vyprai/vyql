@@ -1,0 +1,8 @@
+module code;
+
+review code.CryptoScalarRandomBitsByteLengthConfusion {
+  category: crypto
+  expected: [core.SecureRandom, core.InputValidation]
+  kind: attention
+  text: "review elliptic-curve scalar or nonce helpers using random-bits APIs to ensure callers pass bit counts rather than byte counts"
+}

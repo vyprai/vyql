@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.cxf:cxf-rt-frontend-jaxrs" {
-    source method "cookie" -> code.HttpInput
-  }
-}

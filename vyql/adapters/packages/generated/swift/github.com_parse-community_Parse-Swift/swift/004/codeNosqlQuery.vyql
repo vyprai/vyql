@@ -1,0 +1,9 @@
+module bindings.swift.migration.m98e3ffbb;
+
+binding nosqlQuery4 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "count"
+  emit sink code.NosqlQuery at args[0]
+}

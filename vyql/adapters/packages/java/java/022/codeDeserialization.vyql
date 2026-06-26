@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding deserialization22 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m083f0f32;
+
+binding filePathAccess5 {
+  requires {
+    dependency("league/flysystem-local")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter php {
-  package "cocur/slugify" {
-    sink method "getRules" -> code.Deserialization
-    sink method "getRules" -> code.FilePathAccess
-  }
-}

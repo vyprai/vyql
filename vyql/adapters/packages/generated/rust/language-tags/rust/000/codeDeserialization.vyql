@@ -1,0 +1,9 @@
+module bindings.rust.migration.m11d399ae;
+
+binding deserialization0 {
+  requires {
+    dependency("language-tags")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

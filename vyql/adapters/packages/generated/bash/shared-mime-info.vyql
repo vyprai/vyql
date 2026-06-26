@@ -1,5 +1,0 @@
-adapter bash {
-  package "shared-mime-info" {
-    sink path "shared-mime-info" arg all -> code.SqlExecution
-  }
-}

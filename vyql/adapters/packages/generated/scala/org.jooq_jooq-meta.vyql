@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter scala {
-  package "org.jooq:jooq-meta" {
-    sink method "setExcludeSql" -> code.SqlExecution
-    sink method "setIncludeSql" -> code.SqlExecution
-  }
-}

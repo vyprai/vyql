@@ -1,0 +1,14 @@
+module bindings.objc.migration.m05416fb9;
+
+binding redirectTarget2 {
+  requires {
+    dependency("Siren")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "launchAppStore"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

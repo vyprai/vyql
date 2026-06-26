@@ -1,0 +1,9 @@
+module bindings.go.migration.m785e0061;
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/gliderlabs/ssh")
+  }
+  query pattern callExpr where callee.method == "AgentRequested"
+  emit source core.UserControlledData at call.result
+}

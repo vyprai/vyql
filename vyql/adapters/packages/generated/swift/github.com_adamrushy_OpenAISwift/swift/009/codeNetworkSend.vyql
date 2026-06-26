@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcc8da8a2;
+
+binding networkSend9 {
+  requires {
+    dependency("github.com/adamrushy/OpenAISwift")
+  }
+  query pattern callExpr where callee.method == "sendEmbeddings"
+  emit sink code.NetworkSend at args[0]
+}

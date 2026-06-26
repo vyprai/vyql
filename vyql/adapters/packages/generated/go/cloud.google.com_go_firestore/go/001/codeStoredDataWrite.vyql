@@ -1,0 +1,9 @@
+module bindings.go.migration.m9cb4de0c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("cloud.google.com/go/firestore")
+  }
+  query pattern callExpr where callee.method == "Set"
+  emit sink code.StoredDataWrite at args[0]
+}

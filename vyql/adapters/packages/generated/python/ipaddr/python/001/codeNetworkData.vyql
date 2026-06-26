@@ -1,0 +1,9 @@
+module bindings.python.migration.m0c37bcb0;
+
+binding networkData1 {
+  requires {
+    dependency("ipaddr")
+  }
+  query pattern callExpr where callee.method == "IPAddress"
+  emit source code.NetworkData at call.result
+}

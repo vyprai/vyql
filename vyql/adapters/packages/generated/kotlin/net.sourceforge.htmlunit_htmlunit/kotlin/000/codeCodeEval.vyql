@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me01dae17;
+
+binding codeEval0 {
+  requires {
+    dependency("net.sourceforge.htmlunit:htmlunit")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding xpathQuery22 {
+  requires {
+    dependency("XML::LibXML")
+  }
+  query pattern callExpr where callee.method == "findnodes"
+  emit sink code.XpathQuery at args[0]
+}

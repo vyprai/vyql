@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding sqlExecution18 {
+  requires {
+    dependency("lua-resty-mysql")
+  }
+  query pattern callExpr where callee.path ~= "db.query"
+  emit sink code.SqlExecution at args[0]
+}

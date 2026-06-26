@@ -1,0 +1,9 @@
+module bindings.swift.migration.m21ea1486;
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/OperatorFoundation/AdversaryLabClientSwift")
+  }
+  query pattern callExpr where callee.method == "RawPacket.allow_block"
+  emit source core.UserControlledData at call.result
+}

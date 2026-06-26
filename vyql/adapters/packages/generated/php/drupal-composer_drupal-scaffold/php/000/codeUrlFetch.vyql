@@ -1,0 +1,9 @@
+module bindings.php.migration.m8026eb5f;
+
+binding urlFetch0 {
+  requires {
+    dependency("drupal-composer/drupal-scaffold")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.UrlFetch at args[0]
+}

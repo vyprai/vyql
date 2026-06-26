@@ -1,0 +1,11 @@
+module code;
+
+concept DerSignatureNonCanonicalImport : issue {
+  cwe: [CWE_347, CWE_20]
+  review_assumption: "attackers can supply encoded signatures and exploit alternative encodings for malleability or parser-confusion behavior"
+  reviewCategory: crypto
+  reviewCondition: "DER/ECDSA signature import accepts non-canonical integer lengths or unnecessary leading zeroes"
+  reviewConfidence: high
+  reviewEvidence: "DER signature import context {pattern} parses getLength/data slices into BN(r)/BN(s) before canonical long-form length and leading-zero rejection"
+  vulnerableTo: [crypto.ImproperSignatureCheck, validation.ImproperInputValidation]
+}

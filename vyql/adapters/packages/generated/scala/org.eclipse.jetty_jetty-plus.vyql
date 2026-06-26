@@ -1,7 +1,0 @@
-import code.{Deserialization, StoredDataRead}
-adapter scala {
-  package "org.eclipse.jetty:jetty-plus" {
-    sink method "bindToENC" -> code.Deserialization
-    source method "lookupNamingEntries" -> code.StoredDataRead
-  }
-}

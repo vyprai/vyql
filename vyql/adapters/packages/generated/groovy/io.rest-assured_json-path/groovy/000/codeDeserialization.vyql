@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me7e3fd33;
+
+binding deserialization0 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

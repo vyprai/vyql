@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter scala {
-  package "com.sun.jersey:jersey-core" {
-    control method "validate" -> core.InputValidation
-  }
-}

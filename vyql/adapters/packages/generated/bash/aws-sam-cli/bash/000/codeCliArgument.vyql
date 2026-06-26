@@ -1,0 +1,9 @@
+module bindings.bash.migration.mecc8ace6;
+
+binding cliArgument0 {
+  requires {
+    dependency("aws-sam-cli")
+  }
+  query pattern callExpr where callee.path ~= "aws-sam-cli"
+  emit source code.CliArgument at call.result
+}

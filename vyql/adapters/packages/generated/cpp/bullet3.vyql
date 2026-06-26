@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter cpp {
-  package "bullet3" {
-    source method "CheckCmdLineFlag" -> code.CliArgument
-    source method "GetCmdLineArgument" -> code.CliArgument
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.c.migration.mf37aab9e;
+
+binding deserialization0 {
+  requires {
+    dependency("protobuf-c")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.Deserialization at args[0]
+}

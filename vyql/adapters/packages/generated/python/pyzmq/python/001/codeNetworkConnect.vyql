@@ -1,0 +1,9 @@
+module bindings.python.migration.m135e4421;
+
+binding networkConnect1 {
+  requires {
+    dependency("pyzmq")
+  }
+  query pattern callExpr where callee.method == "zmq_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

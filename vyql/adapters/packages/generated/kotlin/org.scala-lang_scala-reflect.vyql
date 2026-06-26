@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter kotlin {
-  package "org.scala-lang:scala-reflect" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

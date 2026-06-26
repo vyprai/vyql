@@ -1,0 +1,14 @@
+module bindings.scala.migration.m4ff27033;
+
+binding htmlEscape1 {
+  requires {
+    dependency("com.sun.xml.bind:jaxb-core")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

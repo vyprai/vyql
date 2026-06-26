@@ -1,0 +1,9 @@
+module bindings.python.migration.mbd84b515;
+
+binding cliArgument7 {
+  requires {
+    dependency("gdown")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.CliArgument at call.result
+}

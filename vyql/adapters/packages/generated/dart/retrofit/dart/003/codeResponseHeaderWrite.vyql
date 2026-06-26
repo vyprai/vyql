@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0ea56420;
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("retrofit")
+  }
+  query pattern callExpr where callee.method == "Headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

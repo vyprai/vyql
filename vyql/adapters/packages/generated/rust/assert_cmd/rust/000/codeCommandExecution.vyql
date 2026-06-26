@@ -1,0 +1,9 @@
+module bindings.rust.migration.m1b65c385;
+
+binding commandExecution0 {
+  requires {
+    dependency("assert_cmd")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

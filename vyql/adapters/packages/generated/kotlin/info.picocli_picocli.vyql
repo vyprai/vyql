@@ -1,7 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter kotlin {
-  package "info.picocli:picocli" {
-    source method "handleParseException" -> code.CliArgument
-    sink method "run" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m6c731bb3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("file_selector_macos")
+  }
+  query pattern callExpr where callee.method == "displayOpenPanel"
+  emit sink code.FilePathAccess at args[0]
+}

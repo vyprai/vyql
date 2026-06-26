@@ -1,0 +1,11 @@
+module code;
+
+concept ContaoAjaxToggleSubpaletteSqlIdentifierInjection : issue {
+  cwe: [CWE_89]
+  review_assumption: "authenticated backend users can submit toggleSubpalette Ajax requests with a crafted field parameter"
+  reviewCategory: sql
+  reviewCondition: "Contao backend Ajax toggleSubpalette concatenates a posted field name into an UPDATE statement without verifying the field is an allowed selector"
+  reviewConfidence: high
+  reviewEvidence: "Ajax::executePostActions context {pattern} uses Input->post('field') in the UPDATE SET identifier before the patched __selector__ and alexf permission checks"
+  vulnerableTo: [injection.SqlInjection]
+}

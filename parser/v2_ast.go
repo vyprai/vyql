@@ -62,6 +62,7 @@ type V2BindingDecl struct {
 	Name         string
 	Module       string
 	Requirements []V2Requirement
+	Unstable     map[string]any
 	Query        V2BindingQuery
 	Outputs      []V2BindingOutput
 	Attrs        map[string]string
@@ -156,18 +157,45 @@ type V2PackDecl struct {
 func (*V2PackDecl) isV2Decl() {}
 
 type V2MechanicDecl struct {
+	Kind   string
 	Name   string
-	Fields map[string]any
+	Module string
+	Items  []V2BlockItem
+}
+
+type V2BlockItem struct {
+	Key   []string
+	Value any
+	Block []V2BlockItem
+	Items []V2BlockItem
 }
 
 func (*V2MechanicDecl) isV2Decl() {}
+func (*V2MechanicDecl) isDecl()   {}
+
+func (m *V2MechanicDecl) QualifiedName() string {
+	if m.Module == "" {
+		return "mechanic:" + m.Kind + ":" + m.Name
+	}
+	return m.Module + ".mechanic:" + m.Kind + ":" + m.Name
+}
 
 type V2PolicyDecl struct {
+	Kind   string
 	Name   string
-	Fields map[string]any
+	Module string
+	Items  []V2BlockItem
 }
 
 func (*V2PolicyDecl) isV2Decl() {}
+func (*V2PolicyDecl) isDecl()   {}
+
+func (p *V2PolicyDecl) QualifiedName() string {
+	if p.Module == "" {
+		return "policy:" + p.Kind + ":" + p.Name
+	}
+	return p.Module + ".policy:" + p.Kind + ":" + p.Name
+}
 
 type V2QueryExpr struct {
 	Family string
@@ -196,12 +224,19 @@ type V2BinaryExpr struct {
 	Left, Right V2Expr
 }
 type V2CallExpr struct {
-	Name string
-	Args []V2Expr
+	Name      string
+	Args      []V2Expr
+	NamedArgs []V2NamedExprArg
 }
+type V2NamedExprArg struct {
+	Name string
+	Expr V2Expr
+}
+type V2SequenceExpr struct{ Items []V2Expr }
 
-func (V2RefExpr) isV2Expr()     {}
-func (V2LiteralExpr) isV2Expr() {}
-func (V2UnaryExpr) isV2Expr()   {}
-func (V2BinaryExpr) isV2Expr()  {}
-func (V2CallExpr) isV2Expr()    {}
+func (V2RefExpr) isV2Expr()      {}
+func (V2LiteralExpr) isV2Expr()  {}
+func (V2UnaryExpr) isV2Expr()    {}
+func (V2BinaryExpr) isV2Expr()   {}
+func (V2CallExpr) isV2Expr()     {}
+func (V2SequenceExpr) isV2Expr() {}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m293e575b;
+
+binding userControlledData2 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSize"
+  emit source core.UserControlledData at call.result
+}

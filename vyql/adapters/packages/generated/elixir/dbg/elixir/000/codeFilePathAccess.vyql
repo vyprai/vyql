@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma7786ba4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dbg")
+  }
+  query pattern callExpr where callee.method == "Dbg.inspect_file"
+  emit sink code.FilePathAccess at args[0]
+}

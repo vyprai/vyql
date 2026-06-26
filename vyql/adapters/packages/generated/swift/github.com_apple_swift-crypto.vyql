@@ -1,8 +1,0 @@
-adapter swift {
-  package "github.com/apple/swift-crypto" {
-    source method "Credential" -> code.SecretValue
-    flag code.WeakHash on any {
-      method "Digest"
-    }
-  }
-}

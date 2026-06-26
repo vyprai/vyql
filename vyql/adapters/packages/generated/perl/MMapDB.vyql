@@ -1,8 +1,0 @@
-import code.{DatabaseRead, StoredDataWrite}
-
-adapter perl {
-  package "MMapDB" {
-    sink method "get" -> code.DatabaseRead
-    sink method "delete_by_id" -> code.StoredDataWrite
-  }
-}

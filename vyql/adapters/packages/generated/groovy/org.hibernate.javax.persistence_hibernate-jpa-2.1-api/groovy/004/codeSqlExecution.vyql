@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m6962d573;
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.1-api")
+  }
+  query pattern callExpr where callee.method == "createNamedStoredProcedureQuery"
+  emit sink code.SqlExecution at args[0]
+}

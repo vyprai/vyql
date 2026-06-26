@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m4aae079d;
+
+binding httpInput3 {
+  requires {
+    dependency("org.springframework:spring-webflux")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source code.HttpInput at call.result
+}

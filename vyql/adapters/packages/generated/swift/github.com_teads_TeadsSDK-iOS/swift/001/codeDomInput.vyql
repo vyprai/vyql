@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc56187db;
+
+binding domInput1 {
+  requires {
+    dependency("github.com/teads/TeadsSDK-iOS")
+  }
+  query pattern callExpr where callee.method == "userContentController"
+  emit source code.DomInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m411e6779;
+
+binding cookie4 {
+  requires {
+    dependency("cookiejar")
+  }
+  query pattern callExpr where callee.method == "get_cookies"
+  emit source code.Cookie at call.result
+}

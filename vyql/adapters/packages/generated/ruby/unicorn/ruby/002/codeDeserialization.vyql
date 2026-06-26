@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mda51fdd0;
+
+binding deserialization2 {
+  requires {
+    dependency("unicorn")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

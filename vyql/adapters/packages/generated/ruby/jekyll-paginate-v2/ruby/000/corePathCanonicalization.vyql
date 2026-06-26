@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m4fb72a94;
+
+binding pathCanonicalization0 {
+  requires {
+    dependency("jekyll-paginate-v2")
+  }
+  query pattern callExpr where callee.method == "Utils.ensure_full_path"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

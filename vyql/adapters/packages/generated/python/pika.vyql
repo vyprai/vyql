@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "pika" {
-    sink method "decode_value" -> code.Deserialization
-  }
-}

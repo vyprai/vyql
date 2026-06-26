@@ -1,0 +1,9 @@
+module bindings.python.migration.m3a7d1447;
+
+binding filePathAccess5 {
+  requires {
+    dependency("flax")
+  }
+  query pattern callExpr where callee.method == "exists"
+  emit sink code.FilePathAccess at args[0]
+}

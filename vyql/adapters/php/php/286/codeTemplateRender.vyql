@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding templateRender286 {
+  query pattern callExpr where callee.path ~= "Variables.getParsedValue"
+  emit sink code.TemplateRender at args[0]
+}

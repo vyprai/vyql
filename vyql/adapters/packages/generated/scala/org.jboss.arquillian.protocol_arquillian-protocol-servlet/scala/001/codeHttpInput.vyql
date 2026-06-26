@@ -1,0 +1,9 @@
+module bindings.scala.migration.m49d0562d;
+
+binding httpInput1 {
+  requires {
+    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}

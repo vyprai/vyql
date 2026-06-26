@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnboundedEmailRegexValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1333, CWE_400]
+    id: "VYQL-DOS-023"
+    severity: high
+  }
+  issue code.UnboundedEmailRegexValidation as email
+}

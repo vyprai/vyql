@@ -1,0 +1,9 @@
+module bindings.swift.migration.mba9fec3c;
+
+binding filePathAccess13 {
+  requires {
+    dependency("github.com/nvzqz/FileKit")
+  }
+  query pattern callExpr where callee.method == "deleteFile"
+  emit sink code.FilePathAccess at args[0]
+}

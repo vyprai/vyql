@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.apache.xmlbeans:xmlbeans" {
-    sink method "parse" -> code.Deserialization
-  }
-}

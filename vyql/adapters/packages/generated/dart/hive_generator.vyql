@@ -1,7 +1,0 @@
-adapter dart {
-  package "hive_generator" {
-    sink method "buildRead" -> code.Deserialization
-    sink method "buildWrite" -> code.Deserialization
-    sink method "write" -> code.Deserialization
-  }
-}

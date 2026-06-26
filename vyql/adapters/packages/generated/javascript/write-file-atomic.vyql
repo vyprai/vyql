@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "write-file-atomic" {
-    sink method "writeFile" -> code.FilePathAccess
-    sink method "writeFileAsync" -> code.FilePathAccess
-    sink method "writeFileSync" -> code.FilePathAccess
-  }
-}

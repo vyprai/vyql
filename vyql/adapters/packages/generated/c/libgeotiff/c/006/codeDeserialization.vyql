@@ -1,0 +1,9 @@
+module bindings.c.migration.m87ebf0fa;
+
+binding deserialization6 {
+  requires {
+    dependency("libgeotiff")
+  }
+  query pattern callExpr where callee.method == "GTIFImport"
+  emit sink code.Deserialization at args[0]
+}

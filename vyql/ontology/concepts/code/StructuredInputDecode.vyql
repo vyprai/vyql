@@ -1,0 +1,11 @@
+module code;
+
+concept StructuredInputDecode : issue {
+  cwe: [CWE_20]
+  review_assumption: "malformed or out-of-alphabet input can reach callers that trust the decoded value"
+  reviewCategory: input_validation
+  reviewCondition: "structured input bytes are decoded and should be validated against the target format"
+  reviewConfidence: possibility
+  reviewEvidence: "decoder operation {pattern} consumes structured bytes"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

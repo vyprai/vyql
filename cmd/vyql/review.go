@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/parser"
@@ -43,9 +44,72 @@ type reviewConceptInfo struct {
 	review   string
 }
 
+type cachedReviewConcepts struct {
+	concepts map[string]reviewConceptInfo
+	err      error
+}
+
+var reviewConceptsCache sync.Map // map[data root]cachedReviewConcepts
+
 func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
+	root := datadir.Root()
+	if cached, ok := reviewConceptsCache.Load(root); ok {
+		res := cached.(cachedReviewConcepts)
+		return res.concepts, res.err
+	}
+	concepts, err := loadReviewConceptsFromRoot(root)
+	res := cachedReviewConcepts{concepts: concepts, err: err}
+	actual, _ := reviewConceptsCache.LoadOrStore(root, res)
+	actualRes := actual.(cachedReviewConcepts)
+	return actualRes.concepts, actualRes.err
+}
+
+func loadReviewConceptsFromRoot(dataRoot string) (map[string]reviewConceptInfo, error) {
 	out := map[string]reviewConceptInfo{}
-	root := filepath.Join(datadir.Root(), "review")
+	var sources []parser.V2RuntimeSource
+	if err := appendV2RuntimeSourcesFromRoot(&sources, dataRoot, "ontology/concepts"); err != nil {
+		return nil, err
+	}
+	if err := appendV2RuntimeSourcesFromRoot(&sources, dataRoot, "ontology/threatkinds"); err != nil {
+		return nil, err
+	}
+	if err := appendV2RuntimeSourcesFromRoot(&sources, dataRoot, "mechanics"); err != nil {
+		return nil, err
+	}
+	selected := map[string]bool{}
+	beforeReview := len(sources)
+	if err := appendV2RuntimeSourcesFromRoot(&sources, dataRoot, "review"); err != nil {
+		return nil, err
+	}
+	if len(sources) == beforeReview {
+		return out, nil
+	}
+	for _, source := range sources[beforeReview:] {
+		selected[source.Name] = true
+	}
+	decls, err := parser.ParseV2RuntimeSourcesSelected(sources, func(src parser.V2RuntimeSource) bool {
+		return selected[src.Name]
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range decls {
+		rd, ok := d.(*parser.ReviewDecl)
+		if !ok {
+			continue
+		}
+		out[rd.Concept] = reviewConceptInfo{
+			category: reviewString(rd.Fields, "category"),
+			kind:     reviewString(rd.Fields, "kind"),
+			expected: reviewList(rd.Fields, "expected"),
+			review:   reviewString(rd.Fields, "text"),
+		}
+	}
+	return out, nil
+}
+
+func appendV2RuntimeSourcesFromRoot(dst *[]parser.V2RuntimeSource, dataRoot, rel string) error {
+	root := filepath.Join(dataRoot, filepath.FromSlash(rel))
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -57,28 +121,17 @@ func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(data))
+		name, err := filepath.Rel(dataRoot, path)
 		if err != nil {
-			return err
+			name = path
 		}
-		for _, d := range decls {
-			rd, ok := d.(*parser.ReviewDecl)
-			if !ok {
-				continue
-			}
-			out[rd.Concept] = reviewConceptInfo{
-				category: reviewString(rd.Fields, "category"),
-				kind:     reviewString(rd.Fields, "kind"),
-				expected: reviewList(rd.Fields, "expected"),
-				review:   reviewString(rd.Fields, "text"),
-			}
-		}
+		*dst = append(*dst, parser.V2RuntimeSource{Name: filepath.ToSlash(name), Source: string(data)})
 		return nil
 	})
 	if os.IsNotExist(err) {
-		return out, nil
+		return nil
 	}
-	return out, err
+	return err
 }
 
 func reviewString(fields map[string]any, key string) string {

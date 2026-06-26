@@ -1,0 +1,9 @@
+module bindings.java.migration.m9309da93;
+
+binding cookie1 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-api")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.Cookie at call.result
+}

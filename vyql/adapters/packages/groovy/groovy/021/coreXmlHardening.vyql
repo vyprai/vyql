@@ -1,0 +1,14 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding xmlHardening21 {
+  requires {
+    dependency("groovy-xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlSlurper" and args.any.literal contains "allowDocTypeDeclaration=false"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

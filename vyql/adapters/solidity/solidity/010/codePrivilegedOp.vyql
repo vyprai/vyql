@@ -1,0 +1,6 @@
+module bindings.solidity.migration.m88e544d8;
+
+binding privilegedOp10 {
+  query pattern callExpr where callee.path ~= "selfdestruct"
+  emit sink code.PrivilegedOpSink at args[0]
+}

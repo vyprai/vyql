@@ -35,6 +35,23 @@ func TestDebugConceptClassificationUsesPassedOntology(t *testing.T) {
 	}
 }
 
+func TestValidateAdapterRunsV2CorpusValidation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "adapter.vyql")
+	if err := os.WriteFile(path, []byte(`
+module bindings.python.test;
+binding bad {
+  query pattern callExpr where callee.method == "execute"
+  emit sink custom.MissingSink at args[0]
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := cmdValidateAdapter([]string{"-file", path})
+	if err == nil || !strings.Contains(err.Error(), "unknown concept custom.MissingSink") {
+		t.Fatalf("cmdValidateAdapter error = %v, want corpus validation", err)
+	}
+}
+
 func TestCmdRuntimeDoesNotHardcodeDomainKnowledge(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
@@ -116,7 +133,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parser.ParseRuntime(string(raw))
 		if err != nil {
 			return err
 		}

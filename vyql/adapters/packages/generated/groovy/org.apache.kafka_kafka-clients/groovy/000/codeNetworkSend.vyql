@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9ba62e20;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.kafka:kafka-clients")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

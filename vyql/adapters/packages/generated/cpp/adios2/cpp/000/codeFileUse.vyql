@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9f2ce05f;
+
+binding fileUse0 {
+  requires {
+    dependency("adios2")
+  }
+  query pattern callExpr where callee.method == "Open"
+  emit sink code.FileUseSink at args[0]
+}

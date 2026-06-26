@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "shapely" {
-    sink method "loads" -> code.Deserialization
-  }
-}

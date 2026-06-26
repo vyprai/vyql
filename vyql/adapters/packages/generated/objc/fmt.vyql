@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter objc {
-  package "fmt" {
-    sink method "parse" -> code.Deserialization
-    sink method "read" -> code.FilePathAccess
-    sink method "write" -> code.FilePathAccess
-    sink method "fdopen" -> code.FilePathAccess
-  }
-}

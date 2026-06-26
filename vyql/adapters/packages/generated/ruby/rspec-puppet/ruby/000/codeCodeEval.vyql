@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1f0d133a;
+
+binding codeEval0 {
+  requires {
+    dependency("rspec-puppet")
+  }
+  query pattern callExpr where callee.method == "setcode"
+  emit sink code.CodeEval at args[0]
+}

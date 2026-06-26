@@ -1,0 +1,9 @@
+module bindings.php.migration.m329a7cdf;
+
+binding htmlRender0 {
+  requires {
+    dependency("yajra/laravel-datatables-html")
+  }
+  query pattern callExpr where callee.method == "renderJs"
+  emit sink code.HtmlRender at args[0]
+}

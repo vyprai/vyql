@@ -1,0 +1,14 @@
+module bindings.rust.migration.mca7a23c4;
+
+binding inputValidation2 {
+  requires {
+    dependency("widestring")
+  }
+  query pattern callExpr where callee.method == "from_char_slice_truncate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

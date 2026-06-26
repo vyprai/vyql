@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter cpp {
-  package "comms" {
-    source method "read" -> code.NetworkData
-    source method "write" -> code.NetworkData
-  }
-}

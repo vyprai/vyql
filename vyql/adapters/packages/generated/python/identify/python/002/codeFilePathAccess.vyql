@@ -1,0 +1,9 @@
+module bindings.python.migration.mafcd9c02;
+
+binding filePathAccess2 {
+  requires {
+    dependency("identify")
+  }
+  query pattern callExpr where callee.method == "file_is_text"
+  emit sink code.FilePathAccess at args[0]
+}

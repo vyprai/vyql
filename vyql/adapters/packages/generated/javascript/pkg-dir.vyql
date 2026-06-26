@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "pkg-dir" {
-    sink method "packageDirectory" -> code.FilePathAccess
-    sink method "packageDirectorySync" -> code.FilePathAccess
-  }
-}

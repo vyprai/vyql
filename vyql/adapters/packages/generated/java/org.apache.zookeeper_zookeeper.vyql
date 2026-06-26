@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-adapter java {
-  package "org.apache.zookeeper:zookeeper" {
-    sink method "getGroupsCommand" -> code.CommandExecution
-    sink method "getGroupsForUserCommand" -> code.CommandExecution
-    sink method "getUlimitMemoryCommand" -> code.CommandExecution
-  }
-}

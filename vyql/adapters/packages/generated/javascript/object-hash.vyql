@@ -1,7 +1,0 @@
-adapter javascript {
-  package "object-hash" {
-    flag code.WeakHash on any {
-      path "object.hash.hash"
-    }
-  }
-}

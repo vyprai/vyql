@@ -1,0 +1,9 @@
+module bindings.swift.migration.mefe4fc46;
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "serialized"
+  emit sink code.FileUseSink at args[0]
+}

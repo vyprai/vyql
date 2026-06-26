@@ -1,0 +1,9 @@
+module bindings.php.migration.m2e277996;
+
+binding filePathAccess1 {
+  requires {
+    dependency("sebastian/finder-facade")
+  }
+  query pattern callExpr where callee.method == "loadConfiguration"
+  emit sink code.FilePathAccess at args[0]
+}

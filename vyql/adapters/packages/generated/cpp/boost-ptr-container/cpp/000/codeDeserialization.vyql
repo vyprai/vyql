@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9a936437;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-ptr-container")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}

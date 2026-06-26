@@ -1,0 +1,9 @@
+module bindings.java.migration.m7532ca1b;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "readAclsById"
+  emit sink code.SqlExecution at args[0]
+}

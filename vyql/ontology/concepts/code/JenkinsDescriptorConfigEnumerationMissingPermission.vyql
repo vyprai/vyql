@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsDescriptorConfigEnumerationMissingPermission : issue {
+  cwe: [CWE_200, CWE_862]
+  review_assumption: "the doFill endpoint is reachable from users with less privilege than Item/Configure or Overall/Administer"
+  reviewCategory: auth
+  reviewCondition: "Jenkins descriptor fill endpoint enumerates global configuration or credential identifiers without an observed permission check"
+  reviewConfidence: high
+  reviewEvidence: "descriptor endpoint context {pattern} reads host connection or credential configuration before calling checkPermission or hasPermission"
+  vulnerableTo: [access_control.MissingAuthorization, secrets.SecretLeak]
+}

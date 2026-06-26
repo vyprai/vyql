@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m44df4644;
+
+binding fileUse2 {
+  requires {
+    dependency("commons-fileupload:commons-fileupload")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

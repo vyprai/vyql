@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "@babel/plugin-syntax-json-strings" {
-    sink method "manipulateOptions" -> code.Deserialization
-  }
-}

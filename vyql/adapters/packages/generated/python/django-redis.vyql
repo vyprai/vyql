@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "django-redis" {
-    sink method "django_redis.serializers.pickle.PickleSerializer.loads" -> code.Deserialization
-  }
-}

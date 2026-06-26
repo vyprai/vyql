@@ -1,0 +1,9 @@
+module bindings.python.migration.ma1e8986c;
+
+binding deserialization1 {
+  requires {
+    dependency("itsdangerous")
+  }
+  query pattern callExpr where callee.method == "loads_unsafe"
+  emit sink code.Deserialization at args[0]
+}

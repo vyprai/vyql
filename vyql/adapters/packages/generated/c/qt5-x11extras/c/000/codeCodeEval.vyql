@@ -1,0 +1,9 @@
+module bindings.c.migration.ma9cd0dd5;
+
+binding codeEval0 {
+  requires {
+    dependency("qt5-x11extras")
+  }
+  query pattern callExpr where callee.method == "peekEventQueue"
+  emit sink code.CodeEval at args[0]
+}

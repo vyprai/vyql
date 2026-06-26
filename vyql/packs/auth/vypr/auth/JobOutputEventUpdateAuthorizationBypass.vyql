@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule JobOutputEventUpdateAuthorizationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-030"
+    severity: high
+  }
+  issue code.JobOutputEventUpdateAuthorizationBypass as handler
+}

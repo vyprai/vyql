@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.codehaus.jackson:jackson-mapper-asl" {
-    sink method "readValue" -> code.Deserialization
-  }
-}

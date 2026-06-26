@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding commandExecution12 {
+  query pattern callExpr where callee.path ~= "execl"
+  emit sink code.CommandExecution at args[0]
+}

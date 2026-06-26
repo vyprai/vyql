@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "doctrine/lexer" {
-    sink method "setInput" -> code.Deserialization
-  }
-}

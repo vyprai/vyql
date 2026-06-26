@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter groovy {
-  package "org.liquibase:liquibase-core" {
-    sink method "update" -> code.SqlExecution
-  }
-}

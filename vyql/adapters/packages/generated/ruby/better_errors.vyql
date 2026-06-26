@@ -1,9 +1,0 @@
-import code.{CodeEval, CommandExecution}
-
-adapter ruby {
-  package "better_errors" {
-    sink method "do_eval" -> code.CodeEval
-    sink method "execute" -> code.CodeEval
-    sink method "eval_local_variable" -> code.CodeEval
-  }
-}

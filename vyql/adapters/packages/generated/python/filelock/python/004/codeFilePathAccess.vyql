@@ -1,0 +1,9 @@
+module bindings.python.migration.m70248109;
+
+binding filePathAccess4 {
+  requires {
+    dependency("filelock")
+  }
+  query pattern callExpr where callee.method == "write_lock"
+  emit sink code.FilePathAccess at args[0]
+}

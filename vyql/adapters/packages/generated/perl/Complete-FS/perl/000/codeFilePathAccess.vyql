@@ -1,0 +1,9 @@
+module bindings.perl.migration.mb48ed3a0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Complete-FS")
+  }
+  query pattern callExpr where callee.method == "complete_fs"
+  emit sink code.FilePathAccess at args[0]
+}

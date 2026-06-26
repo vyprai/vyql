@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "ant:ant" {
-    sink method "parse" -> code.Deserialization
-  }
-}

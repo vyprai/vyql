@@ -1,0 +1,9 @@
+module bindings.rust.migration.mcf70774b;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("zip")
+  }
+  query pattern callExpr where callee.method == "enclosed_name"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

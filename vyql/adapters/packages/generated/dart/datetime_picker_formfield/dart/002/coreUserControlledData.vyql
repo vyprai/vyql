@@ -1,0 +1,9 @@
+module bindings.dart.migration.m70c9abb4;
+
+binding userControlledData2 {
+  requires {
+    dependency("datetime_picker_formfield")
+  }
+  query pattern callExpr where callee.method == "onChanged"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding ecdsaNonceBitLengthTimingLeak79 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=sign" and node.token contains "HmacDRBG" and node.token contains "$drbg->generate($bytes)" and node.token contains "$k=$this->_truncateToN($k,true)" and node.token contains "$kp=$this->g->mul($k)" and node.token contains "$s=$k->invm($this->n)" and not (node.token contains "$ks=$k->add($this->n)") and not (node.token contains "$kt=$ks->add($this->n)") and not (node.token contains "$ks->bitLength()===$this->n->bitLength()")
+  emit issue code.EcdsaNonceBitLengthTimingLeak at node
+}

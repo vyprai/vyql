@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me5693ac3;
+
+binding deserialization0 {
+  requires {
+    dependency("less")
+  }
+  query pattern callExpr where callee.method == "Less::Parser#parse"
+  emit sink code.Deserialization at args[0]
+}

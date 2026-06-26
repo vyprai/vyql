@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc72452f1;
+
+binding networkSend2 {
+  requires {
+    dependency("ex_aws_cloudwatch")
+  }
+  query pattern callExpr where callee.method == "put_metric_data"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "timezone" {
-    sink method "TZDateTime.parse" -> code.Deserialization
-  }
-}

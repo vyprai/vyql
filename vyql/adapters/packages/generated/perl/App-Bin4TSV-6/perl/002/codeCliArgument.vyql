@@ -1,0 +1,9 @@
+module bindings.perl.migration.maac68e8c;
+
+binding cliArgument2 {
+  requires {
+    dependency("App-Bin4TSV-6")
+  }
+  query pattern callExpr where callee.path ~= "freq"
+  emit source code.CliArgument at call.result
+}

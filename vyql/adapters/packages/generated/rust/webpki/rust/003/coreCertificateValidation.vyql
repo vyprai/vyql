@@ -1,0 +1,14 @@
+module bindings.rust.migration.maf4788c0;
+
+binding certificateValidation3 {
+  requires {
+    dependency("webpki")
+  }
+  query pattern callExpr where callee.method == "verify_is_valid_tls_client_cert_ext"
+  emit check core.CertificateValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

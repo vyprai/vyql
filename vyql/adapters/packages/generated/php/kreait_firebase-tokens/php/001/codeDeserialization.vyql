@@ -1,0 +1,9 @@
+module bindings.php.migration.mbe860073;
+
+binding deserialization1 {
+  requires {
+    dependency("kreait/firebase-tokens")
+  }
+  query pattern callExpr where callee.method == "verifyIdTokenWithLeeway"
+  emit sink code.Deserialization at args[0]
+}

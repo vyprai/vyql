@@ -1,9 +1,0 @@
-import code.{HttpInput}
-adapter kotlin {
-  package "com.amazonaws:aws-java-sdk-core" {
-    source method "setHeaders" -> code.HttpInput
-    source method "setResourcePath" -> code.HttpInput
-    source method "withParameter" -> code.HttpInput
-    source method "setHttpMethod" -> code.HttpInput
-  }
-}

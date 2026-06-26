@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc6b72449;
+
+binding networkData4 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "parseEngineMessage"
+  emit source code.NetworkData at call.result
+}

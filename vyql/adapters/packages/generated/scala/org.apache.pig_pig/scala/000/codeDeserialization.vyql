@@ -1,0 +1,9 @@
+module bindings.scala.migration.mebda50d9;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.pig:pig")
+  }
+  query pattern callExpr where callee.method == "deserialize_input"
+  emit sink code.Deserialization at args[0]
+}

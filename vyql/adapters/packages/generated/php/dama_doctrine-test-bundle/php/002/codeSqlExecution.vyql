@@ -1,0 +1,9 @@
+module bindings.php.migration.meb96413c;
+
+binding sqlExecution2 {
+  requires {
+    dependency("dama/doctrine-test-bundle")
+  }
+  query pattern callExpr where callee.method == "beginTransaction"
+  emit sink code.SqlExecution at args[0]
+}

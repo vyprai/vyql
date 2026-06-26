@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc71f9ce1;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("Dancer-Plugin-MongoDB")
+  }
+  query pattern callExpr where callee.method == "_get_connection"
+  emit sink code.NosqlQuery at args[0]
+}

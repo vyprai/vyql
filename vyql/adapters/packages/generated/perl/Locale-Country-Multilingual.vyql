@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-adapter perl {
-  package "Locale-Country-Multilingual" {
-    sink method "_open_dat" -> code.FilePathAccess
-    sink method "code2country" -> code.FilePathAccess
-    sink method "country2code" -> code.FilePathAccess
-  }
-}

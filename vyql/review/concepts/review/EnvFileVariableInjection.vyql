@@ -1,0 +1,8 @@
+module code;
+
+review code.EnvFileVariableInjection {
+  category: injection
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review .env file update helpers for dotenv-safe escaping or rejection of newline and quote syntax in values"
+}

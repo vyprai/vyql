@@ -1,0 +1,9 @@
+module bindings.php.migration.m29d5cf76;
+
+binding commandExecution0 {
+  requires {
+    dependency("drupal/console-core")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

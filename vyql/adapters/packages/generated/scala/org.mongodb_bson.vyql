@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "org.mongodb:bson" {
-    sink method "parse" -> code.Deserialization
-    sink method "readObject" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

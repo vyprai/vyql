@@ -1,9 +1,0 @@
-import code.{NetworkSend, SecretValue}
-
-adapter php {
-  package "symfony/mailer" {
-    sink method "send" -> code.NetworkSend
-    source method "fromDsn" -> code.SecretValue
-    source method "getPassword" -> code.SecretValue
-  }
-}

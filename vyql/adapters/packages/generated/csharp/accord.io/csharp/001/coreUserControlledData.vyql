@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m04c8218b;
+
+binding userControlledData1 {
+  requires {
+    dependency("accord.io")
+  }
+  query pattern callExpr where callee.method == "FromText"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m95040194;
+
+binding networkData2 {
+  requires {
+    dependency("io.ktor:ktor-client-core")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.NetworkData at call.result
+}

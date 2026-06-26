@@ -1,0 +1,9 @@
+module bindings.perl.migration.mb5913edd;
+
+binding userControlledData0 {
+  requires {
+    dependency("GD-Map-Mercator")
+  }
+  query pattern callExpr where callee.path ~= "bin/wdb2merc.pl::read_wdb"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,14 @@
+module bindings.swift.migration.m9fb65a21;
+
+binding authenticationCheck8 {
+  requires {
+    dependency("github.com/supabase-community/supabase-swift")
+  }
+  query pattern callExpr where callee.method == "unenroll"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,14 @@
+module bindings.scala.migration.m658a6b13;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

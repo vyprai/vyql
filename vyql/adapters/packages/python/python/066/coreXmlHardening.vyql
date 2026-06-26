@@ -1,0 +1,14 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding xmlHardening66 {
+  requires {
+    dependency("lxml")
+  }
+  query pattern callExpr where callee.path ~= "lxml.etree.XMLParser" and args.any.literal contains "resolve_entities=False"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

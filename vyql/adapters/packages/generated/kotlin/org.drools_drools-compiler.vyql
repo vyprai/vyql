@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter kotlin {
-  package "org.drools:drools-compiler" {
-    sink method "analyzeBlock" -> code.CodeEval
-  }
-}

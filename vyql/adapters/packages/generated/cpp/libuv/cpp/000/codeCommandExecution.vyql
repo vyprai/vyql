@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m26ac2c0d;
+
+binding commandExecution0 {
+  requires {
+    dependency("libuv")
+  }
+  query pattern callExpr where callee.method == "uv_spawn"
+  emit sink code.CommandExecution at args[0]
+}

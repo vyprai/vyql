@@ -1,0 +1,9 @@
+module bindings.objc.migration.m3872ad3f;
+
+binding deserialization0 {
+  requires {
+    dependency("JSONModel")
+  }
+  query pattern callExpr where callee.method == "initWithString:error:"
+  emit sink code.Deserialization at args[0]
+}

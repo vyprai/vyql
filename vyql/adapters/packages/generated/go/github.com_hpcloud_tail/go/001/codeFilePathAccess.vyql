@@ -1,0 +1,9 @@
+module bindings.go.migration.m6927527d;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/hpcloud/tail")
+  }
+  query pattern callExpr where callee.method == "OpenFile"
+  emit sink code.FilePathAccess at args[0]
+}

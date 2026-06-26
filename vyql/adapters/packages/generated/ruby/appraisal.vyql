@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "appraisal" {
-    sink method "Appraisal::Command.initialize" -> code.CommandExecution
-  }
-}

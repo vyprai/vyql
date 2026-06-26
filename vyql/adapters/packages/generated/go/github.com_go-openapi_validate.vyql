@@ -1,9 +1,0 @@
-import code.{RegexCompile}
-
-adapter go {
-  package "github.com/go-openapi/validate" {
-    flag code.RegexCompile on any {
-      method "Pattern"
-    }
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding htmlRender405 {
+  query pattern callExpr where callee.path ~= "res.end"
+  emit sink code.HtmlRender at args[0]
+}

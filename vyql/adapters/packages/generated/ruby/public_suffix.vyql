@@ -1,5 +1,0 @@
-adapter ruby {
-  package "public_suffix" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding archiveMarkerSymlinkOverwrite36 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "PACKAGE_SOURCE_LOCK" and node.token contains "entry.unpack_in(parent)" and node.token contains "OpenOptions::new().create(true)" and node.token contains "write!(ok,\"ok\")" and not (node.token contains "entry_path.file_name()") and not (node.token contains "create_new(true)")
+  emit issue code.ArchiveMarkerSymlinkOverwrite at node
+}

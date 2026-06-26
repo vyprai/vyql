@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m89b505fa;
+
+binding commandExecution0 {
+  requires {
+    dependency("bundler")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

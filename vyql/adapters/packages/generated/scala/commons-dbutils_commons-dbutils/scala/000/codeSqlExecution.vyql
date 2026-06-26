@@ -1,0 +1,9 @@
+module bindings.scala.migration.m58ff4075;
+
+binding sqlExecution0 {
+  requires {
+    dependency("commons-dbutils:commons-dbutils")
+  }
+  query pattern callExpr where callee.method == "batch"
+  emit sink code.SqlExecution at args[0]
+}

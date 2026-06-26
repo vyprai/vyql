@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding xmlParse75 {
+  query pattern callExpr where callee.method == "parse_string"
+  emit sink code.XmlParse at args[0]
+}

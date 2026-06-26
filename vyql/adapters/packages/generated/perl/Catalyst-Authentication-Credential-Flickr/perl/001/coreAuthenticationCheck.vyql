@@ -1,0 +1,14 @@
+module bindings.perl.migration.mf94c51b7;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("Catalyst-Authentication-Credential-Flickr")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

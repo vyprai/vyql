@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/mongodb/swift-bson" {
-    sink method "decode" -> code.Deserialization
-  }
-}

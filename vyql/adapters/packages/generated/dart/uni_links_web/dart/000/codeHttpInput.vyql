@@ -1,0 +1,9 @@
+module bindings.dart.migration.m44223454;
+
+binding httpInput0 {
+  requires {
+    dependency("uni_links_web")
+  }
+  query pattern callExpr where callee.method == "UniLinksPlugin.getInitialLink"
+  emit source code.HttpInput at call.result
+}

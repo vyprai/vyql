@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule JenkinsRemoteValidationMissingPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_918]
+    id: "VYQL-AUTH-045"
+    severity: medium
+  }
+  issue code.JenkinsRemoteValidationMissingPermission as endpoint
+}

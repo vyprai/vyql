@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter objc {
-  package "GoogleWebRTC" {
-    sink method "sendData" -> code.NetworkSend
-  }
-}

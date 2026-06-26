@@ -1,0 +1,10 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding checksumErrorLogoutRedirect22 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=groovy" and node.token contains "checksumError" and node.token contains "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)" and not (node.token contains "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)")
+  emit issue code.ChecksumErrorLogoutRedirect at node
+}

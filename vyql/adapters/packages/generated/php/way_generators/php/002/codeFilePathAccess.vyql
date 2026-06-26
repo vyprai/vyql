@@ -1,0 +1,9 @@
+module bindings.php.migration.mbe2de1d4;
+
+binding filePathAccess2 {
+  requires {
+    dependency("way/generators")
+  }
+  query pattern callExpr where callee.method == "WayGeneratorsFilesystemFilesystem::get"
+  emit sink code.FilePathAccess at args[0]
+}

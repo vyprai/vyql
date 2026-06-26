@@ -1,0 +1,14 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding safeDeserialization18 {
+  requires {
+    dependency("snakeyaml")
+  }
+  query pattern callExpr where callee.path ~= "Yaml.safeLoad"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

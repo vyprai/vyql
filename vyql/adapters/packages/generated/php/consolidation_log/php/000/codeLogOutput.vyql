@@ -1,0 +1,9 @@
+module bindings.php.migration.ma507ad59;
+
+binding logOutput0 {
+  requires {
+    dependency("consolidation/log")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

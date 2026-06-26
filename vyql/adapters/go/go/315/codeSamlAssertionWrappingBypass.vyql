@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding samlAssertionWrappingBypass315 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:etreeutils.NSDetatch" and node.token contains "call_path:v.context.Validate" and node.token contains "call_path:elt.RemoveChild" and node.token contains "call_path:elt.AddChild" and not (node.token contains "call_path:elt.ChildElements") and not (node.token contains "call_path:child.NamespaceURI") and not (node.token contains "var_name:errMultipleAssertions")
+  emit issue code.SamlAssertionWrappingBypass at node
+}

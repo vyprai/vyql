@@ -1,0 +1,9 @@
+module bindings.php.migration.mdb8546c7;
+
+binding codeEval0 {
+  requires {
+    dependency("composer/semver")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.CodeEval at args[0]
+}

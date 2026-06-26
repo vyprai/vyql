@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3bdd8444;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.camel:camel-jms")
+  }
+  query pattern callExpr where callee.method == "extractBodyFromJms"
+  emit sink code.Deserialization at args[0]
+}

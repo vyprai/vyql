@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/shurcooL/htmlg" {
-    control method "Render" -> core.HtmlEscape
-    control method "RenderComponents" -> core.HtmlEscape
-    control method "RenderComponentsString" -> core.HtmlEscape
-  }
-}

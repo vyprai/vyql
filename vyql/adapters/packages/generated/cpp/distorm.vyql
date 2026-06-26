@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "distorm" {
-    sink method "distorm_decode64" -> code.Deserialization
-    sink method "distorm_decode32" -> code.Deserialization
-  }
-}

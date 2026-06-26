@@ -1,9 +1,0 @@
-import code.{HttpInput}
-
-adapter objc {
-  package "GPPCore" {
-    source method "handleURL" -> code.HttpInput
-    source method "readDeepLinkAfterInstall" -> code.HttpInput
-    source method "source" -> code.HttpInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m1b7dbac3;
+
+binding htmlRender0 {
+  requires {
+    dependency("bamboo_phoenix")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

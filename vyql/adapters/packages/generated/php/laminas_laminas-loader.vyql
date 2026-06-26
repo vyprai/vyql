@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter php {
-  package "laminas/laminas-loader" {
-    sink method "Laminas\Loader\StandardAutoloader::loadClass" -> code.FilePathAccess
-    sink method "Laminas\Loader\ClassMapAutoloader::loadMapFromFile" -> code.FilePathAccess
-  }
-}

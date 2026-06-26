@@ -1,0 +1,9 @@
+module bindings.objc.migration.me3db4b97;
+
+binding deserialization0 {
+  requires {
+    dependency("Kanna")
+  }
+  query pattern callExpr where callee.method == "XML"
+  emit sink code.Deserialization at args[0]
+}

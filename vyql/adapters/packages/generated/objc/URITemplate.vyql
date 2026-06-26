@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "URITemplate" {
-    source method "expand" -> core.UserControlledData
-    source method "extract" -> core.UserControlledData
-  }
-}

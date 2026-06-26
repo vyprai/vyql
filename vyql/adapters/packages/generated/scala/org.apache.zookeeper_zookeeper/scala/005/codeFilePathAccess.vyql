@@ -1,0 +1,9 @@
+module bindings.scala.migration.me44b1ac9;
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.apache.zookeeper:zookeeper")
+  }
+  query pattern callExpr where callee.method == "getChildren"
+  emit sink code.FilePathAccess at args[0]
+}

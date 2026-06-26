@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfbe00f7a;
+
+binding networkSend0 {
+  requires {
+    dependency("phoenix_pubsub")
+  }
+  query pattern callExpr where callee.method == "broadcast"
+  emit sink code.NetworkSend at args[0]
+}

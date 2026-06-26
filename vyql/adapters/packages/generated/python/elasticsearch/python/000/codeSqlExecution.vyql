@@ -1,0 +1,9 @@
+module bindings.python.migration.m27b878ef;
+
+binding sqlExecution0 {
+  requires {
+    dependency("elasticsearch")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

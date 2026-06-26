@@ -1,0 +1,14 @@
+module bindings.swift.migration.m1c273409;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("github.com/google/GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "authorizeRequest"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

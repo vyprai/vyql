@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcc5d1d36;
+
+binding deserialization0 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

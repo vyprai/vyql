@@ -1,0 +1,9 @@
+module bindings.dart.migration.m33766ff7;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("shared_preferences_ios")
+  }
+  query pattern callExpr where callee.method == "UserDefaultsApi.remove"
+  emit sink code.StoredDataWrite at args[0]
+}

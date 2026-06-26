@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mfc3e218e;
+
+binding deserialization0 {
+  requires {
+    dependency("postcss-value-parser")
+  }
+  query pattern callExpr where callee.method == "ValueParser"
+  emit sink code.Deserialization at args[0]
+}

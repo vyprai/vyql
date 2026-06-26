@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.glassfish.jersey.ext:jersey-bean-validation" {
-    control method "validate" -> core.InputValidation
-    control method "validateValue" -> core.InputValidation
-  }
-}

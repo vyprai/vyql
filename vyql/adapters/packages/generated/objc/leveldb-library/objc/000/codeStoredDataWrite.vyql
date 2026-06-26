@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf143615c;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("leveldb-library")
+  }
+  query pattern callExpr where callee.method == "Put"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m5884e7db;
+
+binding deserialization3 {
+  requires {
+    dependency("Test-DBChanges")
+  }
+  query pattern callExpr where callee.method == "decode_recorded_data"
+  emit sink code.Deserialization at args[0]
+}

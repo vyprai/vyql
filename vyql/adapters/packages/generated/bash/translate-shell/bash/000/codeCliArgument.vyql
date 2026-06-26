@@ -1,0 +1,9 @@
+module bindings.bash.migration.me6562ebd;
+
+binding cliArgument0 {
+  requires {
+    dependency("translate-shell")
+  }
+  query pattern callExpr where callee.path ~= "trans.argv"
+  emit source code.CliArgument at call.result
+}

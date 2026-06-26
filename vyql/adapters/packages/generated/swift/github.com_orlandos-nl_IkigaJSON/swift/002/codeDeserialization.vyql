@@ -1,0 +1,9 @@
+module bindings.swift.migration.m330e36bf;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/orlandos-nl/IkigaJSON")
+  }
+  query pattern callExpr where callee.method == "scanValue"
+  emit sink code.Deserialization at args[0]
+}

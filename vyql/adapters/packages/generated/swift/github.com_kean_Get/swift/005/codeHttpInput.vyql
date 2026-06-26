@@ -1,0 +1,9 @@
+module bindings.swift.migration.m342303c4;
+
+binding httpInput5 {
+  requires {
+    dependency("github.com/kean/Get")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.HttpInput at call.result
+}

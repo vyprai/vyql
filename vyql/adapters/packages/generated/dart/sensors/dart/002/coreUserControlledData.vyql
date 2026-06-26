@@ -1,0 +1,9 @@
+module bindings.dart.migration.mbd1efa1e;
+
+binding userControlledData2 {
+  requires {
+    dependency("sensors")
+  }
+  query pattern callExpr where callee.method == "GyroscopeEvent"
+  emit source core.UserControlledData at call.result
+}

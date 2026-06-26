@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4ca94955;
+
+binding deserialization1 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "Bson.Decoder.document"
+  emit sink code.Deserialization at args[0]
+}

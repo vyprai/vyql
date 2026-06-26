@@ -1,0 +1,9 @@
+module bindings.java.migration.mc02accc9;
+
+binding networkConnect2 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

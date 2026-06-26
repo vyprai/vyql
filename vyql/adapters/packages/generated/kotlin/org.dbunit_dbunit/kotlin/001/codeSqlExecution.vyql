@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m8bda5f94;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.dbunit:dbunit")
+  }
+  query pattern callExpr where callee.method == "assertEqualsByQuery"
+  emit sink code.SqlExecution at args[0]
+}

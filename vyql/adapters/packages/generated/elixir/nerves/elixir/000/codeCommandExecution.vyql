@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc105f924;
+
+binding commandExecution0 {
+  requires {
+    dependency("nerves")
+  }
+  query pattern callExpr where callee.method == "fork_exec"
+  emit sink code.CommandExecution at args[0]
+}

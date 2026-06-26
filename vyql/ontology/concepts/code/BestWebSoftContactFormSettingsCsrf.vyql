@@ -1,0 +1,11 @@
+module code;
+
+concept BestWebSoftContactFormSettingsCsrf : issue {
+  cwe: [CWE_352]
+  review_assumption: "an authenticated administrator can be induced to submit the plugin settings form cross-site"
+  reviewCategory: csrf
+  reviewCondition: "BestWebSoft Contact Form settings can be saved from request parameters without a WordPress nonce check"
+  reviewConfidence: high
+  reviewEvidence: "cntctfrm_settings_page context {pattern} handles cntctfrm_form_submit and calls update_option without check_admin_referer"
+  vulnerableTo: [request_forgery.Csrf]
+}

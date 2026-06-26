@@ -1,0 +1,10 @@
+module bindings.cpp.migration.m4e783366;
+
+binding reachableAssertionReview77 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "visitBrOn(&curr)" and node.token contains "validateTypeAnnotation(in,curr.ref)" and node.token contains "curr.desc" and not (node.token contains "curr.ref->type.isRef") and not (node.token contains "curr.desc->type.isRef")
+  emit issue code.ReachableAssertionReview at node
+}

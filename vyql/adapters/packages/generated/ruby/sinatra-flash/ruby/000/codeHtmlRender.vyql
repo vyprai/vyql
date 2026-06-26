@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m7a917443;
+
+binding htmlRender0 {
+  requires {
+    dependency("sinatra-flash")
+  }
+  query pattern callExpr where callee.method == "styled_flash"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m062b8050;
+
+binding deserialization0 {
+  requires {
+    dependency("setasign/fpdi")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

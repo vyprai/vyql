@@ -1,0 +1,9 @@
+module bindings.perl.migration.mec98890c;
+
+binding deserialization9 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readBool"
+  emit sink code.Deserialization at args[0]
+}

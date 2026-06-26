@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding deserialization60 {
+  requires {
+    dependency("marshal")
+  }
+  query pattern callExpr where callee.path ~= "marshal.loads"
+  emit sink code.Deserialization at args[0]
+}

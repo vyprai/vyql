@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding urlFetch130 {
+  query pattern callExpr where callee.path ~= "HTTP.get"
+  emit sink code.UrlFetch at args[0]
+}

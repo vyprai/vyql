@@ -1,0 +1,9 @@
+module bindings.python.migration.m666df537;
+
+binding httpInput0 {
+  requires {
+    dependency("dj-static")
+  }
+  query pattern callExpr where callee.method == "get_path_info"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m55dfca5a;
+
+binding commandExecution1 {
+  requires {
+    dependency("core")
+  }
+  query pattern callExpr where callee.method == "spawn_link"
+  emit sink code.CommandExecution at args[0]
+}

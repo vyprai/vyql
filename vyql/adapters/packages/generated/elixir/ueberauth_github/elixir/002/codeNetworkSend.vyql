@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mea10675c;
+
+binding networkSend2 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m2b10c041;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "getDatabaseName"
+  emit source core.UserControlledData at call.result
+}

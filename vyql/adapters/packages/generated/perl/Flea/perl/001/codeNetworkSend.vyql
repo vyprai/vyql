@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc61d3835;
+
+binding networkSend1 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit sink code.NetworkSend at args[0]
+}

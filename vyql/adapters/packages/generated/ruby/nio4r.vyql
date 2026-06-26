@@ -1,8 +1,0 @@
-import code.{NetworkData}
-
-adapter ruby {
-  package "nio4r" {
-    source method "read" -> code.NetworkData
-    source method "write" -> code.NetworkData
-  }
-}

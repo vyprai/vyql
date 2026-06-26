@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter rust {
-  package "objc" {
-    sink method "class_addMethod" -> code.CodeEval
-    sink method "method_setImplementation" -> code.CodeEval
-  }
-}

@@ -1,8 +1,0 @@
-import code.{CommandExecution, ArchiveEntryWrite}
-
-adapter python {
-  package "webdriver-manager" {
-    sink method "read_version_from_cmd" -> code.CommandExecution
-    sink method "extract" -> code.ArchiveEntryWrite
-  }
-}

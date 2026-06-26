@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m81c8639b;
+
+binding deserialization0 {
+  requires {
+    dependency("com.alibaba:dubbo")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

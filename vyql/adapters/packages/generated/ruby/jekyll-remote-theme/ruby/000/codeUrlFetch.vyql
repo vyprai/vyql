@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb42b6a5e;
+
+binding urlFetch0 {
+  requires {
+    dependency("jekyll-remote-theme")
+  }
+  query pattern callExpr where callee.method == "Downloader#request!"
+  emit sink code.UrlFetch at args[0]
+}

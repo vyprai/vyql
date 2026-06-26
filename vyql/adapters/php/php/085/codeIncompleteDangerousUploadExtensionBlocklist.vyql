@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding incompleteDangerousUploadExtensionBlocklist85 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=process" and node.token contains "$this->no_script" and node.token contains "preg_match" and node.token contains "php|php5|php4|php3|phtml|pl|py|cgi|asp|js" and node.token contains "$this->file_src_name" and node.token contains "$file_src_name_ext='txt'" and not (node.token contains "phar")
+  emit issue code.IncompleteDangerousUploadExtensionBlocklist at node
+}

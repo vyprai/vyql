@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding filePathAccess370 {
+  query pattern callExpr where callee.path ~= "readFileToBuffer"
+  emit sink code.FilePathAccess at args[0]
+}

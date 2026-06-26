@@ -1,0 +1,9 @@
+module bindings.c.migration.m1cba2526;
+
+binding userControlledData2 {
+  requires {
+    dependency("libsnoretoast")
+  }
+  query pattern callExpr where callee.method == "backgroundCallback"
+  emit source core.UserControlledData at call.result
+}

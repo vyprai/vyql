@@ -1,0 +1,9 @@
+module bindings.php.migration.m4c9e4bf5;
+
+binding htmlRender0 {
+  requires {
+    dependency("yiisoft/yii2-swiftmailer")
+  }
+  query pattern callExpr where callee.method == "setTextBody"
+  emit sink code.HtmlRender at args[0]
+}

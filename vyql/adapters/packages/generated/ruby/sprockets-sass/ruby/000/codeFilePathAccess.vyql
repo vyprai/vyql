@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4edf2d8b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("sprockets-sass")
+  }
+  query pattern callExpr where callee.method == "resolve"
+  emit sink code.FilePathAccess at args[0]
+}

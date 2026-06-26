@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m3ee6ddc6;
+
+binding networkData0 {
+  requires {
+    dependency("rtmidi")
+  }
+  query pattern callExpr where callee.method == "getMessage"
+  emit source code.NetworkData at call.result
+}

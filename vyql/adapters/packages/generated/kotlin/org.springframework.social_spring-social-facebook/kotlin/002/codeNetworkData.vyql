@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mc556037a;
+
+binding networkData2 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "fetchImage"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.mf8030fcb;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/jcmturner/dnsutils/v2")
+  }
+  query pattern callExpr where callee.method == "OrderedSRV"
+  emit source code.NetworkData at call.result
+}

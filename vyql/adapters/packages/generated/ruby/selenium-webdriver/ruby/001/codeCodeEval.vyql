@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me91e1897;
+
+binding codeEval1 {
+  requires {
+    dependency("selenium-webdriver")
+  }
+  query pattern callExpr where callee.method == "execute_script"
+  emit sink code.CodeEval at args[0]
+}

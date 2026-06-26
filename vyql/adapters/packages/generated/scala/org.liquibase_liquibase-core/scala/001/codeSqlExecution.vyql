@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb3f2505b;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.liquibase:liquibase-core")
+  }
+  query pattern callExpr where callee.method == "updateSql"
+  emit sink code.SqlExecution at args[0]
+}

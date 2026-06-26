@@ -1,0 +1,9 @@
+module bindings.perl.migration.m821d860a;
+
+binding commandExecution0 {
+  requires {
+    dependency("RPM2")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

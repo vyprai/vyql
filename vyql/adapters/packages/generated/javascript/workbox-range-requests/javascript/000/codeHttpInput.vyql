@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mbdeabaaa;
+
+binding httpInput0 {
+  requires {
+    dependency("workbox-range-requests")
+  }
+  query pattern callExpr where callee.method == "parseRangeHeader"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.powershell.migration.m92132a18;
+
+binding filePathAccess15 {
+  requires {
+    dependency("Microsoft.PowerShell.Management")
+  }
+  query pattern callExpr where callee.path ~= "Get-Content"
+  emit sink code.FilePathAccess at args[0]
+}

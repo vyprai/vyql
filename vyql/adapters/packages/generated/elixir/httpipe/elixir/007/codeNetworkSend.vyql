@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md8b53b09;
+
+binding networkSend7 {
+  requires {
+    dependency("httpipe")
+  }
+  query pattern callExpr where callee.method == "options!"
+  emit sink code.NetworkSend at args[0]
+}

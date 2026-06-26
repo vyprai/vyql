@@ -1,0 +1,9 @@
+module bindings.php.migration.mc6eba7fb;
+
+binding deserialization0 {
+  requires {
+    dependency("brumann/polyfill-unserialize")
+  }
+  query pattern callExpr where callee.method == "unserialize"
+  emit sink code.Deserialization at args[0]
+}

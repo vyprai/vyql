@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8415f7c2;
+
+binding deserialization0 {
+  requires {
+    dependency("org.glassfish.jaxb:jaxb-runtime")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

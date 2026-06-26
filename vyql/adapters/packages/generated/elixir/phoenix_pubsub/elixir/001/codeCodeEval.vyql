@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfbe00f7a;
+
+binding codeEval1 {
+  requires {
+    dependency("phoenix_pubsub")
+  }
+  query pattern callExpr where callee.method == "dispatch"
+  emit sink code.CodeEval at args[0]
+}

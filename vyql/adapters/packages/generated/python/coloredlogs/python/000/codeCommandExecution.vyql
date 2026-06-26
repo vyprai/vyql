@@ -1,0 +1,9 @@
+module bindings.python.migration.m564496a5;
+
+binding commandExecution0 {
+  requires {
+    dependency("coloredlogs")
+  }
+  query pattern callExpr where callee.method == "convert_command_output"
+  emit sink code.CommandExecution at args[0]
+}

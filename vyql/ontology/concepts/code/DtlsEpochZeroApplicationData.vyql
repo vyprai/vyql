@@ -1,0 +1,11 @@
+module code;
+
+concept DtlsEpochZeroApplicationData : issue {
+  cwe: [CWE_287, CWE_294, CWE_841]
+  review_assumption: "epoch-zero application data is unauthenticated or unencrypted and can be supplied by a remote peer"
+  reviewCategory: auth
+  reviewCondition: "DTLS application data is rejected when the record epoch is zero"
+  reviewConfidence: high
+  reviewEvidence: "DTLS record handler context {pattern} decrypts nonzero epochs and forwards application data without an observed epoch-zero rejection"
+  vulnerableTo: [authentication.AuthenticationBypass, injection.ProtocolStateConfusion]
+}

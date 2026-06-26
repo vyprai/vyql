@@ -1,0 +1,9 @@
+module bindings.dart.migration.m252beaed;
+
+binding sqlExecution3 {
+  requires {
+    dependency("flutter_downloader")
+  }
+  query pattern callExpr where callee.method == "loadTasksWithRawQuery"
+  emit sink code.SqlExecution at args[0]
+}

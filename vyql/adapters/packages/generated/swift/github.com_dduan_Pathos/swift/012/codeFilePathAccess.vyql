@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc537eea8;
+
+binding filePathAccess12 {
+  requires {
+    dependency("github.com/dduan/Pathos")
+  }
+  query pattern callExpr where callee.method == "home"
+  emit sink code.FilePathAccess at args[0]
+}

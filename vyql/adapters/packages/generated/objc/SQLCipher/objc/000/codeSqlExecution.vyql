@@ -1,0 +1,9 @@
+module bindings.objc.migration.m9f990e83;
+
+binding sqlExecution0 {
+  requires {
+    dependency("SQLCipher")
+  }
+  query pattern callExpr where callee.method == "Jim_FindHashEntry"
+  emit sink code.SqlExecution at args[0]
+}

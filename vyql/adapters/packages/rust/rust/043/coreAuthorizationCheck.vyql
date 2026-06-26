@@ -1,0 +1,14 @@
+module bindings.rust.migration.m222602a5;
+
+binding authorizationCheck43 {
+  requires {
+    dependency("casbin")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

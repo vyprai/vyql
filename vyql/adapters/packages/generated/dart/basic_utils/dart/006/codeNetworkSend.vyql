@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8bc63517;
+
+binding networkSend6 {
+  requires {
+    dependency("basic_utils")
+  }
+  query pattern callExpr where callee.method == "putForFullResponse"
+  emit sink code.NetworkSend at args[0]
+}

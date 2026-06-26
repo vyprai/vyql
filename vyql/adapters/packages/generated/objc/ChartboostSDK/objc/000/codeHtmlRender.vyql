@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7c37dc29;
+
+binding htmlRender0 {
+  requires {
+    dependency("ChartboostSDK")
+  }
+  query pattern callExpr where callee.method == "initWithHtml"
+  emit sink code.HtmlRender at args[0]
+}

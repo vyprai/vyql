@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend, FilePathAccess, WeakCipher, SecretValue, CertValidationDisabled}
-import core.{AuthenticationCheck}
-
-adapter swift {
-  package "github.com/Kitura/BlueSSLService" {
-    sink method "send" -> code.NetworkSend
-    source method "recv" -> code.NetworkData
-  }
-}

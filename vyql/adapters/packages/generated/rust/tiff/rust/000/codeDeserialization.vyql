@@ -1,0 +1,9 @@
+module bindings.rust.migration.mcc18f863;
+
+binding deserialization0 {
+  requires {
+    dependency("tiff")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

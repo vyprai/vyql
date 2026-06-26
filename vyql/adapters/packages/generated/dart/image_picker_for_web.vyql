@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "image_picker_for_web" {
-    source method "getMedia" -> core.UserControlledData
-  }
-}

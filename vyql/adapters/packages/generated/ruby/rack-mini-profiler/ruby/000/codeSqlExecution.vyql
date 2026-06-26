@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mab7c94f7;
+
+binding sqlExecution0 {
+  requires {
+    dependency("rack-mini-profiler")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

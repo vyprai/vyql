@@ -1,0 +1,9 @@
+module bindings.scala.migration.me3a64ab3;
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.oauth-client:google-oauth-client")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import core.{InputValidation, UserControlledData, AuthorizationCheck}
-adapter ruby {
-  package "simple_oauth" {
-    source method "parse" -> core.UserControlledData
-    control method "escape" -> core.InputValidation
-    control method "unescape" -> core.InputValidation
-  }
-}

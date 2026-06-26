@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter php {
-  package "fabpot/php-cs-fixer" {
-    source method "PhpCsFixer\FileReader::read" -> core.UserControlledData
-  }
-}

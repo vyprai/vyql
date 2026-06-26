@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/kevinburke/ssh_config" {
-    sink method "parseFile" -> code.FilePathAccess
-    source method "Decode" -> core.UserControlledData
-    sink method "DecodeBytes" -> code.Deserialization
-  }
-}

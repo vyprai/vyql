@@ -1,0 +1,9 @@
+module bindings.objc.migration.m637e118b;
+
+binding fileUse1 {
+  requires {
+    dependency("CocoaLumberjack")
+  }
+  query pattern callExpr where callee.method == "createNewLogFile"
+  emit sink code.FileUseSink at args[0]
+}

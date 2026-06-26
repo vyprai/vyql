@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding sqlParameterization510 {
+  query pattern callExpr where callee.path ~= "sqlstring.escape"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

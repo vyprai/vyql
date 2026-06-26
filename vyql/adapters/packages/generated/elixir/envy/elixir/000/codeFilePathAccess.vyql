@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8022b839;
+
+binding filePathAccess0 {
+  requires {
+    dependency("envy")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

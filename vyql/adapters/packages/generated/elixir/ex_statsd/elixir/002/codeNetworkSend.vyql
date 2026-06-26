@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf10aaadc;
+
+binding networkSend2 {
+  requires {
+    dependency("ex_statsd")
+  }
+  query pattern callExpr where callee.method == "transmit"
+  emit sink code.NetworkSend at args[0]
+}

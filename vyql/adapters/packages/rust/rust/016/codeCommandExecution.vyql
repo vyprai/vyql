@@ -1,0 +1,9 @@
+module bindings.rust.migration.m222602a5;
+
+binding commandExecution16 {
+  requires {
+    dependency("std::process")
+  }
+  query pattern callExpr where callee.path ~= "Command.new"
+  emit sink code.CommandExecution at args[0]
+}

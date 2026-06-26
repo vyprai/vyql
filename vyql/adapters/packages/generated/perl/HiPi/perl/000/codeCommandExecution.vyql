@@ -1,0 +1,9 @@
+module bindings.perl.migration.mf2bec495;
+
+binding commandExecution0 {
+  requires {
+    dependency("HiPi")
+  }
+  query pattern callExpr where callee.method == "create_system_group"
+  emit sink code.CommandExecution at args[0]
+}

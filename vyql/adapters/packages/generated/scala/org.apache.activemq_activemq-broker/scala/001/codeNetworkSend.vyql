@@ -1,0 +1,9 @@
+module bindings.scala.migration.m2d88edef;
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "dispatchSync"
+  emit sink code.NetworkSend at args[0]
+}

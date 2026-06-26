@@ -7,8 +7,8 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -44,10 +44,27 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 
 func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	t.Helper()
-	files := readDataFiles(t, sub, suffix)
 	out := map[string][]parser.Decl{}
+	if strings.HasSuffix(suffix, ".vyql") && !strings.HasPrefix(suffix, ".") {
+		sources, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join(sub, suffix)))
+		if err != nil {
+			t.Fatalf("read %s/%s: %v", sub, suffix, err)
+		}
+		if len(sources) == 0 {
+			t.Fatalf("no %s sources under vyql/%s", suffix, sub)
+		}
+		for _, source := range sources {
+			decls, err := parser.ParseRuntime(string(source.Data))
+			if err != nil {
+				t.Fatalf("parse %s: %v", source.Name, err)
+			}
+			out[source.Name] = decls
+		}
+		return out
+	}
+	files := readDataFiles(t, sub, suffix)
 	for f, c := range files {
-		decls, err := parser.Parse(c)
+		decls, err := parser.ParseRuntime(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -60,7 +77,7 @@ func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id ->
 	t.Helper()
 	out := map[string]string{}
 	for f, c := range files {
-		decls, err := parser.Parse(c)
+		decls, err := parser.ParseRuntime(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -346,8 +363,15 @@ func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 			if !ok || cd.Kind != kind {
 				continue
 			}
-			if v, ok := cd.Fields[field].(string); ok && v == "true" {
-				out[cd.Name] = true
+			switch v := cd.Fields[field].(type) {
+			case bool:
+				if v {
+					out[cd.Name] = true
+				}
+			case string:
+				if v == "true" {
+					out[cd.Name] = true
+				}
 			}
 		}
 	}
@@ -385,10 +409,22 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	controls := conceptsByKind(t, "control")
 	wired := conceptRefsIn(t, "adapters")
 	consumed := map[string]bool{}
-	re := regexp.MustCompile(`(?:sanitized_by|guarded_by|closed_by)\s+(?:core|code)\.([A-Za-z0-9_]+)`)
-	for _, c := range readDataFiles(t, "packs", ".vyql") {
-		for _, m := range re.FindAllStringSubmatch(c, -1) {
-			consumed[m[1]] = true
+	for _, decls := range parseDataDecls(t, "packs", ".vyql") {
+		for _, decl := range decls {
+			rule, ok := decl.(*parser.Rule)
+			if !ok {
+				continue
+			}
+			for _, clause := range rule.Clauses {
+				switch ex := clause.Unless.(type) {
+				case parser.SanitizedBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.GuardedBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.ClosedBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				}
+			}
 		}
 	}
 	var inert []string
@@ -512,15 +548,16 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 // T0.5 — every adapter loads (parses + builds its sink/source/control/mark specs) without
 // panicking, for every adapter shipped under vyql/adapters/.
 func TestAllAdaptersLoadGate(t *testing.T) {
-	for f := range readDataFiles(t, "adapters", ".vyql") {
-		// Files under adapters/packages/ are dependency catalogs keyed by package name,
-		// not standalone tech adapters: the per-language catalog is merged into its tech
-		// by AdaptersFor, and the generated/<lang>/<pkg>.vyql corpus loads dynamically via
-		// GeneratedPackageAdaptersFor. Their basenames are package names, not techs.
-		if strings.Contains(filepath.ToSlash(f), "/adapters/packages/") {
+	root := filepath.Join(datadir.Root(), "adapters")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read adapters: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == "packages" {
 			continue
 		}
-		tech := strings.TrimSuffix(filepath.Base(f), ".vyql")
+		tech := entry.Name()
 		t.Run(tech, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -532,4 +569,117 @@ func TestAllAdaptersLoadGate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCVE1000LedgerCoverageGate(t *testing.T) {
+	repo := testRepoRoot(t)
+	poolPath := filepath.Join(repo, "cve-1000", "pool.tsv")
+	ledgerPath := filepath.Join(repo, "cve-1000", "ledger.tsv")
+	poolRaw, err := os.ReadFile(poolPath)
+	if err != nil {
+		t.Fatalf("read CVE pool: %v", err)
+	}
+	ledgerRaw, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatalf("read CVE ledger: %v", err)
+	}
+
+	poolRows := nonemptyTSVRows(string(poolRaw))
+	if len(poolRows) != 1000 {
+		t.Fatalf("cve-1000 pool rows = %d, want 1000", len(poolRows))
+	}
+	ledgerRows := nonemptyTSVRows(string(ledgerRaw))
+	if len(ledgerRows) != len(poolRows) {
+		t.Fatalf("cve-1000 ledger rows = %d, want exactly %d pool rows", len(ledgerRows), len(poolRows))
+	}
+	covered := make(map[int]bool, len(poolRows))
+	ledgerByRank := make(map[int]string, len(poolRows))
+	statuses := map[string]int{}
+	for i, row := range ledgerRows {
+		fields := strings.SplitN(row, "\t", 6)
+		if len(fields) != 6 {
+			t.Fatalf("ledger row %d has %d fields, want 6: %q", i+1, len(fields), row)
+		}
+		rank, err := strconv.Atoi(fields[0])
+		if err != nil {
+			t.Fatalf("ledger row %d has invalid rank %q", i+1, fields[0])
+		}
+		if rank < 0 || rank >= len(poolRows) {
+			t.Fatalf("ledger row %d rank %d outside pool range 0..%d", i+1, rank, len(poolRows)-1)
+		}
+		status := fields[4]
+		switch status {
+		case "CAUGHT", "FIXED", "ATTENTION", "SKIP":
+			statuses[status]++
+		default:
+			t.Fatalf("ledger row %d rank %d has unknown status %q", i+1, rank, status)
+		}
+		if prev, ok := ledgerByRank[rank]; ok {
+			t.Fatalf("cve-1000 ledger rank %d appears more than once:\nfirst: %s\nagain: %s", rank, prev, row)
+		}
+		ledgerByRank[rank] = row
+		covered[rank] = true
+	}
+	var missing []string
+	for rank := range poolRows {
+		if !covered[rank] {
+			missing = append(missing, strconv.Itoa(rank))
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
+	}
+
+	cveSpecs := readCVERankSpecFiles(t)
+	uniqueSpecRanks := map[int]bool{}
+	for _, path := range cveSpecs {
+		rank, ok := cveRankFromSpecName(filepath.Base(path))
+		if ok {
+			uniqueSpecRanks[rank] = true
+		}
+	}
+	t.Logf("cve-1000 ledger: pool=%d ledger_rows=%d unique_ranks=%d statuses=%v cve_specs=%d unique_spec_ranks=%d",
+		len(poolRows), len(ledgerRows), len(covered), statuses, len(cveSpecs), len(uniqueSpecRanks))
+}
+
+func nonemptyTSVRows(src string) []string {
+	lines := strings.Split(src, "\n")
+	rows := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			rows = append(rows, line)
+		}
+	}
+	return rows
+}
+
+func readCVERankSpecFiles(t *testing.T) []string {
+	t.Helper()
+	testsDir := filepath.Join(datadir.Root(), "tests")
+	entries, err := os.ReadDir(testsDir)
+	if err != nil {
+		t.Fatalf("read tests dir: %v", err)
+	}
+	var out []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() && strings.HasPrefix(name, "cve_rank") && strings.HasSuffix(name, ".test.vyql") {
+			out = append(out, filepath.Join(testsDir, name))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func cveRankFromSpecName(name string) (int, bool) {
+	if !strings.HasPrefix(name, "cve_rank") {
+		return 0, false
+	}
+	rest := strings.TrimPrefix(name, "cve_rank")
+	cut := strings.IndexByte(rest, '_')
+	if cut < 0 {
+		return 0, false
+	}
+	rank, err := strconv.Atoi(rest[:cut])
+	return rank, err == nil
 }

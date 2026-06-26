@@ -1,0 +1,9 @@
+module bindings.php.migration.mb8a7ea2e;
+
+binding userControlledData1 {
+  requires {
+    dependency("zendframework/zend-barcode")
+  }
+  query pattern callExpr where callee.method == "setText"
+  emit source core.UserControlledData at call.result
+}

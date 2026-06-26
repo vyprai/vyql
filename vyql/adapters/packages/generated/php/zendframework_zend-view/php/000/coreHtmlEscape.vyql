@@ -1,0 +1,14 @@
+module bindings.php.migration.m334b0545;
+
+binding htmlEscape0 {
+  requires {
+    dependency("zendframework/zend-view")
+  }
+  query pattern callExpr where callee.method == "Zend\\View\\Helper\\EscapeHtml::escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

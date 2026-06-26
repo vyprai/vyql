@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "symfony/dom-crawler" {
-    sink method "addXmlContent" -> code.Deserialization
-    sink method "addHtmlContent" -> code.Deserialization
-  }
-}

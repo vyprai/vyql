@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter rust {
-  package "url" {
-    source method "parse" -> core.UserControlledData
-  }
-}

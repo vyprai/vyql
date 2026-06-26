@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding stateMutationBeforeOperationPreconditions37 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=apply_smart_op_tx" and node.token contains "self.ensure_smart_account_at_round(&tx.from,current_round);" and node.token contains "self.debit(&tx.from,tx.fee)?;" and node.token contains "self.increment_nonce(&tx.from);" and node.token contains "SmartOpType::Stake{amount}=>{" and node.token contains "returnErr(CoinError::ValidationError(\"belowminimumstake\".into()))" and node.token contains "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?" and not (node.token contains "tx.fee.saturating_add(*amount)")
+  emit issue code.StateMutationBeforeOperationPreconditions at node
+}

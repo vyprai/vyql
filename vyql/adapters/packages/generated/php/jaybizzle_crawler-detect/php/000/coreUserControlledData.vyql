@@ -1,0 +1,9 @@
+module bindings.php.migration.m8a2c78d7;
+
+binding userControlledData0 {
+  requires {
+    dependency("jaybizzle/crawler-detect")
+  }
+  query pattern callExpr where callee.method == "isCrawler"
+  emit source core.UserControlledData at call.result
+}

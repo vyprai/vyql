@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter csharp {
-  package "bootstrap.sass" {
-    control method "sanitizeHtml" -> core.HtmlEscape
-  }
-}

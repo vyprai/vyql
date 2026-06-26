@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "Adjust" {
-    source method "initWithDeeplink" -> core.UserControlledData
-  }
-}

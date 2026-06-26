@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m0832c104;
+
+binding deserialization0 {
+  requires {
+    dependency("media-typer")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

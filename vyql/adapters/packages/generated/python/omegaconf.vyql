@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess, FileUse}
-adapter python {
-  package "omegaconf" {
-    sink method "load" -> code.Deserialization
-    sink method "load" -> code.FilePathAccess
-    sink method "load" -> code.FileUse
-  }
-}

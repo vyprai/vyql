@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.springframework:spring-web" {
-    sink method "parseMediaType" -> code.Deserialization
-  }
-}

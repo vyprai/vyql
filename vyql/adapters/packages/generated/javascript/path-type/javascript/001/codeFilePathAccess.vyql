@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mca5a416b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("path-type")
+  }
+  query pattern callExpr where callee.method == "isTypeSync"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7e60c8e6;
+
+binding sqlExecution0 {
+  requires {
+    dependency("cqerl")
+  }
+  query pattern callExpr where callee.method == "run_query"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{HtmlRender}
-
-adapter csharp {
-  package "formatwith" {
-    sink method "FormatWith" -> code.HtmlRender
-    sink method "FormattableWith" -> code.HtmlRender
-  }
-}

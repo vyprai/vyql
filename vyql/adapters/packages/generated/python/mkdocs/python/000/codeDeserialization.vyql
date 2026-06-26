@@ -1,0 +1,9 @@
+module bindings.python.migration.m478a68cf;
+
+binding deserialization0 {
+  requires {
+    dependency("mkdocs")
+  }
+  query pattern callExpr where callee.method == "yaml_load"
+  emit sink code.Deserialization at args[0]
+}

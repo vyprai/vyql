@@ -1,0 +1,9 @@
+module bindings.rust.migration.m447d6d78;
+
+binding filePathAccess1 {
+  requires {
+    dependency("cc")
+  }
+  query pattern callExpr where callee.method == "write_warning"
+  emit sink code.FilePathAccess at args[0]
+}

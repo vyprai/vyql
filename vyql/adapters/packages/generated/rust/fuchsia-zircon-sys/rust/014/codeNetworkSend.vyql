@@ -1,0 +1,9 @@
+module bindings.rust.migration.m52982397;
+
+binding networkSend14 {
+  requires {
+    dependency("fuchsia-zircon-sys")
+  }
+  query pattern callExpr where callee.method == "zx_socket_write"
+  emit sink code.NetworkSend at args[0]
+}

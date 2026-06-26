@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libwebm" {
-    sink method "Parse" -> code.Deserialization
-    sink method "Read" -> code.Deserialization
-  }
-}

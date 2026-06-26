@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc6005d88;
+
+binding xmlParse13 {
+  requires {
+    dependency("Foundation")
+  }
+  query pattern callExpr where callee.path ~= "XMLDocument"
+  emit sink code.XmlParse at args[0]
+}

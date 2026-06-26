@@ -1,0 +1,9 @@
+module bindings.go.migration.mabff8a86;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/twitchyliquid64/golang-asm")
+  }
+  query pattern callExpr where callee.method == "Create"
+  emit sink code.FilePathAccess at args[0]
+}

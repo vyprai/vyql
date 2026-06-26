@@ -1,5 +1,0 @@
-adapter php {
-  package "league/html-to-markdown" {
-    sink method "convert" -> code.Deserialization
-  }
-}

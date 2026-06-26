@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "sourceror" {
-    sink method "parse_string" -> code.Deserialization
-    sink method "parse_string!" -> code.Deserialization
-    sink method "parse_expression" -> code.Deserialization
-  }
-}

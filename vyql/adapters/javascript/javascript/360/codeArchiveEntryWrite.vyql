@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding archiveEntryWrite360 {
+  query pattern callExpr where callee.path ~= "admZip.extractEntryTo"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

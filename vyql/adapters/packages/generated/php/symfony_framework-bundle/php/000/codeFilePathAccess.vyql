@@ -1,0 +1,9 @@
+module bindings.php.migration.m170b395d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("symfony/framework-bundle")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3b1624df;
+
+binding networkData1 {
+  requires {
+    dependency("gssapi")
+  }
+  query pattern callExpr where callee.method == "accept_context"
+  emit source code.NetworkData at call.result
+}

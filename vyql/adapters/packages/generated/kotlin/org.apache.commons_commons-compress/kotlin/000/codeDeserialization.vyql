@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb960d775;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.commons:commons-compress")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

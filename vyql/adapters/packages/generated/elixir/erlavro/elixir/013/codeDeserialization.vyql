@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0dc0968e;
+
+binding deserialization13 {
+  requires {
+    dependency("erlavro")
+  }
+  query pattern callExpr where callee.method == "parse_map"
+  emit sink code.Deserialization at args[0]
+}

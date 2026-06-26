@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me18a81ce;
+
+binding networkSend6 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "send_data"
+  emit sink code.NetworkSend at args[0]
+}

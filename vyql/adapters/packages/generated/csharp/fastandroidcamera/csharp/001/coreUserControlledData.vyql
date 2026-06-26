@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m0cc8b083;
+
+binding userControlledData1 {
+  requires {
+    dependency("fastandroidcamera")
+  }
+  query pattern callExpr where callee.method == "OnPreviewFrame"
+  emit source core.UserControlledData at call.result
+}

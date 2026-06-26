@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m1fdb3140;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("org.springframework.social:spring-social-security")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m2d36e45b;
+
+binding fileUse3 {
+  requires {
+    dependency("CapacitorFilesystem")
+  }
+  query pattern callExpr where callee.method == "deleteFile"
+  emit sink code.FileUseSink at args[0]
+}

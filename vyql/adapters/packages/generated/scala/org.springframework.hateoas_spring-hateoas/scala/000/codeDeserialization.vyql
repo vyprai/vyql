@@ -1,0 +1,9 @@
+module bindings.scala.migration.m59836b44;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.hateoas:spring-hateoas")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

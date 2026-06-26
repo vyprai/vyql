@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5d33218c;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("wikicloth")
+  }
+  query pattern callExpr where callee.method == "find_reference_by_name"
+  emit sink code.NosqlQuery at args[0]
+}

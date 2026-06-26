@@ -1,0 +1,9 @@
+module bindings.dart.migration.md8c1a8a1;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("clipboard")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.StoredDataWrite at args[0]
+}

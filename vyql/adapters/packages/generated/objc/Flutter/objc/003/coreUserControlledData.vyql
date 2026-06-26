@@ -1,0 +1,9 @@
+module bindings.objc.migration.m02aa3bb4;
+
+binding userControlledData3 {
+  requires {
+    dependency("Flutter")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit source core.UserControlledData at call.result
+}

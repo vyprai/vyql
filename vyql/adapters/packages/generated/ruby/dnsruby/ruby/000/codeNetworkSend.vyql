@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m11e43799;
+
+binding networkSend0 {
+  requires {
+    dependency("dnsruby")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NetworkSend at args[0]
+}

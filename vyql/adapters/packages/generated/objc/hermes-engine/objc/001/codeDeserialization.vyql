@@ -1,0 +1,9 @@
+module bindings.objc.migration.m58d78687;
+
+binding deserialization1 {
+  requires {
+    dependency("hermes-engine")
+  }
+  query pattern callExpr where callee.method == "createValueFromJsonUtf8"
+  emit sink code.Deserialization at args[0]
+}

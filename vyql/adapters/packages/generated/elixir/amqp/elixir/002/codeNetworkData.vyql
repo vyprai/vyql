@@ -1,0 +1,9 @@
+module bindings.elixir.migration.meb41bfa2;
+
+binding networkData2 {
+  requires {
+    dependency("amqp")
+  }
+  query pattern callExpr where callee.method == "subscribe"
+  emit source code.NetworkData at call.result
+}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter php {
-  package "sendgrid/sendgrid" {
-    sink method "send" -> code.NetworkSend
-  }
-}

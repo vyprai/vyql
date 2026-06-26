@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "coffee-script-source" {
-    sink method "parse" -> code.CodeEval
-  }
-}

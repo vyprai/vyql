@@ -1,0 +1,9 @@
+module bindings.java.migration.m16edc12f;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("org.apache.activemq:activemq-kahadb-store")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,5 +1,0 @@
-adapter javascript {
-  package "@babel/traverse" {
-    control method "traverse" -> core.InputValidation
-  }
-}

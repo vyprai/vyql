@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding nodetoolArchiveCommandPrivilegeEscalation78 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:enableFullQueryLogger" and node.token contains "archiveCommand" and node.token contains "fqlOptions.archive_command" and node.token contains "FullQueryLogger.instance.enableWithoutClean" and not (node.token contains "allow_nodetool_archive_command")
+  emit issue code.NodetoolArchiveCommandPrivilegeEscalation at node
+}

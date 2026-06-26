@@ -1,0 +1,14 @@
+module bindings.cryptoreview.migration.m4f475b34;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "cryptoreview"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "syntactic"
+    }
+  }
+}

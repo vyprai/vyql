@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mba891bd7;
+
+binding deserialization0 {
+  requires {
+    dependency("raabro")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

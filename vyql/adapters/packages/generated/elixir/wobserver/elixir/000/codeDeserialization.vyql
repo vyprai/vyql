@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2321e984;
+
+binding deserialization0 {
+  requires {
+    dependency("wobserver")
+  }
+  query pattern callExpr where callee.method == "Wobserver.Web.ClientSocket.parse_command"
+  emit sink code.Deserialization at args[0]
+}

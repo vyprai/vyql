@@ -1,0 +1,9 @@
+module bindings.java.migration.m3b66a18c;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-joda")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.maec902d9;
+
+binding templateRender2 {
+  requires {
+    dependency("rabl")
+  }
+  query pattern callExpr where callee.method == "partial"
+  emit sink code.TemplateRender at args[0]
+}

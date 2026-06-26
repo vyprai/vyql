@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc51f2d06;
+
+binding networkSend5 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "get_discs_by_query"
+  emit sink code.NetworkSend at args[0]
+}

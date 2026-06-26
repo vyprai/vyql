@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.glassfish.jersey.core:jersey-client" {
-    sink method "org.glassfish.jersey.client.ChunkedInput.read" -> code.Deserialization
-  }
-}

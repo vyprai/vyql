@@ -1,0 +1,11 @@
+module code;
+
+concept CommandAllowlistBeforeParsing : issue {
+  cwe: [CWE_863, CWE_78]
+  review_assumption: "the parser can reinterpret quoting, escaping, or command boundaries so the executed command differs from the raw split token"
+  reviewCategory: auth
+  reviewCondition: "a command allowlist or execution permission check runs on a raw split command token before canonical command parsing"
+  reviewConfidence: high
+  reviewEvidence: "command runner context {pattern} checks an allowlist from strings.Split/Fields before runner.ParseCommand and later executes the parsed command"
+  vulnerableTo: [access_control.IncorrectAuthorization, injection.CommandInjection]
+}

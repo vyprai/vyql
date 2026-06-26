@@ -1,0 +1,9 @@
+module bindings.c.migration.m07707a64;
+
+binding networkConnect2 {
+  requires {
+    dependency("igraph")
+  }
+  query pattern callExpr where callee.method == "igraph_st_vertex_connectivity"
+  emit sink code.NetworkConnectSink at args[0]
+}

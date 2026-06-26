@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding httpInput0 {
+  requires {
+    dependency("rails")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}

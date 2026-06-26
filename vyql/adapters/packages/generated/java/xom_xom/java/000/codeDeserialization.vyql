@@ -1,0 +1,9 @@
+module bindings.java.migration.m943b936d;
+
+binding deserialization0 {
+  requires {
+    dependency("xom:xom")
+  }
+  query pattern callExpr where callee.method == "build"
+  emit sink code.Deserialization at args[0]
+}

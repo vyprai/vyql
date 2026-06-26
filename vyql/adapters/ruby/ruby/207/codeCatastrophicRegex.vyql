@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding catastrophicRegex207 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=ruby" and containsAny(node.token, ["literal:\\A/([^/]+)/?([^/]+)?\\z", "literal:^/([^/]+)/?([^/]+)?$"]) and containsAny(node.token, ["call_path:path.match", "call_path:path.match.to_a"]) and not (node.token contains "call_path:path.split") and not (containsAny(node.token, ["call_path:model_id.include", "call_path:model_id.include?"]))
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}

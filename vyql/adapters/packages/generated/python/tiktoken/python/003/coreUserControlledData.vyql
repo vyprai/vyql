@@ -1,0 +1,9 @@
+module bindings.python.migration.m67b314f1;
+
+binding userControlledData3 {
+  requires {
+    dependency("tiktoken")
+  }
+  query pattern callExpr where callee.method == "encode_ordinary_batch"
+  emit source core.UserControlledData at call.result
+}

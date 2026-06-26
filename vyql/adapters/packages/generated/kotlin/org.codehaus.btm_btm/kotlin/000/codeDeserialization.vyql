@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m120c3c28;
+
+binding deserialization0 {
+  requires {
+    dependency("org.codehaus.btm:btm")
+  }
+  query pattern callExpr where callee.method == "bitronix.tm.jndi.BitronixContext.parse"
+  emit sink code.Deserialization at args[0]
+}

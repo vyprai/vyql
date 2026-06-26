@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7bc32aa6;
+
+binding userControlledData4 {
+  requires {
+    dependency("hermit-abi")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

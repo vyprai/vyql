@@ -1,9 +1,0 @@
-import code.{XmlParse}
-import core.{InputValidation}
-
-adapter scala {
-  package "org.ehcache:ehcache" {
-    control method "sanitize" -> core.InputValidation
-    sink method "parse" -> code.XmlParse
-  }
-}

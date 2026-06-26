@@ -1,0 +1,9 @@
+module bindings.java.migration.m16cc9f6c;
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.zxing:core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

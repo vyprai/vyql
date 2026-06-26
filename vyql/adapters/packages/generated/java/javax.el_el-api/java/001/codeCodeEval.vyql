@@ -1,0 +1,9 @@
+module bindings.java.migration.med0f485c;
+
+binding codeEval1 {
+  requires {
+    dependency("javax.el:el-api")
+  }
+  query pattern callExpr where callee.method == "getValue"
+  emit sink code.CodeEval at args[0]
+}

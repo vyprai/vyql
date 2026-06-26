@@ -1,6 +1,0 @@
-adapter scala {
-  package "io.undertow:undertow-core" {
-    control method "urlDecoding" -> core.InputValidation
-    control method "urlDecodingHandler" -> core.InputValidation
-  }
-}

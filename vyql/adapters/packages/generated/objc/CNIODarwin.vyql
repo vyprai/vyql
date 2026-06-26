@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter objc {
-  package "CNIODarwin" {
-    sink method "CNIODarwin_sendmmsg" -> code.NetworkSend
-  }
-}

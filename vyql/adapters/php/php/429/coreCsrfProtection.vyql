@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding csrfProtection429 {
+  query pattern callExpr where callee.path ~= "wp_verify_nonce"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

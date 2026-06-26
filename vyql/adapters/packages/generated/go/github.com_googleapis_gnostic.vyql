@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess, UrlFetch}
-adapter go {
-  package "github.com/googleapis/gnostic" {
-    sink method "ParseList" -> code.Deserialization
-    sink method "NewSchemaFromFile" -> code.FilePathAccess
-    sink method "isURL" -> code.UrlFetch
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter groovy {
-  package "org.springframework:spring-aspects" {
-    sink method "throwUnchecked" -> code.CodeEval
-    sink method "throwAny" -> code.CodeEval
-  }
-}

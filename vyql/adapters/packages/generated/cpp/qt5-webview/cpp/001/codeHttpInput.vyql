@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m6f4e821b;
+
+binding httpInput1 {
+  requires {
+    dependency("qt5-webview")
+  }
+  query pattern callExpr where callee.method == "setUrl"
+  emit source code.HttpInput at call.result
+}

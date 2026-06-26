@@ -1,0 +1,6 @@
+module injection;
+
+threat CrlfInjection {
+  cwe: [CWE_93]
+  desc: "Improper neutralization of CRLF sequences"
+}

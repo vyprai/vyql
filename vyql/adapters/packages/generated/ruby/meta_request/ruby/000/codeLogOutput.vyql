@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m426fc52d;
+
+binding logOutput0 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "debug"
+  emit sink code.LogOutput at args[0]
+}

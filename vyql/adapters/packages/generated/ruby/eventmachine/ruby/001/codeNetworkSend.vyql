@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdb4485cf;
+
+binding networkSend1 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

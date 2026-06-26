@@ -1,0 +1,9 @@
+module bindings.php.migration.m661e6cff;
+
+binding commandExecution0 {
+  requires {
+    dependency("laravel/pint")
+  }
+  query pattern callExpr where callee.method == "getCommandArgs"
+  emit sink code.CommandExecution at args[0]
+}

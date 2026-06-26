@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-adapter java {
-  package "org.liquibase:liquibase-core" {
-    sink method "update" -> code.SqlExecution
-    sink method "updateSql" -> code.SqlExecution
-    sink method "updateCountSql" -> code.SqlExecution
-    sink method "updateToTagSql" -> code.SqlExecution
-  }
-}

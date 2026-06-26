@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter elixir {
-  package "mint_web_socket" {
-    source method "upgrade" -> core.UserControlledData
-    source method "recv" -> core.UserControlledData
-    source method "stream_request_body" -> core.UserControlledData
-  }
-}

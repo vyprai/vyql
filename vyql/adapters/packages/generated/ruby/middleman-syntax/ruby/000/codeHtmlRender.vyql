@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m647613ff;
+
+binding htmlRender0 {
+  requires {
+    dependency("middleman-syntax")
+  }
+  query pattern callExpr where callee.method == "block_code"
+  emit sink code.HtmlRender at args[0]
+}

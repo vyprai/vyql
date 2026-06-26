@@ -1,0 +1,9 @@
+module bindings.c.migration.m1cba2526;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libsnoretoast")
+  }
+  query pattern callExpr where callee.method == "tryCreateShortcut"
+  emit sink code.FilePathAccess at args[0]
+}

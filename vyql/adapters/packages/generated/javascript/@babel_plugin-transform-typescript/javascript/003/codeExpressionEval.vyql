@@ -1,0 +1,9 @@
+module bindings.javascript.migration.ma53c5438;
+
+binding expressionEval3 {
+  requires {
+    dependency("@babel/plugin-transform-typescript")
+  }
+  query pattern callExpr where callee.method == "evalBinaryExpression"
+  emit sink code.ExpressionEval at args[0]
+}

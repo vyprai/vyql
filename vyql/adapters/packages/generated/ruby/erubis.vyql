@@ -1,9 +1,0 @@
-import code.{ExpressionEval}
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "erubis" {
-    sink method "evaluate" -> code.ExpressionEval
-    control method "escape_xml" -> core.HtmlEscape
-  }
-}

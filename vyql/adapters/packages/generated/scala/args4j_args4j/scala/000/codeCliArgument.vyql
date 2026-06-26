@@ -1,0 +1,9 @@
+module bindings.scala.migration.mdcc29e55;
+
+binding cliArgument0 {
+  requires {
+    dependency("args4j:args4j")
+  }
+  query pattern callExpr where callee.method == "parseArgument"
+  emit source code.CliArgument at call.result
+}

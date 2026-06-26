@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5342780c;
+
+binding httpInput0 {
+  requires {
+    dependency("shelf")
+  }
+  query pattern callExpr where callee.method == "queryParameters" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}

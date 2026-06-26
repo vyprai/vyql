@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me22ab7ba;
+
+binding networkSend0 {
+  requires {
+    dependency("qtdoc")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkSend at args[0]
+}

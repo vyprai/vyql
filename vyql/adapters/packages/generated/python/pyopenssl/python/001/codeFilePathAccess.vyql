@@ -1,0 +1,9 @@
+module bindings.python.migration.m26c104f7;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pyopenssl")
+  }
+  query pattern callExpr where callee.method == "use_certificate_file"
+  emit sink code.FilePathAccess at args[0]
+}

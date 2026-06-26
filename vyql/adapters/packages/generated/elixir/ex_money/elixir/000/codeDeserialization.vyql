@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m28aeed4d;
+
+binding deserialization0 {
+  requires {
+    dependency("ex_money")
+  }
+  query pattern callExpr where callee.method == "Money.parse"
+  emit sink code.Deserialization at args[0]
+}

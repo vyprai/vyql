@@ -1,0 +1,9 @@
+module vypr.sca;
+
+rule VulnerableDependency {
+  meta {
+    id: "VYQL-SCA-001"
+    severity: medium
+  }
+  issue sbom.VulnerableDependency as p
+}

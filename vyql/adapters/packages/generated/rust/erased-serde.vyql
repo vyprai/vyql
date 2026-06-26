@@ -1,5 +1,0 @@
-adapter rust {
-  package "erased-serde" {
-    sink method "erased_deserialize_seed" -> code.Deserialization
-  }
-}

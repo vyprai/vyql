@@ -1,0 +1,14 @@
+module bindings.objc.migration.mb50097d4;
+
+binding redirectTarget2 {
+  requires {
+    dependency("TTTAttributedLabel")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "addLinkWithTextCheckingResult:"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

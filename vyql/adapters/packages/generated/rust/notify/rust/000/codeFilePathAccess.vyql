@@ -1,0 +1,9 @@
+module bindings.rust.migration.mbeaaac11;
+
+binding filePathAccess0 {
+  requires {
+    dependency("notify")
+  }
+  query pattern callExpr where callee.method == "watch"
+  emit sink code.FilePathAccess at args[0]
+}

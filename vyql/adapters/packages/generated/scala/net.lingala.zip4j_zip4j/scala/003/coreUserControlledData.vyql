@@ -1,0 +1,9 @@
+module bindings.scala.migration.m27782ca4;
+
+binding userControlledData3 {
+  requires {
+    dependency("net.lingala.zip4j:zip4j")
+  }
+  query pattern callExpr where callee.method == "addStream"
+  emit source core.UserControlledData at call.result
+}

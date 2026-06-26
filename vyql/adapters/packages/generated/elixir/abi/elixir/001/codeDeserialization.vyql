@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2cf7eda7;
+
+binding deserialization1 {
+  requires {
+    dependency("abi")
+  }
+  query pattern callExpr where callee.method == "ABI.decode"
+  emit sink code.Deserialization at args[0]
+}

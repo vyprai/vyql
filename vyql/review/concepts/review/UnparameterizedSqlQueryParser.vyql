@@ -1,0 +1,7 @@
+module code;
+
+review code.UnparameterizedSqlQueryParser {
+  category: sql
+  kind: attention
+  text: "review SQL query builders for unparameterized fragments derived from caller-controlled values"
+}

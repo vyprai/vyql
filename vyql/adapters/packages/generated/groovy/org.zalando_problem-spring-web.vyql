@@ -1,8 +1,0 @@
-import code.{HtmlRender, ResponseHeaderWrite}
-
-adapter groovy {
-  package "org.zalando:problem-spring-web" {
-    sink method "create" -> code.ResponseHeaderWrite
-    sink method "create" -> code.HtmlRender
-  }
-}

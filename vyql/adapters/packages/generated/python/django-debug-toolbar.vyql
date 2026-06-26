@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "django-debug-toolbar" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

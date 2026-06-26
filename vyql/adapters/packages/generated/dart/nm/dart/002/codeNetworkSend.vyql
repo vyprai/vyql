@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0d5a9baa;
+
+binding networkSend2 {
+  requires {
+    dependency("nm")
+  }
+  query pattern callExpr where callee.method == "NetworkManagerSettingsConnection.update"
+  emit sink code.NetworkSend at args[0]
+}

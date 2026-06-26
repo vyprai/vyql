@@ -1,0 +1,9 @@
+module bindings.go.migration.m6bba23a9;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/go-asn1-ber/asn1-ber")
+  }
+  query pattern callExpr where callee.method == "ReadPacket"
+  emit sink code.Deserialization at args[0]
+}

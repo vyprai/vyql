@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule EnvFileVariableInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_15, CWE_74]
+    id: "VYQL-INJ-156"
+    severity: high
+  }
+  issue code.EnvFileVariableInjection as sink
+}

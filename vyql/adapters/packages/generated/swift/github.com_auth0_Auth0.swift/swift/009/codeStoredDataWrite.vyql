@@ -1,0 +1,9 @@
+module bindings.swift.migration.m49bc2eb2;
+
+binding storedDataWrite9 {
+  requires {
+    dependency("github.com/auth0/Auth0.swift")
+  }
+  query pattern callExpr where callee.method == "deleteEntry"
+  emit sink code.StoredDataWrite at args[0]
+}

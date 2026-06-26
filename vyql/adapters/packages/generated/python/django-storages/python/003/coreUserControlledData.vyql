@@ -1,0 +1,9 @@
+module bindings.python.migration.m0d09c3b2;
+
+binding userControlledData3 {
+  requires {
+    dependency("django-storages")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source core.UserControlledData at call.result
+}

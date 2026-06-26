@@ -1,7 +1,0 @@
-import code.{CommandExecution, NetworkSend}
-adapter c {
-  package "redis-plus-plus" {
-    sink method "exec" -> code.CommandExecution
-    sink method "send" -> code.NetworkSend
-  }
-}

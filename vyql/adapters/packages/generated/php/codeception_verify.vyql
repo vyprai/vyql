@@ -1,8 +1,0 @@
-adapter php {
-  package "codeception/verify" {
-    sink method "toEqualJsonFile" -> code.FilePathAccess
-    sink method "notToEqualJsonFile" -> code.FilePathAccess
-    sink method "toEqualXmlFile" -> code.FilePathAccess
-    sink method "notToEqualXmlFile" -> code.FilePathAccess
-  }
-}

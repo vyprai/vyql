@@ -1,5 +1,0 @@
-adapter php {
-  package "yiisoft/yii2-composer" {
-    sink method "runCommands" -> code.CodeEval
-  }
-}

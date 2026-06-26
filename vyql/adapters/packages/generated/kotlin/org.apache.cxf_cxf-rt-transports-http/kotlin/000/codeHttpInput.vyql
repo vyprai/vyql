@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7d263f5b;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}

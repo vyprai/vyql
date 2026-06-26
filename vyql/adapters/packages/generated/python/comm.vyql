@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkData}
-adapter python {
-  package "comm" {
-    sink method "open" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-    source method "comm_open" -> code.NetworkData
-    source method "comm_msg" -> code.NetworkData
-  }
-}

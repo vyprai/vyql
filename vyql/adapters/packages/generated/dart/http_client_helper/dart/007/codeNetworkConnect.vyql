@@ -1,0 +1,9 @@
+module bindings.dart.migration.m9a96523c;
+
+binding networkConnect7 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule DerSignatureNonCanonicalImport {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347, CWE_20]
+    id: "VYQL-CRY-018"
+    severity: high
+  }
+  issue code.DerSignatureNonCanonicalImport as der
+}

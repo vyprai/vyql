@@ -1,8 +1,0 @@
-import core.{HtmlEscape}
-
-adapter php {
-  package "drupal/core-render" {
-    control method "Drupal\Component\Render\FormattableMarkup::placeholderEscape" -> core.HtmlEscape
-    control method "Drupal\Component\Render\PlainTextOutput::renderFromHtml" -> core.HtmlEscape
-  }
-}

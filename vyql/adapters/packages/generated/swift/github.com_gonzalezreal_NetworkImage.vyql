@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter swift {
-  package "github.com/gonzalezreal/NetworkImage" {
-    sink method "init(url:scale:)" -> code.UrlFetch
-  }
-}

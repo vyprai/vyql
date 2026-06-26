@@ -1,7 +1,0 @@
-adapter java {
-  package "io.undertow:undertow-core" {
-    source method "path" -> code.NetworkData
-    sink method "remoteEndpointFailedToSendInitialSettings" -> code.NetworkSend
-    sink method "getConnectorStatistics" -> code.NetworkConnect
-  }
-}

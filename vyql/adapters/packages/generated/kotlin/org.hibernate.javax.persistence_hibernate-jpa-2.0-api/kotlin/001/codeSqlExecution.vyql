@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m44c3534f;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "createNamedQuery"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.md965f901;
+
+binding httpInput1 {
+  requires {
+    dependency("Facebook")
+  }
+  query pattern callExpr where callee.method == "check_cookie_payload"
+  emit source code.HttpInput at call.result
+}

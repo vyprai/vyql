@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb7844a54;
+
+binding deserialization0 {
+  requires {
+    dependency("opensymphony:sitemesh")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

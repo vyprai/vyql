@@ -1,7 +1,0 @@
-import code.{NetworkSend, ArchiveEntryWrite}
-adapter ruby {
-  package "berkshelf" {
-    sink method "upload" -> code.NetworkSend
-    sink method "package" -> code.ArchiveEntryWrite
-  }
-}

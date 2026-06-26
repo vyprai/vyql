@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2682a750;
+
+binding networkConnect1 {
+  requires {
+    dependency("mdns_lite")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NetworkConnectSink at args[0]
+}

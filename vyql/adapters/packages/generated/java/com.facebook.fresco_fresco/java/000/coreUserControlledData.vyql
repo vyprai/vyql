@@ -1,0 +1,9 @@
+module bindings.java.migration.mf40494fa;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.facebook.fresco:fresco")
+  }
+  query pattern callExpr where callee.method == "PipelineDraweeControllerBuilder.setUri"
+  emit source core.UserControlledData at call.result
+}

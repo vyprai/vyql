@@ -1,8 +1,0 @@
-import code.{SecretValue, Deserialization}
-adapter java {
-  package "com.hazelcast:hazelcast" {
-    source method "getSecretKey" -> code.SecretValue
-    source method "setSecretKey" -> code.SecretValue
-    sink method "parse" -> code.Deserialization
-  }
-}

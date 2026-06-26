@@ -1,0 +1,9 @@
+module bindings.java.migration.md6f91e91;
+
+binding deserialization0 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "JsonPath"
+  emit sink code.Deserialization at args[0]
+}

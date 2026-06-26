@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding urlFetch347 {
+  query pattern callExpr where callee.path ~= "urllib.request.urlopen"
+  emit sink code.UrlFetch at args[0]
+}

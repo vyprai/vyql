@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "lewton" {
-    sink method "lewton_decode_packet" -> code.Deserialization
-  }
-}

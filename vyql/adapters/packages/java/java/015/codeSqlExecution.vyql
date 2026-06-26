@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding sqlExecution15 {
+  requires {
+    dependency("hibernate-core")
+  }
+  query pattern callExpr where callee.method == "createNativeQuery"
+  emit sink code.SqlExecution at args[0]
+}

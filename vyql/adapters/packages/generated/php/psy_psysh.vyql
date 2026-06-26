@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "psy/psysh" {
-    sink method "run" -> code.CommandExecution
-  }
-}

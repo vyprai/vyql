@@ -1,7 +1,0 @@
-adapter ruby {
-  package "pg" {
-    sink method "pgconn_send_query_params" -> code.SqlExecution
-    control method "PQsendClosePrepared" -> core.SqlParameterization
-    sink method "rb_thread_call_without_gvl" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m02e745e0;
+
+binding httpInput1 {
+  requires {
+    dependency("http_router")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}

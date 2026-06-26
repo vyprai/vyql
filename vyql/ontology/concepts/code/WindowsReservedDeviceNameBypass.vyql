@@ -1,0 +1,11 @@
+module code;
+
+concept WindowsReservedDeviceNameBypass : issue {
+  cwe: [CWE_67, CWE_184]
+  review_assumption: "an untrusted or sandboxed caller can supply Windows path components that resolve to reserved devices"
+  reviewCategory: path
+  reviewCondition: "Windows reserved device-name filtering omits alternate device-name spellings"
+  reviewConfidence: medium
+  reviewEvidence: "reserved device-name validation context {pattern} blocks ordinary COM/LPT names but misses superscript digit variants"
+  vulnerableTo: [validation.ImproperInputValidation, path.PathTraversal]
+}

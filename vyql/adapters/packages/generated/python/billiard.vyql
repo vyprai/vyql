@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "billiard" {
-    sink method "ForkingPickler.loads" -> code.Deserialization
-  }
-}

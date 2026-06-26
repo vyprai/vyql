@@ -1,0 +1,9 @@
+module bindings.php.migration.m23a425ac;
+
+binding commandExecution0 {
+  requires {
+    dependency("behat/mink-extension")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

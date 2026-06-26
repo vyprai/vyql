@@ -1,0 +1,9 @@
+module bindings.perl.migration.m227799a1;
+
+binding networkConnect7 {
+  requires {
+    dependency("SNMP")
+  }
+  query pattern callExpr where callee.method == "snmp_trap"
+  emit sink code.NetworkConnectSink at args[0]
+}

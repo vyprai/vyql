@@ -1,0 +1,14 @@
+module bindings.php.migration.m01a5cf93;
+
+binding inputValidation4 {
+  requires {
+    dependency("zendframework/zend-escaper")
+  }
+  query pattern callExpr where callee.method == "escapeCss"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

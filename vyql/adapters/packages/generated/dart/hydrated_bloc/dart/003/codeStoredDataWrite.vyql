@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0d60f419;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("hydrated_bloc")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

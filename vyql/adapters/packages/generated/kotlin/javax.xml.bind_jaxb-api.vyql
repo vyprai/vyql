@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "javax.xml.bind:jaxb-api" {
-    sink method "parse" -> code.Deserialization
-    sink method "unmarshal" -> code.Deserialization
-  }
-}

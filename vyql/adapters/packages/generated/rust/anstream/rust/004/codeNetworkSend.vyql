@@ -1,0 +1,9 @@
+module bindings.rust.migration.mcf5c635b;
+
+binding networkSend4 {
+  requires {
+    dependency("anstream")
+  }
+  query pattern callExpr where callee.method == "write_str"
+  emit sink code.NetworkSend at args[0]
+}

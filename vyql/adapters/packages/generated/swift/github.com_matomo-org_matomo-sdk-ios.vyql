@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter swift {
-  package "github.com/matomo-org/matomo-sdk-ios" {
-    sink method "URLSessionDispatcher.send(events:success:failure:)" -> code.NetworkConnect
-    sink method "URLSessionDispatcher.send(events:success:failure:)" -> code.NetworkSend
-  }
-}

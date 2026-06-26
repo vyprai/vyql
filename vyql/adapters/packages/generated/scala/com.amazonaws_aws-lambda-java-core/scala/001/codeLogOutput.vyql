@@ -1,0 +1,9 @@
+module bindings.scala.migration.me31b6993;
+
+binding logOutput1 {
+  requires {
+    dependency("com.amazonaws:aws-lambda-java-core")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,6 +1,0 @@
-adapter csharp {
-  package "7-zip.commandline" {
-    source path "7za.exe.argv" -> code.CliArgument
-    sink path "7za.exe" arg all -> code.FilePathAccess
-  }
-}

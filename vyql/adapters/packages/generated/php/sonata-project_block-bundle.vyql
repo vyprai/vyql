@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter php {
-  package "sonata-project/block-bundle" {
-    sink method "render" -> code.HtmlRender
-  }
-}

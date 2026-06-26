@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter bash {
-  package "spaceman-diff" {
-    sink path "spaceman-diff" -> code.CommandExecution
-  }
-}

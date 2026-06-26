@@ -1,0 +1,8 @@
+module code;
+
+review code.CheckstyleExternalParameterEntitiesXxe {
+  category: xml
+  expected: [core.XmlHardening]
+  kind: attention
+  text: "review Checkstyle SAXParserFactory feature setup for external parameter entities"
+}

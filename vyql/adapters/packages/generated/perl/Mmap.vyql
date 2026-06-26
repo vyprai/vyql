@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter perl {
-  package "Mmap" {
-    sink method "mmap" -> code.FilePathAccess
-    sink method "mmap" -> code.FileUse
-  }
-}

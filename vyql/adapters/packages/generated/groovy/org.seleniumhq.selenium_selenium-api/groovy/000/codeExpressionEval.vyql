@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m3b0c7751;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-api")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.ExpressionEval at args[0]
+}

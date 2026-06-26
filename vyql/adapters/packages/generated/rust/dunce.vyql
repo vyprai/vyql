@@ -1,6 +1,0 @@
-import core.{PathCanonicalization}
-adapter rust {
-  package "dunce" {
-    control method "simplified" -> core.PathCanonicalization
-  }
-}

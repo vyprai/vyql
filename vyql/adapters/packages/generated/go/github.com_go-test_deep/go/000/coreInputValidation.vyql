@@ -1,0 +1,14 @@
+module bindings.go.migration.m8469c48d;
+
+binding inputValidation0 {
+  requires {
+    dependency("github.com/go-test/deep")
+  }
+  query pattern callExpr where callee.method == "Equal"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

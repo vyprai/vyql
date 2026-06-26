@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc7c4f459;
+
+binding networkData1 {
+  requires {
+    dependency("com.facebook.fresco:imagepipeline-okhttp3")
+  }
+  query pattern callExpr where callee.method == "onResponse"
+  emit source code.NetworkData at call.result
+}

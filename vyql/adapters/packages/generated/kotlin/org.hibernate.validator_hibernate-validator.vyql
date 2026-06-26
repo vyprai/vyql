@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter kotlin {
-  package "org.hibernate.validator:hibernate-validator" {
-    control method "validate" -> core.InputValidation
-  }
-}

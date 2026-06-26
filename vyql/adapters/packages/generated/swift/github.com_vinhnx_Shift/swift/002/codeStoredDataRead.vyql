@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb1f1a06a;
+
+binding storedDataRead2 {
+  requires {
+    dependency("github.com/vinhnx/Shift")
+  }
+  query pattern callExpr where callee.method == "fetchEvents"
+  emit source code.StoredDataRead at call.result
+}

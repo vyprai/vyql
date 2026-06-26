@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdeee483b;
+
+binding networkConnect8 {
+  requires {
+    dependency("recaptcha")
+  }
+  query pattern callExpr where callee.method == "api_verification_free"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -180,25 +180,18 @@ var (
 	DiskCacheBytes int64
 )
 
-// newGraphStore creates the analysis graph store. BadgerDB is the DEFAULT source of truth:
-// on-disk when a RAM ceiling is configured (DiskStorePath, cache=DiskCacheBytes), else in-memory
-// badger. hint>0 presizes the in-RAM fallback stores.
+// newGraphStore creates the analysis graph store. The normal hot path is the int-indexed in-RAM
+// store; when a RAM ceiling is configured, DiskStorePath switches to the badger-backed graph so
+// node details can spill to disk under the requested cache budget.
 func newGraphStore(hint int) usg.Store {
-	if UseIntStore {
+	if UseIntStore || DiskStorePath == "" {
 		return usg.NewIntStore(hint)
 	}
-	path, cache := ":memory:", int64(0)
-	if DiskStorePath != "" {
-		path, cache = DiskStorePath, DiskCacheBytes
-	}
-	if g, err := usg.OpenBadgerGraph(path, cache); err == nil {
+	if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
 		return g
 	}
-	// badger unavailable → fall back to the in-RAM store.
-	if hint > 0 {
-		return usg.NewInMemStoreSized(hint)
-	}
-	return usg.NewInMemStore()
+	// Badger unavailable → fall back to the in-RAM store so scans still work.
+	return usg.NewIntStore(hint)
 }
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {

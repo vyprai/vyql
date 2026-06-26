@@ -1,8 +1,0 @@
-import code.{CommandExecution, CodeEval, Deserialization}
-adapter perl {
-  package "Acme-Cow-Interpreter" {
-    sink method "parse_string" -> code.Deserialization
-    sink method "parse_file" -> code.Deserialization
-    sink method "execute" -> code.CodeEval
-  }
-}

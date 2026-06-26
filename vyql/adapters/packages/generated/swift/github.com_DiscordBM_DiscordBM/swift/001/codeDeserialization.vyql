@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma6e9eeed;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/DiscordBM/DiscordBM")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

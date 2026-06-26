@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter go {
-  package "github.com/shurcooL/reactions" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

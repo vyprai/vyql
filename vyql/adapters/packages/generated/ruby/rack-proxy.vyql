@@ -1,9 +1,0 @@
-import code.{HttpInput, NetworkConnect, NetworkSend}
-
-adapter ruby {
-  package "rack-proxy" {
-    source method "call" -> code.HttpInput
-    sink method "perform_request" -> code.NetworkConnect
-    sink method "perform_request" -> code.NetworkSend
-  }
-}

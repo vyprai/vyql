@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me5a115a3;
+
+binding deserialization0 {
+  requires {
+    dependency("org.dom4j:dom4j")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

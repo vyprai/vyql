@@ -1,0 +1,9 @@
+module bindings.java.migration.mdf78272f;
+
+binding deserialization2 {
+  requires {
+    dependency("org.hdrhistogram:HdrHistogram")
+  }
+  query pattern callExpr where callee.method == "decodeFromCompressedByteBuffer"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m8b46436f;
+
+binding httpInput6 {
+  requires {
+    dependency("Raisin")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit source code.HttpInput at call.result
+}

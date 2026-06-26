@@ -1,0 +1,9 @@
+module bindings.php.migration.m7d34f016;
+
+binding httpInput0 {
+  requires {
+    dependency("symfony/form")
+  }
+  query pattern callExpr where callee.method == "handleRequest"
+  emit source code.HttpInput at call.result
+}

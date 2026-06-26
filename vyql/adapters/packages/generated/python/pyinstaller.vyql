@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-adapter python {
-  package "pyinstaller" {
-    sink method "exec_command" -> code.CommandExecution
-    sink method "exec_command_rc" -> code.CommandExecution
-    sink method "exec_command_all" -> code.CommandExecution
-  }
-}

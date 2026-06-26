@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding httpInput0 {
+  query pattern callExpr where callee.path ~= ".param"
+  emit source code.HttpInput at call.result
+}

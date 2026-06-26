@@ -1,0 +1,9 @@
+module bindings.csharp.migration.ma099fb61;
+
+binding deserialization0 {
+  requires {
+    dependency("grid.mvc")
+  }
+  query pattern callExpr where callee.method == "gridMvc.prototype.parseFilterValues"
+  emit sink code.Deserialization at args[0]
+}

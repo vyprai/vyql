@@ -1,0 +1,9 @@
+module bindings.go.migration.m5ad90ce2;
+
+binding networkConnect4 {
+  requires {
+    dependency("github.com/godbus/dbus/v5")
+  }
+  query pattern callExpr where callee.method == "SessionBusPrivate"
+  emit sink code.NetworkConnectSink at args[0]
+}

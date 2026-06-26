@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m237e293e;
+
+binding deserialization1 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-gson")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

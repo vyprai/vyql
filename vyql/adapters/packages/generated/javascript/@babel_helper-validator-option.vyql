@@ -1,5 +1,0 @@
-adapter javascript {
-  package "@babel/helper-validator-option" {
-    control method "validateTopLevelOptions" -> core.InputValidation
-  }
-}

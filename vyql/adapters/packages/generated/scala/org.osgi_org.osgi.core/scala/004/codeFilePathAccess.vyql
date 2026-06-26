@@ -1,0 +1,9 @@
+module bindings.scala.migration.m89fbb3be;
+
+binding filePathAccess4 {
+  requires {
+    dependency("org.osgi:org.osgi.core")
+  }
+  query pattern callExpr where callee.method == "getEntry"
+  emit sink code.FilePathAccess at args[0]
+}

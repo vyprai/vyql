@@ -1,0 +1,9 @@
+module bindings.dart.migration.m135f127c;
+
+binding deserialization1 {
+  requires {
+    dependency("oauth2")
+  }
+  query pattern callExpr where callee.method == "parseJsonParameters"
+  emit sink code.Deserialization at args[0]
+}

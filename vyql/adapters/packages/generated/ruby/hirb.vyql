@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "hirb" {
-    sink method "invoke" -> code.CodeEval
-  }
-}

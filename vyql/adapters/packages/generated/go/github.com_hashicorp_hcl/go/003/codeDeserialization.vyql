@@ -1,0 +1,9 @@
+module bindings.go.migration.mb57ba0ba;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/hashicorp/hcl")
+  }
+  query pattern callExpr where callee.method == "ParseString"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter python {
-  package "distribute" {
-    sink method "exec_" -> code.CodeEval
-    sink method "execfile" -> code.CodeEval
-  }
-}

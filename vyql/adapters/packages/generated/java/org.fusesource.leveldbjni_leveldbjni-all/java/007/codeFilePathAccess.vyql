@@ -1,0 +1,9 @@
+module bindings.java.migration.m6cedf005;
+
+binding filePathAccess7 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "repair"
+  emit sink code.FilePathAccess at args[0]
+}

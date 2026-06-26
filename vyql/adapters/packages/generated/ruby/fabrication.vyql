@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "fabrication" {
-    sink method "to_params" -> code.Deserialization
-    source method "sequence" -> core.UserControlledData
-  }
-}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "color" {
-    sink method "ColorParser.parse" -> code.Deserialization
-  }
-}

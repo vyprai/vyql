@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9b5ee6dd;
+
+binding filePathAccess4 {
+  requires {
+    dependency("libice")
+  }
+  query pattern callExpr where callee.method == "IceAuthFileName"
+  emit sink code.FilePathAccess at args[0]
+}

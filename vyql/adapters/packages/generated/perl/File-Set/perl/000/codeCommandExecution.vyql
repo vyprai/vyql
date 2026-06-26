@@ -1,0 +1,9 @@
+module bindings.perl.migration.mefc0058c;
+
+binding commandExecution0 {
+  requires {
+    dependency("File-Set")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

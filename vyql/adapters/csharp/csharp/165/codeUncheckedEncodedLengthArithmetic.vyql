@@ -1,0 +1,10 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding uncheckedEncodedLengthArithmetic165 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "value.Length<<1" and not (node.token contains "checked(value.Length*2)")
+  emit issue code.UncheckedEncodedLengthArithmetic at node
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.mfcb84eea;
+
+binding userControlledData3 {
+  requires {
+    dependency("argh")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source core.UserControlledData at call.result
+}

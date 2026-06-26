@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m287b70af;
+
+binding commandExecution1 {
+  requires {
+    dependency("rake")
+  }
+  query pattern callExpr where callee.method == "Rake::FileUtils#create_shell_runner"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter python {
-  package "django-celery-beat" {
-    sink method "parse" -> code.Deserialization
-    control method "validate" -> core.InputValidation
-  }
-}

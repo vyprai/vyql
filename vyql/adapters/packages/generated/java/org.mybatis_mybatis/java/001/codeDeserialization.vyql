@@ -1,0 +1,9 @@
+module bindings.java.migration.mabd7350d;
+
+binding deserialization1 {
+  requires {
+    dependency("org.mybatis:mybatis")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

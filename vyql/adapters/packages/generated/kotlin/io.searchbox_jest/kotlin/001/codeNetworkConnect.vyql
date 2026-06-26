@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m0c858cd1;
+
+binding networkConnect1 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "constructHttpMethod"
+  emit sink code.NetworkConnectSink at args[0]
+}

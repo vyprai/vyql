@@ -1,0 +1,9 @@
+module bindings.objc.migration.m764368db;
+
+binding sqlExecution2 {
+  requires {
+    dependency("FMDB")
+  }
+  query pattern callExpr where callee.method == "executeStatements:"
+  emit sink code.SqlExecution at args[0]
+}

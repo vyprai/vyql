@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma307151e;
+
+binding networkSend10 {
+  requires {
+    dependency("net-protocol")
+  }
+  query pattern callExpr where callee.method == "puts"
+  emit sink code.NetworkSend at args[0]
+}

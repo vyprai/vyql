@@ -1,0 +1,9 @@
+module bindings.c.migration.ma7c2e50a;
+
+binding networkBind3 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "socket_bind"
+  emit sink code.NetworkBind at args[0]
+}

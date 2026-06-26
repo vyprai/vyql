@@ -1,0 +1,9 @@
+module bindings.php.migration.meff8c47a;
+
+binding httpInput2 {
+  requires {
+    dependency("aws/aws-php-sns-message-validator")
+  }
+  query pattern callExpr where callee.method == "fromJsonString"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md4ae0c7b;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

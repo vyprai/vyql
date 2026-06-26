@@ -1,0 +1,9 @@
+module bindings.scala.migration.m696a9f36;
+
+binding deserialization2 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.Deserialization at args[0]
+}

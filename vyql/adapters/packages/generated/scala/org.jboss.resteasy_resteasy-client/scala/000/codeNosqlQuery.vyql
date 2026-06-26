@@ -1,0 +1,9 @@
+module bindings.scala.migration.m2a670a38;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-client")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,12 @@
+module vypr.memory;
+
+rule PotentialZeroSizeReallocation {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_415]
+    id: "VYQL-MEM-012"
+    severity: high
+  }
+  taint code.ComputedSizeValue -> code.ZeroSizeReallocationSink
+  unless path coveredBy core.ZeroValueExclusion
+}

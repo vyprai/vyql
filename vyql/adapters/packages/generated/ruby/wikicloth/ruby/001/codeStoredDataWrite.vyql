@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5d33218c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("wikicloth")
+  }
+  query pattern callExpr where callee.method == "add_current_char"
+  emit sink code.StoredDataWrite at args[0]
+}

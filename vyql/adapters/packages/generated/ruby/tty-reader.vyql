@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter ruby {
-  package "tty-reader" {
-    source method "read_keypress" -> core.UserControlledData
-    source method "read_line" -> core.UserControlledData
-    source method "read_multiline" -> core.UserControlledData
-    source method "get_codes" -> core.UserControlledData
-  }
-}

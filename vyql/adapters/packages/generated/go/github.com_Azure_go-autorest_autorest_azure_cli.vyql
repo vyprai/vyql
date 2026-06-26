@@ -1,9 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-
-adapter go {
-  package "github.com/Azure/go-autorest/autorest/azure/cli" {
-    sink method "GetAzureCLICommand" -> code.CommandExecution
-    sink method "LoadProfile" -> code.FilePathAccess
-    sink method "LoadTokens" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,7 @@
+module code;
+
+concept RedirectTargetSink : sink {
+  cwe: [CWE_601]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

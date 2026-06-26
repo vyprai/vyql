@@ -1,0 +1,9 @@
+module bindings.java.migration.md65ebee4;
+
+binding cliArgument0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-server")
+  }
+  query pattern callExpr where callee.method == "GridLauncherV3.parse"
+  emit source code.CliArgument at call.result
+}

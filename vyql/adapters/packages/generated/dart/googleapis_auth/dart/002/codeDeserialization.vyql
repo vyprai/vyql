@@ -1,0 +1,9 @@
+module bindings.dart.migration.m942a4764;
+
+binding deserialization2 {
+  requires {
+    dependency("googleapis_auth")
+  }
+  query pattern callExpr where callee.method == "AccessCredentials.fromJson"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mc24cc569;
+
+binding filePathAccess3 {
+  requires {
+    dependency("symfony/filesystem")
+  }
+  query pattern callExpr where callee.method == "touch"
+  emit sink code.FilePathAccess at args[0]
+}

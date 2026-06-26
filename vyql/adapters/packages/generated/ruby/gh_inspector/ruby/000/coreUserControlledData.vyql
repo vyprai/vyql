@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me4874d07;
+
+binding userControlledData0 {
+  requires {
+    dependency("gh_inspector")
+  }
+  query pattern callExpr where callee.method == "Inspector.search_query"
+  emit source core.UserControlledData at call.result
+}

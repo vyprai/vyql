@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter swift {
-  package "github.com/nerzh/telegram-vapor-bot" {
-    sink method "post" -> code.NetworkSend
-  }
-}

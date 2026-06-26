@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule ArchiveMarkerSymlinkOverwrite {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22, CWE_59]
+    id: "VYQL-PATH-012"
+    severity: high
+  }
+  issue code.ArchiveMarkerSymlinkOverwrite as sink
+}

@@ -1,5 +1,0 @@
-adapter bash {
-  package "p7zip" {
-    sink path "p7zip" arg all -> code.FilePathAccess
-  }
-}

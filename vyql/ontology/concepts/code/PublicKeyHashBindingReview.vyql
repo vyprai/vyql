@@ -1,0 +1,11 @@
+module code;
+
+concept PublicKeyHashBindingReview : issue {
+  cwe: [CWE_347]
+  review_assumption: "the script, witness, or signed payload can provide a public key that must match a committed key hash"
+  reviewCategory: crypto
+  reviewCondition: "signature verification accepts a public key without binding it to the expected key hash"
+  reviewConfidence: medium
+  reviewEvidence: "signature verification context {pattern} derives a public key and verifies a signature without an observed key-hash comparison"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

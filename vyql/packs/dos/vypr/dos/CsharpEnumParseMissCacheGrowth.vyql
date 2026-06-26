@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule CsharpEnumParseMissCacheGrowth {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_400, CWE_770]
+    id: "VYQL-DOS-025"
+    severity: high
+  }
+  issue code.CsharpEnumParseMissCacheGrowth as cache
+}

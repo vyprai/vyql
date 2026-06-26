@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0ebc1c1d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rb-inotify")
+  }
+  query pattern callExpr where callee.method == "watch"
+  emit sink code.FilePathAccess at args[0]
+}

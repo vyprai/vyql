@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter scala {
-  package "org.jboss.resteasy:resteasy-jackson-provider" {
-    sink method "aroundWriteTo" -> code.HtmlRender
-  }
-}

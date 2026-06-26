@@ -1,0 +1,6 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding htmlRender46 {
+  query pattern callExpr where callee.method == "println"
+  emit sink code.HtmlRender at args.any
+}

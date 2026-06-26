@@ -1,0 +1,10 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding unencodedUrlQueryParameter107 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:ConstructValidateUrl" and node.token contains "QueryItems.Add" and node.token contains "ArtifactParameterName" and node.token contains "serviceTicket" and not (node.token contains "HttpUtility.UrlEncode(serviceTicket)")
+  emit issue code.UnencodedUrlQueryParameter at node
+}

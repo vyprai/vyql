@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7872c9f0;
+
+binding filePathAccess1 {
+  requires {
+    dependency("yaml")
+  }
+  query pattern callExpr where callee.method == "File"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m607ef736;
+
+binding sqlExecution0 {
+  requires {
+    dependency("dbup-core")
+  }
+  query pattern callExpr where callee.method == "JournalTo"
+  emit sink code.SqlExecution at args[0]
+}

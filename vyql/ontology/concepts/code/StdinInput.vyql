@@ -1,0 +1,6 @@
+module code;
+
+concept StdinInput : source {
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

@@ -1,5 +1,0 @@
-adapter objc {
-  package "GTMSessionFetcher" {
-    source method "staticCookieStorage" -> code.HttpInput
-  }
-}

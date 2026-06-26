@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding commandExecution80 {
+  query pattern callExpr where callee.path ~= "sh.Command"
+  emit sink code.CommandExecution at args[0]
+}

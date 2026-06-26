@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md6355825;
+
+binding deserialization21 {
+  requires {
+    dependency("sawyer")
+  }
+  query pattern callExpr where callee.method == "decode_hash_value"
+  emit sink code.Deserialization at args[0]
+}

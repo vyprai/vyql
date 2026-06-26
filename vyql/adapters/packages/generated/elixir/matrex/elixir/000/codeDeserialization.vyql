@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m95ec9b88;
+
+binding deserialization0 {
+  requires {
+    dependency("matrex")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

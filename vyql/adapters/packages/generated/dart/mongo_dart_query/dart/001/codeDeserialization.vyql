@@ -1,0 +1,9 @@
+module bindings.dart.migration.m1ec4b138;
+
+binding deserialization1 {
+  requires {
+    dependency("mongo_dart_query")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.Deserialization at args[0]
+}

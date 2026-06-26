@@ -1,0 +1,7 @@
+module code;
+
+review code.UnescapedTableExportHtml {
+  category: xss
+  kind: attention
+  text: "review table-export callbacks that return raw cell HTML instead of text or escaped content"
+}

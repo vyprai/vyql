@@ -1,0 +1,9 @@
+module bindings.python.migration.m432f40d3;
+
+binding deserialization0 {
+  requires {
+    dependency("rdflib")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

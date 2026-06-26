@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/OpenKitten/Cheetah" {
-    sink method "parse" -> code.Deserialization
-  }
-}

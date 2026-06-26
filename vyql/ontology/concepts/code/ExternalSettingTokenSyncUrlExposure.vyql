@@ -1,0 +1,11 @@
+module code;
+
+concept ExternalSettingTokenSyncUrlExposure : issue {
+  cwe: [CWE_79, CWE_200]
+  review_assumption: "an attacker can preset or influence the runtime/default setting and receive token-bearing synchronization requests"
+  reviewCategory: secret
+  reviewCondition: "an externally supplied runtime/default setting selects the URL used for auth or session token synchronization without same-origin path validation"
+  reviewConfidence: high
+  reviewEvidence: "token sync URL setting context {pattern} reads a URL-like auth/session setting and hands it to a token synchronization helper without a relative-path guard"
+  vulnerableTo: [secrets.SecretLeak, injection.Xss]
+}

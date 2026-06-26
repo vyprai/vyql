@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0994f068;
+
+binding networkConnect0 {
+  requires {
+    dependency("bunny")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.NetworkConnectSink at args[0]
+}

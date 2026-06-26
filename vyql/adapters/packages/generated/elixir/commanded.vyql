@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "commanded" {
-    source method "dispatch" -> core.UserControlledData
-  }
-}

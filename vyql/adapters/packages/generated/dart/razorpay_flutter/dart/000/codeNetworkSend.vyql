@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7639c6d8;
+
+binding networkSend0 {
+  requires {
+    dependency("razorpay_flutter")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkSend at args[0]
+}

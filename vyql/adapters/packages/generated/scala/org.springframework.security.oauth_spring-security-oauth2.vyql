@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.springframework.security.oauth:spring-security-oauth2" {
-    sink method "parseMap" -> code.Deserialization
-  }
-}

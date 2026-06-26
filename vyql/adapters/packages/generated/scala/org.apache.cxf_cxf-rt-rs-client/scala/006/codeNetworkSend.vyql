@@ -1,0 +1,9 @@
+module bindings.scala.migration.m0046f374;
+
+binding networkSend6 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

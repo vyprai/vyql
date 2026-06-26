@@ -1,0 +1,14 @@
+module bindings.python.migration.ma2b95db9;
+
+binding inputValidation2 {
+  requires {
+    dependency("flask-wtf")
+  }
+  query pattern callExpr where callee.method == "same_origin"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

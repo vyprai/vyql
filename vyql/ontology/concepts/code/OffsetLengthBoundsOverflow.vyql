@@ -1,0 +1,11 @@
+module code;
+
+concept OffsetLengthBoundsOverflow : issue {
+  cwe: [CWE_190, CWE_125]
+  review_assumption: "a malformed parsed header can choose offset and length values large enough to wrap before the bounds check"
+  reviewCategory: numeric
+  reviewCondition: "offset plus length is added at a narrow width before comparing against the buffer length"
+  reviewConfidence: high
+  reviewEvidence: "offset-length bounds context {pattern} converts or compares offset + length after the addition"
+  vulnerableTo: [validation.ImproperInputValidation, memory.OobRead, memory.IntegerOverflow]
+}

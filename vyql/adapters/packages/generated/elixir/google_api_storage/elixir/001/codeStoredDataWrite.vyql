@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md062d001;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("google_api_storage")
+  }
+  query pattern callExpr where callee.method == "storage_objects_insert_iodata"
+  emit sink code.StoredDataWrite at args[0]
+}

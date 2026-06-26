@@ -1,0 +1,9 @@
+module bindings.java.migration.mdc69555d;
+
+binding expressionEval1 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit sink code.ExpressionEval at args[0]
+}

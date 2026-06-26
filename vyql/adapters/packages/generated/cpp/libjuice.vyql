@@ -1,8 +1,0 @@
-import code.{Deserialization, LogOutput}
-adapter cpp {
-  package "libjuice" {
-    sink method "ice_parse_sdp" -> code.Deserialization
-    sink method "ice_parse_candidate_sdp" -> code.Deserialization
-    sink method "juice_log_write" -> code.LogOutput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.mcf19b29f;
+
+binding fileUse11 {
+  requires {
+    dependency("LKDBHelper")
+  }
+  query pattern callExpr where callee.method == "isFileExists:"
+  emit sink code.FileUseSink at args[0]
+}

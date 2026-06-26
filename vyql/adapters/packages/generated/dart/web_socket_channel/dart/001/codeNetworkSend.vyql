@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma1fc4f1b;
+
+binding networkSend1 {
+  requires {
+    dependency("web_socket_channel")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.NetworkSend at args[0]
+}

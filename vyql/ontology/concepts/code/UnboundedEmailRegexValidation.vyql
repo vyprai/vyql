@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedEmailRegexValidation : issue {
+  cwe: [CWE_1333, CWE_400]
+  review_assumption: "attackers can submit very long email strings to the validator and consume regex or downstream processing resources"
+  reviewCategory: resource
+  reviewCondition: "email syntax validation applies a broad regular expression before bounding input length"
+  reviewConfidence: high
+  reviewEvidence: "email validation context {pattern} tests email with /^\\S+@\\S+$/ and then performs MX lookup without an observed maximum email length check"
+  vulnerableTo: [dos.ReDoS, dos.UncontrolledResourceConsumption]
+}

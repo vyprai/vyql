@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me5d7f088;
+
+binding storedDataRead0 {
+  requires {
+    dependency("hdf5")
+  }
+  query pattern callExpr where callee.method == "H5A__read"
+  emit source code.StoredDataRead at call.result
+}

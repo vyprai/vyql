@@ -1,0 +1,6 @@
+module path;
+
+threat LinkFollowing {
+  cwe: [CWE_59]
+  desc: "Improper link resolution before file access"
+}

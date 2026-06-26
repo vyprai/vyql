@@ -1,0 +1,9 @@
+module bindings.go.migration.m49a7453b;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/chzyer/readline")
+  }
+  query pattern callExpr where callee.method == "Password"
+  emit source core.UserControlledData at call.result
+}

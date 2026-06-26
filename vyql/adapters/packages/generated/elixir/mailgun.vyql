@@ -1,9 +1,0 @@
-import code.{NetworkSend, NetworkData, SecretValue}
-
-adapter elixir {
-  package "mailgun" {
-    sink method "send_email" -> code.NetworkSend
-    source method "get_attachment" -> code.NetworkData
-    source method "request" -> code.NetworkData
-  }
-}

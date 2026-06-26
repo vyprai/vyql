@@ -1,5 +1,0 @@
-adapter rust {
-  package "tokio-fs" {
-    sink method "read" -> code.FilePathAccess
-  }
-}

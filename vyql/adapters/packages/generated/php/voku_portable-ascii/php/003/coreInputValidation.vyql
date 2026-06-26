@@ -1,0 +1,14 @@
+module bindings.php.migration.m38163d31;
+
+binding inputValidation3 {
+  requires {
+    dependency("voku/portable-ascii")
+  }
+  query pattern callExpr where callee.method == "normalize_msword"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

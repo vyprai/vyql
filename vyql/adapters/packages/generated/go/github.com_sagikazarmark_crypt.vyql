@@ -1,7 +1,0 @@
-import code.{Deserialization, SecretValue}
-
-adapter go {
-  package "github.com/sagikazarmark/crypt" {
-    sink method "Decode" -> code.Deserialization
-  }
-}

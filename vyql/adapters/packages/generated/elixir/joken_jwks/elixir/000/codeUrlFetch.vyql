@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma63ee88c;
+
+binding urlFetch0 {
+  requires {
+    dependency("joken_jwks")
+  }
+  query pattern callExpr where callee.method == "fetch_signers"
+  emit sink code.UrlFetch at args[0]
+}

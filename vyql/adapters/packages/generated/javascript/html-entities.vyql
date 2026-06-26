@@ -1,7 +1,0 @@
-adapter javascript {
-  package "html-entities" {
-    control method "encode" -> core.HtmlEscape
-    sink method "decode" -> code.Deserialization
-    sink method "decodeEntity" -> code.Deserialization
-  }
-}

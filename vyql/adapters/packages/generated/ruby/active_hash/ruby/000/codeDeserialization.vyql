@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1d05cd19;
+
+binding deserialization0 {
+  requires {
+    dependency("active_hash")
+  }
+  query pattern callExpr where callee.method == "reload"
+  emit sink code.Deserialization at args[0]
+}

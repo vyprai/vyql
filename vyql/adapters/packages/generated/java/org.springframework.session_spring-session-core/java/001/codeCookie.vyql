@@ -1,0 +1,9 @@
+module bindings.java.migration.mde08d6c2;
+
+binding cookie1 {
+  requires {
+    dependency("org.springframework.session:spring-session-core")
+  }
+  query pattern callExpr where callee.method == "writeCookieValue"
+  emit source code.Cookie at call.result
+}

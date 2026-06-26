@@ -1,0 +1,9 @@
+module bindings.bash.migration.m6d45d3c5;
+
+binding deserialization0 {
+  requires {
+    dependency("jsonnet")
+  }
+  query pattern callExpr where callee.path ~= "jsonnet.parse"
+  emit sink code.Deserialization at args[0]
+}

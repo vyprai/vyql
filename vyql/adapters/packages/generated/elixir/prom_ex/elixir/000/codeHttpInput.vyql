@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4f80a123;
+
+binding httpInput0 {
+  requires {
+    dependency("prom_ex")
+  }
+  query pattern callExpr where callee.method == "PromEx.Plug.call"
+  emit source code.HttpInput at call.result
+}

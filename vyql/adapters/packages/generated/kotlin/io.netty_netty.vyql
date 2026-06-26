@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "io.netty:netty" {
-    sink method "connect" -> code.NetworkConnect
-  }
-}

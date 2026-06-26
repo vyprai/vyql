@@ -1,0 +1,9 @@
+module bindings.cpp.migration.maeb7633b;
+
+binding cliArgument0 {
+  requires {
+    dependency("doctest")
+  }
+  query pattern callExpr where callee.method == "parseArgs"
+  emit source code.CliArgument at call.result
+}

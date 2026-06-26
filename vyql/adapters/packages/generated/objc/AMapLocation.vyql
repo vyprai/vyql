@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter objc {
-  package "AMapLocation" {
-    source method "requestLocationWithReGeocode" -> code.NetworkData
-    source method "startUpdatingLocation" -> code.NetworkData
-  }
-}

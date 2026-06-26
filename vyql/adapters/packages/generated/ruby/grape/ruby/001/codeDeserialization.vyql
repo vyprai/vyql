@@ -1,0 +1,9 @@
+module bindings.ruby.migration.meab8f0d5;
+
+binding deserialization1 {
+  requires {
+    dependency("grape")
+  }
+  query pattern callExpr where callee.method == "parser_for"
+  emit sink code.Deserialization at args[0]
+}

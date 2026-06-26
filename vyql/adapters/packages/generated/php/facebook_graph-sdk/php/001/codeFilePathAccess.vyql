@@ -1,0 +1,9 @@
+module bindings.php.migration.mc89fa6fc;
+
+binding filePathAccess1 {
+  requires {
+    dependency("facebook/graph-sdk")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

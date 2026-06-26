@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding claxonResidualPartitionBufferExposure24 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=decode_residual" and node.token contains "letn_partitions=1u32<<order;" and node.token contains "letn_samples=block_size>>order;" and node.token contains "letmutlen=n_samples-n_warm_up;" and node.token contains "buffer[start..start+lenasusize]" and node.token contains "decode_rice_partition(input,slice)" and node.token contains "decode_rice2_partition(input,slice)" and not (node.token contains "block_size&(n_partitions-1)asu16!=0") and not (node.token contains "n_samples_per_partition")
+  emit issue code.ClaxonResidualPartitionBufferExposure at node
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1c1357ee;
+
+binding httpInput4 {
+  requires {
+    dependency("pistache")
+  }
+  query pattern callExpr where callee.path ~= "Pistache.Rest.Request"
+  emit source code.HttpInput at call.result
+}

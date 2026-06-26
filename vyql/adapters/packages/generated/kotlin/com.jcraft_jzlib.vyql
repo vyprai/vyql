@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter kotlin {
-  package "com.jcraft:jzlib" {
-    source method "InflaterInputStream.read" -> core.UserControlledData
-    source method "GZIPInputStream.read" -> core.UserControlledData
-  }
-}

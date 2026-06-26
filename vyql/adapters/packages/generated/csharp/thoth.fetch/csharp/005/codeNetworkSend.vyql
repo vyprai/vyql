@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m4c791c58;
+
+binding networkSend5 {
+  requires {
+    dependency("thoth.fetch")
+  }
+  query pattern callExpr where callee.method == "tryDelete``2"
+  emit sink code.NetworkSend at args[0]
+}

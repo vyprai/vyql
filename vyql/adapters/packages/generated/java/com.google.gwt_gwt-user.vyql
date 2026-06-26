@@ -1,5 +1,0 @@
-adapter java {
-  package "com.google.gwt:gwt-user" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

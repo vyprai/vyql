@@ -1,0 +1,9 @@
+module bindings.rust.migration.m8e94cf14;
+
+binding networkData1 {
+  requires {
+    dependency("calloop")
+  }
+  query pattern callExpr where callee.method == "poll_read_vectored"
+  emit source code.NetworkData at call.result
+}

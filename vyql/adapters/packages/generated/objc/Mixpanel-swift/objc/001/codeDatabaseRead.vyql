@@ -1,0 +1,9 @@
+module bindings.objc.migration.me5914404;
+
+binding databaseRead1 {
+  requires {
+    dependency("Mixpanel-swift")
+  }
+  query pattern callExpr where callee.method == "readRows"
+  emit sink code.DatabaseReadSink at args[0]
+}

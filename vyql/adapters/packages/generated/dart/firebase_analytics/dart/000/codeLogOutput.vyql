@@ -1,0 +1,9 @@
+module bindings.dart.migration.me53cda8b;
+
+binding logOutput0 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "logEvent"
+  emit sink code.LogOutput at args[0]
+}

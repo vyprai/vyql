@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc8cf5d9a;
+
+binding httpInput0 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_http:parse"
+  emit source code.HttpInput at call.result
+}

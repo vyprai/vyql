@@ -1,0 +1,9 @@
+module bindings.rust.migration.m18178e15;
+
+binding storedDataRead5 {
+  requires {
+    dependency("windows-metadata")
+  }
+  query pattern callExpr where callee.method == "File.new"
+  emit source code.StoredDataRead at call.result
+}

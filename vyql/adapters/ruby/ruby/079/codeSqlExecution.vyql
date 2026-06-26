@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding sqlExecution79 {
+  query pattern callExpr where callee.path ~= "DB.run"
+  emit sink code.SqlExecution at args[0]
+}

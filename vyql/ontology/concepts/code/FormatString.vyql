@@ -1,0 +1,7 @@
+module code;
+
+concept FormatString : sink {
+  cwe: [CWE_134]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.FormatString]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbe17b259;
+
+binding networkSend0 {
+  requires {
+    dependency("cloudex")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}

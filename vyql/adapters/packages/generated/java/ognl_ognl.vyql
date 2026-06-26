@@ -1,9 +1,0 @@
-import code.{ExpressionEval}
-
-adapter java {
-  package "ognl:ognl" {
-    sink method "parseExpression" -> code.ExpressionEval
-    sink method "ASTEval" -> code.ExpressionEval
-    sink method "ASTMethod" -> code.ExpressionEval
-  }
-}

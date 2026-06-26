@@ -1,0 +1,9 @@
+module bindings.rust.migration.m8cd0d175;
+
+binding deserialization1 {
+  requires {
+    dependency("miniz_oxide")
+  }
+  query pattern callExpr where callee.method == "decompress_to_vec_zlib"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m205c7f09;
+
+binding filePathAccess3 {
+  requires {
+    dependency("timm")
+  }
+  query pattern callExpr where callee.method == "load_model_config_from_hf"
+  emit sink code.FilePathAccess at args[0]
+}

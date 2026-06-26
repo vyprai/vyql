@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2d672d5d;
+
+binding deserialization1 {
+  requires {
+    dependency("sax")
+  }
+  query pattern callExpr where callee.method == "SAXParser"
+  emit sink code.Deserialization at args[0]
+}

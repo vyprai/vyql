@@ -1,0 +1,14 @@
+module bindings.python.migration.m3c9894b8;
+
+binding htmlEscape0 {
+  requires {
+    dependency("readme-renderer")
+  }
+  query pattern callExpr where callee.method == "readme_renderer.txt.render"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

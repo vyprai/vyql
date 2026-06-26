@@ -1,0 +1,9 @@
+module bindings.objc.migration.m506289a3;
+
+binding httpInput0 {
+  requires {
+    dependency("GTMAppAuth")
+  }
+  query pattern callExpr where callee.method == "authorizeRequest"
+  emit source code.HttpInput at call.result
+}

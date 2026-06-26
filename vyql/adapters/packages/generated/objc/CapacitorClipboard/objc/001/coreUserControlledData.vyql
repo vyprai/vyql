@@ -1,0 +1,9 @@
+module bindings.objc.migration.m238143b8;
+
+binding userControlledData1 {
+  requires {
+    dependency("CapacitorClipboard")
+  }
+  query pattern callExpr where callee.method == "readText"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m0c6b17b2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("alchemy/zippy")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

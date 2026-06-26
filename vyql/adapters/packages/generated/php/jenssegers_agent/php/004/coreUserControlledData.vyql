@@ -1,0 +1,9 @@
+module bindings.php.migration.m1e757c47;
+
+binding userControlledData4 {
+  requires {
+    dependency("jenssegers/agent")
+  }
+  query pattern callExpr where callee.method == "isPhone"
+  emit source core.UserControlledData at call.result
+}

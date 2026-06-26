@@ -1,0 +1,9 @@
+module bindings.java.migration.m44b3cafd;
+
+binding xmlParse4 {
+  requires {
+    dependency("org.apache.maven.plugin-testing:maven-plugin-testing-harness")
+  }
+  query pattern callExpr where callee.method == "finalizeConfig"
+  emit sink code.XmlParse at args[0]
+}

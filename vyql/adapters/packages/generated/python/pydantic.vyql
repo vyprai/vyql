@@ -1,7 +1,0 @@
-adapter python {
-  package "pydantic" {
-    sink method "model_validate_json" -> code.Deserialization
-    sink method "model_validate_strings" -> code.Deserialization
-    sink method "parse_file" -> code.Deserialization
-  }
-}

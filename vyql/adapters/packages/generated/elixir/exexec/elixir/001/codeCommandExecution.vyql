@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m50ddfd43;
+
+binding commandExecution1 {
+  requires {
+    dependency("exexec")
+  }
+  query pattern callExpr where callee.method == "run_link"
+  emit sink code.CommandExecution at args[0]
+}

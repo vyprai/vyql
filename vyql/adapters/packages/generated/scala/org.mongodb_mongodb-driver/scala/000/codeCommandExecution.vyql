@@ -1,0 +1,9 @@
+module bindings.scala.migration.m11426ff4;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.mongodb:mongodb-driver")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.CommandExecution at args[0]
+}

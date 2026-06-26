@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter objc {
-  package "Alamofire" {
-    control method "escape" -> core.InputValidation
-  }
-}

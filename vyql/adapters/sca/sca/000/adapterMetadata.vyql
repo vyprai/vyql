@@ -1,0 +1,14 @@
+module bindings.sca.migration.mc40a837e;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "sca"
+    meta: {
+      auto_apply: "graph"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}

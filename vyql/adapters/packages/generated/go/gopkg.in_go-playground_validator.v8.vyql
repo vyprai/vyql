@@ -1,5 +1,0 @@
-adapter go {
-  package "gopkg.in/go-playground/validator.v8" {
-    control method "ExampleValidate_new" -> core.InputValidation
-  }
-}

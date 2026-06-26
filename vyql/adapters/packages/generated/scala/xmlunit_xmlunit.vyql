@@ -1,5 +1,0 @@
-adapter scala {
-  package "xmlunit:xmlunit" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m1cbeeec6;
+
+binding urlFetch6 {
+  requires {
+    dependency("AFNetworking-RACExtensions")
+  }
+  query pattern callExpr where callee.method == "rac_enqueueHTTPRequestOperation"
+  emit sink code.UrlFetch at args[0]
+}

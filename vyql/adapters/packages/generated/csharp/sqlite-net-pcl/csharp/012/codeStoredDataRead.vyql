@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m78741b33;
+
+binding storedDataRead12 {
+  requires {
+    dependency("sqlite-net-pcl")
+  }
+  query pattern callExpr where callee.method == "Find``1"
+  emit source code.StoredDataRead at call.result
+}

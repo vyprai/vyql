@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter python {
-  package "jupyterlab-widgets" {
-    control method "escape_html" -> core.HtmlEscape
-  }
-}

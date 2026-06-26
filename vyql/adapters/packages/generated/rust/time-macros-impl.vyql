@@ -1,8 +1,0 @@
-adapter rust {
-  package "time-macros-impl" {
-    sink method "parse" -> code.Deserialization
-    source method "time" -> core.UserControlledData
-    source method "offset" -> core.UserControlledData
-    source method "date" -> core.UserControlledData
-  }
-}

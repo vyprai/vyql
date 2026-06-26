@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter objc {
-  package "Eureka" {
-    control method "validate" -> core.InputValidation
-  }
-}

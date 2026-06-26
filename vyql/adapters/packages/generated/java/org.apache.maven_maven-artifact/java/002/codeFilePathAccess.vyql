@@ -1,0 +1,9 @@
+module bindings.java.migration.m4c33c44c;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "setFile"
+  emit sink code.FilePathAccess at args[0]
+}

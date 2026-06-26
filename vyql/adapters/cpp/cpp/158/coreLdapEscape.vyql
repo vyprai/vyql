@@ -1,0 +1,11 @@
+module bindings.cpp.migration.m4e783366;
+
+binding ldapEscape158 {
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

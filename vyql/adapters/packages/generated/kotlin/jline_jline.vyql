@@ -1,9 +1,0 @@
-import code.{CliArgument, CommandExecution, FilePathAccess}
-import core.{UserControlledData}
-
-adapter kotlin {
-  package "jline:jline" {
-    source method "Options.parse" -> core.UserControlledData
-    sink method "Nano.open" -> code.FilePathAccess
-  }
-}

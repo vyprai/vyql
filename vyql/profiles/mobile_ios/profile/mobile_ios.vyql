@@ -1,0 +1,8 @@
+module profiles;
+
+profile mobile_ios {
+  detect: ["file:Info.plist", "file:Package.swift", "dep:UIKit", "dep:SwiftUI", "dep:WebKit", "ext:.xcodeproj", "ext:.swift"]
+  entrypoints: [PasteboardInput, URLSchemeInput, ExternalApiResponse, DatabaseRead, StoredDataRead, SecretValue, ComputedSizeValue, ArchiveEntryName]
+  priority: "90"
+  title: "Mobile app — iOS"
+}

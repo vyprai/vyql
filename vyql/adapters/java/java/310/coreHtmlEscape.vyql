@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding htmlEscape310 {
+  query pattern callExpr where callee.method == "escapeHtml4"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

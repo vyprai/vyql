@@ -1,0 +1,14 @@
+module bindings.swift.migration.mb8f81ab8;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("github.com/aws-amplify/amplify-swift-utils-notifications")
+  }
+  query pattern callExpr where callee.method == "registerForRemoteNotifications"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

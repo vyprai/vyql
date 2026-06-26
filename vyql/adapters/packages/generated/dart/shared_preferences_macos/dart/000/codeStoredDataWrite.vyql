@@ -1,0 +1,9 @@
+module bindings.dart.migration.m244baacb;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("shared_preferences_macos")
+  }
+  query pattern callExpr where callee.method == "setValue"
+  emit sink code.StoredDataWrite at args[0]
+}

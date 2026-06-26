@@ -1,0 +1,9 @@
+module bindings.scala.migration.mc49381cd;
+
+binding networkSend0 {
+  requires {
+    dependency("io.ktor:ktor-client-core")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}

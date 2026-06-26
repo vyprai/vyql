@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mdb104ad8;
+
+binding sqlExecution0 {
+  requires {
+    dependency("scrivener_ecto")
+  }
+  query pattern callExpr where callee.method == "paginate"
+  emit sink code.SqlExecution at args[0]
+}

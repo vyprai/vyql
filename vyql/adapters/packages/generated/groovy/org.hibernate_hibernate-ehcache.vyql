@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.hibernate:hibernate-ehcache" {
-    sink method "loadAndCorrectConfiguration" -> code.UrlFetch
-  }
-}

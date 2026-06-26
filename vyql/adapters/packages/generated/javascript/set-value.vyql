@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "set-value" {
-    sink method "setValue" -> code.Deserialization
-  }
-}

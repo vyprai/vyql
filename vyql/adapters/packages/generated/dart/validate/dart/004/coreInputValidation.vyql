@@ -1,0 +1,14 @@
+module bindings.dart.migration.m7b58ec6f;
+
+binding inputValidation4 {
+  requires {
+    dependency("validate")
+  }
+  query pattern callExpr where callee.method == "isHex"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

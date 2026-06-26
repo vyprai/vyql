@@ -1,0 +1,9 @@
+module bindings.rust.migration.mdf8e1b02;
+
+binding deserialization9 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "check_decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma9b10b0b;
+
+binding deserialization1 {
+  requires {
+    dependency("libwebm")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit sink code.Deserialization at args[0]
+}

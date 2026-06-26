@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "net.sf.ezmorph:ezmorph" {
-    sink method "morph" -> code.Deserialization
-  }
-}

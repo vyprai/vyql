@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mc80e0066;
+
+binding filePathAccess2 {
+  requires {
+    dependency("html-webpack-plugin")
+  }
+  query pattern callExpr where callee.method == "getTemplatePath"
+  emit sink code.FilePathAccess at args[0]
+}

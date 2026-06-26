@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ComrakDangerousUrlCaseSensitiveGrammar {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_178]
+    id: "VYQL-INJ-098"
+    severity: high
+  }
+  issue code.ComrakDangerousUrlCaseSensitiveGrammar as grammar
+}

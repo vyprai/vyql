@@ -1,0 +1,11 @@
+module code;
+
+concept UnqualifiedDatabaseRoutineReview : issue {
+  cwe: [CWE_426]
+  review_assumption: "an attacker or tenant can influence routine resolution through database search-path state"
+  reviewCategory: path
+  reviewCondition: "database routine names are resolved through the active search path instead of an explicit trusted schema"
+  reviewConfidence: possibility
+  reviewEvidence: "SQL routine reference {pattern} is unqualified"
+  vulnerableTo: [injection.UnsafeDynamicLoading]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc70eb621;
+
+binding commandExecution0 {
+  requires {
+    dependency("phx_gen_tailwind")
+  }
+  query pattern callExpr where callee.method == "maybe_run_npm_install"
+  emit sink code.CommandExecution at args[0]
+}

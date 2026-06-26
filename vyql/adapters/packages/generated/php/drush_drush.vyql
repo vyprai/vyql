@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter php {
-  package "drush/drush" {
-    source method "parse" -> code.CliArgument
-  }
-}

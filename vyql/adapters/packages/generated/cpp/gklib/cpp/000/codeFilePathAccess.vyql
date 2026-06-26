@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m5d6a286e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_fopen"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding filePathAccess436 {
+  query pattern callExpr where callee.method == "unlink"
+  emit sink code.FilePathAccess at callee.receiver
+}

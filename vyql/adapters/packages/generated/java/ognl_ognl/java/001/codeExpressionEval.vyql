@@ -1,0 +1,9 @@
+module bindings.java.migration.m5ddf6cef;
+
+binding expressionEval1 {
+  requires {
+    dependency("ognl:ognl")
+  }
+  query pattern callExpr where callee.method == "ASTEval"
+  emit sink code.ExpressionEval at args[0]
+}

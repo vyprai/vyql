@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdb4485cf;
+
+binding networkData0 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit source code.NetworkData at call.result
+}

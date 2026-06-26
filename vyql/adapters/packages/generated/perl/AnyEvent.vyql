@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-
-adapter perl {
-  package "AnyEvent" {
-    source method "recv" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-  }
-}

@@ -1,6 +1,0 @@
-adapter rust {
-  package "plotters-svg" {
-    control method "escape_and_push" -> core.HtmlEscape
-    sink method "checked_save_file" -> code.FilePathAccess
-  }
-}

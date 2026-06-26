@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mfbc0c37b;
+
+binding deserialization0 {
+  requires {
+    dependency("postcss-convert-values")
+  }
+  query pattern callExpr where callee.method == "pluginCreator"
+  emit sink code.Deserialization at args[0]
+}

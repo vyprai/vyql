@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter rust {
-  package "diesel" {
-    sink method "batch_execute" -> code.SqlExecution
-  }
-}

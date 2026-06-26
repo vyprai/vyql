@@ -1,9 +1,0 @@
-import code.{StoredDataWrite, StoredDataRead}
-adapter objc {
-  package "Cache" {
-    sink method "setObject" -> code.StoredDataWrite
-    source method "entry" -> code.StoredDataRead
-    source method "object" -> code.StoredDataRead
-    sink method "removeObject" -> code.StoredDataWrite
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1b69e178;
+
+binding commandExecution0 {
+  requires {
+    dependency("Narada")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

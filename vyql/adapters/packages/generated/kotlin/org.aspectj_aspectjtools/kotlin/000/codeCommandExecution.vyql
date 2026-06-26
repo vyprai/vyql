@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mce527aa3;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.aspectj:aspectjtools")
+  }
+  query pattern callExpr where callee.method == "runInNewVM"
+  emit sink code.CommandExecution at args[0]
+}

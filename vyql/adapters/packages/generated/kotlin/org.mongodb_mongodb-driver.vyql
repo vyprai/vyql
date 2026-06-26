@@ -1,9 +1,0 @@
-import code.{CodeEval, NosqlQuery}
-
-adapter kotlin {
-  package "org.mongodb:mongodb-driver" {
-    sink method "doEval" -> code.CodeEval
-    sink method "eval" -> code.CodeEval
-    sink method "command" -> code.NosqlQuery
-  }
-}

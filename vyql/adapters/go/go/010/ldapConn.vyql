@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding conn10 {
+  query pattern callExpr where callee.path ~= "ldap.Dial"
+  emit fact runtime.ReceiverType at call.result {
+    about: ldap.Conn
+  }
+}

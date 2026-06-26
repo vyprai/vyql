@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "drupal/core-serialization" {
-    sink method "Drupal\Component\Serialization\Json::decode" -> code.Deserialization
-    sink method "Drupal\Component\Serialization\PhpSerialize::decode" -> code.Deserialization
-    sink method "Drupal\Component\Serialization\Yaml::decode" -> code.Deserialization
-    sink method "Drupal\Component\Serialization\YamlPecl::decode" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m048c22d9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("EGOCache")
+  }
+  query pattern callExpr where callee.method == "initWithCacheDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding deserialization34 {
+  requires {
+    dependency("node-serialize")
+  }
+  query pattern callExpr where callee.path ~= "serialize.unserialize"
+  emit sink code.Deserialization at args[0]
+}

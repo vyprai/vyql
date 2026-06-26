@@ -1,0 +1,9 @@
+module bindings.cpp.migration.md2fe0eea;
+
+binding deserialization2 {
+  requires {
+    dependency("sentry-native")
+  }
+  query pattern callExpr where callee.method == "sentry_envelope_deserialize"
+  emit sink code.Deserialization at args[0]
+}

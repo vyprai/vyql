@@ -1,0 +1,10 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding reconfirmationDirtyTrackingRace250 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=postpone_email_change_until_confirmation_and_regenerate_confirmation_token" and node.token contains "self.unconfirmed_email = self.email" and node.token contains "self.email = self.devise_email_in_database" and node.token contains "self.confirmation_token = nil" and node.token contains "generate_confirmation_token" and not (node.token contains "devise_unconfirmed_email_will_change!")
+  emit issue code.ReconfirmationDirtyTrackingRace at node
+}

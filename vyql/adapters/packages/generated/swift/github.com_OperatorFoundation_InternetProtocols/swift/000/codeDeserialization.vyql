@@ -1,0 +1,9 @@
+module bindings.swift.migration.m2823374c;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/OperatorFoundation/InternetProtocols")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.Deserialization at args[0]
+}

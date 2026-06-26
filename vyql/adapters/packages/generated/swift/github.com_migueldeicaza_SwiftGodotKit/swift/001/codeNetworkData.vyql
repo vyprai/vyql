@@ -1,0 +1,9 @@
+module bindings.swift.migration.m22074257;
+
+binding networkData1 {
+  requires {
+    dependency("github.com/migueldeicaza/SwiftGodotKit")
+  }
+  query pattern callExpr where callee.method == "receiveMessageFromHost"
+  emit source code.NetworkData at call.result
+}

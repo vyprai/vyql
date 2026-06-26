@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.springframework.data:spring-data-mongodb" {
-    sink method "BindableMongoExpression.parse" -> code.Deserialization
-  }
-}

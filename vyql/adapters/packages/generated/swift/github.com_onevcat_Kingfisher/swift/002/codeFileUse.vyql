@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcb2efc93;
+
+binding fileUse2 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "removeImage"
+  emit sink code.FileUseSink at args[0]
+}

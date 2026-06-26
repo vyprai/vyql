@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend, NetworkConnect, NetworkBind}
-adapter scala {
-  package "org.apache.mina:mina-core" {
-    source method "messageReceived" -> code.NetworkData
-    sink method "messageWriting" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-    sink method "bind" -> code.NetworkBind
-  }
-}

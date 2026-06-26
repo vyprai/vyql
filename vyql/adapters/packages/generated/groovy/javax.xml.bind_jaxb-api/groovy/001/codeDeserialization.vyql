@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m6947ab47;
+
+binding deserialization1 {
+  requires {
+    dependency("javax.xml.bind:jaxb-api")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

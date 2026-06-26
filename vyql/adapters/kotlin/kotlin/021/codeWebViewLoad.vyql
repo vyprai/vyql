@@ -1,0 +1,6 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding webViewLoad21 {
+  query pattern callExpr where callee.method == "loadData"
+  emit sink code.WebViewLoad at args[0]
+}

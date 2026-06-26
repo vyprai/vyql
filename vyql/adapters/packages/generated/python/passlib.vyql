@@ -1,7 +1,0 @@
-adapter python {
-  package "passlib" {
-    source method "hash" -> core.UserControlledData
-    source method "verify" -> core.UserControlledData
-    source method "genhash" -> core.UserControlledData
-  }
-}

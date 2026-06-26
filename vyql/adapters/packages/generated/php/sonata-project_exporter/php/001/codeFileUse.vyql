@@ -1,0 +1,9 @@
+module bindings.php.migration.m648b9d02;
+
+binding fileUse1 {
+  requires {
+    dependency("sonata-project/exporter")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FileUseSink at args[0]
+}

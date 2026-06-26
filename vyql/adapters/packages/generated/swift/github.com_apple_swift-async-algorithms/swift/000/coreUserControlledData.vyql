@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3c966402;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/apple/swift-async-algorithms")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source core.UserControlledData at call.result
+}

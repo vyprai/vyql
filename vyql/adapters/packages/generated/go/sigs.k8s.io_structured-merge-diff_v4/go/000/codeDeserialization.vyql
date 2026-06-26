@@ -1,0 +1,9 @@
+module bindings.go.migration.m1768bb4c;
+
+binding deserialization0 {
+  requires {
+    dependency("sigs.k8s.io/structured-merge-diff/v4")
+  }
+  query pattern callExpr where callee.method == "ReadJSONIter"
+  emit sink code.Deserialization at args[0]
+}

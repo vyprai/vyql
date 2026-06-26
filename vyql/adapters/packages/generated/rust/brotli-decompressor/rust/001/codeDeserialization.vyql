@@ -1,0 +1,9 @@
+module bindings.rust.migration.m05219a4d;
+
+binding deserialization1 {
+  requires {
+    dependency("brotli-decompressor")
+  }
+  query pattern callExpr where callee.method == "brotli_decode"
+  emit sink code.Deserialization at args[0]
+}

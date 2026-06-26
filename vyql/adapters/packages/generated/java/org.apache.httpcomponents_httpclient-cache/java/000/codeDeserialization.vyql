@@ -1,0 +1,9 @@
+module bindings.java.migration.me7c7957f;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpclient-cache")
+  }
+  query pattern callExpr where callee.method == "parseDate"
+  emit sink code.Deserialization at args[0]
+}

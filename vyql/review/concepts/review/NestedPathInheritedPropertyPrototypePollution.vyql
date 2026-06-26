@@ -1,0 +1,8 @@
+module code;
+
+review code.NestedPathInheritedPropertyPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review nested path setters for __proto__/constructor/prototype filtering or own-property checks before assigning path segments"
+}

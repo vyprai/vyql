@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m47527582;
+
+binding networkBind2 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx")
+  }
+  query pattern callExpr where callee.method == "newServerSocket"
+  emit sink code.NetworkBind at args[0]
+}

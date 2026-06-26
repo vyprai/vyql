@@ -1,0 +1,9 @@
+module bindings.java.migration.m44b3cafd;
+
+binding urlFetch1 {
+  requires {
+    dependency("org.apache.maven.plugin-testing:maven-plugin-testing-harness")
+  }
+  query pattern callExpr where callee.method == "openPomUrl"
+  emit sink code.UrlFetch at args[0]
+}

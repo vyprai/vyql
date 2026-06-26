@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "polyline" {
-    sink method "decode" -> code.Deserialization
-  }
-}

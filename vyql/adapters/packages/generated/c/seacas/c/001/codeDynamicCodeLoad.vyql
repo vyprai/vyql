@@ -1,0 +1,9 @@
+module bindings.c.migration.m0ec13c4f;
+
+binding dynamicCodeLoad1 {
+  requires {
+    dependency("seacas")
+  }
+  query pattern callExpr where callee.method == "compiler"
+  emit sink code.DynamicCodeLoad at args[0]
+}

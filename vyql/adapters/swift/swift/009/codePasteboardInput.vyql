@@ -1,0 +1,6 @@
+module bindings.swift.migration.m388f23d0;
+
+binding pasteboardInput9 {
+  query pattern callExpr where callee.path ~= "UIPasteboard.general.strings"
+  emit source code.PasteboardInput at call.result
+}

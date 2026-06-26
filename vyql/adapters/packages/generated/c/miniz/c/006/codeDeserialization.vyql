@@ -1,0 +1,9 @@
+module bindings.c.migration.m7e625f98;
+
+binding deserialization6 {
+  requires {
+    dependency("miniz")
+  }
+  query pattern callExpr where callee.method == "uncompress2"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m17305361;
+
+binding deserialization0 {
+  requires {
+    dependency("ircmaxell/php-yacc")
+  }
+  query pattern callExpr where callee.method == "PhpYacc\\Yacc\\Parser::parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me8697759;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sequel")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

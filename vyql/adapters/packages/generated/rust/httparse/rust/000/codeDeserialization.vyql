@@ -1,0 +1,9 @@
+module bindings.rust.migration.m66b2876b;
+
+binding deserialization0 {
+  requires {
+    dependency("httparse")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

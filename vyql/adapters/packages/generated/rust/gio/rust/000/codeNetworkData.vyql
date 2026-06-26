@@ -1,0 +1,9 @@
+module bindings.rust.migration.m88506601;
+
+binding networkData0 {
+  requires {
+    dependency("gio")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

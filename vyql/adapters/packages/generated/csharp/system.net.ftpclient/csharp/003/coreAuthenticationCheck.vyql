@@ -1,0 +1,14 @@
+module bindings.csharp.migration.md1519ec6;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "Authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

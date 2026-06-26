@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc6882f18;
+
+binding commandExecution7 {
+  requires {
+    dependency("github.com/jonasman/TeslaSwift")
+  }
+  query pattern callExpr where callee.method == "sendCommandToVehicle"
+  emit sink code.CommandExecution at args[0]
+}

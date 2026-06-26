@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding dhcpOptionLengthUncheckedRead110 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=parse_options" and node.token contains "u8_t*end=optptr+len;" and node.token contains "while(optptr<end)" and node.token contains "type=*(optptr+2);" and node.token contains "memcmp((char*)&client.addr,(char*)optptr+2,4)==0" and node.token contains "optptr+=optptr[1]+2;" and not (node.token contains "optptr+1>=end") and not (node.token contains "optptr+2+opt_len>end") and not (node.token contains "opt_len>=4")
+  emit issue code.DhcpOptionLengthUncheckedRead at node
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m222602a5;
+
+binding filePathAccess22 {
+  requires {
+    dependency("std::fs")
+  }
+  query pattern callExpr where callee.path ~= "fs.read_to_string"
+  emit sink code.FilePathAccess at args[0]
+}

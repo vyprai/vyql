@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m0a5f1497;
+
+binding filePathAccess2 {
+  requires {
+    dependency("@istanbuljs/load-nyc-config")
+  }
+  query pattern callExpr where callee.method == "applyExtends"
+  emit sink code.FilePathAccess at args[0]
+}

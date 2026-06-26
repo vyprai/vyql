@@ -1,0 +1,9 @@
+module bindings.objc.migration.m048c22d9;
+
+binding storedDataRead11 {
+  requires {
+    dependency("EGOCache")
+  }
+  query pattern callExpr where callee.method == "plistForKey"
+  emit source code.StoredDataRead at call.result
+}

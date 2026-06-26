@@ -1,0 +1,9 @@
+module bindings.dart.migration.me57b2ce8;
+
+binding deserialization1 {
+  requires {
+    dependency("json_rpc_2")
+  }
+  query pattern callExpr where callee.method == "Client.sendRequest"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter php {
-  package "wp-cli/php-cli-tools" {
-    sink method "exec" -> code.CommandExecution
-    sink method "system" -> code.CommandExecution
-    source method "parse" -> code.CliArgument
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding recursiveObjectParentResolveWithoutCycleGuard117 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=getAttribute", "name=getInheritedAttribute", "name=resolveInherited", "name=findInherited"]) and node.token contains "call_path:PdfType.resolve" and node.token contains "call_path:PdfDictionary.get" and node.token contains "literal:Parent" and node.token contains "subscript:$parentDict.value['Parent']" and not (containsAny(node.token, ["call_arg:$ensuredObjectList", "call_arg:$visitedObjects", "call_arg:$visitedObjectList", "call_arg:$visited"]))
+  emit issue code.RecursiveObjectParentResolveWithoutCycleGuard at node
+}

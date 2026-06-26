@@ -1,0 +1,9 @@
+module bindings.python.migration.m899e57cd;
+
+binding deserialization7 {
+  requires {
+    dependency("tinycss2")
+  }
+  query pattern callExpr where callee.method == "parse_component_value_list"
+  emit sink code.Deserialization at args[0]
+}

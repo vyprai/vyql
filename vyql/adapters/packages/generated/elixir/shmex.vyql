@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter elixir {
-  package "shmex" {
-    source method "read" -> core.UserControlledData
-  }
-}

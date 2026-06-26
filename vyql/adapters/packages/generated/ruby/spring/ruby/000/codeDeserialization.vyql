@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc23747b7;
+
+binding deserialization0 {
+  requires {
+    dependency("spring")
+  }
+  query pattern callExpr where callee.method == "Spring::JSON.decode"
+  emit sink code.Deserialization at args[0]
+}

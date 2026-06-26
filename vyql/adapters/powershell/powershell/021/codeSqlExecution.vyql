@@ -1,0 +1,6 @@
+module bindings.powershell.migration.m390f1180;
+
+binding sqlExecution21 {
+  query pattern callExpr where callee.path ~= "Invoke-Sqlcmd"
+  emit sink code.SqlExecution at args[0]
+}

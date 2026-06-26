@@ -1,7 +1,0 @@
-adapter javascript {
-  package "glob-to-regexp" {
-    flag code.RegexCompile on any {
-      method "assertMatch"
-    }
-  }
-}

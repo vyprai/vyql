@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8e656851;
+
+binding deserialization1 {
+  requires {
+    dependency("fast_yaml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-adapter elixir {
-  package "ranch_proxy_protocol" {
-    source method "parse_tlv" -> code.NetworkData
-    source method "parse_ips" -> code.NetworkData
-  }
-}

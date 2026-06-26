@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding unvalidatedDynamicRequirePathTraversal644 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=runWidget" and node.token contains "widgetId" and node.token contains "widget-${widgetId}.js" and node.token contains "path.join(__dirname,file)" and node.token contains "require(path.join(__dirname,file))" and not (node.token contains "resolveWidgetPath") and not (node.token contains "path.relative") and not (node.token contains "widgetIdPattern")
+  emit issue code.UnvalidatedDynamicRequirePathTraversal at node
+}

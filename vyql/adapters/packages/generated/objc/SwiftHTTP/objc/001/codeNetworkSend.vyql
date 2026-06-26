@@ -1,0 +1,9 @@
+module bindings.objc.migration.m61035d9b;
+
+binding networkSend1 {
+  requires {
+    dependency("SwiftHTTP")
+  }
+  query pattern callExpr where callee.method == "Download"
+  emit sink code.NetworkSend at args[0]
+}

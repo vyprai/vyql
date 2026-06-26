@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma17503b3;
+
+binding userControlledData3 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "setCredentialManagerEnabled"
+  emit source core.UserControlledData at call.result
+}

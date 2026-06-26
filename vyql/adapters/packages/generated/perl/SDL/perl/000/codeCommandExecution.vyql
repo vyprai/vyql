@@ -1,0 +1,9 @@
+module bindings.perl.migration.m4fbadbb4;
+
+binding commandExecution0 {
+  requires {
+    dependency("SDL")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

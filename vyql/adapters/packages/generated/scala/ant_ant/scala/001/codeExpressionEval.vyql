@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8c890fb9;
+
+binding expressionEval1 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "parsePropertyString"
+  emit sink code.ExpressionEval at args[0]
+}

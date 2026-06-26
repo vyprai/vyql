@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter swift {
-  package "github.com/marcoarment/Blackbird" {
-    sink method "query" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-  }
-}

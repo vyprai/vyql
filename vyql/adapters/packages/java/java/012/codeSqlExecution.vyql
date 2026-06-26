@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding sqlExecution12 {
+  requires {
+    dependency("java.sql")
+  }
+  query pattern callExpr where callee.method == "executeUpdate"
+  emit sink code.SqlExecution at args[0]
+}

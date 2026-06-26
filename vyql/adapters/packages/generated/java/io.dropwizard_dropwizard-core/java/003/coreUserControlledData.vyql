@@ -1,0 +1,9 @@
+module bindings.java.migration.m816041d7;
+
+binding userControlledData3 {
+  requires {
+    dependency("io.dropwizard:dropwizard-core")
+  }
+  query pattern callExpr where callee.method == "SslReloadTask.execute"
+  emit source core.UserControlledData at call.result
+}

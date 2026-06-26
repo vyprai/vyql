@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m44df4644;
+
+binding networkData0 {
+  requires {
+    dependency("commons-fileupload:commons-fileupload")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

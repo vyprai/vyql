@@ -1,8 +1,0 @@
-import code.{SqlExecution, NetworkConnect}
-
-adapter perl {
-  package "OOPS" {
-    sink method "query" -> code.SqlExecution
-    sink method "dbiconnect" -> code.NetworkConnect
-  }
-}

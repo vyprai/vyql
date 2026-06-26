@@ -1,0 +1,14 @@
+module bindings.swift.migration.m98e3ffbb;
+
+binding authorizationCheck10 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "getWriteAccess"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

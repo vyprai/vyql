@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule CodeCheckerGuidelineRulesMissingViewCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_290, CWE_863]
+    id: "VYQL-AUTH-023"
+    severity: critical
+  }
+  issue code.CodeCheckerGuidelineRulesMissingViewCheck as handler
+}

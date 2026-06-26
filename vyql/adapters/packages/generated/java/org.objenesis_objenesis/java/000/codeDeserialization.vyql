@@ -1,0 +1,9 @@
+module bindings.java.migration.mf19c4e95;
+
+binding deserialization0 {
+  requires {
+    dependency("org.objenesis:objenesis")
+  }
+  query pattern callExpr where callee.method == "newInstance"
+  emit sink code.Deserialization at args[0]
+}

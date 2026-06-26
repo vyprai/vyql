@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m308cb3d5;
+
+binding networkData1 {
+  requires {
+    dependency("rb-kqueue")
+  }
+  query pattern callExpr where callee.method == "watch_socket_for_read"
+  emit source code.NetworkData at call.result
+}

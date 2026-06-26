@@ -1,0 +1,9 @@
+module bindings.scala.migration.m286300e0;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setCreateSessionAttributeQuery"
+  emit sink code.SqlExecution at args[0]
+}

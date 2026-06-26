@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf162c1b1;
+
+binding userControlledData0 {
+  requires {
+    dependency("SCLAlertView")
+  }
+  query pattern callExpr where callee.method == "addTextField"
+  emit source core.UserControlledData at call.result
+}

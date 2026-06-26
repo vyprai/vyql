@@ -1,8 +1,0 @@
-adapter objc {
-  package "GoogleAds-IMA-iOS-SDK" {
-    source method "initWithAdsResponse" -> core.UserControlledData
-    source method "initWithAdTagUrl" -> core.UserControlledData
-    sink method "requestAdsWithRequest" -> code.NetworkConnect
-    sink method "requestStreamWithRequest" -> code.NetworkConnect
-  }
-}

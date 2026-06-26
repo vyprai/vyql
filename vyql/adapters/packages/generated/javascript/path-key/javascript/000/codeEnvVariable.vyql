@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m51e4ce40;
+
+binding envVariable0 {
+  requires {
+    dependency("path-key")
+  }
+  query pattern callExpr where callee.method == "pathKey"
+  emit source code.EnvVariable at call.result
+}

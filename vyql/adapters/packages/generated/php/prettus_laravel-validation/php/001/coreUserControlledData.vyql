@@ -1,0 +1,9 @@
+module bindings.php.migration.mcfec5cd5;
+
+binding userControlledData1 {
+  requires {
+    dependency("prettus/laravel-validation")
+  }
+  query pattern callExpr where callee.method == "setRules"
+  emit source core.UserControlledData at call.result
+}

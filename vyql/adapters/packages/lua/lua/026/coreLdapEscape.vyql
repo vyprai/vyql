@@ -1,0 +1,14 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding ldapEscape26 {
+  requires {
+    dependency("lua-ldap")
+  }
+  query pattern callExpr where callee.path ~= "encode_for_ldap"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

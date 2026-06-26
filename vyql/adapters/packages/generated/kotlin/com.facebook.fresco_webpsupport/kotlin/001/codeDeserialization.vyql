@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m73b97fcc;
+
+binding deserialization1 {
+  requires {
+    dependency("com.facebook.fresco:webpsupport")
+  }
+  query pattern callExpr where callee.method == "decodeInputStream"
+  emit sink code.Deserialization at args[0]
+}

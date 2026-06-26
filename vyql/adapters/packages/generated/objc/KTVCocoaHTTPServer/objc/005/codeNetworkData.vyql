@@ -1,0 +1,9 @@
+module bindings.objc.migration.m5adfe0b1;
+
+binding networkData5 {
+  requires {
+    dependency("KTVCocoaHTTPServer")
+  }
+  query pattern callExpr where callee.method == "webSocket:didReceiveMessage:"
+  emit source code.NetworkData at call.result
+}

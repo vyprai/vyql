@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter perl {
-  package "Hypatia" {
-    sink method "query" -> code.SqlExecution
-  }
-}

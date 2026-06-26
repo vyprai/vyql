@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding htmlRender272 {
+  query pattern callExpr where callee.path ~= "exit"
+  emit sink code.HtmlRender at args[0]
+}

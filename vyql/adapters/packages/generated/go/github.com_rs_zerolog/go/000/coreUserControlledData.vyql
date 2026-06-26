@@ -1,0 +1,9 @@
+module bindings.go.migration.m9b0d4fd9;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/rs/zerolog")
+  }
+  query pattern callExpr where callee.method == "ParseLevel"
+  emit source core.UserControlledData at call.result
+}

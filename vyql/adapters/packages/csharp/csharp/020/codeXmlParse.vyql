@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding xmlParse20 {
+  requires {
+    dependency("System.Xml")
+  }
+  query pattern callExpr where callee.path ~= "XmlDocument.LoadXml"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{FileUse}
-import core.{UserControlledData}
-
-adapter groovy {
-  package "pl.pragmatists:JUnitParams" {
-    source method "read" -> core.UserControlledData
-    source method "parse" -> core.UserControlledData
-  }
-}

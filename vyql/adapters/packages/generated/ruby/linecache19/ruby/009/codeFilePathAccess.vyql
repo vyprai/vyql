@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc82756da;
+
+binding filePathAccess9 {
+  requires {
+    dependency("linecache19")
+  }
+  query pattern callExpr where callee.method == "trace_line_numbers"
+  emit sink code.FilePathAccess at args[0]
+}

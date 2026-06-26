@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2c0cb4ed;
+
+binding deserialization0 {
+  requires {
+    dependency("flatted")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

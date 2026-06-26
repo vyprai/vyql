@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter csharp {
-  package "ninject.web.common.owinhost" {
-    source method "Execute" -> code.NetworkData
-  }
-}

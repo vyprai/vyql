@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m86ad4718;
+
+binding userControlledData5 {
+  requires {
+    dependency("ueberauth_google")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source core.UserControlledData at call.result
+}

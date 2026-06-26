@@ -1,0 +1,9 @@
+module bindings.java.migration.md5001608;
+
+binding filePathAccess2 {
+  requires {
+    dependency("net.masterthought:cucumber-reporting")
+  }
+  query pattern callExpr where callee.method == "Configuration.getReportDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

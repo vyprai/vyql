@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter perl {
-  package "qbit" {
-    sink method "readfile" -> code.FilePathAccess
-    sink method "writefile" -> code.FileUse
-  }
-}

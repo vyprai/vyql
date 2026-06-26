@@ -1,6 +1,0 @@
-adapter elixir {
-  package "esqlite" {
-    sink method "sqlite3_last_insert_rowid" -> code.SqlExecution
-    control method "bind" -> core.SqlParameterization
-  }
-}

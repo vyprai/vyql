@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter ruby {
-  package "claide" {
-    source method "option" -> code.CliArgument
-  }
-}

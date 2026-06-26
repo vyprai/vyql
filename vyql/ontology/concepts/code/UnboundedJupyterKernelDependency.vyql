@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedJupyterKernelDependency : issue {
+  cwe: [CWE_1104]
+  review_assumption: "the image or environment is used to run remote kernels whose message protocol must remain compatible with the gateway/server stack"
+  reviewCategory: supply_chain
+  reviewCondition: "Jupyter kernel runtime dependencies are installed without an upper compatibility cap"
+  reviewConfidence: high
+  reviewEvidence: "dependency context {pattern} installs ipykernel without an observed upper bound"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

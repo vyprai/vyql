@@ -1,7 +1,0 @@
-import code.{CliArgument, CommandExecution}
-
-adapter python {
-  package "dask" {
-    source method "run_cli" -> code.CliArgument
-  }
-}

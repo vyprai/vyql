@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf7f065d1;
+
+binding networkSend0 {
+  requires {
+    dependency("GoogleAnalytics")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

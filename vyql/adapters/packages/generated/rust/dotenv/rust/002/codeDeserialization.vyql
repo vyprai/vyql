@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7a3dca84;
+
+binding deserialization2 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.method == "parse_line"
+  emit sink code.Deserialization at args[0]
+}

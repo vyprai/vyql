@@ -1,0 +1,9 @@
+module bindings.scala.migration.mc93536dc;
+
+binding httpInput1 {
+  requires {
+    dependency("org.atmosphere:atmosphere-runtime")
+  }
+  query pattern callExpr where callee.method == "getPathTranslated"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m0bcdd377;
+
+binding deserialization2 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-hppc")
+  }
+  query pattern callExpr where callee.method == "deserializeContents"
+  emit sink code.Deserialization at args[0]
+}

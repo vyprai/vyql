@@ -1,0 +1,9 @@
+module bindings.scala.migration.m6e0ca957;
+
+binding userControlledData4 {
+  requires {
+    dependency("org.apache.poi:poi-scratchpad")
+  }
+  query pattern callExpr where callee.method == "MAPIMessage.getRtfBody"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,14 @@
+module bindings.php.migration.m5d9e102b;
+
+binding htmlEscape0 {
+  requires {
+    dependency("twbs/bootstrap")
+  }
+  query pattern callExpr where callee.method == "sanitizeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m121c09b6;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/Outdooractive/gis-tools")
+  }
+  query pattern callExpr where callee.method == "decodePolyline"
+  emit sink code.Deserialization at args[0]
+}

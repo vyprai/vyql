@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf7975f00;
+
+binding deserialization0 {
+  requires {
+    dependency("msgpack")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

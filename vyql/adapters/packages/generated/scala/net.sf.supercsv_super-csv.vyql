@@ -1,7 +1,0 @@
-import code.{Deserialization, FileUse}
-adapter scala {
-  package "net.sf.supercsv:super-csv" {
-    sink method "read" -> code.Deserialization
-    sink method "write" -> code.FileUse
-  }
-}

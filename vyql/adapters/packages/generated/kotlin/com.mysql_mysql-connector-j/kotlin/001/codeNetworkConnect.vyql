@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mf271abf4;
+
+binding networkConnect1 {
+  requires {
+    dependency("com.mysql:mysql-connector-j")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

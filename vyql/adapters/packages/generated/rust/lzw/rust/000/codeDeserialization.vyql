@@ -1,0 +1,9 @@
+module bindings.rust.migration.mbcf696d3;
+
+binding deserialization0 {
+  requires {
+    dependency("lzw")
+  }
+  query pattern callExpr where callee.method == "decode_bytes"
+  emit sink code.Deserialization at args[0]
+}

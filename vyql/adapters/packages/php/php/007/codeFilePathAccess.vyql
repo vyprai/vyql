@@ -1,0 +1,9 @@
+module bindings.php.migration.mc5601031;
+
+binding filePathAccess7 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "file_get_contents"
+  emit sink code.FilePathAccess at args[0]
+}

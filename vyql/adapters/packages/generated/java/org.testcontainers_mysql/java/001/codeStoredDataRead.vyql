@@ -1,0 +1,9 @@
+module bindings.java.migration.m9fc3588b;
+
+binding storedDataRead1 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "constructUrlForConnection"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m3a4a401a;
+
+binding deserialization0 {
+  requires {
+    dependency("symfony/validator")
+  }
+  query pattern callExpr where callee.method == "addXmlMapping"
+  emit sink code.Deserialization at args[0]
+}

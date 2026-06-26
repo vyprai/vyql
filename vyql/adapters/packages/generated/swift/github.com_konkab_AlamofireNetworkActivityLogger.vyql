@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter swift {
-  package "github.com/konkab/AlamofireNetworkActivityLogger" {
-    source method "startLogging" -> code.NetworkData
-    source method "stopLogging" -> code.NetworkData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.c.migration.m68b4f673;
+
+binding userControlledData0 {
+  requires {
+    dependency("kf5textwidgets")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit source core.UserControlledData at call.result
+}

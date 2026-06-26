@@ -1,0 +1,9 @@
+module bindings.c.migration.mb4f2a5a4;
+
+binding fileUse2 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "WriteBufferToFile"
+  emit sink code.FileUseSink at args[0]
+}

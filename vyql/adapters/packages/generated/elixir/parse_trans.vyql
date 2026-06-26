@@ -1,6 +1,0 @@
-adapter elixir {
-  package "parse_trans" {
-    sink method "load_binary" -> code.DynamicCodeLoad
-    sink method "load_binary" -> code.Deserialization
-  }
-}

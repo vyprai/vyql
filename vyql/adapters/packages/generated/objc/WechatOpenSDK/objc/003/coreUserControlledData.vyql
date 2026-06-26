@@ -1,0 +1,9 @@
+module bindings.objc.migration.m9075ca44;
+
+binding userControlledData3 {
+  requires {
+    dependency("WechatOpenSDK")
+  }
+  query pattern callExpr where callee.method == "sendReq"
+  emit source core.UserControlledData at call.result
+}

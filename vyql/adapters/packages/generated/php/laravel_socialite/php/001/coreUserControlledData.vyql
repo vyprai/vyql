@@ -1,0 +1,9 @@
+module bindings.php.migration.mef04ba93;
+
+binding userControlledData1 {
+  requires {
+    dependency("laravel/socialite")
+  }
+  query pattern callExpr where callee.method == "mapUserToObject"
+  emit source core.UserControlledData at call.result
+}

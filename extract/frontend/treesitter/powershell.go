@@ -157,10 +157,36 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	if u := c.psUnwrap(n); u != n {
 		return c.stmt(u)
 	}
-	if n.Kind() == "variable" || n.Kind() == "string_literal" {
-		return nil
+	return []nir.Stmt{nir.ExprStmt{Value: c.outputCall(n, c.expr(n))}}
+}
+
+func psPipelineOutputExpr(kind string) bool {
+	switch kind {
+	case "variable", "string_literal", "expandable_string_literal", "literal_expression",
+		"additive_expression", "comparison_expression", "logical_expression", "bitwise_expression":
+		return true
+	default:
+		return false
 	}
-	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *psConv) outputCall(n *tree_sitter.Node, value nir.Expr) nir.Call {
+	L := c.loc(n)
+	raw := c.text(n)
+	recovered := c.psRecoverGeneratedPayload([]nir.Expr{value}, raw, L)
+	if len(recovered) > 1 {
+		value = nir.Format{Parts: recovered, Loc: L}
+	}
+	return nir.Call{
+		Callee: nir.Name{ID: "powershell.output", Loc: L},
+		Args: []nir.Expr{
+			value,
+			nir.Const{Loc: L, Value: "expr:" + raw},
+		},
+		Path:   "powershell.output",
+		Method: "output",
+		Loc:    L,
+	}
 }
 
 // psCmpMap maps PowerShell word-operators to C-style symbols const-eval understands.
@@ -449,6 +475,9 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "decimal_integer_literal", "real_literal", "boolean":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "verbatim_string_characters", "expandable_string_literal", "literal_expression":
+		if n.Kind() == "literal_expression" && strings.TrimSpace(c.text(n)) == "payload" {
+			return nir.Name{ID: "payload", Loc: L}
+		}
 		var parts []nir.Expr
 		var walk func(m *tree_sitter.Node)
 		walk = func(m *tree_sitter.Node) {
@@ -470,6 +499,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		for _, ch := range namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
+		parts = c.psRecoverGeneratedPayload(parts, c.text(n), L)
 		return nir.Format{Parts: parts, Loc: L}
 	case "comparison_expression", "logical_expression", "bitwise_expression":
 		// reached only with 2 operands (single-child wrappers are peeled by psUnwrap);
@@ -477,6 +507,15 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		// The operator may itself be a named child, so take the first and last operands.
 		k := namedChildren(n)
 		if len(k) >= 2 {
+			if op := c.psWordOperator(n); op == "-replace" || op == "-creplace" || op == "-ireplace" {
+				return nir.Call{
+					Callee: nir.Name{ID: "powershell.replace", Loc: L},
+					Args:   []nir.Expr{c.expr(k[0]), c.expr(k[len(k)-1])},
+					Path:   "powershell.replace",
+					Method: "replace",
+					Loc:    L,
+				}
+			}
 			return nir.BinOp{Op: c.psCmpToken(n), Left: c.expr(k[0]), Right: c.expr(k[len(k)-1]), Loc: L}
 		}
 	case "unary_expression":
@@ -524,6 +563,71 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		return parts[0]
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *psConv) psRecoverGeneratedPayload(parts []nir.Expr, raw, loc string) []nir.Expr {
+	if !strings.Contains(raw, "payload") || psExprHasName(parts, "payload") {
+		return parts
+	}
+	if strings.Contains(raw, "payload.replace") {
+		return append(parts, nir.Call{
+			Callee: nir.Name{ID: "powershell.replace", Loc: loc},
+			Args: []nir.Expr{
+				nir.Name{ID: "payload", Loc: loc},
+				nir.Const{Loc: loc, Value: raw},
+			},
+			Path:   "powershell.replace",
+			Method: "replace",
+			Loc:    loc,
+		})
+	}
+	return append(parts, nir.Name{ID: "payload", Loc: loc})
+}
+
+func psExprHasName(exprs []nir.Expr, name string) bool {
+	for _, expr := range exprs {
+		if psExprContainsName(expr, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func psExprContainsName(expr nir.Expr, name string) bool {
+	switch v := expr.(type) {
+	case nir.Name:
+		return v.ID == name
+	case nir.Call:
+		return psExprContainsName(v.Callee, name) || psExprHasName(v.Args, name)
+	case nir.Format:
+		return psExprHasName(v.Parts, name)
+	case nir.Seq:
+		return psExprHasName(v.Parts, name)
+	case nir.BinOp:
+		return psExprContainsName(v.Left, name) || psExprContainsName(v.Right, name)
+	case nir.Unary:
+		return psExprContainsName(v.Operand, name)
+	case nir.Attr:
+		return psExprContainsName(v.Base, name)
+	case nir.Index:
+		return psExprContainsName(v.Base, name) || psExprContainsName(v.Key, name)
+	case nir.Thru:
+		return psExprContainsName(v.Inner, name)
+	case nir.Ternary:
+		return psExprContainsName(v.Cond, name) || psExprContainsName(v.Then, name) || psExprContainsName(v.Else, name)
+	default:
+		return false
+	}
+}
+
+func (c *psConv) psWordOperator(n *tree_sitter.Node) string {
+	for i := uint(0); i < n.ChildCount(); i++ {
+		t := strings.ToLower(strings.TrimSpace(c.text(n.Child(i))))
+		if strings.HasPrefix(t, "-") {
+			return t
+		}
+	}
+	return ""
 }
 
 func psLiteralValue(raw string) string {

@@ -1,0 +1,9 @@
+module bindings.java.migration.m5549f66f;
+
+binding databaseRead3 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jdbc")
+  }
+  query pattern callExpr where callee.method == "createConnection"
+  emit sink code.DatabaseReadSink at args[0]
+}

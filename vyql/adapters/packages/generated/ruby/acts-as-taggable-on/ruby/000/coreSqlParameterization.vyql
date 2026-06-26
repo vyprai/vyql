@@ -1,0 +1,14 @@
+module bindings.ruby.migration.ma08174c4;
+
+binding sqlParameterization0 {
+  requires {
+    dependency("acts-as-taggable-on")
+  }
+  query pattern callExpr where callee.method == "sanitize_sql_for_named_any"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

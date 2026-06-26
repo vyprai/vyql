@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding sqlExecution225 {
+  query pattern callExpr where callee.method == "whereRaw"
+  emit sink code.SqlExecution at args[0]
+}

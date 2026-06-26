@@ -1,0 +1,14 @@
+module bindings.php.migration.m015b1593;
+
+binding inputValidation0 {
+  requires {
+    dependency("composer/spdx-licenses")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

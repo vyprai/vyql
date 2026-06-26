@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb32d0a46;
+
+binding deserialization2 {
+  requires {
+    dependency("io.rest-assured:json-path")
+  }
+  query pattern callExpr where callee.method == "parseInputStream"
+  emit sink code.Deserialization at args[0]
+}

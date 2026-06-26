@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m9669be91;
+
+binding networkData5 {
+  requires {
+    dependency("ch.qos.logback:logback-access")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

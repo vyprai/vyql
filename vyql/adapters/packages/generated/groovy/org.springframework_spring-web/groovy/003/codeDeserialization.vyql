@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m007728c4;
+
+binding deserialization3 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "parseMediaTypes"
+  emit sink code.Deserialization at args[0]
+}

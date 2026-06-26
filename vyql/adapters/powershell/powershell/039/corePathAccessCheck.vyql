@@ -1,0 +1,11 @@
+module bindings.powershell.migration.m390f1180;
+
+binding pathAccessCheck39 {
+  query pattern callExpr where callee.method == "StartsWith"
+  emit check core.PathAccessCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

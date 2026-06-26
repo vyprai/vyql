@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mef0e814e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("os")
+  }
+  query pattern callExpr where callee.method == "OS.open_file_command"
+  emit sink code.FilePathAccess at args[0]
+}

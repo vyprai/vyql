@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "org.springframework:spring-oxm" {
-    sink method "unmarshal" -> code.Deserialization
-  }
-}

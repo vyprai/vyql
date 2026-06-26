@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.googlecode.json-simple:json-simple" {
-    sink method "parse" -> code.Deserialization
-  }
-}

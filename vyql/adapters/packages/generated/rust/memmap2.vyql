@@ -1,5 +1,0 @@
-adapter rust {
-  package "memmap2" {
-    sink method "make_read_only" -> code.FilePathAccess
-  }
-}

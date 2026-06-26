@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding jmxRmiRegistryExposure77 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:createJMXServer" and node.token contains "RMIExporter.EXPORTER_ATTRIBUTE" and node.token contains "configureRMIRegistry" and node.token contains "JMXConnectorServerFactory.newJMXConnectorServer" and not (node.token contains "LocateRegistry.createRegistry") and not (node.token contains "RMIJRMPServerImpl")
+  emit issue code.JmxRmiRegistryExposure at node
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m9e3b01a3;
+
+binding userControlledData0 {
+  requires {
+    dependency("SwiftKVC")
+  }
+  query pattern callExpr where callee.method == "subscript"
+  emit source core.UserControlledData at call.result
+}

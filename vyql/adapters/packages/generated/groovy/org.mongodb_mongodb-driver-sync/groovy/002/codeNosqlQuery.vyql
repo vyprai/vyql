@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m2e645e1a;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("org.mongodb:mongodb-driver-sync")
+  }
+  query pattern callExpr where callee.method == "createCollection"
+  emit sink code.NosqlQuery at args[0]
+}

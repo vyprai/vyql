@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcbf3d81a;
+
+binding deserialization7 {
+  requires {
+    dependency("gen_smtp")
+  }
+  query pattern callExpr where callee.method == "parse_rfc822_addresses"
+  emit sink code.Deserialization at args[0]
+}

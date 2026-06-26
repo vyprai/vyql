@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding codeEval7 {
+  requires {
+    dependency("elixir")
+  }
+  query pattern callExpr where callee.path ~= "Code.eval_file"
+  emit sink code.CodeEval at args[0]
+}

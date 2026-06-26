@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc8a9bc67;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("net.java.dev.jets3t:jets3t")
+  }
+  query pattern callExpr where callee.method == "getTotalDeleteRequests"
+  emit sink code.StoredDataWrite at args[0]
+}

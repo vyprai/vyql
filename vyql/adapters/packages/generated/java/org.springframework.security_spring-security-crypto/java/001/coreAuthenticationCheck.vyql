@@ -1,0 +1,14 @@
+module bindings.java.migration.me48c3402;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("org.springframework.security:spring-security-crypto")
+  }
+  query pattern callExpr where callee.method == "PasswordEncoder.matches"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

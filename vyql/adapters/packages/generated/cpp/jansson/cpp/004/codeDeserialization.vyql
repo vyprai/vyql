@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m7c4fc6af;
+
+binding deserialization4 {
+  requires {
+    dependency("jansson")
+  }
+  query pattern callExpr where callee.method == "json_unpack"
+  emit sink code.Deserialization at args[0]
+}

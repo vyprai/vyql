@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m113c75cd;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpmime")
+  }
+  query pattern callExpr where callee.method == "MultipartEntity.writeTo"
+  emit sink code.NetworkSend at args[0]
+}

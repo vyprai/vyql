@@ -1,0 +1,14 @@
+module bindings.elixir.migration.md4a63e53;
+
+binding fileUpload1 {
+  requires {
+    dependency("phoenix_live_view")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "live_file_input"
+  emit issue code.FileUpload at node
+  emit source code.FileUploadSource at node
+}

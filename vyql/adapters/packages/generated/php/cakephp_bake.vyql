@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter php {
-  package "cakephp/bake" {
-    sink method "Process.call" -> code.CommandExecution
-    sink method "CodeParser.parseFile" -> code.Deserialization
-  }
-}

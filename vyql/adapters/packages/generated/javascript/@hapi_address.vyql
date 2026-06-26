@@ -1,7 +1,0 @@
-import core.{InputValidation}
-adapter javascript {
-  package "@hapi/address" {
-    control method "analyzeEmail" -> core.InputValidation
-    control method "isEmailValid" -> core.InputValidation
-  }
-}

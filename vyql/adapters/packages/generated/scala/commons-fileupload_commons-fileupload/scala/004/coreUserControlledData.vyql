@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3e7f9d53;
+
+binding userControlledData4 {
+  requires {
+    dependency("commons-fileupload:commons-fileupload")
+  }
+  query pattern callExpr where callee.method == "openStream"
+  emit source core.UserControlledData at call.result
+}

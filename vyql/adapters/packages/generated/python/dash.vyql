@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "dash" {
-    sink method "run_command_with_process" -> code.CommandExecution
-  }
-}

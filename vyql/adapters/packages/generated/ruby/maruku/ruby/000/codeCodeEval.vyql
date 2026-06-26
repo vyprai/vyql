@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m6685b6c9;
+
+binding codeEval0 {
+  requires {
+    dependency("maruku")
+  }
+  query pattern callExpr where callee.method == "parse_doc"
+  emit sink code.CodeEval at args[0]
+}

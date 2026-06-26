@@ -1,0 +1,9 @@
+module bindings.perl.migration.m27a90614;
+
+binding commandExecution0 {
+  requires {
+    dependency("Carton")
+  }
+  query pattern callExpr where callee.method == "cmd_run"
+  emit sink code.CommandExecution at args[0]
+}

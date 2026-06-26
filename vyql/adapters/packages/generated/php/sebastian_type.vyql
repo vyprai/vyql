@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter php {
-  package "sebastian/type" {
-    source method "Type::fromValue" -> core.UserControlledData
-    source method "Type::fromName" -> core.UserControlledData
-  }
-}

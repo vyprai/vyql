@@ -1,0 +1,9 @@
+module bindings.rust.migration.mdf8e1b02;
+
+binding deserialization10 {
+  requires {
+    dependency("tendril")
+  }
+  query pattern callExpr where callee.method == "decode_utf8_encoding_rs"
+  emit sink code.Deserialization at args[0]
+}

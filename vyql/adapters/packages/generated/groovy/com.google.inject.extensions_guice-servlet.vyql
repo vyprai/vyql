@@ -1,8 +1,0 @@
-import code.{HttpInput, HtmlRender}
-
-adapter groovy {
-  package "com.google.inject.extensions:guice-servlet" {
-    source method "getRequest" -> code.HttpInput
-    sink method "getResponse" -> code.HtmlRender
-  }
-}

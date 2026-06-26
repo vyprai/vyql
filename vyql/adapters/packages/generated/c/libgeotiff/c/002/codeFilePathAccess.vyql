@@ -1,0 +1,9 @@
+module bindings.c.migration.m87ebf0fa;
+
+binding filePathAccess2 {
+  requires {
+    dependency("libgeotiff")
+  }
+  query pattern callExpr where callee.method == "XTIFFClientOpen"
+  emit sink code.FilePathAccess at args[0]
+}

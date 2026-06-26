@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m64163879;
+
+binding htmlRender0 {
+  requires {
+    dependency("bootstrap-will_paginate")
+  }
+  query pattern callExpr where callee.method == "will_paginate"
+  emit sink code.HtmlRender at args[0]
+}

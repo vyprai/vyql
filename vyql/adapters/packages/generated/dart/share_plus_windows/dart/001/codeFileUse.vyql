@@ -1,0 +1,9 @@
+module bindings.dart.migration.m4c62c28f;
+
+binding fileUse1 {
+  requires {
+    dependency("share_plus_windows")
+  }
+  query pattern callExpr where callee.method == "ShareWindows.shareFiles"
+  emit sink code.FileUseSink at args[0]
+}

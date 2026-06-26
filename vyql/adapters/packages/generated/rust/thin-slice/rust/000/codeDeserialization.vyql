@@ -1,0 +1,9 @@
+module bindings.rust.migration.m10c91996;
+
+binding deserialization0 {
+  requires {
+    dependency("thin-slice")
+  }
+  query pattern callExpr where callee.method == "from_raw"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.mb980b818;
+
+binding deserialization3 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "nd_decode_with_context"
+  emit sink code.Deserialization at args[0]
+}

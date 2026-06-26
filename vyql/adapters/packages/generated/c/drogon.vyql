@@ -1,8 +1,0 @@
-import code.{HttpInput}
-
-adapter c {
-  package "drogon" {
-    source method "HttpRequestImpl::query" -> code.HttpInput
-    sink method "HttpRequestImpl::setQuery" -> code.UrlFetch
-  }
-}

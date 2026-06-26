@@ -1,0 +1,9 @@
+module bindings.groovy.migration.meca8c689;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.zeroturnaround:zt-zip")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}

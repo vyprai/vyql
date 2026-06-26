@@ -1,0 +1,9 @@
+module bindings.php.migration.m22e9362e;
+
+binding deserialization2 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

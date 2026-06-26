@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding sqlExecution7 {
+  requires {
+    dependency("mysql-client")
+  }
+  query pattern callExpr where callee.path ~= "mysql"
+  emit sink code.SqlExecution at args.any
+}

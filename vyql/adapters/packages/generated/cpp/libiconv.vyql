@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "libiconv" {
-    sink method "iconv_open" -> code.Deserialization
-  }
-}

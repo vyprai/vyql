@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter ruby {
-  package "pry-debugger" {
-    sink method "add" -> code.ExpressionEval
-    sink method "change" -> code.ExpressionEval
-  }
-}

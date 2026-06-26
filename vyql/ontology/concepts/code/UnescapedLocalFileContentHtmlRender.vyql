@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedLocalFileContentHtmlRender : issue {
+  cwe: [CWE_79]
+  review_assumption: "the displayed file may contain attacker-controlled configuration, log, or generated content"
+  reviewCategory: xss
+  reviewCondition: "local or generated file contents are rendered into an HTML response without HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "file display context {pattern} reads a file and prints it into HTML without htmlspecialchars/htmlentities-style escaping"
+  vulnerableTo: [injection.Xss]
+}

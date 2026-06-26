@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter objc {
-  package "GoogleDataTransport" {
-    sink method "GDTCORDecodeArchiveAtPath" -> code.Deserialization
-    sink method "GDTCORDecodeArchive" -> code.Deserialization
-    sink method "GDTCORWriteDataToFile" -> code.FilePathAccess
-  }
-}

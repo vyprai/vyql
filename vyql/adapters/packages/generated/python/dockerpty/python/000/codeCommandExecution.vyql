@@ -1,0 +1,9 @@
+module bindings.python.migration.mc56aa747;
+
+binding commandExecution0 {
+  requires {
+    dependency("dockerpty")
+  }
+  query pattern callExpr where callee.method == "exec_command"
+  emit sink code.CommandExecution at args[0]
+}

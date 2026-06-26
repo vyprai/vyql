@@ -1,0 +1,9 @@
+module bindings.python.migration.m84075738;
+
+binding deserialization2 {
+  requires {
+    dependency("pyasn1-modules")
+  }
+  query pattern callExpr where callee.method == "readBase64fromText"
+  emit sink code.Deserialization at args[0]
+}

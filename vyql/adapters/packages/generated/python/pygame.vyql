@@ -1,5 +1,0 @@
-adapter python {
-  package "pygame" {
-    sink method "spawn" -> code.CommandExecution
-  }
-}

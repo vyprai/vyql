@@ -1,0 +1,9 @@
+module bindings.dart.migration.m2347fc4e;
+
+binding userControlledData2 {
+  requires {
+    dependency("auto_route")
+  }
+  query pattern callExpr where callee.method == "matchByPath"
+  emit source core.UserControlledData at call.result
+}

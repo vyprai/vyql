@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding zeroLengthRadiusAttributeValueParse130 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and containsAny(node.token, ["name=rad_decode", "name=decode_radius", "name=radius_decode"]) and containsAny(node.token, ["call_path:debug_pair", "call_path:pairfree"]) and not (containsAny(node.prop.str_args, ["attrlen==0", "0==attrlen"]))
+  emit issue code.ZeroLengthRadiusAttributeValueParse at node
+}

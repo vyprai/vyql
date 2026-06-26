@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1eafc4ff;
+
+binding deserialization0 {
+  requires {
+    dependency("directxmesh")
+  }
+  query pattern callExpr where callee.method == "CreateFromVBO"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m96f21ad3;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/Octadero/Unarchiver")
+  }
+  query pattern callExpr where callee.method == "gunzipped"
+  emit sink code.Deserialization at args[0]
+}

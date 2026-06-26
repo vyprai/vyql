@@ -1,0 +1,9 @@
+module bindings.java.migration.ma41afe90;
+
+binding deserialization3 {
+  requires {
+    dependency("javax.json:javax.json-api")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

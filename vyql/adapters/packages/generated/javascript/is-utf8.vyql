@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "is-utf8" {
-    sink method "module.exports" -> code.Deserialization
-  }
-}

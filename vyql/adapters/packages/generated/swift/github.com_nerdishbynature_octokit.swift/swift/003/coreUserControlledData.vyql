@@ -1,0 +1,9 @@
+module bindings.swift.migration.mffd03dc4;
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "accessTokenFromResponse"
+  emit source core.UserControlledData at call.result
+}

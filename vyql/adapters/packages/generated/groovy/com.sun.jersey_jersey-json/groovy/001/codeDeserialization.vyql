@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m846711fb;
+
+binding deserialization1 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{SqlExecution, CodeEval}
-
-adapter php {
-  package "spatie/laravel-activitylog" {
-    sink method "save" -> code.SqlExecution
-    sink method "replacePlaceholders" -> code.CodeEval
-  }
-}

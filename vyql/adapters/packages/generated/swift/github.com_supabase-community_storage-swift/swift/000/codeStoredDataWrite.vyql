@@ -1,0 +1,9 @@
+module bindings.swift.migration.m07c946ba;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("github.com/supabase-community/storage-swift")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.StoredDataWrite at args[0]
+}

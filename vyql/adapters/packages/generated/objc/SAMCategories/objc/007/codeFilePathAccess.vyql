@@ -1,0 +1,9 @@
+module bindings.objc.migration.m0cb6a173;
+
+binding filePathAccess7 {
+  requires {
+    dependency("SAMCategories")
+  }
+  query pattern callExpr where callee.method == "sam_documentsDirectoryURL"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m597b847b;
+
+binding deserialization0 {
+  requires {
+    dependency("jsmn")
+  }
+  query pattern callExpr where callee.method == "jsmn_parse"
+  emit sink code.Deserialization at args[0]
+}

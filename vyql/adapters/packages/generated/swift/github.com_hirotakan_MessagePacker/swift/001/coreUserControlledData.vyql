@@ -1,0 +1,9 @@
+module bindings.swift.migration.m92105e6b;
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/hirotakan/MessagePacker")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit source core.UserControlledData at call.result
+}

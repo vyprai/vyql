@@ -1,0 +1,8 @@
+module code;
+
+review code.UnvalidatedCoordinateSqlInterpolation {
+  category: sql
+  expected: [core.InputValidation, core.SqlParameterization]
+  kind: target
+  text: "verify geospatial SQL helpers coerce coordinate bounds before interpolating them into BETWEEN predicates"
+}

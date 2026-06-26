@@ -1,0 +1,9 @@
+module bindings.go.migration.mb32cf6c5;
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/xeipuuv/gojsonschema")
+  }
+  query pattern callExpr where callee.method == "NewStringLoader"
+  emit source core.UserControlledData at call.result
+}

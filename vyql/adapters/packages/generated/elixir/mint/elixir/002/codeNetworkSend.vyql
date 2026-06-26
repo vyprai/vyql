@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma217580b;
+
+binding networkSend2 {
+  requires {
+    dependency("mint")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

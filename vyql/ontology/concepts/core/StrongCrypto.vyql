@@ -1,0 +1,6 @@
+module core;
+
+concept StrongCrypto : check {
+  neutralizes: [crypto.WeakCrypto, crypto.WeakHash, crypto.ImproperSignatureCheck]
+  summary: "Evidence that cryptographic algorithms, parameters, or key-binding choices meet current strength expectations."
+}

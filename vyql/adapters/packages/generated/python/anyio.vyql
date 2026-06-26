@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "anyio" {
-    sink method "run_sync" -> code.CommandExecution
-    sink method "process_worker" -> code.CommandExecution
-  }
-}

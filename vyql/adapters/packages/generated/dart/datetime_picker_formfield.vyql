@@ -1,8 +1,0 @@
-adapter dart {
-  package "datetime_picker_formfield" {
-    sink method "parse" -> code.Deserialization
-    sink method "tryParse" -> code.Deserialization
-    source method "onChanged" -> core.UserControlledData
-    source method "onSubmitted" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.bash.migration.m5a131030;
+
+binding cliArgument0 {
+  requires {
+    dependency("kube-linter")
+  }
+  query pattern callExpr where callee.path ~= "gitignore.argv"
+  emit source code.CliArgument at call.result
+}

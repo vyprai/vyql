@@ -1,8 +1,0 @@
-import code.{ResponseHeaderWrite}
-
-adapter javascript {
-  package "vary" {
-    sink method "vary" -> code.ResponseHeaderWrite
-    sink method "append" -> code.ResponseHeaderWrite
-  }
-}

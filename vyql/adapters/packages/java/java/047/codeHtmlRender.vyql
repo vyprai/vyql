@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding htmlRender47 {
+  requires {
+    dependency("org.kohsuke.stapler")
+  }
+  query pattern callExpr where callee.path ~= "FormValidation.errorWithMarkup"
+  emit sink code.HtmlRender at args[0]
+}

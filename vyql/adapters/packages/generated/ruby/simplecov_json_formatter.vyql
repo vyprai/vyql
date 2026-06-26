@@ -1,5 +1,0 @@
-adapter ruby {
-  package "simplecov_json_formatter" {
-    sink method "export_formatted_result" -> code.FileUse
-  }
-}

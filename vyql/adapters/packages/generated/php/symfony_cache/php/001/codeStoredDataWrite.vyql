@@ -1,0 +1,9 @@
+module bindings.php.migration.m8fa9b822;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("symfony/cache")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.StoredDataWrite at args[0]
+}

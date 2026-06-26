@@ -1,0 +1,9 @@
+module bindings.objc.migration.m01c2bb6d;
+
+binding deserialization0 {
+  requires {
+    dependency("Google-Maps-iOS-Utils")
+  }
+  query pattern callExpr where callee.method == "GMUKMLParser.parse"
+  emit sink code.Deserialization at args[0]
+}

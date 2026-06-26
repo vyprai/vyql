@@ -1,0 +1,11 @@
+module code;
+
+concept PublicWeakChecksumUtility : issue {
+  cwe: [CWE_327, CWE_328]
+  review_assumption: "external callers may use the public API for security-sensitive hashing, integrity, or identity decisions"
+  reviewCategory: crypto
+  reviewCondition: "public checksum or digest helper exposes weak general-purpose hash/checksum algorithms"
+  reviewConfidence: high
+  reviewEvidence: "public checksum utility context {pattern} exposes SHA-1, CRC32, or fuzzy-hash digest behavior through public API surface"
+  vulnerableTo: [crypto.WeakHash]
+}

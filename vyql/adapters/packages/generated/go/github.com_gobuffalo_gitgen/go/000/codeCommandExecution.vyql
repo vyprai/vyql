@@ -1,0 +1,9 @@
+module bindings.go.migration.m65280293;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/gobuffalo/gitgen")
+  }
+  query pattern callExpr where callee.method == "Run"
+  emit sink code.CommandExecution at args[0]
+}

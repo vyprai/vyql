@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb6eea7a7;
+
+binding expressionEval1 {
+  requires {
+    dependency("org.drools:drools-compiler")
+  }
+  query pattern callExpr where callee.method == "normalizeEval"
+  emit sink code.ExpressionEval at args[0]
+}

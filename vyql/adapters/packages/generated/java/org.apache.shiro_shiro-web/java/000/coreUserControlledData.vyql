@@ -1,0 +1,9 @@
+module bindings.java.migration.md94de084;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.shiro:shiro-web")
+  }
+  query pattern callExpr where callee.method == "decodeRequestString"
+  emit source core.UserControlledData at call.result
+}

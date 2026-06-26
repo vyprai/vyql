@@ -1,7 +1,0 @@
-import code.{Deserialization, SecretValue}
-
-adapter java {
-  package "org.apache.hadoop:hadoop-auth" {
-    sink method "AuthToken.parse" -> code.Deserialization
-  }
-}

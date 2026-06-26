@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf021321c;
+
+binding fileUse0 {
+  requires {
+    dependency("sitemap")
+  }
+  query pattern callExpr where callee.method == "Sitemap.Location.write"
+  emit sink code.FileUseSink at args[0]
+}

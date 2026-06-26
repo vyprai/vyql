@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter elixir {
-  package "contex" {
-    control method "clean" -> core.HtmlEscape
-  }
-}

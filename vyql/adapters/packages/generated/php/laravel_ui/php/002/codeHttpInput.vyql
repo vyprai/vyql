@@ -1,0 +1,9 @@
+module bindings.php.migration.meb280da6;
+
+binding httpInput2 {
+  requires {
+    dependency("laravel/ui")
+  }
+  query pattern callExpr where callee.method == "ResetsPasswords::reset"
+  emit source code.HttpInput at call.result
+}

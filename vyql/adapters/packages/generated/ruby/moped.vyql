@@ -1,7 +1,0 @@
-adapter ruby {
-  package "moped" {
-    sink method "query" -> code.NosqlQuery
-    sink method "command" -> code.NosqlQuery
-    control method "login" -> core.AuthenticationCheck
-  }
-}

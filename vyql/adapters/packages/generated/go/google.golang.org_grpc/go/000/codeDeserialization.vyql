@@ -1,0 +1,9 @@
+module bindings.go.migration.m4884b628;
+
+binding deserialization0 {
+  requires {
+    dependency("google.golang.org/grpc")
+  }
+  query pattern callExpr where callee.method == "Unmarshal"
+  emit sink code.Deserialization at args[0]
+}

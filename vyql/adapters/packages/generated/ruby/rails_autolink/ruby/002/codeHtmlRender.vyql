@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m7b3b1e13;
+
+binding htmlRender2 {
+  requires {
+    dependency("rails_autolink")
+  }
+  query pattern callExpr where callee.method == "auto_link_email_addresses"
+  emit sink code.HtmlRender at args[0]
+}

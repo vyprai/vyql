@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "tsl-ordered-map" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

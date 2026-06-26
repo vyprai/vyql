@@ -1,0 +1,9 @@
+module bindings.perl.migration.m9fefdd51;
+
+binding filePathAccess1 {
+  requires {
+    dependency("Hal-Cdroms")
+  }
+  query pattern callExpr where callee.method == "unmount"
+  emit sink code.FilePathAccess at args[0]
+}

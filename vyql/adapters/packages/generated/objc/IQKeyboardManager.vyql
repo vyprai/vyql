@@ -1,9 +1,0 @@
-import code.{RedirectTarget}
-
-adapter objc {
-  package "IQKeyboardManager" {
-    flag code.RedirectTarget on any {
-      method "textView:shouldInteractWithURL:inRange:interaction:"
-    }
-  }
-}

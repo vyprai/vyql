@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m16e42457;
+
+binding deserialization2 {
+  requires {
+    dependency("safe_yaml")
+  }
+  query pattern callExpr where callee.method == "safe_load"
+  emit sink code.Deserialization at args[0]
+}

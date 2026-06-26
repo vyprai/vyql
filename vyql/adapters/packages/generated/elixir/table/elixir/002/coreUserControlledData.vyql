@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbb7b1591;
+
+binding userControlledData2 {
+  requires {
+    dependency("table")
+  }
+  query pattern callExpr where callee.method == "Table.to_columns"
+  emit source core.UserControlledData at call.result
+}

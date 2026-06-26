@@ -1,0 +1,9 @@
+module bindings.python.migration.m27518148;
+
+binding filePathAccess3 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "locate_file"
+  emit sink code.FilePathAccess at args[0]
+}

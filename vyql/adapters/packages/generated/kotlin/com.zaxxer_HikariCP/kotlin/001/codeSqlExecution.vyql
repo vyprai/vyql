@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m6a98b0f4;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.zaxxer:HikariCP")
+  }
+  query pattern callExpr where callee.method == "setConnectionTestQuery"
+  emit sink code.SqlExecution at args[0]
+}

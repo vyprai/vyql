@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule ClaspRemoteFilePathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-019"
+    severity: high
+  }
+  issue code.ClaspRemoteFilePathTraversal as sink
+}

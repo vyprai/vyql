@@ -1,0 +1,9 @@
+module bindings.bash.migration.mdfb197f6;
+
+binding cliArgument0 {
+  requires {
+    dependency("dialog")
+  }
+  query pattern callExpr where callee.path ~= "dialog.argv"
+  emit source code.CliArgument at call.result
+}

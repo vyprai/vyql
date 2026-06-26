@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m251914f9;
+
+binding fileUse0 {
+  requires {
+    dependency("file_only_logger")
+  }
+  query pattern callExpr where callee.method == "File.Only.Logger.Proxy.log"
+  emit sink code.FileUseSink at args[0]
+}

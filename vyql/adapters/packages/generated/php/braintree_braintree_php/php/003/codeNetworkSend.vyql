@@ -1,0 +1,9 @@
+module bindings.php.migration.mf0879722;
+
+binding networkSend3 {
+  requires {
+    dependency("braintree/braintree_php")
+  }
+  query pattern callExpr where callee.method == "postMultipart"
+  emit sink code.NetworkSend at args[0]
+}

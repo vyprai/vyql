@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkConnect}
-
-adapter python {
-  package "boto" {
-    sink method "parse" -> code.Deserialization
-    sink method "connect" -> code.NetworkConnect
-  }
-}

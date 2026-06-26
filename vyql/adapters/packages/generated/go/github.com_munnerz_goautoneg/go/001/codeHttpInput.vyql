@@ -1,0 +1,9 @@
+module bindings.go.migration.mfa3aca3a;
+
+binding httpInput1 {
+  requires {
+    dependency("github.com/munnerz/goautoneg")
+  }
+  query pattern callExpr where callee.method == "Negotiate"
+  emit source code.HttpInput at call.result
+}

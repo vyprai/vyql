@@ -1,0 +1,9 @@
+module bindings.php.migration.me4f39690;
+
+binding fileUse1 {
+  requires {
+    dependency("enlightn/security-checker")
+  }
+  query pattern callExpr where callee.method == "writeCacheFile"
+  emit sink code.FileUseSink at args[0]
+}

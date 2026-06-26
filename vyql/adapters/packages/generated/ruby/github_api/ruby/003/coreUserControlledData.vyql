@@ -1,0 +1,9 @@
+module bindings.ruby.migration.med7e12a4;
+
+binding userControlledData3 {
+  requires {
+    dependency("github_api")
+  }
+  query pattern callExpr where callee.method == "Utils::Url.unescape"
+  emit source core.UserControlledData at call.result
+}

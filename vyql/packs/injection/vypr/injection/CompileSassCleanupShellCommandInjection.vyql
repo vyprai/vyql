@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CompileSassCleanupShellCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-095"
+    severity: critical
+  }
+  issue code.CompileSassCleanupShellCommandWithoutPathCheck as sink
+}

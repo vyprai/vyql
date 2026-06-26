@@ -1,0 +1,9 @@
+module bindings.php.migration.m0f2ba173;
+
+binding networkSend12 {
+  requires {
+    dependency("pestphp/pest-plugin-laravel")
+  }
+  query pattern callExpr where callee.method == "from"
+  emit sink code.NetworkSend at args[0]
+}

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/parser"
 )
 
 type topPackageSources struct {
@@ -102,6 +104,32 @@ func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 	}
 }
 
+func TestGeneratedPackageAdapterSourceRejectsLegacySyntax(t *testing.T) {
+	source := datadir.Source{
+		Name: "adapters/packages/generated/javascript/legacy.vyql",
+		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
+	}
+
+	_, err := parseGeneratedPackageAdapterSource(source)
+	if err == nil {
+		t.Fatal("generated package adapter accepted legacy syntax")
+	}
+	if !strings.Contains(err.Error(), "invalid generated package adapter adapters/packages/generated/javascript/legacy.vyql") {
+		t.Fatalf("generated adapter error = %v, want generated file context", err)
+	}
+
+	decls, err := parser.ParseRuntimeCompat(string(source.Data))
+	if err != nil {
+		t.Fatalf("compat parser should still accept migration legacy syntax: %v", err)
+	}
+	if len(decls) != 1 {
+		t.Fatalf("compat generated adapter decl count = %d, want 1", len(decls))
+	}
+	if _, ok := decls[0].(*parser.AdapterDecl); !ok {
+		t.Fatalf("compat generated adapter decl = %T, want *parser.AdapterDecl", decls[0])
+	}
+}
+
 func mustReadJSON(t *testing.T, rel string, dst any) {
 	t.Helper()
 	b, err := datadir.Read(rel)
@@ -122,17 +150,24 @@ func supportedPackageCatalogLanguages(t *testing.T) []string {
 	}
 	var out []string
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".vyql" {
+		var lang string
+		if entry.IsDir() {
+			if entry.Name() == "generated" {
+				continue
+			}
+			lang = entry.Name()
+		} else if filepath.Ext(entry.Name()) == ".vyql" {
+			lang = entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
+		} else {
 			continue
 		}
-		lang := entry.Name()[:len(entry.Name())-len(filepath.Ext(entry.Name()))]
 		out = append(out, lang)
 	}
 	if len(out) != 22 {
 		t.Fatalf("supported package catalogs = %d (%v), want 22", len(out), out)
 	}
 	for _, lang := range out {
-		if _, err := os.Stat(filepath.Join(root, fmt.Sprintf("%s.vyql", lang))); err != nil {
+		if _, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join("adapters", "packages", fmt.Sprintf("%s.vyql", lang)))); err != nil {
 			t.Fatalf("missing catalog for %s: %v", lang, err)
 		}
 	}

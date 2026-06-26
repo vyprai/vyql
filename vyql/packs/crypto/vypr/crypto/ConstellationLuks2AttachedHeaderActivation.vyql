@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule ConstellationLuks2AttachedHeaderActivation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347]
+    id: "VYQL-CRY-008"
+    severity: high
+  }
+  issue code.ConstellationLuks2AttachedHeaderActivation as c
+}

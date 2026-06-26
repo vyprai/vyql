@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m26ac4b8f;
+
+binding httpInput2 {
+  requires {
+    dependency("webpack-dev-middleware")
+  }
+  query pattern callExpr where callee.method == "honoWrapper"
+  emit source code.HttpInput at call.result
+}

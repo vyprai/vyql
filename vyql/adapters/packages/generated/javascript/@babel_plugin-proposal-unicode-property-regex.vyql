@@ -1,8 +1,0 @@
-import code.{RegexCompile}
-adapter javascript {
-  package "@babel/plugin-proposal-unicode-property-regex" {
-    flag code.RegexCompile on any {
-      method "default"
-    }
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "drf-yasg" {
-    sink method "yaml_load" -> code.Deserialization
-    sink method "yaml_sane_load" -> code.Deserialization
-  }
-}

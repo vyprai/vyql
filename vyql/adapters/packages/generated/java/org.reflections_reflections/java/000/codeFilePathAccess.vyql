@@ -1,0 +1,9 @@
+module bindings.java.migration.m8e08a2a1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.reflections:reflections")
+  }
+  query pattern callExpr where callee.method == "getFile"
+  emit sink code.FilePathAccess at args[0]
+}

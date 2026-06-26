@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m470abfc0;
+
+binding sqlExecution2 {
+  requires {
+    dependency("paginator")
+  }
+  query pattern callExpr where callee.method == "Paginator.Ecto.Query.reverse_order_bys"
+  emit sink code.SqlExecution at args[0]
+}

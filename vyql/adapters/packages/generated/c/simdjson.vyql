@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter c {
-  package "simdjson" {
-    sink method "parse" -> code.Deserialization
-    sink method "load" -> code.Deserialization
-    sink method "parse_string" -> code.Deserialization
-    sink method "parse_wobbly_string" -> code.Deserialization
-  }
-}

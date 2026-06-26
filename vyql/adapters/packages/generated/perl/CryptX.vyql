@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter perl {
-  package "CryptX" {
-    source method "Crypt::PRNG::random_bytes" -> code.SecretValue
-  }
-}

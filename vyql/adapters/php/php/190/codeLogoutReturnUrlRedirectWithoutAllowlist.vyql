@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding logoutReturnUrlRedirectWithoutAllowlist190 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=handle", "name=logout", "name=logOut", "name=redirect"]) and node.token contains "call_path:$request.getQueryParams" and node.token contains "call_path:Arr.get" and node.token contains "call_path:RedirectResponse" and not (node.token contains "call_path:sanitizeReturnUrl") and not (node.token contains "call_path:url_is_external") and not (node.token contains "call_path:is_safe_url") and not (node.token contains "call_path:getAllowedRedirectDomains")
+  emit issue code.LogoutReturnUrlRedirectWithoutAllowlist at node
+}

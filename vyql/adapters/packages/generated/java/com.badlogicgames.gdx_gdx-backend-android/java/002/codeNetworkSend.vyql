@@ -1,0 +1,9 @@
+module bindings.java.migration.m06c858bd;
+
+binding networkSend2 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-backend-android")
+  }
+  query pattern callExpr where callee.method == "sendHttpRequest"
+  emit sink code.NetworkSend at args[0]
+}

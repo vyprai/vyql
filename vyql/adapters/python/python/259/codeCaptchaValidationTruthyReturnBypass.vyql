@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding captchaValidationTruthyReturnBypass259 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["function_name:validate", "function_name:verify", "function_name:check"]) and node.token contains "call_path:session.get" and node.token contains "call_path:session.__setitem__" and containsAny(node.token, ["call_path:request.form[].strip", "call_path:request.form.get"]) and node.token contains "call_arg:session.get:captcha_answer" and containsAny(node.token, ["binary:__binop.and"]) and containsAny(node.token, ["binary:__binop.eq"]) and not (containsAny(node.token, ["binary:__binop.is not", "binary:value != None", "binary:answer != None"]))
+  emit issue code.CaptchaValidationTruthyReturnBypass at node
+}

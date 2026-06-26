@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding httpInput46 {
+  query pattern callExpr where callee.path ~= "ctx.request.body"
+  emit source code.HttpInput at call.result
+}

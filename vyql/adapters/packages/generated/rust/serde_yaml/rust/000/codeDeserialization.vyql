@@ -1,0 +1,9 @@
+module bindings.rust.migration.m392a8805;
+
+binding deserialization0 {
+  requires {
+    dependency("serde_yaml")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

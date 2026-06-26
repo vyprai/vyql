@@ -1,0 +1,9 @@
+module bindings.dart.migration.me8cafdb0;
+
+binding httpInput1 {
+  requires {
+    dependency("stacked")
+  }
+  query pattern callExpr where callee.method == "Parameters"
+  emit source code.HttpInput at call.result
+}

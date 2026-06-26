@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mb204f76f;
+
+binding sqlExecution5 {
+  requires {
+    dependency("sqlpp11")
+  }
+  query pattern callExpr where callee.method == "outer_join"
+  emit sink code.SqlExecution at args[0]
+}

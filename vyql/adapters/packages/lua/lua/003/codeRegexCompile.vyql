@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding regexCompile3 {
+  requires {
+    dependency("openresty")
+  }
+  query pattern callExpr where callee.path ~= "ngx.re.match"
+  emit sink code.RegexCompileSink at args[0]
+}

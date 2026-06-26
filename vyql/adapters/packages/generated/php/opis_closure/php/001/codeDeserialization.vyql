@@ -1,0 +1,9 @@
+module bindings.php.migration.m7a664c31;
+
+binding deserialization1 {
+  requires {
+    dependency("opis/closure")
+  }
+  query pattern callExpr where callee.method == "OpisClosureSerializer::decode"
+  emit sink code.Deserialization at args[0]
+}

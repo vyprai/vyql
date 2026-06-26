@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4013f612;
+
+binding deserialization2 {
+  requires {
+    dependency("rome:rome")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

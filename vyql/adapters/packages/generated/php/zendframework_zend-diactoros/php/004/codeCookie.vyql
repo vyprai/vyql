@@ -1,0 +1,9 @@
+module bindings.php.migration.m4685cbb4;
+
+binding cookie4 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "ServerRequest::withCookieParams"
+  emit source code.Cookie at call.result
+}

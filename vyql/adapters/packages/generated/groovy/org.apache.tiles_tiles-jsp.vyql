@@ -1,8 +1,0 @@
-adapter groovy {
-  package "org.apache.tiles:tiles-jsp" {
-    sink method "InsertTemplateTag.doTag" -> code.TemplateRender
-    sink method "InsertDefinitionTag.doTag" -> code.TemplateRender
-    source method "PutAttributeTag.setValue" -> core.UserControlledData
-    source method "PutAttributeTag.setExpression" -> core.UserControlledData
-  }
-}

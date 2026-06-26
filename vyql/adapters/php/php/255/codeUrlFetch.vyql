@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding urlFetch255 {
+  query pattern callExpr where callee.path ~= "curl_exec"
+  emit sink code.UrlFetch at args[0]
+}

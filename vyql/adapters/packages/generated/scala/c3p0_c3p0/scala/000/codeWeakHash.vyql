@@ -1,0 +1,13 @@
+module bindings.scala.migration.m9d7b3af3;
+
+binding weakHash0 {
+  requires {
+    dependency("c3p0:c3p0")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "hash"
+  emit issue code.WeakHash at node
+}

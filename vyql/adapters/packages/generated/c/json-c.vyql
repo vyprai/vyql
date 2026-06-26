@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "json-c" {
-    sink method "json_tokener_parse" -> code.Deserialization
-    sink method "json_tokener_parse_ex" -> code.Deserialization
-  }
-}

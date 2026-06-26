@@ -1,6 +1,0 @@
-adapter elixir {
-  package "elixir_feed_parser" {
-    sink method "parse_string" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

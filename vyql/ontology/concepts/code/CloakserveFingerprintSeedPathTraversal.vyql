@@ -1,0 +1,11 @@
+module code;
+
+concept CloakserveFingerprintSeedPathTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "an unauthenticated caller can reach the cloakserve fingerprint route and choose the seed path segment"
+  reviewCategory: path
+  reviewCondition: "cloakserve uses a request-supplied fingerprint seed as a Chrome profile directory component before validating it"
+  reviewConfidence: high
+  reviewEvidence: "ChromePool.get_or_launch context {pattern} joins seed_key under data_dir, creates the profile directory, and cleans it with rmtree without the patched SAFE_SEED_RE and _safe_rmtree guards"
+  vulnerableTo: [path.PathTraversal]
+}

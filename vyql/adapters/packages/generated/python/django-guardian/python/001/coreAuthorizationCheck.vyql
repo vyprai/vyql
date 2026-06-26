@@ -1,0 +1,14 @@
+module bindings.python.migration.mfe65b901;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("django-guardian")
+  }
+  query pattern callExpr where callee.method == "get_group_perms"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

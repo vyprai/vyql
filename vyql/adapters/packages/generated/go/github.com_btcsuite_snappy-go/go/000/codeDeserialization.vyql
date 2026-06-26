@@ -1,0 +1,9 @@
+module bindings.go.migration.m25bd0ddf;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/btcsuite/snappy-go")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}

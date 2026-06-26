@@ -1,8 +1,0 @@
-import code.{CodeEval, FilePathAccess}
-
-adapter python {
-  package "pyflakes" {
-    sink method "check" -> code.CodeEval
-    sink method "checkPath" -> code.FilePathAccess
-  }
-}

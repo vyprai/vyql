@@ -1,0 +1,9 @@
+module bindings.rust.migration.m074e875c;
+
+binding codeEval8 {
+  requires {
+    dependency("dispatch")
+  }
+  query pattern callExpr where callee.method == "dispatch_barrier_sync_f"
+  emit sink code.CodeEval at args[0]
+}

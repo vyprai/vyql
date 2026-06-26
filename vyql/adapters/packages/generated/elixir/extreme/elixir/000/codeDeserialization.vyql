@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf5b60d29;
+
+binding deserialization0 {
+  requires {
+    dependency("extreme")
+  }
+  query pattern callExpr where callee.method == "Extreme.Response.parse"
+  emit sink code.Deserialization at args[0]
+}

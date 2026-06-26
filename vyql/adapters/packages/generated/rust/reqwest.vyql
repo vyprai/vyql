@@ -1,7 +1,0 @@
-import code.{NetworkConnect, HttpInput}
-
-adapter rust {
-  package "reqwest" {
-    sink method "send" -> code.NetworkConnect
-  }
-}

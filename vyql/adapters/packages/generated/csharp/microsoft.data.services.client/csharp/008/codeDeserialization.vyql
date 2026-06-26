@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m9974d4d4;
+
+binding deserialization8 {
+  requires {
+    dependency("microsoft.data.services.client")
+  }
+  query pattern callExpr where callee.method == "ToClrValue"
+  emit sink code.Deserialization at args[0]
+}

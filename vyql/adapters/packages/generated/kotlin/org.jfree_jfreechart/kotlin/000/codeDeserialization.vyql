@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma33e9292;
+
+binding deserialization0 {
+  requires {
+    dependency("org.jfree:jfreechart")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

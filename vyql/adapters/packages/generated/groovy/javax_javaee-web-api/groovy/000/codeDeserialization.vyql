@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md2d28b65;
+
+binding deserialization0 {
+  requires {
+    dependency("javax:javaee-web-api")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

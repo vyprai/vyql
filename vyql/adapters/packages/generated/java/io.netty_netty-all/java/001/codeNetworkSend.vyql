@@ -1,0 +1,9 @@
+module bindings.java.migration.mc02accc9;
+
+binding networkSend1 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "writeBytes"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m8b93e1a3;
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/dom-crawler")
+  }
+  query pattern callExpr where callee.method == "addHtmlContent"
+  emit sink code.Deserialization at args[0]
+}

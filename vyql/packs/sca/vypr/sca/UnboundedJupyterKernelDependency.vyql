@@ -1,0 +1,10 @@
+module vypr.sca;
+
+rule UnboundedJupyterKernelDependency {
+  meta {
+    cwe: [CWE_1104]
+    id: "VYQL-SCA-007"
+    severity: high
+  }
+  issue code.UnboundedJupyterKernelDependency as p
+}

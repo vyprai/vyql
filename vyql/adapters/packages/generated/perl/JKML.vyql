@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "JKML" {
-    sink method "decode_jkml" -> code.Deserialization
-  }
-}

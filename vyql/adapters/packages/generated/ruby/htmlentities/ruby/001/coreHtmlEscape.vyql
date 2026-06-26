@@ -1,0 +1,14 @@
+module bindings.ruby.migration.mb9ad016e;
+
+binding htmlEscape1 {
+  requires {
+    dependency("htmlentities")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

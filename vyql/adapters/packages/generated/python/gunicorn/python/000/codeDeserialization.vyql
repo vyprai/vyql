@@ -1,0 +1,9 @@
+module bindings.python.migration.m18a81a7b;
+
+binding deserialization0 {
+  requires {
+    dependency("gunicorn")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

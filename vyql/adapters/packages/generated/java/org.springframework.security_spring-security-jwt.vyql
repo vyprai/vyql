@@ -1,8 +1,0 @@
-import core.{UserControlledData, AuthenticationCheck}
-
-adapter java {
-  package "org.springframework.security:spring-security-jwt" {
-    source method "JwtHelper.decode" -> core.UserControlledData
-    control method "JwtHelper.decodeAndVerify" -> core.AuthenticationCheck
-  }
-}

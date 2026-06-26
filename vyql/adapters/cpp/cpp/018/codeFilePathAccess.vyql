@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding filePathAccess18 {
+  query pattern callExpr where callee.path ~= "open"
+  emit sink code.FilePathAccess at args[0]
+}

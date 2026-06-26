@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter java {
-  package "org.seleniumhq.selenium:selenium-ie-driver" {
-    sink method "addCommandSwitches" -> code.CommandExecution
-  }
-}

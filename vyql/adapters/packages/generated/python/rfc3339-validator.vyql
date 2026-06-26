@@ -1,5 +1,0 @@
-adapter python {
-  package "rfc3339-validator" {
-    control method "validate_rfc3339" -> core.InputValidation
-  }
-}

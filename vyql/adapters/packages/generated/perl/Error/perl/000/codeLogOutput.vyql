@@ -1,0 +1,9 @@
+module bindings.perl.migration.m157054e9;
+
+binding logOutput0 {
+  requires {
+    dependency("Error")
+  }
+  query pattern callExpr where callee.method == "stacktrace"
+  emit sink code.LogOutput at args[0]
+}

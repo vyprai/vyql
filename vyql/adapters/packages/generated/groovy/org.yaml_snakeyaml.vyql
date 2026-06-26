@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.yaml:snakeyaml" {
-    sink method "load" -> code.Deserialization
-    sink method "loadAs" -> code.Deserialization
-    sink method "loadAll" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

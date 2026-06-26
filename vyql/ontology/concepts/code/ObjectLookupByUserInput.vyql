@@ -1,0 +1,12 @@
+module code;
+
+concept ObjectLookupByUserInput : sink {
+  cwe: [CWE_639]
+  enabledBy: [taint.UntrustedData]
+  review_assumption: "the object is not constrained to the authenticated principal or tenant"
+  reviewCategory: access_control
+  reviewCondition: "attacker-controlled object id reaches a direct object lookup"
+  reviewConfidence: medium
+  reviewEvidence: "lookup primitive {pattern} receives tainted input"
+  vulnerableTo: [access_control.Idor]
+}

@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.glassfish.jaxb:jaxb-runtime" {
-    sink method "parse" -> code.Deserialization
-  }
-}

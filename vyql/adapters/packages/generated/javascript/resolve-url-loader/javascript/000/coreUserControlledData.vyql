@@ -1,0 +1,9 @@
+module bindings.javascript.migration.madd9e1f7;
+
+binding userControlledData0 {
+  requires {
+    dependency("resolve-url-loader")
+  }
+  query pattern callExpr where callee.method == "resolveUrlLoader"
+  emit source core.UserControlledData at call.result
+}

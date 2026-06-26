@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization}
-
-adapter perl {
-  package "ShipIt" {
-    sink method "parse" -> code.Deserialization
-    sink method "system" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding envVariable4 {
+  query pattern callExpr where callee.path ~= "ENV"
+  emit source code.EnvVariable at call.result
+}

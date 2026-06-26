@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2fc6db66;
+
+binding httpInput0 {
+  requires {
+    dependency("workbox-routing")
+  }
+  query pattern callExpr where callee.method == "handleRequest"
+  emit source code.HttpInput at call.result
+}

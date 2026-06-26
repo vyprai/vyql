@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mef66eb3a;
+
+binding deserialization1 {
+  requires {
+    dependency("fastcdr")
+  }
+  query pattern callExpr where callee.method == "read_wstring"
+  emit sink code.Deserialization at args[0]
+}

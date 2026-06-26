@@ -1,0 +1,9 @@
+module bindings.python.migration.md4eb2962;
+
+binding commandExecution1 {
+  requires {
+    dependency("pep517")
+  }
+  query pattern callExpr where callee.method == "quiet_subprocess_runner"
+  emit sink code.CommandExecution at args[0]
+}

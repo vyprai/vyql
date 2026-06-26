@@ -13,12 +13,16 @@ package frontend
 // engine's apply-time packageAllowed gate remains the authoritative second check.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
@@ -42,46 +46,141 @@ func DependencyEvidence(s usg.Store) map[string]bool {
 	return packageEvidence(s, "", true)
 }
 
+var generatedPackageIndex sync.Map // map[tech]map[lowercase stem]actual stem
+
 // GeneratedPackageAdaptersFor loads the generated per-package adapters for a language,
-// restricted to packages present in deps. Missing corpus, unreadable files, or individual
-// files that fail to parse are skipped silently — the generated catalog augments a scan,
-// it never breaks one. Returns nil when nothing matches.
+// restricted to packages present in deps. The generated directory is indexed once per
+// language, then each call reads only files named by project dependency evidence.
+// Missing corpus remains non-fatal because the generated catalog augments a scan.
+// Present generated files must parse/lower successfully so SCA/CVE verification
+// cannot silently lose package coverage. Returns nil when nothing matches.
 func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.Adapter {
 	if len(deps) == 0 {
 		return nil
 	}
-	dir := filepath.Join(generatedRoot(), tech)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
+	index := generatedPackageFileIndex(tech)
+	if len(index) == 0 {
 		return nil
 	}
 	merged := &parser.AdapterDecl{Name: tech, Meta: map[string]any{}}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".vyql") {
+	for _, stem := range generatedPackageCandidateStems(deps) {
+		actual, ok := index[strings.ToLower(stem)]
+		if !ok {
 			continue
 		}
-		pkg := strings.TrimSuffix(e.Name(), ".vyql")
-		if !packageInEvidence(pkg, deps) {
-			continue
-		}
-		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		sources, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join("adapters", "packages", "generated", tech, actual+".vyql")))
 		if err != nil {
-			continue
+			panic(fmt.Sprintf("frontend: read generated package adapter %s/%s: %v", tech, actual, err))
 		}
-		decls, err := parser.Parse(string(b))
-		if err != nil {
-			continue
-		}
-		for _, d := range decls {
-			a, ok := d.(*parser.AdapterDecl)
-			if !ok || a.Name != tech {
-				continue
+		for _, source := range sources {
+			decls, err := parseGeneratedPackageAdapterSource(source)
+			if err != nil {
+				panic(err.Error())
 			}
-			merged.Mappings = append(merged.Mappings, a.Mappings...)
+			for _, d := range decls {
+				a, ok := d.(*parser.AdapterDecl)
+				if !ok || a.Name != tech {
+					continue
+				}
+				merged.Mappings = append(merged.Mappings, a.Mappings...)
+			}
 		}
 	}
 	if len(merged.Mappings) == 0 {
 		return nil
 	}
 	return adaptersFromSpec(specFromDecl(merged))
+}
+
+func parseGeneratedPackageAdapterSource(source datadir.Source) ([]parser.Decl, error) {
+	decls, err := parseV2RuntimeAdapterSources([]datadir.Source{source})
+	if err != nil {
+		return nil, fmt.Errorf("frontend: invalid generated package adapter %s: %w", source.Name, err)
+	}
+	return decls, nil
+}
+
+func generatedPackageFileIndex(tech string) map[string]string {
+	if cached, ok := generatedPackageIndex.Load(tech); ok {
+		return cached.(map[string]string)
+	}
+	dir := filepath.Join(generatedRoot(), tech)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		empty := map[string]string{}
+		generatedPackageIndex.Store(tech, empty)
+		return empty
+	}
+	out := map[string]string{}
+	for _, e := range entries {
+		var stem string
+		if e.IsDir() {
+			stem = e.Name()
+		} else if strings.HasSuffix(e.Name(), ".vyql") {
+			stem = strings.TrimSuffix(e.Name(), ".vyql")
+		} else {
+			continue
+		}
+		out[strings.ToLower(stem)] = stem
+	}
+	generatedPackageIndex.Store(tech, out)
+	return out
+}
+
+func generatedPackageCandidateStems(deps map[string]bool) []string {
+	seen := map[string]bool{}
+	addName := func(name string) {
+		name = sca.NormalizePackageName(name)
+		if name == "" {
+			return
+		}
+		addPackagePathPrefixes(seen, name)
+		if root := sca.PackageRoot(name); root != "" {
+			addPackagePathPrefixes(seen, root)
+		}
+		for _, alias := range sca.ImportAliases(name) {
+			addPackagePathPrefixes(seen, alias)
+		}
+	}
+	for dep := range deps {
+		addName(dep)
+	}
+	var out []string
+	for stem := range seen {
+		out = append(out, stem)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func addPackagePathPrefixes(out map[string]bool, name string) {
+	if name == "" {
+		return
+	}
+	addPackageStem(out, name)
+	if strings.HasPrefix(name, "@") {
+		if parts := strings.Split(name, "/"); len(parts) >= 2 {
+			addPackageStem(out, parts[0]+"/"+parts[1])
+		}
+		return
+	}
+	parts := strings.Split(name, "/")
+	if len(parts) > 1 {
+		for i := 2; i <= len(parts); i++ {
+			addPackageStem(out, strings.Join(parts[:i], "/"))
+		}
+	}
+	dotParts := strings.Split(name, ".")
+	if len(dotParts) > 1 {
+		for i := 2; i <= len(dotParts); i++ {
+			addPackageStem(out, strings.Join(dotParts[:i], "."))
+		}
+	}
+}
+
+func addPackageStem(out map[string]bool, name string) {
+	stem := strings.NewReplacer("/", "_", "\\", "_").Replace(name)
+	if stem != "" {
+		out[strings.ToLower(stem)] = true
+	}
 }

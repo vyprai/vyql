@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "Text-MessageFormat" {
-    sink method "new" -> code.Deserialization
-  }
-}

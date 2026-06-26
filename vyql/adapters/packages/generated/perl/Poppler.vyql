@@ -1,5 +1,0 @@
-adapter perl {
-  package "Poppler" {
-    sink method "Poppler::Document::new_from_file" -> code.FilePathAccess
-  }
-}

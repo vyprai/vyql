@@ -1,0 +1,9 @@
+module bindings.objc.migration.m792df8bf;
+
+binding deserialization2 {
+  requires {
+    dependency("SBJson")
+  }
+  query pattern callExpr where callee.method == "multiRootParserWithBlock"
+  emit sink code.Deserialization at args[0]
+}

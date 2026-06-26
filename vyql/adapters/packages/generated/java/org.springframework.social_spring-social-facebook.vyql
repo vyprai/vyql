@@ -1,8 +1,0 @@
-adapter java {
-  package "org.springframework.social:spring-social-facebook" {
-    source method "fetchObject" -> code.NetworkData
-    source method "fetchConnections" -> code.NetworkData
-    sink method "publish" -> code.NetworkSend
-    sink method "post" -> code.NetworkSend
-  }
-}

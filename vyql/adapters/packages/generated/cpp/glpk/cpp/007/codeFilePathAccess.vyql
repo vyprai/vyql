@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mdddbcb0d;
+
+binding filePathAccess7 {
+  requires {
+    dependency("glpk")
+  }
+  query pattern callExpr where callee.method == "glp_write_mps"
+  emit sink code.FilePathAccess at args[0]
+}

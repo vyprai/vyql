@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mda897de6;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.xbean:xbean-spring")
+  }
+  query pattern callExpr where callee.method == "rebind"
+  emit sink code.Deserialization at args[0]
+}

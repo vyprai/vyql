@@ -1,0 +1,14 @@
+module bindings.php.migration.mecdba9b5;
+
+binding authenticationCheck7 {
+  requires {
+    dependency("nexmo/client-core")
+  }
+  query pattern callExpr where callee.method == "generateJwt"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

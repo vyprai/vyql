@@ -1,0 +1,9 @@
+module bindings.php.migration.m2276f8e9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("laminas/laminas-loader")
+  }
+  query pattern callExpr where callee.method == "LaminasLoaderStandardAutoloader::loadClass"
+  emit sink code.FilePathAccess at args[0]
+}

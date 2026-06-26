@@ -1,0 +1,9 @@
+module bindings.php.migration.ma476dac8;
+
+binding networkData2 {
+  requires {
+    dependency("guzzlehttp/ringphp")
+  }
+  query pattern callExpr where callee.method == "createResponse"
+  emit source code.NetworkData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{CodeEval, Deserialization, SqlExecution}
-adapter dart {
-  package "mongo_dart_query" {
-    sink method "jsQuery" -> code.CodeEval
-    sink method "raw" -> code.Deserialization
-    sink method "Match" -> code.SqlExecution
-  }
-}

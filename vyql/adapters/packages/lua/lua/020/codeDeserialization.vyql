@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding deserialization20 {
+  requires {
+    dependency("lua-cjson")
+  }
+  query pattern callExpr where callee.path ~= "cjson.decode"
+  emit sink code.Deserialization at args[0]
+}

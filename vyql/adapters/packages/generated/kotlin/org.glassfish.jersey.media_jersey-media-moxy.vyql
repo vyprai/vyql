@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.glassfish.jersey.media:jersey-media-moxy" {
-    sink method "initializeUnmarshaller" -> code.Deserialization
-  }
-}

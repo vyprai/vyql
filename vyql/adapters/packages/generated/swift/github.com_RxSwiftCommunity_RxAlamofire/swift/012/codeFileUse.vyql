@@ -1,0 +1,9 @@
+module bindings.swift.migration.m586c3899;
+
+binding fileUse12 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.FileUseSink at args[0]
+}

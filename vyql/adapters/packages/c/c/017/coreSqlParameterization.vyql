@@ -1,0 +1,14 @@
+module bindings.c.migration.m2816daee;
+
+binding sqlParameterization17 {
+  requires {
+    dependency("libpq")
+  }
+  query pattern callExpr where callee.path ~= "PQescapeStringConn"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

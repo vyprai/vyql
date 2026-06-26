@@ -1,0 +1,9 @@
+module bindings.python.migration.m051ea694;
+
+binding networkConnect0 {
+  requires {
+    dependency("requests-toolbelt")
+  }
+  query pattern callExpr where callee.method == "requests_toolbelt.sessions.BaseUrlSession.request"
+  emit sink code.NetworkConnectSink at args[0]
+}

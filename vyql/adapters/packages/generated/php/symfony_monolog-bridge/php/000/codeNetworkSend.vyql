@@ -1,0 +1,9 @@
+module bindings.php.migration.m7d25bced;
+
+binding networkSend0 {
+  requires {
+    dependency("symfony/monolog-bridge")
+  }
+  query pattern callExpr where callee.method == "stream_socket_sendto"
+  emit sink code.NetworkSend at args[0]
+}

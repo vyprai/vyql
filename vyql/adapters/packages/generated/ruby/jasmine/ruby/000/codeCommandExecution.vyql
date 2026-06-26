@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mcc87902b;
+
+binding commandExecution0 {
+  requires {
+    dependency("jasmine")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.CommandExecution at args[0]
+}

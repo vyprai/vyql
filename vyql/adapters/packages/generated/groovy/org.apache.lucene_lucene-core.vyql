@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.apache.lucene:lucene-core" {
-    source method "read" -> core.UserControlledData
-  }
-}

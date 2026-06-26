@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m16a2cff2;
+
+binding sqlExecution4 {
+  requires {
+    dependency("com.github.miemiedev:mybatis-paginator")
+  }
+  query pattern callExpr where callee.method == "getSortString"
+  emit sink code.SqlExecution at args[0]
+}

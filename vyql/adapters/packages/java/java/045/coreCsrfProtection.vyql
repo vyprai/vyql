@@ -1,0 +1,14 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding csrfProtection45 {
+  requires {
+    dependency("spring-security")
+  }
+  query pattern callExpr where callee.path ~= "CsrfToken"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

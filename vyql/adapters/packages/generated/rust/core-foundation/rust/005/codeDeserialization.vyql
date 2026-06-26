@@ -1,0 +1,9 @@
+module bindings.rust.migration.md1392577;
+
+binding deserialization5 {
+  requires {
+    dependency("core-foundation")
+  }
+  query pattern callExpr where callee.method == "from_buffer"
+  emit sink code.Deserialization at args[0]
+}

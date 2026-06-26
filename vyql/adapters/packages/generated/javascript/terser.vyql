@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "terser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

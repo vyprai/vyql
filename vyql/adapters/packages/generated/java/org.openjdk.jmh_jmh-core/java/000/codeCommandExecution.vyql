@@ -1,0 +1,9 @@
+module bindings.java.migration.ma29ab65a;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "doFork"
+  emit sink code.CommandExecution at args[0]
+}

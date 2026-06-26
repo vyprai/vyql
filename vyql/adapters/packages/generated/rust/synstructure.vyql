@@ -1,5 +1,0 @@
-adapter rust {
-  package "synstructure" {
-    sink method "ensure_compiles" -> code.DynamicCodeLoad
-  }
-}

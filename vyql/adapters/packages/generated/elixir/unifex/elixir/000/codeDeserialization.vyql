@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m6f4d2a5c;
+
+binding deserialization0 {
+  requires {
+    dependency("unifex")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

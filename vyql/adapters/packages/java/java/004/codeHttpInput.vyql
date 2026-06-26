@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding httpInput4 {
+  requires {
+    dependency("org.springframework")
+  }
+  query pattern callExpr where callee.path ~= ".getHeader"
+  emit source code.HttpInput at call.result
+}

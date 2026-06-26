@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md6f18c21;
+
+binding filePathAccess0 {
+  requires {
+    dependency("css_parser")
+  }
+  query pattern callExpr where callee.method == "load_uri!"
+  emit sink code.FilePathAccess at args[0]
+}

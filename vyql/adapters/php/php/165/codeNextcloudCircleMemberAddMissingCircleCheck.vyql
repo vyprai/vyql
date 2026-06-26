@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding nextcloudCircleMemberAddMissingCircleCheck165 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=memberAdd" and node.token contains "generateFederatedUser($userId,$type)" and node.token contains "addMember($circleId,$federatedUser)" and not (node.token contains "Member::TYPE_CIRCLE") and not (node.token contains "circleService->getCircle($userId)")
+  emit issue code.NextcloudCircleMemberAddMissingCircleCheck at node
+}

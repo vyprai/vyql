@@ -1,0 +1,13 @@
+module bindings.swift.migration.m27f9f375;
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/awslabs/aws-crt-swift")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "computeSHA1"
+  emit issue code.WeakHash at node
+}

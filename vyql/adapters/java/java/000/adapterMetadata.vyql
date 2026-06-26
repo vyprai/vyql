@@ -1,0 +1,13 @@
+module bindings.java.migration.m420f6b67;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "java"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

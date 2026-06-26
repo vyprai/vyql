@@ -1,0 +1,9 @@
+module bindings.dart.migration.mcff10504;
+
+binding filePathAccess0 {
+  requires {
+    dependency("riverpod_generator")
+  }
+  query pattern callExpr where callee.method == "assetPath"
+  emit sink code.FilePathAccess at args[0]
+}

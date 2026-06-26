@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "trust-dns-proto" {
-    sink method "read" -> code.Deserialization
-    sink method "read_data" -> code.Deserialization
-  }
-}

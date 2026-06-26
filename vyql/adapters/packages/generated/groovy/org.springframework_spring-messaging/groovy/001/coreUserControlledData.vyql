@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mad3f0932;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.springframework:spring-messaging")
+  }
+  query pattern callExpr where callee.method == "getHeaders"
+  emit source core.UserControlledData at call.result
+}

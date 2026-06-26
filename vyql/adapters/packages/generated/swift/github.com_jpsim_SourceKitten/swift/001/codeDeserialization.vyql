@@ -1,0 +1,9 @@
+module bindings.swift.migration.m03d71708;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/jpsim/SourceKitten")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,5 +1,0 @@
-adapter php {
-  package "ergebnis/composer-normalize" {
-    sink method "normalize" -> code.Deserialization
-  }
-}

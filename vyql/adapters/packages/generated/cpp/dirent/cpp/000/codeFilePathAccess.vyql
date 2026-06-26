@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m01ea10e7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dirent")
+  }
+  query pattern callExpr where callee.method == "opendir"
+  emit sink code.FilePathAccess at args[0]
+}

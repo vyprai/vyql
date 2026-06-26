@@ -1,0 +1,9 @@
+module bindings.go.migration.m20179f3a;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/docker/cli")
+  }
+  query pattern callExpr where callee.method == "ValidateEnv"
+  emit source core.UserControlledData at call.result
+}

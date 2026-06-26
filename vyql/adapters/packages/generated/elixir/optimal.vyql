@@ -1,7 +1,0 @@
-import core.{InputValidation}
-adapter elixir {
-  package "optimal" {
-    control method "validate" -> core.InputValidation
-    control method "validate!" -> core.InputValidation
-  }
-}

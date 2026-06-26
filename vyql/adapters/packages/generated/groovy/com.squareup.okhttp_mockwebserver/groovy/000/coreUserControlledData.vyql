@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m417fc301;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "getPath"
+  emit source core.UserControlledData at call.result
+}

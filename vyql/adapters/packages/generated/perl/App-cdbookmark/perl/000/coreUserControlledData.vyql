@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1223a792;
+
+binding userControlledData0 {
+  requires {
+    dependency("App-cdbookmark")
+  }
+  query pattern callExpr where callee.method == "cdbookmark_backend"
+  emit source core.UserControlledData at call.result
+}

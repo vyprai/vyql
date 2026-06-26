@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m07b39768;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.zeroturnaround:zt-zip")
+  }
+  query pattern callExpr where callee.method == "unpack"
+  emit sink code.FilePathAccess at args[0]
+}

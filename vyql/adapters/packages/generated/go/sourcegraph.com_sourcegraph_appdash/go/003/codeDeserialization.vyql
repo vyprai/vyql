@@ -1,0 +1,9 @@
+module bindings.go.migration.m4d8ccd46;
+
+binding deserialization3 {
+  requires {
+    dependency("sourcegraph.com/sourcegraph/appdash")
+  }
+  query pattern callExpr where callee.method == "ParseSpanID"
+  emit sink code.Deserialization at args[0]
+}

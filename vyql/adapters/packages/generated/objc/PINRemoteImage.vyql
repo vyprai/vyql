@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-
-adapter objc {
-  package "PINRemoteImage" {
-    sink method "scheduleDownloadWithRequest" -> code.UrlFetch
-    sink method "addDownloadWithSessionManager" -> code.UrlFetch
-  }
-}

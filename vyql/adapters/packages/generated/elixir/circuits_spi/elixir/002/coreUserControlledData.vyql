@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m6fc05958;
+
+binding userControlledData2 {
+  requires {
+    dependency("circuits_spi")
+  }
+  query pattern callExpr where callee.method == "transfer"
+  emit source core.UserControlledData at call.result
+}

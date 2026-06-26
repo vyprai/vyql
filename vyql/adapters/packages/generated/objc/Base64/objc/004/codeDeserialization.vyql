@@ -1,0 +1,9 @@
+module bindings.objc.migration.m48a85977;
+
+binding deserialization4 {
+  requires {
+    dependency("Base64")
+  }
+  query pattern callExpr where callee.method == "dataFromBase64String"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-adapter groovy {
-  package "io.cucumber:cucumber-testng" {
-    sink method "runScenario" -> code.ExpressionEval
-    source method "TestNGCucumberRunner" -> core.UserControlledData
-  }
-}

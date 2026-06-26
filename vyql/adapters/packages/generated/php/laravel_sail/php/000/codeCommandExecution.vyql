@@ -1,0 +1,9 @@
+module bindings.php.migration.m6bcd860b;
+
+binding commandExecution0 {
+  requires {
+    dependency("laravel/sail")
+  }
+  query pattern callExpr where callee.method == "runCommands"
+  emit sink code.CommandExecution at args[0]
+}

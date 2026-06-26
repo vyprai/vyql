@@ -1,0 +1,14 @@
+module bindings.perl.migration.md5b2a6ed;
+
+binding shellEscape1 {
+  requires {
+    dependency("Char-Cyrillic")
+  }
+  query pattern callExpr where callee.method == "_escapeshellcmd"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

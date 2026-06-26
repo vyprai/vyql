@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter php {
-  package "vlucas/phpdotenv" {
-    sink method "parse" -> code.Deserialization
-    sink method "load" -> code.FilePathAccess
-  }
-}

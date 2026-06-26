@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "spirv" {
-    sink method "from_str" -> code.Deserialization
-  }
-}

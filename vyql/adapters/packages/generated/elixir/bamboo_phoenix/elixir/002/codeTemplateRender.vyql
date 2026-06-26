@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m1b7dbac3;
+
+binding templateRender2 {
+  requires {
+    dependency("bamboo_phoenix")
+  }
+  query pattern callExpr where callee.method == "assign"
+  emit sink code.TemplateRender at args[0]
+}

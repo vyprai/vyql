@@ -1,0 +1,9 @@
+module bindings.objc.migration.m6190fe32;
+
+binding networkSend1 {
+  requires {
+    dependency("LFLiveKit")
+  }
+  query pattern callExpr where callee.method == "sendFrame"
+  emit sink code.NetworkSend at args[0]
+}

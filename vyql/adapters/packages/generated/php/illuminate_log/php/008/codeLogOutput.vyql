@@ -1,0 +1,9 @@
+module bindings.php.migration.mf7bebf2b;
+
+binding logOutput8 {
+  requires {
+    dependency("illuminate/log")
+  }
+  query pattern callExpr where callee.method == "log"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mdc6801fc;
+
+binding userControlledData0 {
+  requires {
+    dependency("BerkeleyDB")
+  }
+  query pattern callExpr where callee.method == "ParseParameters"
+  emit source core.UserControlledData at call.result
+}

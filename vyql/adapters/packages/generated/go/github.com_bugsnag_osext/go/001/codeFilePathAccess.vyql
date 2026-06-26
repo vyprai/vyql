@@ -1,0 +1,9 @@
+module bindings.go.migration.m73543500;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/bugsnag/osext")
+  }
+  query pattern callExpr where callee.method == "ExecutableFolder"
+  emit sink code.FilePathAccess at args[0]
+}

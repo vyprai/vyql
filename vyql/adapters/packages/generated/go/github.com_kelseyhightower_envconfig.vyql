@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/kelseyhightower/envconfig" {
-    source method "Process" -> core.UserControlledData
-    source method "MustProcess" -> core.UserControlledData
-  }
-}

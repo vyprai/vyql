@@ -1,0 +1,14 @@
+module bindings.php.migration.m34d9c21e;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("ircmaxell/password-compat")
+  }
+  query pattern callExpr where callee.method == "password_verify"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m49d40bc5;
+
+binding networkConnect0 {
+  requires {
+    dependency("SocketRocket")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

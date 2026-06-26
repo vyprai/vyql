@@ -1,0 +1,9 @@
+module bindings.perl.migration.m25682e96;
+
+binding commandExecution4 {
+  requires {
+    dependency("Sjis")
+  }
+  query pattern callExpr where callee.method == "_systemx"
+  emit sink code.CommandExecution at args[0]
+}

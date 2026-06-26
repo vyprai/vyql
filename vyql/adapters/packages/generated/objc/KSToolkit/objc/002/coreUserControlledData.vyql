@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf363386e;
+
+binding userControlledData2 {
+  requires {
+    dependency("KSToolkit")
+  }
+  query pattern callExpr where callee.method == "getUrlParams"
+  emit source core.UserControlledData at call.result
+}

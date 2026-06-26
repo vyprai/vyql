@@ -1,0 +1,9 @@
+module bindings.swift.migration.mab0c3409;
+
+binding fileUse1 {
+  requires {
+    dependency("github.com/dreymonde/Shallows")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.FileUseSink at args[0]
+}

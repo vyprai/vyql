@@ -1,6 +1,0 @@
-import code.{NetworkConnect}
-adapter swift {
-  package "github.com/supabase-community/realtime-swift" {
-    sink method "connect" -> code.NetworkConnect
-  }
-}

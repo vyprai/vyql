@@ -1,0 +1,9 @@
+module bindings.php.migration.m3388e338;
+
+binding commandExecution0 {
+  requires {
+    dependency("consolidation/site-process")
+  }
+  query pattern callExpr where callee.method == "mustRun"
+  emit sink code.CommandExecution at args[0]
+}

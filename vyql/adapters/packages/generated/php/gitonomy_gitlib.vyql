@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter php {
-  package "gitonomy/gitlib" {
-    sink method "run" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

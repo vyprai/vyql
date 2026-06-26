@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9ec18a80;
+
+binding networkSend0 {
+  requires {
+    dependency("fog-brightbox")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

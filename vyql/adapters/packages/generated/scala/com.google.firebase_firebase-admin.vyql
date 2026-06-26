@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.google.firebase:firebase-admin" {
-    sink method "FirebaseTokenVerifierImpl.parse" -> code.Deserialization
-  }
-}

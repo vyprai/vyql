@@ -1,6 +1,0 @@
-adapter php {
-  package "composer/class-map-generator" {
-    sink method "scanPaths" -> code.FilePathAccess
-    sink method "findClasses" -> code.FilePathAccess
-  }
-}

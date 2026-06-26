@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m21d23a8b;
+
+binding deserialization0 {
+  requires {
+    dependency("org.spockframework:spock-spring")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

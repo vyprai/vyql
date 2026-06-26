@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdb4d9ca9;
+
+binding deserialization0 {
+  requires {
+    dependency("MLKitFaceDetection")
+  }
+  query pattern callExpr where callee.method == "processImage"
+  emit sink code.Deserialization at args[0]
+}

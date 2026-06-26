@@ -1,5 +1,0 @@
-adapter rust {
-  package "system-deps" {
-    sink method "parse_deps_table" -> code.Deserialization
-  }
-}

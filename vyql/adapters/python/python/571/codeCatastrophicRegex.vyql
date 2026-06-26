@@ -1,0 +1,7 @@
+module bindings.python.migration.m21017d75;
+
+binding catastrophicRegex571 {
+  query pattern callExpr where callee.path ~= "re.compile" and args.any.literal contains "[^@]+(?:\\.[^@]+)*"
+  emit sink code.CatastrophicRegexSink at args[0]
+  emit issue code.CatastrophicRegex at call
+}

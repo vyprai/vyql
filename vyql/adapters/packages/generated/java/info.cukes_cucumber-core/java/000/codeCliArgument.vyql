@@ -1,0 +1,9 @@
+module bindings.java.migration.m490e28e4;
+
+binding cliArgument0 {
+  requires {
+    dependency("info.cukes:cucumber-core")
+  }
+  query pattern callExpr where callee.method == "cucumber.api.cli.Main.run"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m422ff57e;
+
+binding networkSend7 {
+  requires {
+    dependency("algolia/algoliasearch-client-php")
+  }
+  query pattern callExpr where callee.method == "customPut"
+  emit sink code.NetworkSend at args[0]
+}

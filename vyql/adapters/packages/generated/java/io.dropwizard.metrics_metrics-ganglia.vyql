@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter java {
-  package "io.dropwizard.metrics:metrics-ganglia" {
-    sink method "announce" -> code.NetworkSend
-  }
-}

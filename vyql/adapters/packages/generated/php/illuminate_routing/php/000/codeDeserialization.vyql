@@ -1,0 +1,9 @@
+module bindings.php.migration.m24b29a83;
+
+binding deserialization0 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "RouteUri::parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m3181293e;
+
+binding userControlledData0 {
+  requires {
+    dependency("base58")
+  }
+  query pattern callExpr where callee.method == "b58decode"
+  emit source core.UserControlledData at call.result
+}

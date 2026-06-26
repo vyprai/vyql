@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "parse-zoneinfo" {
-    sink method "Line::from_str" -> code.Deserialization
-    sink method "TimeSpec::from_str" -> code.Deserialization
-  }
-}

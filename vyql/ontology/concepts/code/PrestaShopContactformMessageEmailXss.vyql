@@ -1,0 +1,11 @@
+module code;
+
+concept PrestaShopContactformMessageEmailXss : issue {
+  cwe: [CWE_79]
+  review_assumption: "the contact form message field is attacker-controlled and rendered in HTML email clients or back-office mail views"
+  reviewCategory: xss
+  reviewCondition: "PrestaShop contactform inserts the submitted message into email template variables without HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "contactform sendMessage context {pattern} applies nl2br and stripslashes to the message before Mail::Send without htmlentitiesUTF8"
+  vulnerableTo: [injection.Xss]
+}

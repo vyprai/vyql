@@ -1,8 +1,0 @@
-adapter python {
-  package "pyinotify" {
-    sink method "add_watch" -> code.FilePathAccess
-    source method "command_line" -> code.CliArgument
-    sink method "read_events" -> code.FilePathAccess
-    sink method "process_events" -> code.FilePathAccess
-  }
-}

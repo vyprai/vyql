@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mebe89998;
+
+binding codeEval1 {
+  requires {
+    dependency("lazy-importer")
+  }
+  query pattern callExpr where callee.method == "lazy_module"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m31666a03;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.avro:avro")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

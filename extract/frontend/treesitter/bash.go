@@ -163,6 +163,11 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		if event, ok := sourceVarEvent("bash", name); ok {
 			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
 		}
+		if nested := c.shNestedSourceRefs(n, name); len(nested) > 0 {
+			parts := []nir.Expr{nir.Name{ID: name, Loc: L}}
+			parts = append(parts, nested...)
+			return nir.Format{Parts: parts, Loc: L}
+		}
 		return nir.Name{ID: name, Loc: L}
 	case "string", "concatenation":
 		var parts []nir.Expr
@@ -171,6 +176,9 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 				k == "command_substitution" || k == "string" || k == "concatenation" {
 				parts = append(parts, c.expr(ch))
 			}
+		}
+		if event, ok := sourceVarEventInText("bash", c.text(n)); ok && !shExprsHaveCallPath(parts, event) {
+			parts = append(parts, nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L})
 		}
 		if len(parts) > 0 {
 			return nir.Format{Parts: parts, Loc: L}
@@ -216,6 +224,72 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *shConv) shNestedSourceRefs(root *tree_sitter.Node, outer string) []nir.Expr {
+	var out []nir.Expr
+	seen := map[string]bool{}
+	add := func(event string, loc string) {
+		if event == "" || seen[event] {
+			return
+		}
+		seen[event] = true
+		out = append(out, nir.Call{Callee: nir.Name{ID: event, Loc: loc}, Path: event, Method: event, Loc: loc})
+	}
+	if event, ok := sourceVarEventInText("bash", c.text(root)); ok {
+		add(event, c.loc(root))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "variable_name", "special_variable_name":
+			name := c.text(n)
+			if name != outer {
+				if event, ok := sourceVarEvent("bash", name); ok {
+					add(event, c.loc(n))
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	for _, ch := range namedChildren(root) {
+		walk(ch)
+	}
+	return out
+}
+
+func shExprsHaveCallPath(exprs []nir.Expr, path string) bool {
+	for _, expr := range exprs {
+		if shExprHasCallPath(expr, path) {
+			return true
+		}
+	}
+	return false
+}
+
+func shExprHasCallPath(expr nir.Expr, path string) bool {
+	switch v := expr.(type) {
+	case nir.Call:
+		if v.Path == path {
+			return true
+		}
+		return shExprsHaveCallPath(v.Args, path)
+	case nir.Format:
+		return shExprsHaveCallPath(v.Parts, path)
+	case nir.Seq:
+		return shExprsHaveCallPath(v.Parts, path)
+	case nir.BinOp:
+		return shExprHasCallPath(v.Left, path) || shExprHasCallPath(v.Right, path)
+	case nir.Unary:
+		return shExprHasCallPath(v.Operand, path)
+	default:
+		return false
+	}
 }
 
 func shLiteralValue(raw string) string {

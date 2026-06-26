@@ -1,0 +1,11 @@
+module code;
+
+concept AbsolutePathDisclosure : issue {
+  cwe: [CWE_200]
+  review_assumption: "the output may be observable outside the host boundary or persisted for later comparison"
+  reviewCategory: secret
+  reviewCondition: "an absolute local path is included in externally visible or reusable output"
+  reviewConfidence: possibility
+  reviewEvidence: "absolute path disclosure pattern {pattern} preserves resolved filesystem location information"
+  vulnerableTo: [secrets.SecretLeak]
+}

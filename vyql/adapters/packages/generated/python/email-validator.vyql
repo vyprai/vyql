@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter python {
-  package "email-validator" {
-    control method "validate_email" -> core.InputValidation
-  }
-}

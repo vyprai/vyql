@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding exportDefaultPublicFilesystemDisk326 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=getFileDisk" and node.token contains "call_path:config" and node.token contains "literal:filament.default_filesystem_disk" and not (node.token contains "literal:local") and not (node.token contains "call_path:array_key_exists")
+  emit issue code.ExportDefaultPublicFilesystemDisk at node
+}

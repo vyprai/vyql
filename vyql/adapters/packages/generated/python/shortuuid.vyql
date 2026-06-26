@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "shortuuid" {
-    sink method "decode" -> code.Deserialization
-  }
-}

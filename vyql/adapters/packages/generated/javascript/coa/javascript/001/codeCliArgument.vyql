@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5b9c56c6;
+
+binding cliArgument1 {
+  requires {
+    dependency("coa")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

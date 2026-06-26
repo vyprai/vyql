@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m19ced11c;
+
+binding expressionEval0 {
+  requires {
+    dependency("exometer_core")
+  }
+  query pattern callExpr where callee.method == "eval_exprs"
+  emit sink code.ExpressionEval at args[0]
+}

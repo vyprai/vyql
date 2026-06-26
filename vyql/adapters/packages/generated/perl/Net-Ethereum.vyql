@@ -1,7 +1,0 @@
-import code.{Deserialization, NetworkSend}
-adapter perl {
-  package "Net-Ethereum" {
-    sink method "eth_sendTransaction" -> code.NetworkSend
-    sink method "sendTransaction" -> code.NetworkSend
-  }
-}

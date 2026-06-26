@@ -1,0 +1,8 @@
+module code;
+
+review code.MultiOptionUrlValidationBypass {
+  category: request_forgery
+  expected: [core.RedirectAllowlist]
+  kind: attention
+  text: "review multi-option authentication URL validation for callback host allowlisting"
+}

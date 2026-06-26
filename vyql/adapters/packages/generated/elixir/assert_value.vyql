@@ -1,8 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-
-adapter elixir {
-  package "assert_value" {
-    sink method "check_string_and_file_read" -> code.FilePathAccess
-    sink method "parse_assert_value" -> code.Deserialization
-  }
-}

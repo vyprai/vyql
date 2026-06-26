@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkData}
-
-adapter php {
-  package "symfony/contracts" {
-    sink method "request" -> code.NetworkConnect
-    sink method "request" -> code.NetworkSend
-    source method "stream" -> code.NetworkData
-  }
-}

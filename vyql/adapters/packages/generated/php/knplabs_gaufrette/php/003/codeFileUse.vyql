@@ -1,0 +1,9 @@
+module bindings.php.migration.m001f1d31;
+
+binding fileUse3 {
+  requires {
+    dependency("knplabs/gaufrette")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FileUseSink at args[0]
+}

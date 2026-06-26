@@ -1,0 +1,9 @@
+module bindings.python.migration.mb8e7c75a;
+
+binding deserialization0 {
+  requires {
+    dependency("netaddr")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

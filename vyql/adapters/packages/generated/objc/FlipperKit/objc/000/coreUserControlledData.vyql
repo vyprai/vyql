@@ -1,0 +1,9 @@
+module bindings.objc.migration.m09608f84;
+
+binding userControlledData0 {
+  requires {
+    dependency("FlipperKit")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

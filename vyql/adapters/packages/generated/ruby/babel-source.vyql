@@ -1,8 +1,0 @@
-import code.{CodeEval, Deserialization}
-adapter ruby {
-  package "babel-source" {
-    sink method "exec" -> code.CodeEval
-    sink method "run" -> code.CodeEval
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding codeEval13 {
+  requires {
+    dependency("lua")
+  }
+  query pattern callExpr where callee.path ~= "loadstring"
+  emit sink code.CodeEval at args[0]
+}

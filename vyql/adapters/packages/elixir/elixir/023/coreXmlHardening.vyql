@@ -1,0 +1,14 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding xmlHardening23 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.path ~= "SweetXml.parse" and args.any.literal contains "dtd=false"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

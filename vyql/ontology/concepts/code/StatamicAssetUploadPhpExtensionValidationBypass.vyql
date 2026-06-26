@@ -1,0 +1,11 @@
+module code;
+
+concept StatamicAssetUploadPhpExtensionValidationBypass : issue {
+  cwe: [CWE_434]
+  review_assumption: "a front-end Statamic Forms asset field is exposed and uploaded files can later be served or executed by the deployment"
+  reviewCategory: upload
+  reviewCondition: "Statamic front-end form asset uploads use only Laravel's file rule without rejecting PHP executable extensions"
+  reviewConfidence: high
+  reviewEvidence: "FormController extraRules context {pattern} applies the generic file rule to asset fields without a client-original-extension PHP denylist"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

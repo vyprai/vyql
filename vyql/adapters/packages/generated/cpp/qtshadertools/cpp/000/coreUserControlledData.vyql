@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc71a236c;
+
+binding userControlledData0 {
+  requires {
+    dependency("qtshadertools")
+  }
+  query pattern callExpr where callee.method == "QShaderBaker::setSourceFileName"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.md198fb05;
+
+binding expressionEval4 {
+  requires {
+    dependency("org.glassfish.web:javax.el")
+  }
+  query pattern callExpr where callee.method == "DynamicExpression"
+  emit sink code.ExpressionEval at args[0]
+}

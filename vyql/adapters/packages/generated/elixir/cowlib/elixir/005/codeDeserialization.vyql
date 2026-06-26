@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf15b86d9;
+
+binding deserialization5 {
+  requires {
+    dependency("cowlib")
+  }
+  query pattern callExpr where callee.method == "parse_cookie_trim"
+  emit sink code.Deserialization at args[0]
+}

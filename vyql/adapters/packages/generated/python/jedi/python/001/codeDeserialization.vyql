@@ -1,0 +1,9 @@
+module bindings.python.migration.meaa5f734;
+
+binding deserialization1 {
+  requires {
+    dependency("jedi")
+  }
+  query pattern callExpr where callee.method == "parse_and_get_code"
+  emit sink code.Deserialization at args[0]
+}

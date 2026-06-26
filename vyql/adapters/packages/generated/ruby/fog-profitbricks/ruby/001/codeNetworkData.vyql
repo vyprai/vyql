@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8cfb9945;
+
+binding networkData1 {
+  requires {
+    dependency("fog-profitbricks")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}

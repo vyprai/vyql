@@ -1,0 +1,14 @@
+module bindings.perl.migration.mb1af140d;
+
+binding authorizationCheck7 {
+  requires {
+    dependency("Catalyst-Plugin-Authentication-Store-RDBO")
+  }
+  query pattern callExpr where callee.method == "roles"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

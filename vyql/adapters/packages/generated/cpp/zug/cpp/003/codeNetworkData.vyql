@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9db0069f;
+
+binding networkData3 {
+  requires {
+    dependency("zug")
+  }
+  query pattern callExpr where callee.method == "write_inputs"
+  emit source code.NetworkData at call.result
+}

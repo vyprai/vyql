@@ -1,0 +1,9 @@
+module bindings.php.migration.m001c4b27;
+
+binding htmlRender8 {
+  requires {
+    dependency("laravelcollective/html")
+  }
+  query pattern callExpr where callee.method == "date"
+  emit sink code.HtmlRender at args[0]
+}

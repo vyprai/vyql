@@ -1,0 +1,9 @@
+module bindings.perl.migration.me75e208e;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("Attean")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

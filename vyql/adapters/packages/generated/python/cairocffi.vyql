@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "cairocffi" {
-    sink method "decode_to_pixbuf" -> code.Deserialization
-    sink method "decode_to_image_surface" -> code.Deserialization
-  }
-}

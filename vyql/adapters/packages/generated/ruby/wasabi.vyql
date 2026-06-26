@@ -1,8 +1,0 @@
-import code.{Deserialization, UrlFetch}
-
-adapter ruby {
-  package "wasabi" {
-    sink method "parse_url" -> code.UrlFetch
-    sink method "initialize" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.maeb3cd42;
+
+binding httpInput0 {
+  requires {
+    dependency("matchit")
+  }
+  query pattern callExpr where callee.method == "Router.insert"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m9d786d35;
+
+binding urlFetch2 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "LoadFromFileOrHTTPWithTimeout"
+  emit sink code.UrlFetch at args[0]
+}

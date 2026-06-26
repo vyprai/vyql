@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding commandExecution81 {
+  query pattern callExpr where callee.path ~= "channel.NewLocalChannel.Run"
+  emit sink code.CommandExecution at args.any
+}

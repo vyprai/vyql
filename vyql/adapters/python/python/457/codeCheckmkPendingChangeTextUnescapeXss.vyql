@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding checkmkPendingChangeTextUnescapeXss457 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=get_all_data_required_for_activation_popout" and node.token contains "PendingChangeSummary(" and node.token contains "changeText=unescape(change[\"text\"])" and not (node.token contains "changeText=change[\"text\"]")
+  emit issue code.CheckmkPendingChangeTextUnescapeXss at node
+}

@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "PerlPoint-Template-TT2" {
-    sink method "new" -> code.CodeEval
-  }
-}

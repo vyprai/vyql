@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0d60f419;
+
+binding storedDataRead1 {
+  requires {
+    dependency("hydrated_bloc")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

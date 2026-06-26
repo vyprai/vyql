@@ -1,0 +1,9 @@
+module bindings.rust.migration.mb8e55656;
+
+binding deserialization0 {
+  requires {
+    dependency("cssparser")
+  }
+  query pattern callExpr where callee.method == "get_string"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{NetworkData, Deserialization}
-
-adapter php {
-  package "padraic/phar-updater" {
-    source method "downloadPhar" -> code.NetworkData
-    sink method "validatePhar" -> code.Deserialization
-  }
-}

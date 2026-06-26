@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m4e76e37d;
+
+binding htmlRender2 {
+  requires {
+    dependency("microsoft.toolkit.forms.ui.controls.webview")
+  }
+  query pattern callExpr where callee.method == "NavigateToString"
+  emit sink code.HtmlRender at args[0]
+}

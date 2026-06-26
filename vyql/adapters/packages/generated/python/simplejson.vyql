@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "simplejson" {
-    sink method "load" -> code.Deserialization
-    sink method "loads" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-    sink method "raw_decode" -> code.Deserialization
-  }
-}

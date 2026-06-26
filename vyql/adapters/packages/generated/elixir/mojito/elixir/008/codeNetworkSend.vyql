@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7a8231df;
+
+binding networkSend8 {
+  requires {
+    dependency("mojito")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit sink code.NetworkSend at args[0]
+}

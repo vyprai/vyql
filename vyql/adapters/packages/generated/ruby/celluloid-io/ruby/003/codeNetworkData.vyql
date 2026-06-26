@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8593331a;
+
+binding networkData3 {
+  requires {
+    dependency("celluloid-io")
+  }
+  query pattern callExpr where callee.method == "sysread"
+  emit source code.NetworkData at call.result
+}

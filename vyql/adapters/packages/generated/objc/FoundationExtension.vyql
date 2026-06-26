@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter objc {
-  package "FoundationExtension" {
-    sink method "initWithPaths:latency:flags:delegate:" -> code.FilePathAccess
-    sink method "scheduledEventStreamWithPaths:latency:flags:delegate:" -> code.FilePathAccess
-    sink method "scheduledEventStreamWithPath:latency:flags:delegate:" -> code.FilePathAccess
-  }
-}

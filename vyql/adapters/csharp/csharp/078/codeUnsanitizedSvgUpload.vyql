@@ -1,0 +1,10 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding unsanitizedSvgUpload78 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and containsAny(node.token, ["param_type:Stream", "param_type:IFormFile", "param_type:IBrowserFile"]) and containsAny(node.token, ["call_path:Upload", "call_path:UploadAsync", "call_path:Save", "call_path:SaveAsync", "call_path:Write", "call_path:WriteAsync", "call_path:CopyTo"]) and containsAny(node.token, ["selector:.Name", "selector:.FileName", "selector:.NormalizedName", "selector:.ContentType", "selector:.Extension"]) and containsAny(node.token, ["identifier:file", "identifier:stream", "identifier:content", "identifier:upload"]) and not (containsAny(node.token, ["call_path:SanitizeSvg", "call_path:sanitizeSvg", "call_path:svgSanitize", "call_path:XmlReader.Create", "call_path:XDocument.Load", "call_path:HtmlSanitizer"]))
+  emit issue code.UnsanitizedSvgUpload at node
+}

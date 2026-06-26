@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc9bf9bf6;
+
+binding deserialization0 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "parse_database"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding logOutput406 {
+  query pattern callExpr where callee.path ~= "log.info"
+  emit sink code.LogOutput at args.any
+}

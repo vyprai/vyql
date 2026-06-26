@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-adapter objc {
-  package "React" {
-    sink method "downloadTaskWithRequest" -> code.NetworkConnect
-    sink method "initWithRequest" -> code.NetworkConnect
-  }
-}

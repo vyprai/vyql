@@ -1,0 +1,9 @@
+module bindings.python.migration.m2b60fdc0;
+
+binding networkData7 {
+  requires {
+    dependency("h2")
+  }
+  query pattern callExpr where callee.method == "H2Stream.process_input"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.me4890779;
+
+binding networkData2 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "serve"
+  emit source code.NetworkData at call.result
+}

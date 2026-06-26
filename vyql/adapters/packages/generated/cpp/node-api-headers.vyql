@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter cpp {
-  package "node-api-headers" {
-    sink method "napi_run_script" -> code.CodeEval
-  }
-}

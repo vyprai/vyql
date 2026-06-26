@@ -1,9 +1,0 @@
-import code.{SecretValue}
-adapter php {
-  package "league/oauth1-client" {
-    source method "Credentials.getSecret" -> code.SecretValue
-    source method "Credentials.setSecret" -> code.SecretValue
-    source method "TokenCredentials.getIdentifier" -> code.SecretValue
-    source method "TokenCredentials.getSecret" -> code.SecretValue
-  }
-}

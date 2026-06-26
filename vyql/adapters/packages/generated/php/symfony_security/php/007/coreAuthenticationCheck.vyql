@@ -1,0 +1,14 @@
+module bindings.php.migration.m86f7686e;
+
+binding authenticationCheck7 {
+  requires {
+    dependency("symfony/security")
+  }
+  query pattern callExpr where callee.method == "isCredentialsNonExpired"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

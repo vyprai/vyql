@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5f396801;
+
+binding networkSend6 {
+  requires {
+    dependency("scenic_driver_nerves_rpi")
+  }
+  query pattern callExpr where callee.method == "send_key"
+  emit sink code.NetworkSend at args[0]
+}

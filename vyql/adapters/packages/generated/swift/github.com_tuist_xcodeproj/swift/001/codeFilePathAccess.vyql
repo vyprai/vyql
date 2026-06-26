@@ -1,0 +1,9 @@
+module bindings.swift.migration.md62bcff4;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/tuist/xcodeproj")
+  }
+  query pattern callExpr where callee.method == "writeWorkspace"
+  emit sink code.FilePathAccess at args[0]
+}

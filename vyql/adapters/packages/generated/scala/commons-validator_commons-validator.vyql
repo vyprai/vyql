@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter scala {
-  package "commons-validator:commons-validator" {
-    control method "isValid" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m0abb209c;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("joblib")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.StoredDataWrite at args[0]
+}

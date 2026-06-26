@@ -1,0 +1,9 @@
+module bindings.perl.migration.md85d39a7;
+
+binding cliArgument0 {
+  requires {
+    dependency("OptArgs")
+  }
+  query pattern callExpr where callee.method == "GetOptionsFromArray"
+  emit source code.CliArgument at call.result
+}

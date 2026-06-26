@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf35ca464;
+
+binding userControlledData4 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "try_recv"
+  emit source core.UserControlledData at call.result
+}

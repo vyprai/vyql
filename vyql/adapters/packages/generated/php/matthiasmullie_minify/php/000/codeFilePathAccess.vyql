@@ -1,0 +1,9 @@
+module bindings.php.migration.mfcc3a662;
+
+binding filePathAccess0 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "addFile"
+  emit sink code.FilePathAccess at args[0]
+}

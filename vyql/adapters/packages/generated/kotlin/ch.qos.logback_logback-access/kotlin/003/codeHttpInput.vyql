@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m9669be91;
+
+binding httpInput3 {
+  requires {
+    dependency("ch.qos.logback:logback-access")
+  }
+  query pattern callExpr where callee.method == "getRequestHeader"
+  emit source code.HttpInput at call.result
+}

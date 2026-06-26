@@ -1,0 +1,9 @@
+module bindings.dart.migration.mac6759df;
+
+binding deserialization1 {
+  requires {
+    dependency("coverage")
+  }
+  query pattern callExpr where callee.method == "HitMap.parseJson"
+  emit sink code.Deserialization at args[0]
+}

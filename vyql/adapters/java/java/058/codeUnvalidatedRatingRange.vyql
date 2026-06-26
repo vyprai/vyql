@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding unvalidatedRatingRange58 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:rateTopic" and node.token contains "call_path:registry.rateResource" and node.token contains "call_path:genericArtifact.getPath" and not (node.token contains "MAX_RATE") and not (node.token contains "MIN_RATE")
+  emit issue code.UnvalidatedRatingRange at node
+}

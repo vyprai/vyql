@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding deserialization285 {
+  query pattern callExpr where callee.path ~= "yaml.unsafe_load"
+  emit sink code.Deserialization at args[0]
+}

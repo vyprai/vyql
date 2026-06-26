@@ -1,0 +1,9 @@
+module bindings.java.migration.m912ff882;
+
+binding networkConnect4 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

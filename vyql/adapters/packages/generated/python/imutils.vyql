@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter python {
-  package "imutils" {
-    sink method "url_to_image" -> code.UrlFetch
-  }
-}

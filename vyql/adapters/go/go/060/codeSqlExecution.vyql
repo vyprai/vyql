@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding sqlExecution60 {
+  query pattern callExpr where callee.method == "QueryRow" and callee.receiver.type in [sql.DB, sqlx.DB, gorm.DB]
+  emit sink code.SqlExecution at args[0]
+}

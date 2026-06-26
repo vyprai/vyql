@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "simdjson" {
-    sink method "parse" -> code.Deserialization
-  }
-}

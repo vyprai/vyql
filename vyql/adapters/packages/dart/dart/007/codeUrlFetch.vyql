@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5342780c;
+
+binding urlFetch7 {
+  requires {
+    dependency("http")
+  }
+  query pattern callExpr where callee.path ~= "http.get"
+  emit sink code.UrlFetch at args[0]
+}

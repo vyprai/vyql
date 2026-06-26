@@ -1,0 +1,9 @@
+module bindings.php.migration.mdee1b9f3;
+
+binding filePathAccess3 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "readFile"
+  emit sink code.FilePathAccess at args[0]
+}

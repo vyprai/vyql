@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7ab87d2b;
+
+binding deserialization0 {
+  requires {
+    dependency("tentacat")
+  }
+  query pattern callExpr where callee.method == "process_response_body"
+  emit sink code.Deserialization at args[0]
+}

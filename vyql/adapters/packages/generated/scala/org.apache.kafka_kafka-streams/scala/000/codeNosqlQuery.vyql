@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9916cfd1;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.apache.kafka:kafka-streams")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m38885b37;
+
+binding userControlledData0 {
+  requires {
+    dependency("sebastian/type")
+  }
+  query pattern callExpr where callee.method == "Type::fromValue"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.mc5f1cd3a;
+
+binding networkSend2 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_send_headers"
+  emit sink code.NetworkSend at args[0]
+}

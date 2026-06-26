@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/naoina/toml" {
-    sink method "Parse" -> code.Deserialization
-    sink method "Unmarshal" -> code.Deserialization
-    sink method "NewDecoder" -> code.Deserialization
-    sink method "UnmarshalTable" -> code.Deserialization
-  }
-}

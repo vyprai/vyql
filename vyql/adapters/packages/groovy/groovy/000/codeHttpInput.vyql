@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding httpInput0 {
+  requires {
+    dependency("grails")
+  }
+  query pattern callExpr where callee.path ~= "params"
+  emit source code.HttpInput at call.result
+}

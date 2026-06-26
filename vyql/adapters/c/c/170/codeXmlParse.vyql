@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding xmlParse170 {
+  query pattern callExpr where callee.path ~= "xmlReadFile"
+  emit sink code.XmlParse at args[0]
+}

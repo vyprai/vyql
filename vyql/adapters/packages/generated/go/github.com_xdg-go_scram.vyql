@@ -1,6 +1,0 @@
-import code.{SecretValue}
-adapter go {
-  package "github.com/xdg-go/scram" {
-    source method "newClient" -> code.SecretValue
-  }
-}

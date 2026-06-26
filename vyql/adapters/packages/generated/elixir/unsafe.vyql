@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter elixir {
-  package "unsafe" {
-    sink method "Unsafe.Compiler.compile!" -> code.CodeEval
-  }
-}

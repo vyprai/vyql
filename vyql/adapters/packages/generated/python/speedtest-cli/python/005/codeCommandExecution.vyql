@@ -1,0 +1,9 @@
+module bindings.python.migration.mc2fad8fe;
+
+binding commandExecution5 {
+  requires {
+    dependency("speedtest-cli")
+  }
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}

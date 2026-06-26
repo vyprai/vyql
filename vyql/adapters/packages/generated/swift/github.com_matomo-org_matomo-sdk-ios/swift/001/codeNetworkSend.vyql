@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma4950829;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/matomo-org/matomo-sdk-ios")
+  }
+  query pattern callExpr where callee.method == "URLSessionDispatcher.send(events:success:failure:)"
+  emit sink code.NetworkSend at args[0]
+}

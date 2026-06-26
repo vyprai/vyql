@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9037b4c7;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/daltoniam/Starscream")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

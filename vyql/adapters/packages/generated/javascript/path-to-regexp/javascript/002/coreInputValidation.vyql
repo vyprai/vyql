@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m3c38face;
+
+binding inputValidation2 {
+  requires {
+    dependency("path-to-regexp")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

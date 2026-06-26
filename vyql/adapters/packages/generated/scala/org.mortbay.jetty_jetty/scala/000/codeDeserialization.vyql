@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb56e132d;
+
+binding deserialization0 {
+  requires {
+    dependency("org.mortbay.jetty:jetty")
+  }
+  query pattern callExpr where callee.method == "org.mortbay.jetty.HttpURI.parse"
+  emit sink code.Deserialization at args[0]
+}

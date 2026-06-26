@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9af36424;
+
+binding archiveEntryWrite0 {
+  requires {
+    dependency("archive-zip")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

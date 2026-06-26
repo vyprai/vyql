@@ -1,0 +1,9 @@
+module bindings.python.migration.m240fa5ae;
+
+binding networkConnect6 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit sink code.NetworkConnectSink at args[0]
+}

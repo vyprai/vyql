@@ -1,0 +1,9 @@
+module bindings.dart.migration.m849f089d;
+
+binding codeEval4 {
+  requires {
+    dependency("webview_flutter_android")
+  }
+  query pattern callExpr where callee.method == "evaluateJavascript"
+  emit sink code.CodeEval at args[0]
+}

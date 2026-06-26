@@ -1,0 +1,8 @@
+module core;
+
+concept SafeDeserialization : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_502]
+  neutralizes: [deserialization.DeserializationAbuse]
+}

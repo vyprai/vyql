@@ -1,0 +1,14 @@
+module bindings.java.migration.m87251a0e;
+
+binding ldapEscape1 {
+  requires {
+    dependency("org.springframework.security:spring-security-ldap")
+  }
+  query pattern callExpr where callee.method == "filterEncode"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

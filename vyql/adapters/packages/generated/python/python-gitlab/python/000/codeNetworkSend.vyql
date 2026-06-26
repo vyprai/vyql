@@ -1,0 +1,9 @@
+module bindings.python.migration.m0a3bbddc;
+
+binding networkSend0 {
+  requires {
+    dependency("python-gitlab")
+  }
+  query pattern callExpr where callee.method == "http_request"
+  emit sink code.NetworkSend at args[0]
+}

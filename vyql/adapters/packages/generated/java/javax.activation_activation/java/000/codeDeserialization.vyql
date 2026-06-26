@@ -1,0 +1,9 @@
+module bindings.java.migration.ma9959e29;
+
+binding deserialization0 {
+  requires {
+    dependency("javax.activation:activation")
+  }
+  query pattern callExpr where callee.method == "MimeType"
+  emit sink code.Deserialization at args[0]
+}

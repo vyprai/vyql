@@ -1,0 +1,9 @@
+module bindings.perl.migration.mac97a6e3;
+
+binding userControlledData7 {
+  requires {
+    dependency("App-ansifold")
+  }
+  query pattern callExpr where callee.method == "doit"
+  emit source core.UserControlledData at call.result
+}

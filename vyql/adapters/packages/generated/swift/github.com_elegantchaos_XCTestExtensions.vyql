@@ -1,7 +1,0 @@
-import code.{CommandExecution, CliArgument}
-
-adapter swift {
-  package "github.com/elegantchaos/XCTestExtensions" {
-    sink method "run" -> code.CommandExecution
-  }
-}

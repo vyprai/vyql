@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "moto" {
-    sink method "deserialize_body" -> code.Deserialization
-  }
-}

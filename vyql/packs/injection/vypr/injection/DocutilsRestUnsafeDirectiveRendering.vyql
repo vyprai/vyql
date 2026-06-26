@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule DocutilsRestUnsafeDirectiveRendering {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_22]
+    id: "VYQL-INJ-142"
+    severity: high
+  }
+  issue code.DocutilsRestUnsafeDirectiveRendering as sink
+}

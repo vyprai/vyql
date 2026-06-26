@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m6133c430;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.module:jackson-module-parameter-names")
+  }
+  query pattern callExpr where callee.method == "findImplicitPropertyName"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m2820fe1c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("zict")
+  }
+  query pattern callExpr where callee.path ~= "zict.File"
+  emit sink code.FilePathAccess at args[0]
+}

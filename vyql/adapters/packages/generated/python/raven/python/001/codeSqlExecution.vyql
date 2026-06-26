@@ -1,0 +1,9 @@
+module bindings.python.migration.mba7fb4c0;
+
+binding sqlExecution1 {
+  requires {
+    dependency("raven")
+  }
+  query pattern callExpr where callee.method == "captureQuery"
+  emit sink code.SqlExecution at args[0]
+}

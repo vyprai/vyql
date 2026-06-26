@@ -1,8 +1,0 @@
-adapter java {
-  package "org.springframework.plugin:spring-plugin-core" {
-    source method "supports" -> core.UserControlledData
-    source method "getPluginFor" -> core.UserControlledData
-    source method "getPluginsFor" -> core.UserControlledData
-    source method "getPluginOrDefaultFor" -> core.UserControlledData
-  }
-}

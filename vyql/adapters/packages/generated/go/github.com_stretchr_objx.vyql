@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-adapter go {
-  package "github.com/stretchr/objx" {
-    sink method "FromURLQuery" -> code.UrlFetch
-    sink method "MustFromURLQuery" -> code.UrlFetch
-  }
-}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "bunch" {
-    sink method "Bunch.Config.parse" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter php {
-  package "php-console/php-console" {
-    sink method "dispatchCode" -> code.CodeEval
-  }
-}

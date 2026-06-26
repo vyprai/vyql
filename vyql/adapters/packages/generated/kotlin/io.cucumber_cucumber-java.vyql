@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter kotlin {
-  package "io.cucumber:cucumber-java" {
-    control method "escapePattern" -> core.InputValidation
-  }
-}

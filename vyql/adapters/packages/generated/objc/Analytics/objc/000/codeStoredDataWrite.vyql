@@ -1,0 +1,9 @@
+module bindings.objc.migration.m69249d62;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("Analytics")
+  }
+  query pattern callExpr where callee.method == "setData:forKey:"
+  emit sink code.StoredDataWrite at args[0]
+}

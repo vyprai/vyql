@@ -1,0 +1,9 @@
+module bindings.rust.migration.m719fb5ae;
+
+binding deserialization0 {
+  requires {
+    dependency("base-x")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

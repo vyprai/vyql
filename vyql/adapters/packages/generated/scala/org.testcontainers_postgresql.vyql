@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.testcontainers:postgresql" {
-    sink method "getTestQueryString" -> code.SqlExecution
-  }
-}

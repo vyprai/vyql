@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mb065e17d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("simpleini")
+  }
+  query pattern callExpr where callee.method == "LoadFile"
+  emit sink code.FilePathAccess at args[0]
+}

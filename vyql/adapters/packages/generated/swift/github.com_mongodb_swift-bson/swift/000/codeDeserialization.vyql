@@ -1,0 +1,9 @@
+module bindings.swift.migration.m459dcca1;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/mongodb/swift-bson")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

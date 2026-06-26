@@ -1,0 +1,9 @@
+module bindings.php.migration.m1d82df5f;
+
+binding userControlledData0 {
+  requires {
+    dependency("ratchet/rfc6455")
+  }
+  query pattern callExpr where callee.method == "ServerNegotiator::handshake"
+  emit source core.UserControlledData at call.result
+}

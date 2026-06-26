@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m450cf8f9;
+
+binding networkConnect1 {
+  requires {
+    dependency("email_checker")
+  }
+  query pattern callExpr where callee.method == "EmailChecker.Check.SMTP.smtp_reply"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "ja_serializer" {
-    sink method "JaSerializer.ParamParser.parse" -> code.Deserialization
-  }
-}

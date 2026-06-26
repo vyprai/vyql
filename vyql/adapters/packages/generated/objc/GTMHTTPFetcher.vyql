@@ -1,7 +1,0 @@
-import code.{UrlFetch, HttpInput}
-adapter objc {
-  package "GTMHTTPFetcher" {
-    sink method "fetcherWithRequest" -> code.UrlFetch
-    sink method "initWithRequest" -> code.UrlFetch
-  }
-}

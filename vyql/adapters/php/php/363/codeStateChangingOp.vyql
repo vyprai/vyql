@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding stateChangingOp363 {
+  query pattern callExpr where callee.path ~= "update_option"
+  emit sink code.StateChangingOpSink at args[0]
+}

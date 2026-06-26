@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding unescapedDocsOpenapiUrl443 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=swagger_dashboard" and node.token contains "req.query_params.get(\"version\")" and node.token contains "openapi_url=root_path+f\"{self.openapi_url}?version={version}\"" and node.token contains "get_swagger_ui_html" and not (node.token contains "quote(version,safe='')")
+  emit issue code.UnescapedDocsOpenapiUrl at node
+}

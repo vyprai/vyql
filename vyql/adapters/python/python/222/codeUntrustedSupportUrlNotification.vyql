@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding untrustedSupportUrlNotification222 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=python" and node.token contains "name=post" and containsAny(node.token, ["call_path:validate_request", "call_path:self.validate_request"]) and containsAny(node.token, ["call_path:schedule_support_email", "call_path:send_support_email", "call_path:notify_admin", "call_path:send_mail", "call_path:send_email"]) and containsAny(node.token, ["literal:Site:", "literal:URL:", "literal:Url:", "literal:Website:"]) and containsAny(node.token, ["subscript:request['url']", "subscript:request['uri']", "subscript:request['site']", "subscript:payload['url']", "subscript:data['url']"]) and not (containsAny(node.token, ["selector:request.hostname", "selector:request.host", "selector:request.host_url", "selector:self.request.hostname", "selector:self.request.host"])) and not (containsAny(node.token, ["call_path:defang", "call_path:url_has_allowed_host_and_scheme", "call_path:is_safe_url", "call_path:same_origin", "call_path:allowed_host"]))
+  emit issue code.UntrustedSupportUrlNotification at node
+}

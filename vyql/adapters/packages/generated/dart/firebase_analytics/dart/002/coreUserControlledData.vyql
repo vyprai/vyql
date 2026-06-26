@@ -1,0 +1,9 @@
+module bindings.dart.migration.me53cda8b;
+
+binding userControlledData2 {
+  requires {
+    dependency("firebase_analytics")
+  }
+  query pattern callExpr where callee.method == "setUserProperty"
+  emit source core.UserControlledData at call.result
+}

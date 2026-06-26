@@ -1,0 +1,11 @@
+module code;
+
+concept CkeditorStaticProtectedSourceTokenBypass : issue {
+  cwe: [CWE_79]
+  review_assumption: "attacker-controlled source-mode HTML can include the reserved marker string alongside elements excluded from filtering"
+  reviewCategory: xss
+  reviewCondition: "CKEditor protected-source sanitization uses a static cke_temp marker that attacker-supplied HTML can collide with"
+  reviewConfidence: high
+  reviewEvidence: "HTML data processor context {pattern} skips source protection when matched HTML already contains the static cke_temp token"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m03268d36;
+
+binding networkSend9 {
+  requires {
+    dependency("crow")
+  }
+  query pattern callExpr where callee.method == "close_websockets"
+  emit sink code.NetworkSend at args[0]
+}

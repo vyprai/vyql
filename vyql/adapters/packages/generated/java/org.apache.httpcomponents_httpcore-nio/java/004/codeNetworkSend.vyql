@@ -1,0 +1,9 @@
+module bindings.java.migration.m9e05fe53;
+
+binding networkSend4 {
+  requires {
+    dependency("org.apache.httpcomponents:httpcore-nio")
+  }
+  query pattern callExpr where callee.method == "outputReady"
+  emit sink code.NetworkSend at args[0]
+}

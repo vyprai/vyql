@@ -1,5 +1,0 @@
-adapter perl {
-  package "PDL" {
-    sink method "system" -> code.CommandExecution
-  }
-}

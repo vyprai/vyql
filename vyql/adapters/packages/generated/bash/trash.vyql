@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter bash {
-  package "trash" {
-    sink path "trash" -> code.FilePathAccess
-  }
-}

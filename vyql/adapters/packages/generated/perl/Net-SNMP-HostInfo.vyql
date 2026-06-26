@@ -1,8 +1,0 @@
-import code.{SecretValue, NetworkConnect, NetworkData}
-
-adapter perl {
-  package "Net-SNMP-HostInfo" {
-    sink method "new" -> code.NetworkConnect
-    source method "getTable" -> code.NetworkData
-  }
-}

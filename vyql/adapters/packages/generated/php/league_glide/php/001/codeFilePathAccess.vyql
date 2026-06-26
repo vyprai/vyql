@@ -1,0 +1,9 @@
+module bindings.php.migration.m05c08863;
+
+binding filePathAccess1 {
+  requires {
+    dependency("league/glide")
+  }
+  query pattern callExpr where callee.method == "LeagueGlideServer::outputImage"
+  emit sink code.FilePathAccess at args[0]
+}

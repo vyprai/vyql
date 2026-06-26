@@ -1,0 +1,9 @@
+module bindings.swift.migration.mceef4e68;
+
+binding expressionEval8 {
+  requires {
+    dependency("github.com/pointfreeco/swift-html")
+  }
+  query pattern callExpr where callee.method == "onloadedmetadata"
+  emit sink code.ExpressionEval at args[0]
+}

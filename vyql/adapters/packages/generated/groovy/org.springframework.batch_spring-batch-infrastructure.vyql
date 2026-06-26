@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter groovy {
-  package "org.springframework.batch:spring-batch-infrastructure" {
-    sink method "setUpOutputFile" -> code.FilePathAccess
-    sink method "createNewFile" -> code.FilePathAccess
-  }
-}

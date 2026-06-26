@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb9577a8d;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.hibernate:hibernate-ehcache")
+  }
+  query pattern callExpr where callee.method == "putIntoCache"
+  emit sink code.StoredDataWrite at args[0]
+}

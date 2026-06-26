@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding sqlExecution10 {
+  requires {
+    dependency("sqlite")
+  }
+  query pattern callExpr where callee.path ~= "sqlite3"
+  emit sink code.SqlExecution at args.any
+}

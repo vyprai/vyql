@@ -1,0 +1,11 @@
+module code;
+
+concept ZikulaThemeNameReflectedXss : issue {
+  cwe: [CWE_79]
+  review_assumption: "an authenticated administrator can be induced to open a crafted Theme admin URL containing HTML or script in the themename parameter"
+  reviewCategory: xss
+  reviewCondition: "Zikula Theme admin reflects a request-supplied theme name into the set-default confirmation template without request filtering"
+  reviewConfidence: high
+  reviewEvidence: "Theme admin setasdefault context {pattern} reads themename with FormUtil::getPassedValue and assigns it to the template before rendering theme_admin_setasdefault.tpl"
+  vulnerableTo: [injection.Xss]
+}

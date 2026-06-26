@@ -1,0 +1,9 @@
+module bindings.perl.migration.m49d3cbfb;
+
+binding commandExecution1 {
+  requires {
+    dependency("Printer")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

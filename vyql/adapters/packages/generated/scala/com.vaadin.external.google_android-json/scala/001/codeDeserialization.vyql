@@ -1,0 +1,9 @@
+module bindings.scala.migration.maf202c9b;
+
+binding deserialization1 {
+  requires {
+    dependency("com.vaadin.external.google:android-json")
+  }
+  query pattern callExpr where callee.method == "JSONArray.JSONArray(String)"
+  emit sink code.Deserialization at args[0]
+}

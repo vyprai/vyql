@@ -1,0 +1,9 @@
+module bindings.java.migration.md65b6b85;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.hibernate:hibernate-envers")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.SqlExecution at args[0]
+}

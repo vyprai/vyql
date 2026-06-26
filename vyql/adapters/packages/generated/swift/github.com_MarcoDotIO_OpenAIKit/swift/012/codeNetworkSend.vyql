@@ -1,0 +1,9 @@
+module bindings.swift.migration.m61394e88;
+
+binding networkSend12 {
+  requires {
+    dependency("github.com/MarcoDotIO/OpenAIKit")
+  }
+  query pattern callExpr where callee.method == "uploadFile"
+  emit sink code.NetworkSend at args[0]
+}

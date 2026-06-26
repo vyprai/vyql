@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding httpInput203 {
+  requires {
+    dependency("servicestack")
+  }
+  query pattern callExpr where callee.method == "ResolveAbsoluteUrl"
+  emit source code.HttpInput at call.result
+}

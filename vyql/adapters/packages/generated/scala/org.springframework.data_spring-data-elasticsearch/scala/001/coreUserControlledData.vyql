@@ -1,0 +1,9 @@
+module bindings.scala.migration.m202d5bae;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.springframework.data:spring-data-elasticsearch")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

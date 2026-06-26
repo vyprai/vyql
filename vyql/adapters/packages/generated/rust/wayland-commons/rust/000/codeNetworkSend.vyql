@@ -1,0 +1,9 @@
+module bindings.rust.migration.m62e9465d;
+
+binding networkSend0 {
+  requires {
+    dependency("wayland-commons")
+  }
+  query pattern callExpr where callee.method == "send_msg"
+  emit sink code.NetworkSend at args[0]
+}

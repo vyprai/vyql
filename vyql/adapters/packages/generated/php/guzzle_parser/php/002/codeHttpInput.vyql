@@ -1,0 +1,9 @@
+module bindings.php.migration.m895b0ce3;
+
+binding httpInput2 {
+  requires {
+    dependency("guzzle/parser")
+  }
+  query pattern callExpr where callee.method == "parseRequest"
+  emit source code.HttpInput at call.result
+}

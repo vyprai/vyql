@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "snappyer" {
-    sink method "RawUncompress" -> code.Deserialization
-    sink method "GetUncompressedLength" -> code.Deserialization
-    sink method "Uncompress" -> code.Deserialization
-  }
-}

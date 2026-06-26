@@ -1,8 +1,0 @@
-adapter perl {
-  package "Exobrain" {
-    sink method "get" -> code.NosqlQuery
-    sink method "tzset" -> code.StoredDataWrite
-    sink method "get" -> code.UrlFetch
-    sink method "new" -> code.Deserialization
-  }
-}

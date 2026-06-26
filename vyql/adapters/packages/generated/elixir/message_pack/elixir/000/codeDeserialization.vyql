@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m47334078;
+
+binding deserialization0 {
+  requires {
+    dependency("message_pack")
+  }
+  query pattern callExpr where callee.method == "MessagePack.Unpacker.unpack"
+  emit sink code.Deserialization at args[0]
+}

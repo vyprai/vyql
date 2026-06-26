@@ -1,0 +1,11 @@
+module code;
+
+concept StateMutationBeforeOperationPreconditions : issue {
+  cwe: [CWE_696, CWE_460]
+  review_assumption: "an attacker-controlled operation can pass transaction-level checks but fail a later operation-specific authorization or validation check"
+  reviewCategory: lifecycle
+  reviewCondition: "state-changing operation handling mutates durable state before all operation-specific preconditions are known to pass"
+  reviewConfidence: high
+  reviewEvidence: "operation application context {pattern} mutates fee, nonce, balance, or lifecycle state before later fallible authorization or validation checks"
+  vulnerableTo: [access_control.IncorrectAuthorization, business_logic.BusinessLogic]
+}

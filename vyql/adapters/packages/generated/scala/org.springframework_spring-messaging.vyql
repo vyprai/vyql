@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter scala {
-  package "org.springframework:spring-messaging" {
-    sink method "send" -> code.NetworkSend
-  }
-}

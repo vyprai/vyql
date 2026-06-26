@@ -1,0 +1,14 @@
+module bindings.ruby.migration.md7188f92;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("cancancan")
+  }
+  query pattern callExpr where callee.method == "can"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

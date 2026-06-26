@@ -1,7 +1,0 @@
-adapter rust {
-  package "fastrand" {
-    flag code.WeakRandomValue on any {
-      method "gen_u32"
-    }
-  }
-}

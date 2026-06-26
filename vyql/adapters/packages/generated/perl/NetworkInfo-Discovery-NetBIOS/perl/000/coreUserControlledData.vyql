@@ -1,0 +1,9 @@
+module bindings.perl.migration.m718368cb;
+
+binding userControlledData0 {
+  requires {
+    dependency("NetworkInfo-Discovery-NetBIOS")
+  }
+  query pattern callExpr where callee.method == "hosts"
+  emit source core.UserControlledData at call.result
+}

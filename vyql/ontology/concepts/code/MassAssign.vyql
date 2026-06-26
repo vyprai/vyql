@@ -1,0 +1,7 @@
+module code;
+
+concept MassAssign : sink {
+  cwe: [CWE_915]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.MassAssignment]
+}

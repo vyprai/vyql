@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "moment/moment" {
-    sink method "parseWeekday" -> code.Deserialization
-  }
-}

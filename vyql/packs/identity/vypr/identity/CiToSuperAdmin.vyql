@@ -1,0 +1,9 @@
+module vypr.identity;
+
+rule CiToSuperAdmin {
+  meta {
+    id: "VYQL-IDN-003"
+    severity: high
+  }
+  grant identity.CiPrincipal -> identity.SuperAdminPrivilege
+}

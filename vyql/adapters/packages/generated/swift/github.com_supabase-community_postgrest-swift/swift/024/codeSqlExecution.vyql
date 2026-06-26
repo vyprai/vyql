@@ -1,0 +1,9 @@
+module bindings.swift.migration.m82477a6a;
+
+binding sqlExecution24 {
+  requires {
+    dependency("github.com/supabase-community/postgrest-swift")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.SqlExecution at args[0]
+}

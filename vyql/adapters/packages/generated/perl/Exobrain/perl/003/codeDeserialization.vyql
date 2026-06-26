@@ -1,0 +1,9 @@
+module bindings.perl.migration.m4f4583e7;
+
+binding deserialization3 {
+  requires {
+    dependency("Exobrain")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

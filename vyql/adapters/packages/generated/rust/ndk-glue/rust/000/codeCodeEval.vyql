@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf80144b7;
+
+binding codeEval0 {
+  requires {
+    dependency("ndk-glue")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.CodeEval at args[0]
+}

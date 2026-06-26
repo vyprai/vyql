@@ -1,0 +1,14 @@
+module bindings.groovy.migration.mb3f494c8;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

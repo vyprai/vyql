@@ -1,0 +1,9 @@
+module bindings.perl.migration.m60d17f1b;
+
+binding httpInput0 {
+  requires {
+    dependency("SRU")
+  }
+  query pattern callExpr where callee.method == "SRU::Request.newFromCGI"
+  emit source code.HttpInput at call.result
+}

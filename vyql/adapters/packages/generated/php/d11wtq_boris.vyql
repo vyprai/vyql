@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter php {
-  package "d11wtq/boris" {
-    sink method "eval" -> code.CodeEval
-  }
-}

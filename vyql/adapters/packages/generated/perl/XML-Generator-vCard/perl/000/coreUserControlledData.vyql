@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7dcafcb3;
+
+binding userControlledData0 {
+  requires {
+    dependency("XML-Generator-vCard")
+  }
+  query pattern callExpr where callee.method == "parse_files"
+  emit source core.UserControlledData at call.result
+}

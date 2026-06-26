@@ -1,0 +1,9 @@
+module bindings.objc.migration.m8ed02bed;
+
+binding networkSend15 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "CLSNSLog"
+  emit sink code.NetworkSend at args[0]
+}

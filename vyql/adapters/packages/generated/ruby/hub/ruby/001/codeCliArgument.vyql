@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m35e7bf25;
+
+binding cliArgument1 {
+  requires {
+    dependency("hub")
+  }
+  query pattern callExpr where callee.method == "to_exec"
+  emit source code.CliArgument at call.result
+}

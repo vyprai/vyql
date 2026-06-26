@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding regexCompile26 {
+  requires {
+    dependency("System.Text.RegularExpressions")
+  }
+  query pattern callExpr where callee.path ~= "Regex"
+  emit sink code.RegexCompileSink at args[0]
+}

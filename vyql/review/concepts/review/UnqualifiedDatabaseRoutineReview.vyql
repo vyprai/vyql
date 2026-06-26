@@ -1,0 +1,7 @@
+module code;
+
+review code.UnqualifiedDatabaseRoutineReview {
+  category: path
+  kind: attention
+  text: "review database routine references for explicit trusted schema qualification"
+}

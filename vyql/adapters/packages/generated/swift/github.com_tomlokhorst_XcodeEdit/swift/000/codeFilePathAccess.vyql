@@ -1,0 +1,9 @@
+module bindings.swift.migration.mefe4fc46;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/tomlokhorst/XcodeEdit")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

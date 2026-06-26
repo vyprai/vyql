@@ -1,0 +1,9 @@
+module bindings.python.migration.mbc0a307c;
+
+binding httpInput1 {
+  requires {
+    dependency("waitress")
+  }
+  query pattern callExpr where callee.method == "get_header_lines"
+  emit source code.HttpInput at call.result
+}

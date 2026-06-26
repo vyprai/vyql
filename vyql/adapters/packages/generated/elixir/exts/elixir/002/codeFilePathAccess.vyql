@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9e73db6f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("exts")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.FilePathAccess at args[0]
+}

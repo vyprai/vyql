@@ -10,6 +10,7 @@ test "path-sensitive: a CSRF guard that DOMINATES the sink suppresses (clean)"
   ```
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
+  label op code.StateChangingOpSink
   node guard core.CsrfProtection {region=/fn1, order=2}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
@@ -21,6 +22,7 @@ test "path-sensitive: a CSRF guard in a SIBLING branch does NOT cover the sink (
   ```
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
+  label op code.StateChangingOpSink
   node guard core.CsrfProtection {region=/fn1/if2.e, order=4}
   edge FLOWS src -> op
   edge PROTECTS guard -> op

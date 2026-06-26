@@ -1,9 +1,0 @@
-import code.{ExpressionEval, StdinInput, LogOutput}
-
-adapter swift {
-  package "github.com/RxSwiftCommunity/Action" {
-    sink method "execute" -> code.ExpressionEval
-    source method "inputs" -> code.StdinInput
-    sink method "errors" -> code.LogOutput
-  }
-}

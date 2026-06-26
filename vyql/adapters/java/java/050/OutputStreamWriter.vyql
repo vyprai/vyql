@@ -1,0 +1,8 @@
+module bindings.java.migration.m420f6b67;
+
+binding outputStreamWriter50 {
+  query pattern callExpr where callee.path ~= "OutputStreamWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: OutputStreamWriter
+  }
+}

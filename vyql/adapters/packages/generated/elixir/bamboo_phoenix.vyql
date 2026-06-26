@@ -1,8 +1,0 @@
-import code.{HtmlRender, TemplateRender}
-adapter elixir {
-  package "bamboo_phoenix" {
-    sink method "render" -> code.HtmlRender
-    sink method "render" -> code.TemplateRender
-    sink method "assign" -> code.TemplateRender
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m205c7f09;
+
+binding filePathAccess2 {
+  requires {
+    dependency("timm")
+  }
+  query pattern callExpr where callee.method == "load_cfg_from_json"
+  emit sink code.FilePathAccess at args[0]
+}

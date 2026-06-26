@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter dart {
-  package "flutter_keyboard_visibility_web" {
-    source method "FlutterKeyboardVisibilityPlugin" -> core.UserControlledData
-  }
-}

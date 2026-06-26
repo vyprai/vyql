@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m36442869;
+
+binding deserialization14 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getShort"
+  emit sink code.Deserialization at args[0]
+}

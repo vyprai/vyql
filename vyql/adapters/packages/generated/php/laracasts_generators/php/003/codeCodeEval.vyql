@@ -1,0 +1,9 @@
+module bindings.php.migration.mcc603099;
+
+binding codeEval3 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "fire"
+  emit sink code.CodeEval at args[0]
+}

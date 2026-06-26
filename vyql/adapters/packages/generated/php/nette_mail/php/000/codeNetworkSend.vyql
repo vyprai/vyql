@@ -1,0 +1,9 @@
+module bindings.php.migration.mb62cf118;
+
+binding networkSend0 {
+  requires {
+    dependency("nette/mail")
+  }
+  query pattern callExpr where callee.method == "NetteMailMailer::send"
+  emit sink code.NetworkSend at args[0]
+}

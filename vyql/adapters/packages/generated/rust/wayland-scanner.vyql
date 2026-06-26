@@ -1,8 +1,0 @@
-import code.{XmlParse}
-
-adapter rust {
-  package "wayland-scanner" {
-    sink method "xml_parse" -> code.XmlParse
-    sink method "headerless_xml_parse" -> code.XmlParse
-  }
-}

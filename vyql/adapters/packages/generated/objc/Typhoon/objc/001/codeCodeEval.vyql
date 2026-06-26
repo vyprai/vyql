@@ -1,0 +1,9 @@
+module bindings.objc.migration.me3e9bb7d;
+
+binding codeEval1 {
+  requires {
+    dependency("Typhoon")
+  }
+  query pattern callExpr where callee.method == "inject:withSelector:"
+  emit sink code.CodeEval at args[0]
+}

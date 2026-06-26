@@ -1,0 +1,9 @@
+module bindings.swift.migration.m0c2ced10;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/swift-extras/swift-extras-json")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

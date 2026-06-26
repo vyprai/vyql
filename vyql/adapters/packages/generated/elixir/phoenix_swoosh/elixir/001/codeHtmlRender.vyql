@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m824aca62;
+
+binding htmlRender1 {
+  requires {
+    dependency("phoenix_swoosh")
+  }
+  query pattern callExpr where callee.method == "do_render_body"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-adapter rust {
-  package "markup5ever" {
-    sink method "write_text" -> code.HtmlRender
-    sink method "write_comment" -> code.HtmlRender
-    sink method "write_doctype" -> code.HtmlRender
-    sink method "write_processing_instruction" -> code.HtmlRender
-  }
-}

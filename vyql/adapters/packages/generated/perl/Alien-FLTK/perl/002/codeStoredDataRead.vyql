@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc3b6ece2;
+
+binding storedDataRead2 {
+  requires {
+    dependency("Alien-FLTK")
+  }
+  query pattern callExpr where callee.method == "read_file"
+  emit source code.StoredDataRead at call.result
+}

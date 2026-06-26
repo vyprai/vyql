@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter csharp {
-  package "bootbox.js" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

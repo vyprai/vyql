@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7c64ffc3;
+
+binding filePathAccess4 {
+  requires {
+    dependency("ndk-sys")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

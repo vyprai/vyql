@@ -1,0 +1,9 @@
+module bindings.php.migration.m4b09c39b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("hoa/file")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

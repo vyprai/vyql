@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding pathAccessCheck527 {
+  query pattern callExpr where callee.path ~= "isParentDirectory"
+  emit check core.PathAccessCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

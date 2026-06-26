@@ -1,0 +1,10 @@
+module vypr.misconfig;
+
+rule InsecurePermission {
+  meta {
+    cwe: [CWE_732]
+    id: "VYQL-CFG-008"
+    severity: medium
+  }
+  issue code.InsecurePermission as p
+}

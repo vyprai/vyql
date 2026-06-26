@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "jest-snapshot" {
-    sink method "saveInlineSnapshots" -> code.FilePathAccess
-    sink method "jestWriteFile" -> code.FilePathAccess
-  }
-}

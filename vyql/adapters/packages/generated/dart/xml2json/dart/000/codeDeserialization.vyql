@@ -1,0 +1,9 @@
+module bindings.dart.migration.m13bbff80;
+
+binding deserialization0 {
+  requires {
+    dependency("xml2json")
+  }
+  query pattern callExpr where callee.method == "Xml2Json.parse"
+  emit sink code.Deserialization at args[0]
+}

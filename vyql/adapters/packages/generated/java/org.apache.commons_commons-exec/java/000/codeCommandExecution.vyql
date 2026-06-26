@@ -1,0 +1,9 @@
+module bindings.java.migration.mf6750505;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.commons:commons-exec")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

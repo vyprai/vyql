@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3bcd46e2;
+
+binding deserialization12 {
+  requires {
+    dependency("github.com/tristanhimmelman/ObjectMapper")
+  }
+  query pattern callExpr where callee.method == "toJSONData"
+  emit sink code.Deserialization at args[0]
+}

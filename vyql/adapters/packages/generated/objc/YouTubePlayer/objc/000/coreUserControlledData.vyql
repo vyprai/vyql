@@ -1,0 +1,9 @@
+module bindings.objc.migration.m46abc796;
+
+binding userControlledData0 {
+  requires {
+    dependency("YouTubePlayer")
+  }
+  query pattern callExpr where callee.method == "videoIDFromYouTubeURL"
+  emit source core.UserControlledData at call.result
+}

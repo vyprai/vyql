@@ -1,0 +1,9 @@
+module bindings.python.migration.m757f9725;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pyflakes")
+  }
+  query pattern callExpr where callee.method == "checkPath"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.mdd32c5df;
+
+binding networkData1 {
+  requires {
+    dependency("location_web")
+  }
+  query pattern callExpr where callee.method == "LocationWebPlugin.onLocationChanged"
+  emit source code.NetworkData at call.result
+}

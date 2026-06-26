@@ -1,0 +1,9 @@
+module bindings.rust.migration.m4619e8b3;
+
+binding deserialization0 {
+  requires {
+    dependency("sqlformat")
+  }
+  query pattern callExpr where callee.method == "format"
+  emit sink code.Deserialization at args[0]
+}

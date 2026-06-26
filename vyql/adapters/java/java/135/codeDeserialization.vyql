@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding deserialization135 {
+  query pattern callExpr where callee.path ~= "Yaml.load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mc0603966;
+
+binding filePathAccess9 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "listFolder"
+  emit sink code.FilePathAccess at args[0]
+}

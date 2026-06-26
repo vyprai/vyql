@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma860ad40;
+
+binding sqlExecution5 {
+  requires {
+    dependency("orm_adapter")
+  }
+  query pattern callExpr where callee.method == "destroy"
+  emit sink code.SqlExecution at args[0]
+}

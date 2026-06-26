@@ -1,7 +1,0 @@
-import code.{SqlExecution, NetworkConnect}
-adapter groovy {
-  package "com.mysql:mysql-connector-j" {
-    sink method "query" -> code.SqlExecution
-    sink method "connect" -> code.NetworkConnect
-  }
-}

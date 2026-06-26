@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6a4e475c;
+
+binding fileUse0 {
+  requires {
+    dependency("PDL-Util")
+  }
+  query pattern callExpr where callee.method == "export2d"
+  emit sink code.FileUseSink at args[0]
+}

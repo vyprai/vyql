@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m48fcd74c;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework:spring-beans")
+  }
+  query pattern callExpr where callee.method == "setPropertyValue"
+  emit sink code.Deserialization at args[0]
+}

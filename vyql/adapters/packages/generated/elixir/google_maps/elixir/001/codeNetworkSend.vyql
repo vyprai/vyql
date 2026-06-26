@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m553964c8;
+
+binding networkSend1 {
+  requires {
+    dependency("google_maps")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

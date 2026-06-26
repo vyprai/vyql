@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m8100a046;
+
+binding networkConnect4 {
+  requires {
+    dependency("org.apache.maven:maven-artifact")
+  }
+  query pattern callExpr where callee.method == "getPort"
+  emit sink code.NetworkConnectSink at args[0]
+}

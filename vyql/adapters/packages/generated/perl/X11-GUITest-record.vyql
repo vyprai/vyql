@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter perl {
-  package "X11-GUITest-record" {
-    sink method "X_OpenFont" -> code.FilePathAccess
-    sink method "X_SetFontPath" -> code.FilePathAccess
-  }
-}

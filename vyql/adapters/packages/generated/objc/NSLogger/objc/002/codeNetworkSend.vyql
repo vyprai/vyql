@@ -1,0 +1,9 @@
+module bindings.objc.migration.mfd249e23;
+
+binding networkSend2 {
+  requires {
+    dependency("NSLogger")
+  }
+  query pattern callExpr where callee.method == "LogDataF"
+  emit sink code.NetworkSend at args[0]
+}

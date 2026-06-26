@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf554f12d;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/livekit/client-sdk-swift")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.HttpInput at call.result
+}

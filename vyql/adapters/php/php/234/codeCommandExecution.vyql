@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding commandExecution234 {
+  query pattern callExpr where callee.path ~= "exec"
+  emit sink code.CommandExecution at args[0]
+}

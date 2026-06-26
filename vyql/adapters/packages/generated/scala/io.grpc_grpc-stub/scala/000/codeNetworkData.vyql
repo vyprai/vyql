@@ -1,0 +1,9 @@
+module bindings.scala.migration.md306b79e;
+
+binding networkData0 {
+  requires {
+    dependency("io.grpc:grpc-stub")
+  }
+  query pattern callExpr where callee.method == "BlockingClientCall.read"
+  emit source code.NetworkData at call.result
+}

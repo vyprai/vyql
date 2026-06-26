@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter rust {
-  package "bytecheck" {
-    control method "verify" -> core.InputValidation
-  }
-}

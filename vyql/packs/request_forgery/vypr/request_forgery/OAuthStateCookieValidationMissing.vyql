@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule OAuthStateCookieValidationMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352, CWE_287]
+    id: "VYQL-RF-032"
+    severity: high
+  }
+  issue code.OAuthStateCookieValidationMissing as flow
+}

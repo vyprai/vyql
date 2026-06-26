@@ -1,0 +1,9 @@
+module bindings.dart.migration.mc83fef43;
+
+binding filePathAccess1 {
+  requires {
+    dependency("wakelock_web")
+  }
+  query pattern callExpr where callee.method == "enabled"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1880b755;
+
+binding filePathAccess0 {
+  requires {
+    dependency("kf5xmlgui")
+  }
+  query pattern callExpr where callee.method == "importConfiguration"
+  emit sink code.FilePathAccess at args[0]
+}

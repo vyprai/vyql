@@ -1,0 +1,11 @@
+module code;
+
+concept CheckstyleExternalParameterEntitiesXxe : issue {
+  cwe: [CWE_611]
+  review_assumption: "the XML configuration input may include attacker-controlled external parameter entity declarations"
+  reviewCategory: xml
+  reviewCondition: "Checkstyle SAX parser hardening disables external DTD and general entities but omits external parameter entities"
+  reviewConfidence: high
+  reviewEvidence: "LoadExternalDtdFeatureProvider context {pattern} configures external DTD/general entity features without external-parameter-entities"
+  vulnerableTo: [deserialization.Xxe]
+}

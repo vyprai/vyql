@@ -1,0 +1,9 @@
+module bindings.objc.migration.mb118e0aa;
+
+binding networkSend4 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "startRecording"
+  emit sink code.NetworkSend at args[0]
+}

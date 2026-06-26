@@ -1,0 +1,9 @@
+module bindings.php.migration.m87de9ee0;
+
+binding commandExecution0 {
+  requires {
+    dependency("wp-cli/php-cli-tools")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

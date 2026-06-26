@@ -1,7 +1,0 @@
-import code.{CommandExecution, HttpInput}
-
-adapter bash {
-  package "caddy" {
-    source method "caddy" -> code.HttpInput
-  }
-}

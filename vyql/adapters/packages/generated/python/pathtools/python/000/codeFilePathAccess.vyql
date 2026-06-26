@@ -1,0 +1,9 @@
+module bindings.python.migration.ma6552fc8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pathtools")
+  }
+  query pattern callExpr where callee.method == "walk"
+  emit sink code.FilePathAccess at args[0]
+}

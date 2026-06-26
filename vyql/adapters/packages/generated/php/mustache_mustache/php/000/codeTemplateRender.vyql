@@ -1,0 +1,9 @@
+module bindings.php.migration.m1fe6a199;
+
+binding templateRender0 {
+  requires {
+    dependency("mustache/mustache")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}

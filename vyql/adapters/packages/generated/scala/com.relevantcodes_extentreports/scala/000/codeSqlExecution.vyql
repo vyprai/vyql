@@ -1,0 +1,9 @@
+module bindings.scala.migration.m5b729966;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.relevantcodes:extentreports")
+  }
+  query pattern callExpr where callee.method == "getPreparedStatement"
+  emit sink code.SqlExecution at args[0]
+}

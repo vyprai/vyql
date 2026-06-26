@@ -1,0 +1,9 @@
+module bindings.bash.migration.me5359fe3;
+
+binding sqlExecution1 {
+  requires {
+    dependency("freetds")
+  }
+  query pattern callExpr where callee.path ~= "freetds"
+  emit sink code.SqlExecution at args.any
+}

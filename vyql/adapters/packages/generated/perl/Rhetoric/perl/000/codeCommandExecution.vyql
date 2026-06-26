@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6b6cd553;
+
+binding commandExecution0 {
+  requires {
+    dependency("Rhetoric")
+  }
+  query pattern callExpr where callee.path ~= "Rhetoric::Storage::File::system"
+  emit sink code.CommandExecution at args[0]
+}

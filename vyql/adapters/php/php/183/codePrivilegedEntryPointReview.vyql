@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding privilegedEntryPointReview183 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "$_POST['systemRootPath']" and node.token contains "videos/configuration.php" and node.token contains "fopen" and not (node.token contains "../videos/configuration.php")
+  emit issue code.PrivilegedEntryPointReview at node
+}

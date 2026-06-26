@@ -1,0 +1,9 @@
+module bindings.swift.migration.m929f2717;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/AzureAD/microsoft-authentication-library-for-objc")
+  }
+  query pattern callExpr where callee.method == "signIn"
+  emit source core.UserControlledData at call.result
+}

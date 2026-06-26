@@ -1,6 +1,0 @@
-adapter perl {
-  package "Sedna" {
-    sink method "find_api" -> code.SqlExecution
-    sink method "parse_version" -> code.XmlParse
-  }
-}

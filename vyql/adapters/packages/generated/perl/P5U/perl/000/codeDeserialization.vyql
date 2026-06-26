@@ -1,0 +1,9 @@
+module bindings.perl.migration.m267a5c99;
+
+binding deserialization0 {
+  requires {
+    dependency("P5U")
+  }
+  query pattern callExpr where callee.method == "YAML::Tiny::Load"
+  emit sink code.Deserialization at args[0]
+}

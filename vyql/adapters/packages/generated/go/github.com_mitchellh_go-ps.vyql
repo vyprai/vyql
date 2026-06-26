@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/mitchellh/go-ps" {
-    sink method "Processes" -> code.CommandExecution
-    sink method "FindProcess" -> code.CommandExecution
-  }
-}

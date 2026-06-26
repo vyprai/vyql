@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m21f9522d;
+
+binding deserialization0 {
+  requires {
+    dependency("calendar")
+  }
+  query pattern callExpr where callee.method == "httpdate"
+  emit sink code.Deserialization at args[0]
+}

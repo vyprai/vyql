@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mf0a92a7e;
+
+binding xmlParse1 {
+  requires {
+    dependency("jquery.jqgrid")
+  }
+  query pattern callExpr where callee.method == "stringToDoc"
+  emit sink code.XmlParse at args[0]
+}

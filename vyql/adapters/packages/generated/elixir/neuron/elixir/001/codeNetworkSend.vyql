@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc927b36e;
+
+binding networkSend1 {
+  requires {
+    dependency("neuron")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkSend at args[0]
+}

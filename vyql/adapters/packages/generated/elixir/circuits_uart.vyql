@@ -1,7 +1,0 @@
-adapter elixir {
-  package "circuits_uart" {
-    sink method "open" -> code.FilePathAccess
-    sink method "write" -> code.NetworkSend
-    source method "read" -> code.NetworkData
-  }
-}

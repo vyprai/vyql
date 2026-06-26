@@ -1,0 +1,9 @@
+module bindings.javascript.migration.ma6af8d4c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("path-parse")
+  }
+  query pattern callExpr where callee.method == "win32.parse"
+  emit sink code.FilePathAccess at args[0]
+}

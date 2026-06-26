@@ -1,0 +1,9 @@
+module bindings.php.migration.m607bb026;
+
+binding urlFetch0 {
+  requires {
+    dependency("symfony/routing")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.UrlFetch at args[0]
+}

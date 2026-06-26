@@ -1,7 +1,0 @@
-import code.{Deserialization, NetworkSend}
-adapter java {
-  package "org.apache.kafka:kafka-clients" {
-    sink method "parse" -> code.Deserialization
-    sink method "send" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbbe1ca32;
+
+binding networkSend7 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "delete_zone"
+  emit sink code.NetworkSend at args[0]
+}

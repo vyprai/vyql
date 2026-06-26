@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8b0d4f35;
+
+binding userControlledData0 {
+  requires {
+    dependency("flutter_keyboard_visibility_web")
+  }
+  query pattern callExpr where callee.method == "FlutterKeyboardVisibilityPlugin"
+  emit source core.UserControlledData at call.result
+}

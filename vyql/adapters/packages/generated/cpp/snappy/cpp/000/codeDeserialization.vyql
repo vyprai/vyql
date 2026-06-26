@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m10d3e7f2;
+
+binding deserialization0 {
+  requires {
+    dependency("snappy")
+  }
+  query pattern callExpr where callee.method == "snappy_validate_compressed_buffer"
+  emit sink code.Deserialization at args[0]
+}

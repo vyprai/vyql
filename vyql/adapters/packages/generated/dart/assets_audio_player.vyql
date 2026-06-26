@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter dart {
-  package "assets_audio_player" {
-    sink method "open" -> code.UrlFetch
-  }
-}

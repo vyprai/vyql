@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3608f193;
+
+binding archiveEntryWrite21 {
+  requires {
+    dependency("commons-compress")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mda51fdd0;
+
+binding httpInput0 {
+  requires {
+    dependency("unicorn")
+  }
+  query pattern callExpr where callee.path ~= "for"
+  emit source code.HttpInput at call.result
+}

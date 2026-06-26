@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7a315a1d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("gdk-pixbuf-sys")
+  }
+  query pattern callExpr where callee.method == "gdk_pixbuf_new_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

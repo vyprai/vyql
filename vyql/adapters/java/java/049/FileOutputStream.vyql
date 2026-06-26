@@ -1,0 +1,8 @@
+module bindings.java.migration.m420f6b67;
+
+binding fileOutputStream49 {
+  query pattern callExpr where callee.path ~= "FileOutputStream"
+  emit fact runtime.ReceiverType at call.result {
+    about: FileOutputStream
+  }
+}

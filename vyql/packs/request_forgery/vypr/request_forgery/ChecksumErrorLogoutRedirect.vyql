@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule ChecksumErrorLogoutRedirect {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_601]
+    id: "VYQL-RF-009"
+    severity: medium
+  }
+  issue code.ChecksumErrorLogoutRedirect as redirect
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "polymer_expressions" {
-    sink method "Parser.parse" -> code.Deserialization
-  }
-}

@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/bgentry/speakeasy" {
-    source method "Ask" -> core.UserControlledData
-    source method "FAsk" -> core.UserControlledData
-  }
-}

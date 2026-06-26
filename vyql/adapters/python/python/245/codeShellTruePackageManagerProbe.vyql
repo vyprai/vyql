@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding shellTruePackageManagerProbe245 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=check_for_libaio_pkg" and node.token contains "call_path:distutils.spawn.find_executable" and node.token contains "call_path:subprocess.Popen" and node.token contains "identifier:shell" and node.token contains "literal:True" and node.token contains "identifier:pkgmgr" and node.token contains "identifier:lib"
+  emit issue code.ShellTruePackageManagerProbe at node
+}

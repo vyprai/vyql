@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2d8bc0d5;
+
+binding userControlledData0 {
+  requires {
+    dependency("Options-Generator")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit source core.UserControlledData at call.result
+}

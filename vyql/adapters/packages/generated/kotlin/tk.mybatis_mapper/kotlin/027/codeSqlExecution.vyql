@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4c477ebd;
+
+binding sqlExecution27 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orNotLike"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9ce689e6;
+
+binding deserialization1 {
+  requires {
+    dependency("io.rest-assured:json-schema-validator")
+  }
+  query pattern callExpr where callee.method == "matchesJsonSchemaInClasspath"
+  emit sink code.Deserialization at args[0]
+}

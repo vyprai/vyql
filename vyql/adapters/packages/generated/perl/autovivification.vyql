@@ -1,8 +1,0 @@
-import core.{InputValidation}
-
-adapter perl {
-  package "autovivification" {
-    control method "import" -> core.InputValidation
-    control method "unimport" -> core.InputValidation
-  }
-}

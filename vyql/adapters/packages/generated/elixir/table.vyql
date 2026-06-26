@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter elixir {
-  package "table" {
-    source method "Table.Reader.init" -> core.UserControlledData
-    source method "Table.to_rows" -> core.UserControlledData
-    source method "Table.to_columns" -> core.UserControlledData
-  }
-}

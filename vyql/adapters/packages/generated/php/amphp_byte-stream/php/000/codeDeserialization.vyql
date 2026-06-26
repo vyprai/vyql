@@ -1,0 +1,9 @@
+module bindings.php.migration.md2d4a98a;
+
+binding deserialization0 {
+  requires {
+    dependency("amphp/byte-stream")
+  }
+  query pattern callExpr where callee.method == "parseLineDelimitedJson"
+  emit sink code.Deserialization at args[0]
+}

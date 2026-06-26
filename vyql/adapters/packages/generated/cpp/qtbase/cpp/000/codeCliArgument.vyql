@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m29423213;
+
+binding cliArgument0 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "Option::init"
+  emit source code.CliArgument at call.result
+}

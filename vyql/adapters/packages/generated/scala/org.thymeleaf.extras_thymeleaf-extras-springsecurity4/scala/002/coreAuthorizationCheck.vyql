@@ -1,0 +1,14 @@
+module bindings.scala.migration.m11d754bc;
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingAccessControlList"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

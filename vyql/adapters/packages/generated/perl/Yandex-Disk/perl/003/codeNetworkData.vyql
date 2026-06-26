@@ -1,0 +1,9 @@
+module bindings.perl.migration.md985d210;
+
+binding networkData3 {
+  requires {
+    dependency("Yandex-Disk")
+  }
+  query pattern callExpr where callee.method == "downloadFile"
+  emit source code.NetworkData at call.result
+}

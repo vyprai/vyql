@@ -1,0 +1,9 @@
+module bindings.php.migration.m4c4dbaf2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("orangehill/iseed")
+  }
+  query pattern callExpr where callee.method == "getData"
+  emit sink code.SqlExecution at args[0]
+}

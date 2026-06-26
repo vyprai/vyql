@@ -1,0 +1,9 @@
+module bindings.objc.migration.m84615035;
+
+binding logOutput4 {
+  requires {
+    dependency("GoogleUtilities")
+  }
+  query pattern callExpr where callee.method == "GULOSLogNotice"
+  emit sink code.LogOutput at args[0]
+}

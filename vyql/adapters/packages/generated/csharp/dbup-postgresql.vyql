@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter csharp {
-  package "dbup-postgresql" {
-    sink method "ExecuteCommandsWithinExceptionHandler" -> code.SqlExecution
-  }
-}

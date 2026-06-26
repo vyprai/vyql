@@ -1,0 +1,9 @@
+module bindings.dart.migration.m61d57e2d;
+
+binding deserialization0 {
+  requires {
+    dependency("boolean_selector")
+  }
+  query pattern callExpr where callee.method == "BooleanSelector.parse"
+  emit sink code.Deserialization at args[0]
+}

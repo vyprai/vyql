@@ -1,9 +1,0 @@
-import code.{CliArgument, Deserialization}
-import core.{UserControlledData}
-
-adapter kotlin {
-  package "args4j:args4j" {
-    source method "parseArgument" -> code.CliArgument
-    sink method "parse" -> code.Deserialization
-  }
-}

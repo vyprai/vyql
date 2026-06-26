@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m63f99da8;
+
+binding sqlExecution2 {
+  requires {
+    dependency("db_connection")
+  }
+  query pattern callExpr where callee.method == "prepare_execute"
+  emit sink code.SqlExecution at args[0]
+}

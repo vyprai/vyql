@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc4f12def;
+
+binding commandExecution1 {
+  requires {
+    dependency("Git")
+  }
+  query pattern callExpr where callee.method == "command_oneline"
+  emit sink code.CommandExecution at args[0]
+}

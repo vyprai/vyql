@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcb2efc93;
+
+binding fileUse0 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit sink code.FileUseSink at args[0]
+}

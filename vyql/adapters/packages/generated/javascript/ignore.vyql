@@ -1,7 +1,0 @@
-adapter javascript {
-  package "ignore" {
-    control method "test" -> core.InputValidation
-    control method "ignores" -> core.InputValidation
-    control method "filter" -> core.InputValidation
-  }
-}

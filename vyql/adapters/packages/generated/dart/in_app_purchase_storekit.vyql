@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "in_app_purchase_storekit" {
-    sink method "decode" -> code.Deserialization
-  }
-}

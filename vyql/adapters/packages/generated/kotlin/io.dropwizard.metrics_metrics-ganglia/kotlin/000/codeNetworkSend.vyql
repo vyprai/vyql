@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mfd64b37e;
+
+binding networkSend0 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-ganglia")
+  }
+  query pattern callExpr where callee.method == "announce"
+  emit sink code.NetworkSend at args[0]
+}

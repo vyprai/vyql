@@ -1,0 +1,9 @@
+module bindings.swift.migration.md7751016;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/pusher/NWWebSocket")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

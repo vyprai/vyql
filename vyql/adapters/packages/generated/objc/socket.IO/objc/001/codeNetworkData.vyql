@@ -1,0 +1,9 @@
+module bindings.objc.migration.m00ed25c5;
+
+binding networkData1 {
+  requires {
+    dependency("socket.IO")
+  }
+  query pattern callExpr where callee.method == "send:"
+  emit source code.NetworkData at call.result
+}

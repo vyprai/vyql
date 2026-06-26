@@ -1,0 +1,14 @@
+module bindings.go.migration.m50dab3f4;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_Authenticate_0"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

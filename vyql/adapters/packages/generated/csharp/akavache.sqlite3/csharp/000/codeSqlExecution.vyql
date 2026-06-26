@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m9d6a1ab2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("akavache.sqlite3")
+  }
+  query pattern callExpr where callee.method == "ISqliteOperation.Execute"
+  emit sink code.SqlExecution at args[0]
+}

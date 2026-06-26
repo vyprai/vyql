@@ -1,0 +1,8 @@
+module core;
+
+concept PathCanonicalization : check {
+  applies: path
+  covers: [path, sameReceiver]
+  cwe: [CWE_22]
+  neutralizes: [path.PathTraversal]
+}

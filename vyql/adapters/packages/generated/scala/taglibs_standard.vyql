@@ -1,7 +1,0 @@
-import core.{SqlParameterization}
-
-adapter scala {
-  package "taglibs:standard" {
-    control method "addSQLParameter" -> core.SqlParameterization
-  }
-}

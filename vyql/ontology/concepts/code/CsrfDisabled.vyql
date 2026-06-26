@@ -1,0 +1,7 @@
+module code;
+
+concept CsrfDisabled : issue {
+  cwe: [CWE_352]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [access_control.CsrfDisabled]
+}

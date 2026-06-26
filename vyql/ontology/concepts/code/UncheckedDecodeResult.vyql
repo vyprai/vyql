@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedDecodeResult : issue {
+  cwe: [CWE_20]
+  review_assumption: "malformed attacker-controlled encoded input can reach this decoder"
+  reviewCategory: input_validation
+  reviewCondition: "structured decoding errors should be returned or rejected before decoded data is trusted"
+  reviewConfidence: medium
+  reviewEvidence: "decode operation {pattern} unwraps or expects a successful result"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

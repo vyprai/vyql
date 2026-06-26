@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "ex_image_info" {
-    sink method "parse" -> code.Deserialization
-  }
-}

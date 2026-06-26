@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkConnect, NetworkSend}
-
-adapter dart {
-  package "cached_network_image" {
-    sink method "CachedNetworkImageProvider" -> code.NetworkConnect
-    sink method "CachedNetworkImageProvider" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.scala.migration.m40e67106;
+
+binding authorizationCheck8 {
+  requires {
+    dependency("com.github.theborakompanioni:thymeleaf-extras-shiro")
+  }
+  query pattern callExpr where callee.method == "hasRole"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

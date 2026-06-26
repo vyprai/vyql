@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding httpInput19 {
+  query pattern callExpr where callee.path ~= "req.body"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma110b9ca;
+
+binding expressionEval2 {
+  requires {
+    dependency("github.com/d-exclaimation/pioneer")
+  }
+  query pattern callExpr where callee.method == "executeHTTPGraphQLRequest"
+  emit sink code.ExpressionEval at args[0]
+}

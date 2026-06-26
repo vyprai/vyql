@@ -1,0 +1,9 @@
+module bindings.swift.migration.m677fbc11;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/dagronf/SwiftImageReadWrite")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

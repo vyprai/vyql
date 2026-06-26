@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter ruby {
-  package "ruby_gntp" {
-    sink method "send_and_recieve" -> code.NetworkConnect
-    sink method "send_and_recieve" -> code.NetworkSend
-    sink method "notify" -> code.NetworkSend
-    sink method "register" -> code.NetworkSend
-  }
-}

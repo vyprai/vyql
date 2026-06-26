@@ -1,0 +1,9 @@
+module bindings.go.migration.mca5e322a;
+
+binding userControlledData8 {
+  requires {
+    dependency("github.com/btcsuite/btcutil")
+  }
+  query pattern callExpr where callee.method == "NewAddressWitnessScriptHash"
+  emit source core.UserControlledData at call.result
+}

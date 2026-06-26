@@ -1,0 +1,6 @@
+module bindings.scala.migration.m06d0685b;
+
+binding htmlRender67 {
+  query pattern callExpr where callee.method == "println"
+  emit sink code.HtmlRender at args.any
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc7c52aa2;
+
+binding networkConnect0 {
+  requires {
+    dependency("brod")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

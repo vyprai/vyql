@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "nifticlib" {
-    sink method "znzopen" -> code.FilePathAccess
-  }
-}

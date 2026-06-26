@@ -1,0 +1,9 @@
+module bindings.objc.migration.mb80ffee0;
+
+binding deserialization0 {
+  requires {
+    dependency("ISO8601DateFormatter")
+  }
+  query pattern callExpr where callee.method == "dateComponentsFromString:"
+  emit sink code.Deserialization at args[0]
+}

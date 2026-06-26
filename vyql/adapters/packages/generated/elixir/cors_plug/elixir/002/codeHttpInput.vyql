@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5d5d8ef7;
+
+binding httpInput2 {
+  requires {
+    dependency("cors_plug")
+  }
+  query pattern callExpr where callee.method == "request_origin"
+  emit source code.HttpInput at call.result
+}

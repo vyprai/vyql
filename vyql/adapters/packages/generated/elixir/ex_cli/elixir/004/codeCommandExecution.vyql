@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m01e9df6f;
+
+binding commandExecution4 {
+  requires {
+    dependency("ex_cli")
+  }
+  query pattern callExpr where callee.method == "ExCLI.run!"
+  emit sink code.CommandExecution at args[0]
+}

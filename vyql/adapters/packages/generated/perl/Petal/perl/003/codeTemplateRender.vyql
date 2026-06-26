@@ -1,0 +1,9 @@
+module bindings.perl.migration.m3314d2bf;
+
+binding templateRender3 {
+  requires {
+    dependency("Petal")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.TemplateRender at args[0]
+}

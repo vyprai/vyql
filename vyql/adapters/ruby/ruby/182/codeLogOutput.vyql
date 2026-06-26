@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding logOutput182 {
+  query pattern callExpr where callee.path ~= "Rails.logger.info"
+  emit sink code.LogOutput at args.any
+}

@@ -1,0 +1,6 @@
+module bindings.elixir.migration.m728b8a72;
+
+binding commandExecution12 {
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}

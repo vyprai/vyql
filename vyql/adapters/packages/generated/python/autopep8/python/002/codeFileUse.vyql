@@ -1,0 +1,9 @@
+module bindings.python.migration.md83add5e;
+
+binding fileUse2 {
+  requires {
+    dependency("autopep8")
+  }
+  query pattern callExpr where callee.method == "readlines_from_file"
+  emit sink code.FileUseSink at args[0]
+}

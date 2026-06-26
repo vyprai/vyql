@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m76159498;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-webapp")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

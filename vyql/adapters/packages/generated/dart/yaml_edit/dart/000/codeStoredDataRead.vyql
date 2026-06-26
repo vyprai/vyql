@@ -1,0 +1,9 @@
+module bindings.dart.migration.m60a94493;
+
+binding storedDataRead0 {
+  requires {
+    dependency("yaml_edit")
+  }
+  query pattern callExpr where callee.method == "YamlEditor"
+  emit source code.StoredDataRead at call.result
+}

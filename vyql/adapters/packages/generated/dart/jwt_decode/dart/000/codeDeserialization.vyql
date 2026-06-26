@@ -1,0 +1,9 @@
+module bindings.dart.migration.m83860135;
+
+binding deserialization0 {
+  requires {
+    dependency("jwt_decode")
+  }
+  query pattern callExpr where callee.method == "parseJwt"
+  emit sink code.Deserialization at args[0]
+}

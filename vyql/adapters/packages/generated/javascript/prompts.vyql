@@ -1,6 +1,0 @@
-adapter javascript {
-  package "prompts" {
-    source method "prompt" -> core.UserControlledData
-    source method "NumberPrompt.parse" -> core.UserControlledData
-  }
-}

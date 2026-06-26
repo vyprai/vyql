@@ -1,0 +1,9 @@
+module bindings.python.migration.mc780062e;
+
+binding deserialization2 {
+  requires {
+    dependency("hydra-core")
+  }
+  query pattern callExpr where callee.method == "parse_overrides"
+  emit sink code.Deserialization at args[0]
+}

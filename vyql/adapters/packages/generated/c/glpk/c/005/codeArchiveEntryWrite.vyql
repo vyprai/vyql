@@ -1,0 +1,9 @@
+module bindings.c.migration.m95208f1d;
+
+binding archiveEntryWrite5 {
+  requires {
+    dependency("glpk")
+  }
+  query pattern callExpr where callee.method == "glp_write_sol"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

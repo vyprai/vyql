@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6e17abe9;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/supabase-community/gotrue-swift")
+  }
+  query pattern callExpr where callee.method == "signIn"
+  emit source core.UserControlledData at call.result
+}

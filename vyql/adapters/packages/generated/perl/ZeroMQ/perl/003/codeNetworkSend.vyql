@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7b5a4479;
+
+binding networkSend3 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "zmq_send"
+  emit sink code.NetworkSend at args[0]
+}

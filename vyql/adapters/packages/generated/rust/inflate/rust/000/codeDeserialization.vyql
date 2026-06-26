@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7e95535b;
+
+binding deserialization0 {
+  requires {
+    dependency("inflate")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

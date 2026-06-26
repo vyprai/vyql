@@ -1,0 +1,9 @@
+module bindings.rust.migration.m52982397;
+
+binding userControlledData1 {
+  requires {
+    dependency("fuchsia-zircon-sys")
+  }
+  query pattern callExpr where callee.method == "zx_channel_read_etc"
+  emit source core.UserControlledData at call.result
+}

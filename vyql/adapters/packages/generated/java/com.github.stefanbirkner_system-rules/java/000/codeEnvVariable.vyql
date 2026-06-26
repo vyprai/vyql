@@ -1,0 +1,9 @@
+module bindings.java.migration.mcdede0a8;
+
+binding envVariable0 {
+  requires {
+    dependency("com.github.stefanbirkner:system-rules")
+  }
+  query pattern callExpr where callee.method == "EnvironmentVariables.set"
+  emit source code.EnvVariable at call.result
+}

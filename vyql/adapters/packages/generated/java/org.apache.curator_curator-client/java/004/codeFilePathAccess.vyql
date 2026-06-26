@@ -1,0 +1,9 @@
+module bindings.java.migration.m254c4c73;
+
+binding filePathAccess4 {
+  requires {
+    dependency("org.apache.curator:curator-client")
+  }
+  query pattern callExpr where callee.method == "deleteChildren"
+  emit sink code.FilePathAccess at args[0]
+}

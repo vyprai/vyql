@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m88967e3e;
+
+binding deserialization0 {
+  requires {
+    dependency("elmah.corelibrary")
+  }
+  query pattern callExpr where callee.method == "ErrorXml.DecodeString"
+  emit sink code.Deserialization at args[0]
+}

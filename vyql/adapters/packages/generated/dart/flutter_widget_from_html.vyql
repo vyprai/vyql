@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter dart {
-  package "flutter_widget_from_html" {
-    sink method "HtmlWidget" -> code.HtmlRender
-  }
-}

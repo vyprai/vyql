@@ -1,0 +1,9 @@
+module bindings.c.migration.ma98d5688;
+
+binding filePathAccess0 {
+  requires {
+    dependency("magnum")
+  }
+  query pattern callExpr where callee.method == "AbstractResourceLoader::load"
+  emit sink code.FilePathAccess at args[0]
+}

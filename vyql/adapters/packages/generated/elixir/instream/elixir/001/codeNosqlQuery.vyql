@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m86249842;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("instream")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NosqlQuery at args[0]
+}

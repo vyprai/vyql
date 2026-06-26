@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m6154bf05;
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("org.webjars:webjars-locator-core")
+  }
+  query pattern callExpr where callee.method == "extractWebJarsTo"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

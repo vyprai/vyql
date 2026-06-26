@@ -1,0 +1,9 @@
+module bindings.scala.migration.m11946b9b;
+
+binding codeEval0 {
+  requires {
+    dependency("org.jboss.weld.servlet:weld-servlet")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.CodeEval at args[0]
+}

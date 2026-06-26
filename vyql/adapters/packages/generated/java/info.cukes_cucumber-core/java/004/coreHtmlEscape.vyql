@@ -1,0 +1,14 @@
+module bindings.java.migration.m490e28e4;
+
+binding htmlEscape4 {
+  requires {
+    dependency("info.cukes:cucumber-core")
+  }
+  query pattern callExpr where callee.method == "cucumber.runtime.Utils.htmlEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

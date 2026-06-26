@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf2c061b0;
+
+binding deserialization1 {
+  requires {
+    dependency("couchbase-lite-ios")
+  }
+  query pattern callExpr where callee.method == "validateJSONObject:"
+  emit sink code.Deserialization at args[0]
+}

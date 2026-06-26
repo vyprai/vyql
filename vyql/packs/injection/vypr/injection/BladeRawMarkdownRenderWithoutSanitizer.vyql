@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule BladeRawMarkdownRenderWithoutSanitizer {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-155"
+    severity: high
+  }
+  issue code.BladeRawMarkdownRenderWithoutSanitizer as sink
+}

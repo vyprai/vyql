@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb48597eb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("build_resolvers")
+  }
+  query pattern callExpr where callee.method == "assetPathFor"
+  emit sink code.FilePathAccess at args[0]
+}

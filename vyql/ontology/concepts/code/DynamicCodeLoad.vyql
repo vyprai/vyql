@@ -1,0 +1,12 @@
+module code;
+
+concept DynamicCodeLoad : sink {
+  cwe: [CWE_829]
+  enabledBy: [taint.UntrustedData]
+  review_assumption: "the resolved module/library path or search path can be influenced by the attacker"
+  reviewCategory: code_loading
+  reviewCondition: "attacker-controlled module or library name reaches a dynamic code loader"
+  reviewConfidence: medium
+  reviewEvidence: "dynamic loader {pattern} receives tainted input"
+  vulnerableTo: [injection.UnsafeDynamicLoading]
+}

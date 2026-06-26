@@ -1,5 +1,0 @@
-adapter bash {
-  package "dialog" {
-    source path "dialog.argv" -> code.CliArgument
-  }
-}

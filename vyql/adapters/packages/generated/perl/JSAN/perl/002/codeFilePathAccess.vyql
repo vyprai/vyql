@@ -1,0 +1,9 @@
+module bindings.perl.migration.mdd98cc15;
+
+binding filePathAccess2 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.path ~= "jsan"
+  emit sink code.FilePathAccess at args.any
+}

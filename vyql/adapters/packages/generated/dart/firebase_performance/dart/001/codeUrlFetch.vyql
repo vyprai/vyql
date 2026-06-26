@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma57346c9;
+
+binding urlFetch1 {
+  requires {
+    dependency("firebase_performance")
+  }
+  query pattern callExpr where callee.method == "startHttpMetric"
+  emit sink code.UrlFetch at args[0]
+}

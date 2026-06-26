@@ -1,0 +1,9 @@
+module bindings.swift.migration.m1a3534f9;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/firebase/grpc-SwiftPM")
+  }
+  query pattern callExpr where callee.method == "SendMessageBenchmark"
+  emit sink code.NetworkSend at args[0]
+}

@@ -92,6 +92,8 @@ type AdapterMapping struct {
 	FlowDestArg      int      // for `flow`: destination out-param argument index
 	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result
 	FlowSourceResult bool     // for `flow`: call result flows into destination out-param
+	Advisory         bool     // advisory check evidence; must not suppress findings
+	Coverage         string   // v2 coverage mode for advisory check evidence
 	Flag             *AdapterFlag
 }
 
@@ -177,7 +179,7 @@ type Endpoint struct {
 	Binding string // "" = none
 }
 
-// FlowStmt is `taint|flow|reach|assume A -> B`.
+// FlowStmt is `taint|flow|reach|grant|assume A -> B`.
 type FlowStmt struct {
 	Verb string
 	Src  Endpoint
@@ -224,13 +226,21 @@ type Exception interface{ isException() }
 
 type SanitizedBy struct{ Concept string }
 type GuardedBy struct{ Concept string }
+type SameReceiverCoveredBy struct{ Concept string }
+type SameScopeCoveredBy struct{ Concept string }
+type GlobalCoveredBy struct{ Concept string }
+type DominatesCoveredBy struct{ Concept string }
 type ClosedBy struct{ Concept string } // post-dominance: a release on every path to exit
 type ExprException struct{ Expr Expr }
 
-func (SanitizedBy) isException()   {}
-func (GuardedBy) isException()     {}
-func (ClosedBy) isException()      {}
-func (ExprException) isException() {}
+func (SanitizedBy) isException()           {}
+func (GuardedBy) isException()             {}
+func (SameReceiverCoveredBy) isException() {}
+func (SameScopeCoveredBy) isException()    {}
+func (GlobalCoveredBy) isException()       {}
+func (DominatesCoveredBy) isException()    {}
+func (ClosedBy) isException()              {}
+func (ExprException) isException()         {}
 
 // --- expressions ---------------------------------------------------------
 
@@ -307,5 +317,5 @@ func (Cmp) isExpr()            {}
 func (NotIn) isExpr()          {}
 
 // FlowVerbs / SolverVerbs (docs/05).
-var FlowVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true}
-var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "assume": true, "can_access": true, "dominates": true}
+var FlowVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "grant": true, "assume": true}
+var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "grant": true, "assume": true, "can_access": true, "dominates": true}

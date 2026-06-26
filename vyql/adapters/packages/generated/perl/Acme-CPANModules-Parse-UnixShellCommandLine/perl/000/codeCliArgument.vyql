@@ -1,0 +1,9 @@
+module bindings.perl.migration.m204695cb;
+
+binding cliArgument0 {
+  requires {
+    dependency("Acme-CPANModules-Parse-UnixShellCommandLine")
+  }
+  query pattern callExpr where callee.method == "Acme::CPANModules::Parse::UnixShellCommandLine"
+  emit source code.CliArgument at call.result
+}

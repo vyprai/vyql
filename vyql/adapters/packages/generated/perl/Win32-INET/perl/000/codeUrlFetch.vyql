@@ -1,0 +1,9 @@
+module bindings.perl.migration.m880da059;
+
+binding urlFetch0 {
+  requires {
+    dependency("Win32-INET")
+  }
+  query pattern callExpr where callee.method == "Win32::INET::GetUrlCacheFile"
+  emit sink code.UrlFetch at args[0]
+}

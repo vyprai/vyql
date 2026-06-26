@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc749145d;
+
+binding networkSend1 {
+  requires {
+    dependency("codeclimate-test-reporter")
+  }
+  query pattern callExpr where callee.method == "batch_post_results"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.powermock:powermock-classloading-xstream" {
-    sink method "clone" -> code.Deserialization
-  }
-}

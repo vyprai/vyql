@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5ea2d965;
+
+binding networkConnect0 {
+  requires {
+    dependency("http-proxy-middleware")
+  }
+  query pattern callExpr where callee.method == "HttpProxyMiddleware"
+  emit sink code.NetworkConnectSink at args[0]
+}

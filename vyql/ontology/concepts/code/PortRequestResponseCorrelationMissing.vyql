@@ -1,0 +1,11 @@
+module code;
+
+concept PortRequestResponseCorrelationMissing : issue {
+  cwe: [CWE_362, CWE_200]
+  review_assumption: "a timed-out or delayed prior response can remain in the worker mailbox and be returned to a later caller"
+  reviewCategory: concurrency
+  reviewCondition: "a worker sends requests to an async port process and accepts the next protocol response without binding it to the active request"
+  reviewConfidence: high
+  reviewEvidence: "port worker context {pattern} writes requests with Port.command and waits for get_response without a UID/correlation field"
+  vulnerableTo: [concurrency.RaceCondition, secrets.SecretLeak]
+}

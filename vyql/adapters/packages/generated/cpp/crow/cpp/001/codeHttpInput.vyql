@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m03268d36;
+
+binding httpInput1 {
+  requires {
+    dependency("crow")
+  }
+  query pattern callExpr where callee.method == "handle_full"
+  emit source code.HttpInput at call.result
+}

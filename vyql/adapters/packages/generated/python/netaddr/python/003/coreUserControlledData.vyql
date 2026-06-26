@@ -1,0 +1,9 @@
+module bindings.python.migration.mb8e7c75a;
+
+binding userControlledData3 {
+  requires {
+    dependency("netaddr")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source core.UserControlledData at call.result
+}

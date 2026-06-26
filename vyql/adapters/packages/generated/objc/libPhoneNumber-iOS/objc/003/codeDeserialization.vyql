@@ -1,0 +1,9 @@
+module bindings.objc.migration.mca1e1296;
+
+binding deserialization3 {
+  requires {
+    dependency("libPhoneNumber-iOS")
+  }
+  query pattern callExpr where callee.method == "parseWithCarrierRegion"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m293e575b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("gzip-size")
+  }
+  query pattern callExpr where callee.method == "gzipSizeFromFileSync"
+  emit sink code.FilePathAccess at args[0]
+}

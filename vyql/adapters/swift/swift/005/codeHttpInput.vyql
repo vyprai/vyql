@@ -1,0 +1,6 @@
+module bindings.swift.migration.m388f23d0;
+
+binding httpInput5 {
+  query pattern callExpr where callee.path ~= ".queryParameters"
+  emit source code.HttpInput at call.result
+}

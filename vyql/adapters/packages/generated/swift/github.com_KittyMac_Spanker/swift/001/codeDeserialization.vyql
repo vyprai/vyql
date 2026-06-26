@@ -1,0 +1,9 @@
+module bindings.swift.migration.m527e34e1;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/KittyMac/Spanker")
+  }
+  query pattern callExpr where callee.method == "parsed"
+  emit sink code.Deserialization at args[0]
+}

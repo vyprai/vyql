@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule NextcloudFileDropShareScopeBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_639, CWE_863]
+    id: "VYQL-AUTH-050"
+    severity: high
+  }
+  issue code.NextcloudFileDropShareScopeBypass as controller
+}

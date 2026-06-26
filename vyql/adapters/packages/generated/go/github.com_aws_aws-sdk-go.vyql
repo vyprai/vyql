@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/aws/aws-sdk-go" {
-    sink method "ParseAST" -> code.Deserialization
-    sink method "ParseASTBytes" -> code.Deserialization
-    sink method "Parse" -> code.Deserialization
-  }
-}

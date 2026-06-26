@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma1ee5524;
+
+binding htmlRender0 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "getBestFragment"
+  emit sink code.HtmlRender at args[0]
+}

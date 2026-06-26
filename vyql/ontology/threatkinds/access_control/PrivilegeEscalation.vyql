@@ -1,0 +1,6 @@
+module access_control;
+
+threat PrivilegeEscalation {
+  cwe: [CWE_269]
+  desc: "Improper privilege management"
+}

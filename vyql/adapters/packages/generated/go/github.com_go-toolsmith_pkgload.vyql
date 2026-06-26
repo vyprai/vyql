@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/go-toolsmith/pkgload" {
-    sink method "LoadPackages" -> code.FilePathAccess
-  }
-}

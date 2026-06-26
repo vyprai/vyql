@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9646c86e;
+
+binding htmlRender1 {
+  requires {
+    dependency("opensymphony:sitemesh")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.HtmlRender at args[0]
+}

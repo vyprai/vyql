@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md39518e8;
+
+binding networkConnect9 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "do_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

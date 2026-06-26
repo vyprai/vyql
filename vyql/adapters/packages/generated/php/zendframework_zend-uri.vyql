@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "zendframework/zend-uri" {
-    sink method "parse" -> code.Deserialization
-  }
-}

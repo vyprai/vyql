@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf32ebf06;
+
+binding deserialization3 {
+  requires {
+    dependency("target-lexicon")
+  }
+  query pattern callExpr where callee.method == "OperatingSystem::from_str"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m81d1f3b6;
+
+binding networkSend5 {
+  requires {
+    dependency("google-auth-httplib2")
+  }
+  query pattern callExpr where callee.method == "AuthorizedHttp.request"
+  emit sink code.NetworkSend at args[0]
+}

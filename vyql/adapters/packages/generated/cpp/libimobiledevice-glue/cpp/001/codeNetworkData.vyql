@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9681b87d;
+
+binding networkData1 {
+  requires {
+    dependency("libimobiledevice-glue")
+  }
+  query pattern callExpr where callee.method == "socket_receive_timeout"
+  emit source code.NetworkData at call.result
+}

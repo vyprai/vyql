@@ -1,0 +1,9 @@
+module bindings.python.migration.m26c75aca;
+
+binding deserialization0 {
+  requires {
+    dependency("anyjson")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

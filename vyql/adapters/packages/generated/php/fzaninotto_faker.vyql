@@ -1,6 +1,0 @@
-adapter php {
-  package "fzaninotto/faker" {
-    sink method "Faker\\Provider\\Image::image" -> code.UrlFetch
-    sink method "Faker\\Provider\\Image::image" -> code.FilePathAccess
-  }
-}

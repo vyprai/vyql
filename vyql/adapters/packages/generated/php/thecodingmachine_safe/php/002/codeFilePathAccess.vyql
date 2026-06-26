@@ -1,0 +1,9 @@
+module bindings.php.migration.mdc1ba520;
+
+binding filePathAccess2 {
+  requires {
+    dependency("thecodingmachine/safe")
+  }
+  query pattern callExpr where callee.method == "opendir"
+  emit sink code.FilePathAccess at args[0]
+}

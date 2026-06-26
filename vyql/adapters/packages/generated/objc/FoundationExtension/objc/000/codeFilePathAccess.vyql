@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc7263894;
+
+binding filePathAccess0 {
+  requires {
+    dependency("FoundationExtension")
+  }
+  query pattern callExpr where callee.method == "initWithPaths:latency:flags:delegate:"
+  emit sink code.FilePathAccess at args[0]
+}

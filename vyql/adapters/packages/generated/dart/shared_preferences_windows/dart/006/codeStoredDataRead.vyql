@@ -1,0 +1,9 @@
+module bindings.dart.migration.m30cff533;
+
+binding storedDataRead6 {
+  requires {
+    dependency("shared_preferences_windows")
+  }
+  query pattern callExpr where callee.method == "getAllWithPrefix"
+  emit source code.StoredDataRead at call.result
+}

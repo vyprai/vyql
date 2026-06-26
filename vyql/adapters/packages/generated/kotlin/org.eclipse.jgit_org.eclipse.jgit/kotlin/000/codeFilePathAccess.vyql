@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mf96d6752;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

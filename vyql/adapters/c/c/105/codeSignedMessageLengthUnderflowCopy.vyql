@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding signedMessageLengthUnderflowCopy105 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=crypto_sign_open" and node.token contains "*mlen=smlen-(unsignedlonglong)sizeof(CROSS_sig_t)" and node.token contains "memcpy((unsignedchar*)m,(constunsignedchar*)sm,(size_t)*mlen)" and not (node.token contains "smlen<(size_t)sizeof(CROSS_sig_t)")
+  emit issue code.SignedMessageLengthUnderflowCopy at node
+}

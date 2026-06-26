@@ -1,5 +1,0 @@
-adapter c {
-  package "pugixml" {
-    sink path "pugixml.parse" -> code.XmlParse
-  }
-}

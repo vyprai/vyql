@@ -1,0 +1,9 @@
+module bindings.go.migration.m6bc05322;
+
+binding filePathAccess0 {
+  requires {
+    dependency("go.etcd.io/etcd/client/pkg/v3")
+  }
+  query pattern callExpr where callee.method == "OpenDir"
+  emit sink code.FilePathAccess at args[0]
+}

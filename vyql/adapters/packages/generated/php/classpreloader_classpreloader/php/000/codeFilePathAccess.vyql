@@ -1,0 +1,9 @@
+module bindings.php.migration.m5d956e89;
+
+binding filePathAccess0 {
+  requires {
+    dependency("classpreloader/classpreloader")
+  }
+  query pattern callExpr where callee.method == "readPhpFile"
+  emit sink code.FilePathAccess at args[0]
+}

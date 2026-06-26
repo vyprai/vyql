@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule JenkinsTestResultNameXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-173"
+    severity: high
+  }
+  issue code.JenkinsTestResultNameXss as sink
+}

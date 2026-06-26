@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.httpcomponents:httpcore" {
-    sink method "parse" -> code.Deserialization
-    sink method "create" -> code.Deserialization
-  }
-}

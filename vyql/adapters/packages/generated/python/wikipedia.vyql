@@ -1,9 +1,0 @@
-adapter python {
-  package "wikipedia" {
-    source method "search" -> core.UserControlledData
-    source method "geosearch" -> core.UserControlledData
-    source method "suggest" -> core.UserControlledData
-    source method "page" -> core.UserControlledData
-    source method "summary" -> core.UserControlledData
-  }
-}

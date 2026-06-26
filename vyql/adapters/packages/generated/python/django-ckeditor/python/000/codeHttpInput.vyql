@@ -1,0 +1,9 @@
+module bindings.python.migration.mf4fe81f1;
+
+binding httpInput0 {
+  requires {
+    dependency("django-ckeditor")
+  }
+  query pattern callExpr where callee.method == "ckeditor_uploader.views.post"
+  emit source code.HttpInput at call.result
+}

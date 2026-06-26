@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0fc475b4;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("hive_flutter")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

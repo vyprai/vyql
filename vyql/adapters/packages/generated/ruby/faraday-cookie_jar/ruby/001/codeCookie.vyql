@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me74e540b;
+
+binding cookie1 {
+  requires {
+    dependency("faraday-cookie_jar")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source code.Cookie at call.result
+}

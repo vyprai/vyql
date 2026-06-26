@@ -1,0 +1,9 @@
+module bindings.php.migration.m93cc0120;
+
+binding sqlExecution0 {
+  requires {
+    dependency("doctrine/migrations")
+  }
+  query pattern callExpr where callee.method == "addSql"
+  emit sink code.SqlExecution at args[0]
+}

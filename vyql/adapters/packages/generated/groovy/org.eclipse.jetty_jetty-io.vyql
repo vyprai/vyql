@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkData}
-adapter groovy {
-  package "org.eclipse.jetty:jetty-io" {
-    sink method "connect" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-    source method "read" -> code.NetworkData
-  }
-}

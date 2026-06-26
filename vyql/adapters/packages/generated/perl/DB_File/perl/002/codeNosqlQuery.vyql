@@ -1,0 +1,9 @@
+module bindings.perl.migration.m49d8eae4;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "STORE"
+  emit sink code.NosqlQuery at args[0]
+}

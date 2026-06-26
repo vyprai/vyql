@@ -1,0 +1,9 @@
+module bindings.perl.migration.md871dd99;
+
+binding deserialization12 {
+  requires {
+    dependency("HackaMol")
+  }
+  query pattern callExpr where callee.method == "read_yaml_atoms"
+  emit sink code.Deserialization at args[0]
+}

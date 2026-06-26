@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter elixir {
-  package "dns" {
-    source method "resolve" -> code.NetworkData
-    source method "query" -> code.NetworkData
-  }
-}

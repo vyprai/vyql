@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding prototypePollutionGuard570 {
+  query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "k==='__proto__'||k==='constructor'||k==='prototype'"
+  emit check core.PrototypePollutionGuard at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

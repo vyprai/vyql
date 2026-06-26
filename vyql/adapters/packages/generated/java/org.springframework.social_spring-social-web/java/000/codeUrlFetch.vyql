@@ -1,0 +1,9 @@
+module bindings.java.migration.mbdcb4371;
+
+binding urlFetch0 {
+  requires {
+    dependency("org.springframework.social:spring-social-web")
+  }
+  query pattern callExpr where callee.method == "fetchRequestToken"
+  emit sink code.UrlFetch at args[0]
+}

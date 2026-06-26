@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me757db40;
+
+binding databaseRead0 {
+  requires {
+    dependency("com.baomidou:mybatis-plus-generator")
+  }
+  query pattern callExpr where callee.method == "FastAutoGenerator.create"
+  emit sink code.DatabaseReadSink at args[0]
+}

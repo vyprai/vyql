@@ -1,0 +1,9 @@
+module bindings.perl.migration.m5884e7db;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Test-DBChanges")
+  }
+  query pattern callExpr where callee.method == "_db_do"
+  emit sink code.SqlExecution at args[0]
+}

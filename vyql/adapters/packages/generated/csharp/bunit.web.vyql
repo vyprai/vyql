@@ -1,8 +1,0 @@
-import code.{DomInput, HtmlRender}
-
-adapter csharp {
-  package "bunit.web" {
-    source method "CompareTo" -> code.DomInput
-    sink method "MarkupMatches" -> code.HtmlRender
-  }
-}

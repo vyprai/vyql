@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m3f4f1628;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("redis.clients:jedis")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

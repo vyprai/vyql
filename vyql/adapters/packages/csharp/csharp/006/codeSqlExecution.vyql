@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding sqlExecution6 {
+  requires {
+    dependency("Microsoft.EntityFrameworkCore")
+  }
+  query pattern callExpr where callee.method == "ExecuteSqlRaw"
+  emit sink code.SqlExecution at args[0]
+}

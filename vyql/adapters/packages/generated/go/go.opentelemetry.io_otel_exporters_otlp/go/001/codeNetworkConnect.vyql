@@ -1,0 +1,9 @@
+module bindings.go.migration.m4a873653;
+
+binding networkConnect1 {
+  requires {
+    dependency("go.opentelemetry.io/otel/exporters/otlp")
+  }
+  query pattern callExpr where callee.method == "WithMetricsEndpoint"
+  emit sink code.NetworkConnectSink at args[0]
+}

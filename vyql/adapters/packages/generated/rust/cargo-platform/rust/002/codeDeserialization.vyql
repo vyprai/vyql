@@ -1,0 +1,9 @@
+module bindings.rust.migration.mbc07c8fa;
+
+binding deserialization2 {
+  requires {
+    dependency("cargo-platform")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

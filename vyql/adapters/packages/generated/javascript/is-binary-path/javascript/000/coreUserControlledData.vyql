@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m627d9031;
+
+binding userControlledData0 {
+  requires {
+    dependency("is-binary-path")
+  }
+  query pattern callExpr where callee.method == "isBinaryPath"
+  emit source core.UserControlledData at call.result
+}

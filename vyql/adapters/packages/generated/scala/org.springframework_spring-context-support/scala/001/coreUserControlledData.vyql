@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf9407243;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.springframework:spring-context-support")
+  }
+  query pattern callExpr where callee.method == "setText"
+  emit source core.UserControlledData at call.result
+}

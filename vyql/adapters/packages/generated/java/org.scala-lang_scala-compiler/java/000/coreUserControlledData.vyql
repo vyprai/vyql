@@ -1,0 +1,9 @@
+module bindings.java.migration.m03731e0e;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.scala-lang:scala-compiler")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

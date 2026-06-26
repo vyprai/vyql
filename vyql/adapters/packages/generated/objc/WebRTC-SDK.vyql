@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter objc {
-  package "WebRTC-SDK" {
-    sink method "sendData:" -> code.NetworkSend
-  }
-}

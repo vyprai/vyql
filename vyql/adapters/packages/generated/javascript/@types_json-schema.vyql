@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "@types/json-schema" {
-    sink method "validate" -> code.Deserialization
-  }
-}

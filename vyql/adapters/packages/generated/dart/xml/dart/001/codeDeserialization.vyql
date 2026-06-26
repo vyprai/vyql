@@ -1,0 +1,9 @@
+module bindings.dart.migration.m42bc60c0;
+
+binding deserialization1 {
+  requires {
+    dependency("xml")
+  }
+  query pattern callExpr where callee.method == "XmlDocumentFragment.parse"
+  emit sink code.Deserialization at args[0]
+}

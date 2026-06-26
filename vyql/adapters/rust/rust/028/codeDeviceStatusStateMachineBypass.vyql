@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding deviceStatusStateMachineBypass28 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and containsAny(node.token, ["name=write_common_config", "name=write_device_status", "name=write_config_byte"]) and node.token contains "match_arm:DEVICE_STATUS" and node.token contains "assign:self.driver_status=value" and not (node.token contains "call_path:self.set_device_status")
+  emit issue code.DeviceStatusStateMachineBypass at node
+}

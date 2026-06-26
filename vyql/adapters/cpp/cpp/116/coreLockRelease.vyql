@@ -1,0 +1,11 @@
+module bindings.cpp.migration.m4e783366;
+
+binding lockRelease116 {
+  query pattern callExpr where callee.path ~= "mtx_unlock"
+  emit check core.LockRelease at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

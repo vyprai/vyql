@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m81ec1fbf;
+
+binding htmlEscape2 {
+  requires {
+    dependency("RedCloth")
+  }
+  query pattern callExpr where callee.method == "rb_str_cat_escaped"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

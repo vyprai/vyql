@@ -1,0 +1,9 @@
+module bindings.rust.migration.m4014f6c5;
+
+binding logOutput0 {
+  requires {
+    dependency("android_glue")
+  }
+  query pattern callExpr where callee.method == "write_log"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.mcf656555;
+
+binding deserialization3 {
+  requires {
+    dependency("oatpp")
+  }
+  query pattern callExpr where callee.method == "parseQueryParams"
+  emit sink code.Deserialization at args[0]
+}

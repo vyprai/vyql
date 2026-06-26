@@ -1,0 +1,13 @@
+module bindings.java.migration.m420f6b67;
+
+binding binding451 {
+  query pattern callExpr where callee.method == "getCanonicalPath"
+  emit check core.Assumption at call {
+    advisory: true
+    about: code.FilePathAccess
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

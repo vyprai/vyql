@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "ryml" {
-    sink method "parse" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma1a1c5db;
+
+binding codeEval1 {
+  requires {
+    dependency("only")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.CodeEval at args[0]
+}

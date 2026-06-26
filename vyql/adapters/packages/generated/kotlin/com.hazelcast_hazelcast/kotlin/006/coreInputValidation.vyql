@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m5458f5bb;
+
+binding inputValidation6 {
+  requires {
+    dependency("com.hazelcast:hazelcast")
+  }
+  query pattern callExpr where callee.method == "urlEncode"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

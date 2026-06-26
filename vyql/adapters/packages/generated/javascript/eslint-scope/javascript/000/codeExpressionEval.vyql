@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mcf944a37;
+
+binding expressionEval0 {
+  requires {
+    dependency("eslint-scope")
+  }
+  query pattern callExpr where callee.method == "analyze"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m839b577a;
+
+binding filePathAccess5 {
+  requires {
+    dependency("github.com/lyft/protoc-gen-star")
+  }
+  query pattern callExpr where callee.method == "JoinPaths"
+  emit sink code.FilePathAccess at args[0]
+}

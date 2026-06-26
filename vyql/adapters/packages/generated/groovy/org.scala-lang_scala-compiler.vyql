@@ -1,8 +1,0 @@
-import code.{CommandExecution, Deserialization, CodeEval}
-adapter groovy {
-  package "org.scala-lang:scala-compiler" {
-    sink method "compile" -> code.CodeEval
-    sink method "parse" -> code.Deserialization
-    sink method "run" -> code.CommandExecution
-  }
-}

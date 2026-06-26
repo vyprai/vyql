@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding deserialization35 {
+  requires {
+    dependency("yaml")
+  }
+  query pattern callExpr where callee.path ~= "yaml.parse"
+  emit sink code.Deserialization at args[0]
+}

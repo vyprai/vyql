@@ -1,0 +1,9 @@
+module bindings.java.migration.m37090c2a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.mortbay.jetty:jetty-util")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m9e2b0c5f;
+
+binding networkData9 {
+  requires {
+    dependency("org.apache.avro:avro-ipc")
+  }
+  query pattern callExpr where callee.method == "respond"
+  emit source code.NetworkData at call.result
+}

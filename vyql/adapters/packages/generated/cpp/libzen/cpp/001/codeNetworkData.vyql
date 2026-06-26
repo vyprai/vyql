@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mcd81c70b;
+
+binding networkData1 {
+  requires {
+    dependency("libzen")
+  }
+  query pattern callExpr where callee.method == "HTTP_Client::Read"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.me05b050f;
+
+binding deserialization0 {
+  requires {
+    dependency("org.hdrhistogram:HdrHistogram")
+  }
+  query pattern callExpr where callee.method == "decodeFromByteBuffer"
+  emit sink code.Deserialization at args[0]
+}

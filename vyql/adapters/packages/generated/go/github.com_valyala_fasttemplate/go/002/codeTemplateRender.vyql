@@ -1,0 +1,9 @@
+module bindings.go.migration.m3466c608;
+
+binding templateRender2 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteFuncStringWithErr"
+  emit sink code.TemplateRender at args[0]
+}

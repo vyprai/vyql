@@ -1,5 +1,0 @@
-adapter php {
-  package "yiisoft/yii" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

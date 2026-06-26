@@ -1,0 +1,9 @@
+module bindings.objc.migration.m742074f4;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("FirebaseFirestore")
+  }
+  query pattern callExpr where callee.method == "FindHeader"
+  emit sink code.NosqlQuery at args[0]
+}

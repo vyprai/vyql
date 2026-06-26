@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "terminal-table" {
-    control method "ansi_escape" -> core.InputValidation
-  }
-}

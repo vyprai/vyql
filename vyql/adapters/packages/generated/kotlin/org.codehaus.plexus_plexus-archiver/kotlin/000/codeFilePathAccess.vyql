@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mf4591cb5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.codehaus.plexus:plexus-archiver")
+  }
+  query pattern callExpr where callee.method == "setDestFile"
+  emit sink code.FilePathAccess at args[0]
+}

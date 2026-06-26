@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter swift {
-  package "github.com/danger/swift" {
-    sink method "exec" -> code.CommandExecution
-    sink method "spawn" -> code.CommandExecution
-  }
-}

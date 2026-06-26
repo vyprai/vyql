@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m03fb46b2;
+
+binding logOutput1 {
+  requires {
+    dependency("com.jakewharton.timber:timber")
+  }
+  query pattern callExpr where callee.method == "d"
+  emit sink code.LogOutput at args[0]
+}

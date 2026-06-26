@@ -1,8 +1,0 @@
-import code.{FilePathAccess, StdinInput, Deserialization}
-adapter python {
-  package "cligj" {
-    sink method "normalize_feature_inputs" -> code.FilePathAccess
-    source method "normalize_feature_inputs" -> code.StdinInput
-    sink method "iter_features" -> code.Deserialization
-  }
-}

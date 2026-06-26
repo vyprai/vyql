@@ -1,0 +1,9 @@
+module bindings.scala.migration.m14712537;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework:spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mb516a7c2;
+
+binding deserialization0 {
+  requires {
+    dependency("dnlib")
+  }
+  query pattern callExpr where callee.method == "AssemblyDef.Load"
+  emit sink code.Deserialization at args[0]
+}

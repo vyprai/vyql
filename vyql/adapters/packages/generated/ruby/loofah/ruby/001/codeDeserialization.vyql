@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m441454db;
+
+binding deserialization1 {
+  requires {
+    dependency("loofah")
+  }
+  query pattern callExpr where callee.method == "html4_document"
+  emit sink code.Deserialization at args[0]
+}

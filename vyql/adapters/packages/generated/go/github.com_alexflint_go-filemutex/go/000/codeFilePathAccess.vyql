@@ -1,0 +1,9 @@
+module bindings.go.migration.m0fabdae7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/alexflint/go-filemutex")
+  }
+  query pattern callExpr where callee.method == "New"
+  emit sink code.FilePathAccess at args[0]
+}

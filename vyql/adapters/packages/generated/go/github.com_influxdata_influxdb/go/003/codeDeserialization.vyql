@@ -1,0 +1,9 @@
+module bindings.go.migration.m286dcc82;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/influxdata/influxdb")
+  }
+  query pattern callExpr where callee.method == "ParseKeyBytes"
+  emit sink code.Deserialization at args[0]
+}

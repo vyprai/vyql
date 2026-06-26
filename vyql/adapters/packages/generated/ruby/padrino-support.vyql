@@ -1,8 +1,0 @@
-import code.{FilePathAccess, CodeEval}
-adapter ruby {
-  package "padrino-support" {
-    sink method "glob" -> code.FilePathAccess
-    sink method "glob_require" -> code.FilePathAccess
-    sink method "glob_require" -> code.CodeEval
-  }
-}

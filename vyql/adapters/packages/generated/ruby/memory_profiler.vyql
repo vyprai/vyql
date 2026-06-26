@@ -1,8 +1,0 @@
-import code.{Deserialization, EnvVariable}
-
-adapter ruby {
-  package "memory_profiler" {
-    source method "deserialize_hash" -> code.EnvVariable
-    sink method "deserialize_hash" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mc235c2c4;
+
+binding networkSend1 {
+  requires {
+    dependency("nyholm/psr7")
+  }
+  query pattern callExpr where callee.method == "Stream.write"
+  emit sink code.NetworkSend at args[0]
+}

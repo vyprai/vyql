@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m66e9778b;
+
+binding filePathAccess3 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "isNonGlibcLinuxSync"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.scala.migration.mf9a78076;
+
+binding htmlEscape1 {
+  requires {
+    dependency("net.logstash.logback:logstash-logback-encoder")
+  }
+  query pattern callExpr where callee.method == "escapeJson"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

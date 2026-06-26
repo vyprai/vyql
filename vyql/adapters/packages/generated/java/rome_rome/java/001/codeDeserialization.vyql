@@ -1,0 +1,9 @@
+module bindings.java.migration.mde0c0649;
+
+binding deserialization1 {
+  requires {
+    dependency("rome:rome")
+  }
+  query pattern callExpr where callee.method == "build"
+  emit sink code.Deserialization at args[0]
+}

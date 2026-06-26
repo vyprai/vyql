@@ -1,0 +1,9 @@
+module bindings.swift.migration.m96997166;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/swift-server-community/APNSwift")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

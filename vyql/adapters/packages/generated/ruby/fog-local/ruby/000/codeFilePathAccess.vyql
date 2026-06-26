@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbf5b106a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fog-local")
+  }
+  query pattern callExpr where callee.method == "path_to"
+  emit sink code.FilePathAccess at args[0]
+}

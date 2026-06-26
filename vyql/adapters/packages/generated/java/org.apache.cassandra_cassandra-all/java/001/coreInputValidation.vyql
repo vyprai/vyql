@@ -1,0 +1,14 @@
+module bindings.java.migration.m6be46fbf;
+
+binding inputValidation1 {
+  requires {
+    dependency("org.apache.cassandra:cassandra-all")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

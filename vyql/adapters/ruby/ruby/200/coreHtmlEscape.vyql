@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding htmlEscape200 {
+  query pattern callExpr where callee.path ~= "Rack.Utils.escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m1f95a22f;
+
+binding networkConnect2 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "sendShutdownLegacy"
+  emit sink code.NetworkConnectSink at args[0]
+}

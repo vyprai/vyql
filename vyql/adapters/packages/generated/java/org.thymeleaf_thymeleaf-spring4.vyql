@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter java {
-  package "org.thymeleaf:thymeleaf-spring4" {
-    sink method "render" -> code.HtmlRender
-  }
-}

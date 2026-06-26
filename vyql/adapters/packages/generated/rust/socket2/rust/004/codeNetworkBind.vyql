@@ -1,0 +1,9 @@
+module bindings.rust.migration.m86000b79;
+
+binding networkBind4 {
+  requires {
+    dependency("socket2")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit sink code.NetworkBind at args[0]
+}

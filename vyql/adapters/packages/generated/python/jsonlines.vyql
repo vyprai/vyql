@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter python {
-  package "jsonlines" {
-    sink method "read" -> code.Deserialization
-    sink method "open" -> code.FilePathAccess
-  }
-}

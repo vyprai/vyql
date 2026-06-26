@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7d1994cd;
+
+binding sqlExecution2 {
+  requires {
+    dependency("clickhouse_ecto")
+  }
+  query pattern callExpr where callee.method == "ClickhouseEcto.Query.update_all"
+  emit sink code.SqlExecution at args[0]
+}

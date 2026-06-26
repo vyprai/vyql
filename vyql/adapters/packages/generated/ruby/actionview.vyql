@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "actionview" {
-    control method "sanitize" -> core.HtmlEscape
-    control method "sanitize_css" -> core.HtmlEscape
-  }
-}

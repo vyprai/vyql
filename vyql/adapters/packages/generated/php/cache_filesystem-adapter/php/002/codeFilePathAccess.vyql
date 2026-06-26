@@ -1,0 +1,9 @@
+module bindings.php.migration.m58a90d88;
+
+binding filePathAccess2 {
+  requires {
+    dependency("cache/filesystem-adapter")
+  }
+  query pattern callExpr where callee.method == "getFilePath"
+  emit sink code.FilePathAccess at args[0]
+}

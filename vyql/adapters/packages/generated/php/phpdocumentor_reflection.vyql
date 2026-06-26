@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "phpdocumentor/reflection" {
-    sink method "create" -> code.Deserialization
-  }
-}

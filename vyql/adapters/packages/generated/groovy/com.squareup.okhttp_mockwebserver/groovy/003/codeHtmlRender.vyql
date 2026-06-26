@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m417fc301;
+
+binding htmlRender3 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "setBody"
+  emit sink code.HtmlRender at args[0]
+}

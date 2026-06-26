@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "FBRetainCycleDetector" {
-    sink method "parseStructEncoding" -> code.Deserialization
-    sink method "parseStructEncodingWithName" -> code.Deserialization
-  }
-}

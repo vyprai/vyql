@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4edf2d8b;
+
+binding codeEval2 {
+  requires {
+    dependency("sprockets-sass")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.CodeEval at args[0]
+}

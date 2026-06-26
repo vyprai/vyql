@@ -1,9 +1,0 @@
-import code.{WeakRandomValue}
-
-adapter perl {
-  package "Crypt-Vernam" {
-    flag code.WeakRandomValue on any {
-      method "_get_key_mod26"
-    }
-  }
-}

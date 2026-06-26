@@ -1,0 +1,9 @@
+module bindings.python.migration.ma8174b37;
+
+binding deserialization1 {
+  requires {
+    dependency("munch")
+  }
+  query pattern callExpr where callee.method == "fromYAML"
+  emit sink code.Deserialization at args[0]
+}

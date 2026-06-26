@@ -1,0 +1,11 @@
+module vypr.deserialization;
+
+rule PhpSimplexmlUnscopedEntityLoaderXxe {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_611]
+    id: "VYQL-DESER-020"
+    severity: high
+  }
+  issue code.PhpSimplexmlUnscopedEntityLoaderXxe as parser
+}

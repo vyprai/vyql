@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m711a0255;
+
+binding deserialization5 {
+  requires {
+    dependency("luerl")
+  }
+  query pattern callExpr where callee.method == "decode_luafunc"
+  emit sink code.Deserialization at args[0]
+}

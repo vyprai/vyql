@@ -1,0 +1,9 @@
+module bindings.python.migration.mf16a0cc3;
+
+binding userControlledData2 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "parse_stream"
+  emit source core.UserControlledData at call.result
+}

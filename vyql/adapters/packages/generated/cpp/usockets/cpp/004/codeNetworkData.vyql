@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mbb7981ca;
+
+binding networkData4 {
+  requires {
+    dependency("usockets")
+  }
+  query pattern callExpr where callee.method == "us_quic_socket_context_set_header"
+  emit source code.NetworkData at call.result
+}

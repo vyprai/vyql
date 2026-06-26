@@ -1,0 +1,9 @@
+module bindings.rust.migration.md585d09d;
+
+binding deserialization0 {
+  requires {
+    dependency("tokio-util")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

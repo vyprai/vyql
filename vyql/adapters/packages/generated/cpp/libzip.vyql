@@ -1,5 +1,0 @@
-adapter cpp {
-  package "libzip" {
-    sink method "diff_output_start_file" -> code.ArchiveEntryWrite
-  }
-}

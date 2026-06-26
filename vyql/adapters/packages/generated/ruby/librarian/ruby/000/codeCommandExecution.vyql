@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md6888d04;
+
+binding commandExecution0 {
+  requires {
+    dependency("librarian")
+  }
+  query pattern callExpr where callee.method == "run!"
+  emit sink code.CommandExecution at args[0]
+}

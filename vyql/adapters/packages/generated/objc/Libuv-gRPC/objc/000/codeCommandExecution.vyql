@@ -1,0 +1,9 @@
+module bindings.objc.migration.m0b064b2b;
+
+binding commandExecution0 {
+  requires {
+    dependency("Libuv-gRPC")
+  }
+  query pattern callExpr where callee.method == "uv_spawn"
+  emit sink code.CommandExecution at args[0]
+}

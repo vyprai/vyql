@@ -1,0 +1,9 @@
+module bindings.go.migration.mbf908620;
+
+binding urlFetch1 {
+  requires {
+    dependency("k8s.io/cli-runtime")
+  }
+  query pattern callExpr where callee.method == "readHttpWithRetries"
+  emit sink code.UrlFetch at args[0]
+}

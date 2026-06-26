@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding incompleteTemplateValidation490 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "Formatter().parse" and node.token contains "[" and not (node.token contains "format_spec")
+  emit issue code.IncompleteTemplateValidation at node
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m39c3b7a9;
+
+binding deserialization1 {
+  requires {
+    dependency("coretweet")
+  }
+  query pattern callExpr where callee.method == "CoreTweet.Streaming.StreamingMessage.Parse"
+  emit sink code.Deserialization at args[0]
+}

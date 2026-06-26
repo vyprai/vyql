@@ -1,0 +1,9 @@
+module bindings.rust.migration.md48767e5;
+
+binding userControlledData2 {
+  requires {
+    dependency("windows")
+  }
+  query pattern callExpr where callee.method == "QueryParsed"
+  emit source core.UserControlledData at call.result
+}

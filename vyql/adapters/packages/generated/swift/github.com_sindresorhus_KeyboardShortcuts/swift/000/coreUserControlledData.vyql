@@ -1,0 +1,9 @@
+module bindings.swift.migration.m72740eb4;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/sindresorhus/KeyboardShortcuts")
+  }
+  query pattern callExpr where callee.method == "onKeyDown"
+  emit source core.UserControlledData at call.result
+}

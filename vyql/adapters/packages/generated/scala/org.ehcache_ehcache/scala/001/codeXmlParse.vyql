@@ -1,0 +1,9 @@
+module bindings.scala.migration.m7297c04d;
+
+binding xmlParse1 {
+  requires {
+    dependency("org.ehcache:ehcache")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

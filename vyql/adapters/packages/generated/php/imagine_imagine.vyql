@@ -1,5 +1,0 @@
-adapter php {
-  package "imagine/imagine" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

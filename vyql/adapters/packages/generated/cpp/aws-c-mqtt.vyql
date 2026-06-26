@@ -1,5 +1,0 @@
-adapter cpp {
-  package "aws-c-mqtt" {
-    control method "aws_mqtt_validate_utf8_text" -> core.InputValidation
-  }
-}

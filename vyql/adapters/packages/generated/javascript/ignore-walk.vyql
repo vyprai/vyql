@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-import core.{UserControlledData}
-
-adapter javascript {
-  package "ignore-walk" {
-    sink method "addIgnoreFile" -> code.FilePathAccess
-    sink method "onReadIgnoreFile" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter groovy {
-  package "org.hibernate.validator:hibernate-validator" {
-    sink method "scriptEvaluatorFactory" -> code.CodeEval
-    sink method "externalClassLoader" -> code.CodeEval
-  }
-}

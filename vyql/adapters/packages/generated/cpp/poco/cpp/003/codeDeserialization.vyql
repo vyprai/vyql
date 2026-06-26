@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m64dff1c6;
+
+binding deserialization3 {
+  requires {
+    dependency("poco")
+  }
+  query pattern callExpr where callee.method == "stream"
+  emit sink code.Deserialization at args[0]
+}

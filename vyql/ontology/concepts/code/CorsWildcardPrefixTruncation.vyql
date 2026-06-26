@@ -1,0 +1,11 @@
+module code;
+
+concept CorsWildcardPrefixTruncation : issue {
+  cwe: [CWE_346]
+  review_assumption: "the parsed wildcard prefix is later used with prefix matching to accept Origin header values"
+  reviewCategory: access_control
+  reviewCondition: "CORS wildcard origin parsing truncates the trusted prefix before prefix matching request origins"
+  reviewConfidence: high
+  reviewEvidence: "CORS wildcard parser context {pattern} stores a prefix slice ending before the wildcard index"
+  vulnerableTo: [access_control.OriginValidationError]
+}

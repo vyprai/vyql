@@ -1,0 +1,9 @@
+module bindings.python.migration.ma614fd81;
+
+binding userControlledData1 {
+  requires {
+    dependency("configparser")
+  }
+  query pattern callExpr where callee.method == "read_file"
+  emit source core.UserControlledData at call.result
+}

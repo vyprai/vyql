@@ -1,8 +1,0 @@
-import code.{SqlExecution, SecretValue}
-adapter csharp {
-  package "microsoft.azure.cosmosdb.table" {
-    sink method "Execute" -> code.SqlExecution
-    sink method "ExecuteBatch" -> code.SqlExecution
-    source method "GetSharedAccessSignature" -> code.SecretValue
-  }
-}

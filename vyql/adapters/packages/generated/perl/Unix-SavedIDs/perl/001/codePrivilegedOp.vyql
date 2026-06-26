@@ -1,0 +1,14 @@
+module bindings.perl.migration.m61576ded;
+
+binding privilegedOp1 {
+  requires {
+    dependency("Unix-SavedIDs")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "setresgid"
+  emit issue code.PrivilegedOp at node
+  emit sink code.PrivilegedOpSink at node
+}

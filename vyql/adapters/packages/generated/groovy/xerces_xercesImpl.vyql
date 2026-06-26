@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "xerces:xercesImpl" {
-    sink method "startElement" -> code.Deserialization
-    sink method "characters" -> code.Deserialization
-    sink method "processingInstruction" -> code.Deserialization
-  }
-}

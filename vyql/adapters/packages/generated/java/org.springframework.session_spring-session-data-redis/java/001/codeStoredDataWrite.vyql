@@ -1,0 +1,9 @@
+module bindings.java.migration.m176bf515;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.springframework.session:spring-session-data-redis")
+  }
+  query pattern callExpr where callee.method == "setAttribute"
+  emit sink code.StoredDataWrite at args[0]
+}

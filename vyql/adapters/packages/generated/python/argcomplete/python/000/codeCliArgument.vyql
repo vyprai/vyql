@@ -1,0 +1,9 @@
+module bindings.python.migration.m7a28f3df;
+
+binding cliArgument0 {
+  requires {
+    dependency("argcomplete")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit source code.CliArgument at call.result
+}

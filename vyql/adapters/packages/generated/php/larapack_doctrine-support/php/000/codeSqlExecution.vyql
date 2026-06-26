@@ -1,0 +1,9 @@
+module bindings.php.migration.m861160fa;
+
+binding sqlExecution0 {
+  requires {
+    dependency("larapack/doctrine-support")
+  }
+  query pattern callExpr where callee.method == "getSQLDeclaration"
+  emit sink code.SqlExecution at args[0]
+}

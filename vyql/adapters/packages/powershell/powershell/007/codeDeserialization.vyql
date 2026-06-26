@@ -1,0 +1,9 @@
+module bindings.powershell.migration.m92132a18;
+
+binding deserialization7 {
+  requires {
+    dependency("Microsoft.PowerShell.Utility")
+  }
+  query pattern callExpr where callee.path ~= "Import-Clixml"
+  emit sink code.Deserialization at args[0]
+}

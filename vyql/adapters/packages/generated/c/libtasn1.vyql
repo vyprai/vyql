@@ -1,6 +1,0 @@
-adapter c {
-  package "libtasn1" {
-    sink method "spawn" -> code.CommandExecution
-    sink method "file" -> code.FilePathAccess
-  }
-}

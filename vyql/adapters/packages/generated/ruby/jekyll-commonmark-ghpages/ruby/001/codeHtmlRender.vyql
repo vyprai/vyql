@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8bd50664;
+
+binding htmlRender1 {
+  requires {
+    dependency("jekyll-commonmark-ghpages")
+  }
+  query pattern callExpr where callee.method == "code_block"
+  emit sink code.HtmlRender at args[0]
+}

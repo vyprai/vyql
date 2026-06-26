@@ -1,0 +1,9 @@
+module bindings.objc.migration.m86c0763f;
+
+binding deserialization0 {
+  requires {
+    dependency("Zip")
+  }
+  query pattern callExpr where callee.method == "unzipFile"
+  emit sink code.Deserialization at args[0]
+}

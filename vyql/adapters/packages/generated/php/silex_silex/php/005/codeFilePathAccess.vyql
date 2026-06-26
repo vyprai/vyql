@@ -1,0 +1,9 @@
+module bindings.php.migration.mea539daf;
+
+binding filePathAccess5 {
+  requires {
+    dependency("silex/silex")
+  }
+  query pattern callExpr where callee.method == "sendFile"
+  emit sink code.FilePathAccess at args[0]
+}

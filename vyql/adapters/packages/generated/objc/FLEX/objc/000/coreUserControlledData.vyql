@@ -1,0 +1,9 @@
+module bindings.objc.migration.mfe9583df;
+
+binding userControlledData0 {
+  requires {
+    dependency("FLEX")
+  }
+  query pattern callExpr where callee.method == "filter:completion:"
+  emit source core.UserControlledData at call.result
+}

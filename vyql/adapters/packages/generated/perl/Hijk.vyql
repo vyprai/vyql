@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData, NetworkSend}
-adapter perl {
-  package "Hijk" {
-    source method "_read_http_message" -> code.NetworkData
-    sink method "request" -> code.NetworkSend
-    sink method "_build_http_message" -> code.NetworkSend
-    sink method "_construct_socket" -> code.NetworkConnect
-  }
-}

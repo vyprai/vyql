@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdb125fb2;
+
+binding userControlledData7 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startUpdatingHeading"
+  emit source core.UserControlledData at call.result
+}

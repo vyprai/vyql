@@ -1,0 +1,9 @@
+module bindings.java.migration.m00e8ed25;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

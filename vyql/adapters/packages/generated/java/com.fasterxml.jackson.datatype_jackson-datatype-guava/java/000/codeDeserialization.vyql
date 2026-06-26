@@ -1,0 +1,9 @@
+module bindings.java.migration.m68684dda;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-guava")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

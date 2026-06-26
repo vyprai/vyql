@@ -1,0 +1,9 @@
+module bindings.objc.migration.m99062b4b;
+
+binding dynamicCodeLoad2 {
+  requires {
+    dependency("TensorFlowLiteObjC")
+  }
+  query pattern callExpr where callee.method == "Compile"
+  emit sink code.DynamicCodeLoad at args[0]
+}

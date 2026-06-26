@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "contracts" {
-    control method "validate_hash" -> core.InputValidation
-  }
-}

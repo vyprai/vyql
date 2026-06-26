@@ -1,0 +1,9 @@
+module bindings.scala.migration.m4a4ad117;
+
+binding networkBind0 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockWebServer.start"
+  emit sink code.NetworkBind at args[0]
+}

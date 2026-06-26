@@ -1,0 +1,13 @@
+module bindings.php.migration.m5e085d6c;
+
+binding weakCipher8 {
+  requires {
+    dependency("symfony/http-client")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "setCiphers"
+  emit issue code.WeakCipher at node
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter perl {
-  package "Mac-AppleScript-Glue" {
-    sink method "run" -> code.CommandExecution
-  }
-}

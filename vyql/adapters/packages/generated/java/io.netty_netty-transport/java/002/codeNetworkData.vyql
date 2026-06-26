@@ -1,0 +1,9 @@
+module bindings.java.migration.maa48f2c3;
+
+binding networkData2 {
+  requires {
+    dependency("io.netty:netty-transport")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

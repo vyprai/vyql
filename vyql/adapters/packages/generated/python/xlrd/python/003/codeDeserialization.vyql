@@ -1,0 +1,9 @@
+module bindings.python.migration.mfd2e419c;
+
+binding deserialization3 {
+  requires {
+    dependency("xlrd")
+  }
+  query pattern callExpr where callee.method == "inspect_format"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m38fd08c7;
+
+binding deserialization2 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "lz4f_decode"
+  emit sink code.Deserialization at args[0]
+}

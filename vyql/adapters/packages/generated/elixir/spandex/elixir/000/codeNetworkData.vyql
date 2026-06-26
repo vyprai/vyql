@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc8134996;
+
+binding networkData0 {
+  requires {
+    dependency("spandex")
+  }
+  query pattern callExpr where callee.method == "inject_context"
+  emit source code.NetworkData at call.result
+}

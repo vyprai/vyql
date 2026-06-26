@@ -1,0 +1,14 @@
+module bindings.swift.migration.m4806c3f7;
+
+binding redirectTarget1 {
+  requires {
+    dependency("github.com/SvenTiigi/YouTubePlayerKit")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "youTubePlayerEventCallbackURLScheme"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

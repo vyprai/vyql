@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3f2c2607;
+
+binding networkSend0 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}

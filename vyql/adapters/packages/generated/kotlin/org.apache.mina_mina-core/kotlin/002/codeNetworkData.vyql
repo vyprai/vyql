@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m15c4af74;
+
+binding networkData2 {
+  requires {
+    dependency("org.apache.mina:mina-core")
+  }
+  query pattern callExpr where callee.method == "messageReceived"
+  emit source code.NetworkData at call.result
+}

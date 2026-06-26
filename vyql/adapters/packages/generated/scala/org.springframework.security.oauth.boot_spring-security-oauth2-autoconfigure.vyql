@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter scala {
-  package "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure" {
-    source method "getClientSecret" -> code.SecretValue
-    source method "setClientSecret" -> code.SecretValue
-  }
-}

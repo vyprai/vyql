@@ -1,0 +1,9 @@
+module bindings.dart.migration.m42a72c4e;
+
+binding userControlledData0 {
+  requires {
+    dependency("pasteboard")
+  }
+  query pattern callExpr where callee.method == "files"
+  emit source core.UserControlledData at call.result
+}

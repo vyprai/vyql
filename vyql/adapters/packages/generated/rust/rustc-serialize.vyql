@@ -1,6 +1,0 @@
-adapter rust {
-  package "rustc-serialize" {
-    sink method "for" -> code.DynamicCodeLoad
-    sink method "parse" -> code.Deserialization
-  }
-}

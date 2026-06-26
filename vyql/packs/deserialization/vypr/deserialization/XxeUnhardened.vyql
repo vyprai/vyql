@@ -1,0 +1,13 @@
+module vypr.deserialization;
+
+rule XxeUnhardened {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_611]
+    id: "VYQL-DESER-004"
+    severity: medium
+  }
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.XmlHardening
+  unless p.path coveredBy core.XmlHardening
+}

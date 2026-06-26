@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4e1fb66d;
+
+binding userControlledData0 {
+  requires {
+    dependency("table_rex")
+  }
+  query pattern callExpr where callee.method == "quick_render"
+  emit source core.UserControlledData at call.result
+}

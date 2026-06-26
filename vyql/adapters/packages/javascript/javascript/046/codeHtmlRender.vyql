@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding htmlRender46 {
+  requires {
+    dependency("jquery")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}

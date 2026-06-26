@@ -1,0 +1,9 @@
+module bindings.perl.migration.mbe603286;
+
+binding networkSend9 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "_unauth_connect"
+  emit sink code.NetworkSend at args[0]
+}

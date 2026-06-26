@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb7779f7f;
+
+binding envVariable3 {
+  requires {
+    dependency("google-cloud-env")
+  }
+  query pattern callExpr where callee.method == "Env.variables"
+  emit source code.EnvVariable at call.result
+}

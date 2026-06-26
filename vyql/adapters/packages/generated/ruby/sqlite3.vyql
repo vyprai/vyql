@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter ruby {
-  package "sqlite3" {
-    sink method "query" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m00378b39;
+
+binding deserialization0 {
+  requires {
+    dependency("json-patch")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.Deserialization at args[0]
+}

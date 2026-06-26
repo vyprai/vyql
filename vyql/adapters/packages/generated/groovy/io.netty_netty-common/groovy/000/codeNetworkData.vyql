@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mcdce3135;
+
+binding networkData0 {
+  requires {
+    dependency("io.netty:netty-common")
+  }
+  query pattern callExpr where callee.method == "createByteArrayFromIpAddressString"
+  emit source code.NetworkData at call.result
+}

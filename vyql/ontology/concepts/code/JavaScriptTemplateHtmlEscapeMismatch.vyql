@@ -1,0 +1,11 @@
+module code;
+
+concept JavaScriptTemplateHtmlEscapeMismatch : issue {
+  cwe: [CWE_79, CWE_116]
+  review_assumption: "the receiving template substitutes the variable into an inline script or JavaScript string literal"
+  reviewCategory: xss
+  reviewCondition: "request-derived template variables are HTML-escaped but rendered inside a JavaScript string context"
+  reviewConfidence: high
+  reviewEvidence: "template variable context {pattern} reads a request parameter and stores it through an HTML-content encoder before a server-side template renders it as JavaScript string data"
+  vulnerableTo: [injection.Xss]
+}

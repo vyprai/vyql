@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mf448c100;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-devtools")
+  }
+  query pattern callExpr where callee.method == "addSourceDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

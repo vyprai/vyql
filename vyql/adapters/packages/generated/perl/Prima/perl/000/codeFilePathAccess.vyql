@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc1a0aeb2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Prima")
+  }
+  query pattern callExpr where callee.method == "Prima::IniFile::read"
+  emit sink code.FilePathAccess at args[0]
+}

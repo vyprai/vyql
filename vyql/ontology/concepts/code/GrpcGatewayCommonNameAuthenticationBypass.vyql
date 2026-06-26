@@ -1,0 +1,11 @@
+module code;
+
+concept GrpcGatewayCommonNameAuthenticationBypass : issue {
+  cwe: [CWE_287, CWE_290]
+  review_assumption: "the gRPC-gateway proxy uses a client certificate whose CommonName must not authenticate the proxied HTTP caller"
+  reviewCategory: auth
+  reviewCondition: "gRPC TLS CommonName authentication accepts certificate CommonName for gateway-proxied requests"
+  reviewConfidence: high
+  reviewEvidence: "gRPC auth context {pattern} derives AuthInfo.Username from VerifiedChains[0].Subject.CommonName without an observed grpcgateway-accept metadata rejection"
+  vulnerableTo: [authentication.AuthenticationBypass]
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding ldapQuery185 {
+  query pattern callExpr where callee.path ~= "DirectorySearcher"
+  emit sink code.LdapQuery at args[0]
+}

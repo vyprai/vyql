@@ -1,0 +1,9 @@
+module bindings.dart.migration.md470ac1c;
+
+binding commandExecution0 {
+  requires {
+    dependency("isolate")
+  }
+  query pattern callExpr where callee.method == "IsolateRunner.spawn"
+  emit sink code.CommandExecution at args[0]
+}

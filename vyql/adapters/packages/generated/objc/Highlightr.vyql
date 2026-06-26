@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter objc {
-  package "Highlightr" {
-    sink method "highlight" -> code.CodeEval
-  }
-}

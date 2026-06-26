@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md15b4d9e;
+
+binding httpInput6 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "FormMapHttpMessageConverter.read"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m1e6cbc76;
+
+binding deserialization2 {
+  requires {
+    dependency("humantime")
+  }
+  query pattern callExpr where callee.method == "parse_rfc3339_weak"
+  emit sink code.Deserialization at args[0]
+}

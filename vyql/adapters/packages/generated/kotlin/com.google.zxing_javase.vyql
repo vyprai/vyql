@@ -1,9 +1,0 @@
-import code.{CliArgument, Deserialization, FilePathAccess}
-
-adapter kotlin {
-  package "com.google.zxing:javase" {
-    sink method "readImage" -> code.FilePathAccess
-    sink method "decode" -> code.Deserialization
-    source method "CommandLineRunner" -> code.CliArgument
-  }
-}

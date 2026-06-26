@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding htmlRender123 {
+  query pattern callExpr where callee.path ~= "analysis.function.return" and args.any.literal contains "<body"
+  emit sink code.HtmlRender at args[0]
+}

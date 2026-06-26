@@ -1,6 +1,0 @@
-adapter php {
-  package "jms/serializer-bundle" {
-    sink method "getRuns" -> code.UrlFetch
-    sink method "load" -> code.Deserialization
-  }
-}

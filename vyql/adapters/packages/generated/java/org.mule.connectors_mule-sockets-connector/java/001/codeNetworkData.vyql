@@ -1,0 +1,9 @@
+module bindings.java.migration.macff0dbe;
+
+binding networkData1 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

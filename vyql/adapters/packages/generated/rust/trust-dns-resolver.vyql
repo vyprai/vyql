@@ -1,7 +1,0 @@
-import code.{FileUse}
-
-adapter rust {
-  package "trust-dns-resolver" {
-    sink method "read_hosts_conf" -> code.FileUse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m766d64ac;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Startup")
+  }
+  query pattern callExpr where callee.method == "_mkpath"
+  emit sink code.FilePathAccess at args[0]
+}

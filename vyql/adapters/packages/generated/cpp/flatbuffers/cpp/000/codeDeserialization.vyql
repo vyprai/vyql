@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc2b1535f;
+
+binding deserialization0 {
+  requires {
+    dependency("flatbuffers")
+  }
+  query pattern callExpr where callee.method == "UnPack"
+  emit sink code.Deserialization at args[0]
+}

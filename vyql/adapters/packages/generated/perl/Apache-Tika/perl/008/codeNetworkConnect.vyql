@@ -1,0 +1,9 @@
+module bindings.perl.migration.m27397705;
+
+binding networkConnect8 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "language_stream"
+  emit sink code.NetworkConnectSink at args[0]
+}

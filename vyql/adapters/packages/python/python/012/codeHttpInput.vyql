@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding httpInput12 {
+  requires {
+    dependency("autobahn")
+  }
+  query pattern callExpr where callee.path ~= "self.http_request_params.__subscript"
+  emit source code.HttpInput at call.result
+}

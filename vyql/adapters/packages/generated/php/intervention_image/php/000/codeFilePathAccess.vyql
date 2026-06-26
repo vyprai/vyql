@@ -1,0 +1,9 @@
+module bindings.php.migration.m6b5b5523;
+
+binding filePathAccess0 {
+  requires {
+    dependency("intervention/image")
+  }
+  query pattern callExpr where callee.method == "fromPath"
+  emit sink code.FilePathAccess at args[0]
+}

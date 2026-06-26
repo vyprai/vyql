@@ -1,0 +1,8 @@
+module code;
+
+review code.ClusterDeployFunctionMissingPermission {
+  category: access_control
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify cluster functions that deploy uploaded JARs declare privileged deploy/manage permissions before execution"
+}

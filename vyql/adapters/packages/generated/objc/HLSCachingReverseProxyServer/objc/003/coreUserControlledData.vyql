@@ -1,0 +1,9 @@
+module bindings.objc.migration.mfedb8893;
+
+binding userControlledData3 {
+  requires {
+    dependency("HLSCachingReverseProxyServer")
+  }
+  query pattern callExpr where callee.method == "lineByReplacingURI"
+  emit source core.UserControlledData at call.result
+}

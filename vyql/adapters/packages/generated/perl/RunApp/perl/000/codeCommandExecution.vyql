@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma9c2e309;
+
+binding commandExecution0 {
+  requires {
+    dependency("RunApp")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

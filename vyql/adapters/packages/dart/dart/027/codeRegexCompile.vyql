@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5342780c;
+
+binding regexCompile27 {
+  requires {
+    dependency("dart:core")
+  }
+  query pattern callExpr where callee.path ~= "RegExp"
+  emit sink code.RegexCompileSink at args[0]
+}

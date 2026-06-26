@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding publicRestDataEndpointMissingAuthorization162 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=php" and node.token contains "call_path:register_rest_route" and node.token contains "call_arg:__return_true" and node.token contains "call_arg:get_items" and node.token contains "call_path:Campaign.find" and node.token contains "call_path:CampaignDonationQuery" and node.token contains "call_path:joinDonationMeta" and not (containsAny(node.token, ["call_path:canViewPrivate", "call_path:isActive", "call_path:get_post_status", "call_path:authorizationStatusCode"])) and not (node.token contains "call_arg:WP_Error:rest_forbidden")
+  emit issue code.PublicRestDataEndpointMissingAuthorization at node
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter kotlin {
-  package "org.springframework:spring-websocket" {
-    source method "getPayload" -> core.UserControlledData
-  }
-}

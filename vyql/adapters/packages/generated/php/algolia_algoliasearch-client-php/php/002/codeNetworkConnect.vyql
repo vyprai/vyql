@@ -1,0 +1,9 @@
+module bindings.php.migration.m422ff57e;
+
+binding networkConnect2 {
+  requires {
+    dependency("algolia/algoliasearch-client-php")
+  }
+  query pattern callExpr where callee.method == "customGet"
+  emit sink code.NetworkConnectSink at args[0]
+}

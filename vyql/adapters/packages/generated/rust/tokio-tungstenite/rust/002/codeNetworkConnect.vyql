@@ -1,0 +1,9 @@
+module bindings.rust.migration.m578f71d7;
+
+binding networkConnect2 {
+  requires {
+    dependency("tokio-tungstenite")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

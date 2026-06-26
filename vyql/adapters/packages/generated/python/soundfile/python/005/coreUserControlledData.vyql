@@ -1,0 +1,9 @@
+module bindings.python.migration.m98a05381;
+
+binding userControlledData5 {
+  requires {
+    dependency("soundfile")
+  }
+  query pattern callExpr where callee.method == "vio_read"
+  emit source core.UserControlledData at call.result
+}

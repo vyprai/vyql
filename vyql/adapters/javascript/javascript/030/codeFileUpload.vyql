@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding fileUpload30 {
+  query pattern callExpr where callee.path ~= "file.name"
+  emit source code.FileUploadSource at call.result
+}

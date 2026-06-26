@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "qr_flutter" {
-    source method "validate" -> core.UserControlledData
-  }
-}

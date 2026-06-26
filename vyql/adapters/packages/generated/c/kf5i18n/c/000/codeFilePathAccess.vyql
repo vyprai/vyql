@@ -1,0 +1,9 @@
+module bindings.c.migration.mca6b33d5;
+
+binding filePathAccess0 {
+  requires {
+    dependency("kf5i18n")
+  }
+  query pattern callExpr where callee.method == "addDomainLocaleDir"
+  emit sink code.FilePathAccess at args[0]
+}

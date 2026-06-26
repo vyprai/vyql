@@ -1,8 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-
-adapter dart {
-  package "cloud_functions" {
-    sink method "httpsFunctionCall" -> code.NetworkConnect
-    sink method "httpsFunctionCall" -> code.NetworkSend
-  }
-}

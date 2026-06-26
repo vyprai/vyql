@@ -1,9 +1,0 @@
-import code.{SecretValue}
-adapter elixir {
-  package "nerves_key" {
-    source method "create_signing_key_pair" -> code.SecretValue
-    source method "manufacturer_sn" -> code.SecretValue
-    source method "manufacturer_mac" -> code.SecretValue
-    source method "sign_digest" -> code.SecretValue
-  }
-}

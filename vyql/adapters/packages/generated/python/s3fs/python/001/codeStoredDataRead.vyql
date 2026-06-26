@@ -1,0 +1,9 @@
+module bindings.python.migration.m84b4aed9;
+
+binding storedDataRead1 {
+  requires {
+    dependency("s3fs")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8d30e341;
+
+binding httpInput0 {
+  requires {
+    dependency("google-apis-androidpublisher_v3")
+  }
+  query pattern callExpr where callee.path ~= "ActivateBasePlanRequest"
+  emit source code.HttpInput at call.result
+}

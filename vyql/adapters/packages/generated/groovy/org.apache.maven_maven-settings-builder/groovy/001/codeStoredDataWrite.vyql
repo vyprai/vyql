@@ -1,0 +1,9 @@
+module bindings.groovy.migration.med520b51;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("org.apache.maven:maven-settings-builder")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

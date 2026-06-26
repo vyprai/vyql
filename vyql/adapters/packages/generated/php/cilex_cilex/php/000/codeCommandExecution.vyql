@@ -1,0 +1,9 @@
+module bindings.php.migration.mda47b64f;
+
+binding commandExecution0 {
+  requires {
+    dependency("cilex/cilex")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

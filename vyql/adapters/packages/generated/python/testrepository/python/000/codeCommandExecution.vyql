@@ -1,0 +1,9 @@
+module bindings.python.migration.m3ecc7f26;
+
+binding commandExecution0 {
+  requires {
+    dependency("testrepository")
+  }
+  query pattern callExpr where callee.method == "subprocess_Popen"
+  emit sink code.CommandExecution at args[0]
+}

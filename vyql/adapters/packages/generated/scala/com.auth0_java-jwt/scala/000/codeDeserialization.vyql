@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb08f3ba2;
+
+binding deserialization0 {
+  requires {
+    dependency("com.auth0:java-jwt")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

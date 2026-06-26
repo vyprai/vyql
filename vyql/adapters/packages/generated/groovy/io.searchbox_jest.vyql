@@ -1,9 +1,0 @@
-import code.{NetworkSend, NetworkConnect, HttpInput}
-
-adapter groovy {
-  package "io.searchbox:jest" {
-    sink method "execute" -> code.NetworkSend
-    sink method "executeAsync" -> code.NetworkSend
-    sink method "constructHttpMethod" -> code.NetworkConnect
-  }
-}

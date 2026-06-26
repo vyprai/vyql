@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "manifold" {
-    sink method "unpack_message" -> code.Deserialization
-  }
-}

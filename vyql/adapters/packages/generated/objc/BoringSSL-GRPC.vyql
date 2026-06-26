@@ -1,5 +1,0 @@
-adapter objc {
-  package "BoringSSL-GRPC" {
-    sink method "CRYPTO_atomic_load_u32" -> code.Deserialization
-  }
-}

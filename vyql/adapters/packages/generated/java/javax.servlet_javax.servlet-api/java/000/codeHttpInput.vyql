@@ -1,0 +1,9 @@
+module bindings.java.migration.m59de0b5e;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

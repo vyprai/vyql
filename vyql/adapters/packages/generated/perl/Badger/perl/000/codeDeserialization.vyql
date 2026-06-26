@@ -1,0 +1,9 @@
+module bindings.perl.migration.m4ecf3588;
+
+binding deserialization0 {
+  requires {
+    dependency("Badger")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

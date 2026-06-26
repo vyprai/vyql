@@ -1,0 +1,9 @@
+module bindings.go.migration.m4e8233d3;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/neelance/astrewrite")
+  }
+  query pattern callExpr where callee.method == "Simplify"
+  emit sink code.CodeEval at args[0]
+}

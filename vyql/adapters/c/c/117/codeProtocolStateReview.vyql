@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding protocolStateReview117 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=__of_unflatten_dtb" and node.token contains "FDT_BEGIN_NODE" and node.token contains "FDT_PROP" and node.token contains "is_reserved_name(pathp)" and node.token contains "is_reserved_name(name)" and node.token contains "of_new_node(node,pathp)" and node.token contains "of_new_property" and not (node.token contains "is_allowed_input_name") and not (node.token contains "strchr(name,'/')")
+  emit issue code.ProtocolStateReview at node
+}

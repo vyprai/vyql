@@ -1,7 +1,0 @@
-import code.{NetworkConnect, SecretValue}
-adapter ruby {
-  package "fog-xenserver" {
-    source method "authenticate" -> code.SecretValue
-    sink method "request" -> code.NetworkConnect
-  }
-}

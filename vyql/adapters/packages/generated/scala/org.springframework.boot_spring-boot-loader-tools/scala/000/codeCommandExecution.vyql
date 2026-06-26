@@ -1,0 +1,9 @@
+module bindings.scala.migration.mea86a15a;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-loader-tools")
+  }
+  query pattern callExpr where callee.method == "RunProcess.run"
+  emit sink code.CommandExecution at args[0]
+}

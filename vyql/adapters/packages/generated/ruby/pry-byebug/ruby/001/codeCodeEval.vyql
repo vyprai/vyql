@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m08886c3e;
+
+binding codeEval1 {
+  requires {
+    dependency("pry-byebug")
+  }
+  query pattern callExpr where callee.method == "add_method"
+  emit sink code.CodeEval at args[0]
+}

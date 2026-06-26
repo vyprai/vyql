@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2ad1be90;
+
+binding networkData1 {
+  requires {
+    dependency("workbox-background-sync")
+  }
+  query pattern callExpr where callee.method == "unshiftRequest"
+  emit source code.NetworkData at call.result
+}

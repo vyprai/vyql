@@ -1,0 +1,9 @@
+module bindings.objc.migration.m89200495;
+
+binding networkSend4 {
+  requires {
+    dependency("UnityAds")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.NetworkSend at args[0]
+}

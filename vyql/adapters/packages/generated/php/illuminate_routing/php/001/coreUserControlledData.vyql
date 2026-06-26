@@ -1,0 +1,9 @@
+module bindings.php.migration.m24b29a83;
+
+binding userControlledData1 {
+  requires {
+    dependency("illuminate/routing")
+  }
+  query pattern callExpr where callee.method == "UrlGenerator::query"
+  emit source core.UserControlledData at call.result
+}

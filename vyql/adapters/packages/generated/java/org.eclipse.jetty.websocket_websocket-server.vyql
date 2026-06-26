@@ -1,6 +1,0 @@
-adapter java {
-  package "org.eclipse.jetty.websocket:websocket-server" {
-    source method "handle" -> code.HttpInput
-    sink method "handle" -> code.ResponseHeaderWrite
-  }
-}

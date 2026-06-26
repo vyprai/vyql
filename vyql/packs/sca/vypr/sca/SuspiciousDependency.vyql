@@ -1,0 +1,10 @@
+module vypr.sca;
+
+rule SuspiciousDependency {
+  meta {
+    cwe: [CWE_1357]
+    id: "VYQL-SCA-003"
+    severity: high
+  }
+  issue sbom.SuspiciousDependency as p
+}

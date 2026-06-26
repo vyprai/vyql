@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "docopt" {
-    source method "docopt" -> code.CliArgument
-    source method "parse" -> code.CliArgument
-  }
-}

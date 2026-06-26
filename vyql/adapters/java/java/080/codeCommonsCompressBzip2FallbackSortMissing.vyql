@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding commonsCompressBzip2FallbackSortMissing80 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:blockSort" and node.token contains "call:mainSort" and node.token contains "call:randomiseBlock" and node.token contains "expr:this.workDone>this.workLimit" and not (node.scopeCall.any contains "fallbackSort")
+  emit issue code.CommonsCompressBzip2FallbackSortMissing at node
+}

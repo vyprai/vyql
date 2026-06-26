@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule AttestationPredicateVerificationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347]
+    id: "VYQL-CRY-010"
+    severity: high
+  }
+  issue code.AttestationPredicateVerificationBypass as a
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m97e8f2b5;
+
+binding userControlledData1 {
+  requires {
+    dependency("nette/application")
+  }
+  query pattern callExpr where callee.method == "NetteApplicationRequest::setPost"
+  emit source core.UserControlledData at call.result
+}

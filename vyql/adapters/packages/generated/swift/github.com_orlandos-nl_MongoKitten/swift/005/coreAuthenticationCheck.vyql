@@ -1,0 +1,14 @@
+module bindings.swift.migration.m64cf68f9;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("github.com/orlandos-nl/MongoKitten")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

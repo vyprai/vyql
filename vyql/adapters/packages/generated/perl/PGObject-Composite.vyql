@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-
-adapter perl {
-  package "PGObject-Composite" {
-    sink method "call_dbmethod" -> code.SqlExecution
-    sink method "call_procedure" -> code.SqlExecution
-  }
-}

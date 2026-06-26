@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter kotlin {
-  package "org.openjdk.jmh:jmh-core" {
-    sink method "doFork" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

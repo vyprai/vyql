@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mab2861a0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("benchee_csv")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

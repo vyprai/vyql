@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me43d1a41;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.postgresql:postgresql")
+  }
+  query pattern callExpr where callee.method == "getPreferQueryMode"
+  emit sink code.SqlExecution at args[0]
+}

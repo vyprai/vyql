@@ -1,9 +1,0 @@
-import code.{NetworkData}
-adapter java {
-  package "com.google.inject.extensions:guice-servlet" {
-    source method "filter" -> code.NetworkData
-    source method "filterRegex" -> code.NetworkData
-    source method "serve" -> code.NetworkData
-    source method "serveRegex" -> code.NetworkData
-  }
-}

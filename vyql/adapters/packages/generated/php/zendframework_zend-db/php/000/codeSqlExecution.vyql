@@ -1,0 +1,9 @@
+module bindings.php.migration.mdcdbf890;
+
+binding sqlExecution0 {
+  requires {
+    dependency("zendframework/zend-db")
+  }
+  query pattern callExpr where callee.method == "Zend\\Db\\Adapter\\Adapter::query"
+  emit sink code.SqlExecution at args[0]
+}

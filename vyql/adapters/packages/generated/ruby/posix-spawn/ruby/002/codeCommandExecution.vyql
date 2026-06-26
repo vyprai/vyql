@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9e93d7f3;
+
+binding commandExecution2 {
+  requires {
+    dependency("posix-spawn")
+  }
+  query pattern callExpr where callee.method == "pspawn"
+  emit sink code.CommandExecution at args[0]
+}

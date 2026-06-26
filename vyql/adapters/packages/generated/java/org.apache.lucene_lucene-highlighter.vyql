@@ -1,8 +1,0 @@
-import code.{HtmlRender}
-
-adapter java {
-  package "org.apache.lucene:lucene-highlighter" {
-    sink method "highlightTerm" -> code.HtmlRender
-    sink method "highlight" -> code.HtmlRender
-  }
-}

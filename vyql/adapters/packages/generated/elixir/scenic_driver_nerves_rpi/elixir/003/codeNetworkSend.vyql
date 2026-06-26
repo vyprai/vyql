@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m5f396801;
+
+binding networkSend3 {
+  requires {
+    dependency("scenic_driver_nerves_rpi")
+  }
+  query pattern callExpr where callee.method == "send_static_texture_miss"
+  emit sink code.NetworkSend at args[0]
+}

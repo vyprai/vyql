@@ -1,0 +1,9 @@
+module bindings.csharp.migration.me21cf90e;
+
+binding urlFetch0 {
+  requires {
+    dependency("attributerouting.core.http")
+  }
+  query pattern callExpr where callee.method == "GETAttribute"
+  emit sink code.UrlFetch at args[0]
+}

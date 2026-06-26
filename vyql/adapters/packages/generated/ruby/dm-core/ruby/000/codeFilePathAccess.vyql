@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md3beb2e7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dm-core")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

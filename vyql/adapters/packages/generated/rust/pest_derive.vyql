@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "pest_derive" {
-    sink method "derive_parser" -> code.Deserialization
-  }
-}

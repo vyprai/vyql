@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "build_web_compilers" {
-    sink method "load" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdb4d9ca9;
+
+binding userControlledData1 {
+  requires {
+    dependency("MLKitFaceDetection")
+  }
+  query pattern callExpr where callee.method == "processImage"
+  emit source core.UserControlledData at call.result
+}

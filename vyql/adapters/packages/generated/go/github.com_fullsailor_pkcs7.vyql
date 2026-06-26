@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/fullsailor/pkcs7" {
-    sink method "Parse" -> code.Deserialization
-  }
-}

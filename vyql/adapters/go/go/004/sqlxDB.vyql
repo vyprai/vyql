@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding dB4 {
+  query pattern callExpr where callee.path ~= "sqlx.MustConnect"
+  emit fact runtime.ReceiverType at call.result {
+    about: sqlx.DB
+  }
+}

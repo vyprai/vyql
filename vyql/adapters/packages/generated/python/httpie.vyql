@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "httpie" {
-    source method "HTTPieArgumentParser.parse_args" -> code.CliArgument
-  }
-}

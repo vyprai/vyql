@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding unescapedContentDispositionFilename162 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:Attachment" and node.token contains "call_path:filepath.Base" and node.token contains "call_path:ctx.Set" and node.token contains "call_arg:ctx.Set:HeaderContentDisposition" and node.token contains "literal:attachment; filename=" and not (node.token contains "call_path:url.QueryEscape") and not (node.token contains "call_path:url.PathEscape")
+  emit issue code.UnescapedContentDispositionFilename at node
+}

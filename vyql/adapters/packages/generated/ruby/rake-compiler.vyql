@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "rake-compiler" {
-    sink method "make_makefile_cmd" -> code.CommandExecution
-  }
-}

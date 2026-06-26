@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1c373427;
+
+binding deserialization0 {
+  requires {
+    dependency("ch.qos.logback:logback-core")
+  }
+  query pattern callExpr where callee.method == "ch.qos.logback.core.net.AutoFlushingObjectWriter.write"
+  emit sink code.Deserialization at args[0]
+}

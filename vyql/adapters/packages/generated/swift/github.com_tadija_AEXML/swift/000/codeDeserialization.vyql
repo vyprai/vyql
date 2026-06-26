@@ -1,0 +1,9 @@
+module bindings.swift.migration.mee84ee6f;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/tadija/AEXML")
+  }
+  query pattern callExpr where callee.method == "loadXML"
+  emit sink code.Deserialization at args[0]
+}

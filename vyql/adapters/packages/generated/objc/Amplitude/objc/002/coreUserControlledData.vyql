@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma3a84a11;
+
+binding userControlledData2 {
+  requires {
+    dependency("Amplitude")
+  }
+  query pattern callExpr where callee.method == "logEvent:withEventProperties:withUserProperties:"
+  emit source core.UserControlledData at call.result
+}

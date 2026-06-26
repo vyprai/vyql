@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m7575f75e;
+
+binding httpInput1 {
+  requires {
+    dependency("needle")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}

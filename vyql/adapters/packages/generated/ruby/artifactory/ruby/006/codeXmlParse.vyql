@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m86aacb26;
+
+binding xmlParse6 {
+  requires {
+    dependency("artifactory")
+  }
+  query pattern callExpr where callee.method == "xml_to_hash"
+  emit sink code.XmlParse at args[0]
+}

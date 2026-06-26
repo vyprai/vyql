@@ -1,0 +1,9 @@
+module bindings.scala.migration.ma91ee222;
+
+binding filePathAccess5 {
+  requires {
+    dependency("com.baomidou:mybatis-plus-generator")
+  }
+  query pattern callExpr where callee.method == "forceMkdirParent"
+  emit sink code.FilePathAccess at args[0]
+}

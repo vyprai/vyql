@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding civiCrmScientificNotationNumericValidationBypass200 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=positiveInteger" and node.token contains "is_int($value)" and node.token contains "is_numeric($value)&&preg_match" and not (node.token contains "!is_numeric($value)")
+  emit issue code.CiviCrmScientificNotationNumericValidationBypass at node
+}

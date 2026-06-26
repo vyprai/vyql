@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcf414805;
+
+binding fileUse0 {
+  requires {
+    dependency("system_registry_term_storage")
+  }
+  query pattern callExpr where callee.method == "persist"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m736e2978;
+
+binding deserialization5 {
+  requires {
+    dependency("libusb-win32")
+  }
+  query pattern callExpr where callee.method == "usb_parse_descriptor"
+  emit sink code.Deserialization at args[0]
+}

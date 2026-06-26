@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0107c52f;
+
+binding networkData1 {
+  requires {
+    dependency("redix_pubsub")
+  }
+  query pattern callExpr where callee.method == "psubscribe"
+  emit source code.NetworkData at call.result
+}

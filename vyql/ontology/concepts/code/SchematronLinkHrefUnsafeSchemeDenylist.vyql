@@ -1,0 +1,11 @@
+module code;
+
+concept SchematronLinkHrefUnsafeSchemeDenylist : issue {
+  cwe: [CWE_79, CWE_178]
+  review_assumption: "rich-text or XML link href values can be author-controlled and later rendered as browser links"
+  reviewCategory: xss
+  reviewCondition: "Schematron link href validation uses a case-sensitive unsafe-scheme denylist"
+  reviewConfidence: high
+  reviewEvidence: "Schematron context {pattern} checks xlink:href with contains(..., javascript:/vbscript:) instead of lowercasing and allowlisting safe schemes"
+  vulnerableTo: [injection.Xss, validation.ImproperInputValidation]
+}

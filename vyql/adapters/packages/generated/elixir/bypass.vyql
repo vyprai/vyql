@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter elixir {
-  package "bypass" {
-    sink method "call" -> code.UrlFetch
-  }
-}

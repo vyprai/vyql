@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "spatie/laravel-ignition" {
-    sink method "json_decode" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m26dcc6cc;
+
+binding cookie3 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "setCookie"
+  emit source code.Cookie at call.result
+}

@@ -1,0 +1,11 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding shellEscape99 {
+  query pattern callExpr where callee.path ~= "escapeShell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

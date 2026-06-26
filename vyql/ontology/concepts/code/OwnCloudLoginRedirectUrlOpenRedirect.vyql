@@ -1,0 +1,11 @@
+module code;
+
+concept OwnCloudLoginRedirectUrlOpenRedirect : issue {
+  cwe: [CWE_601]
+  review_assumption: "an attacker can place an absolute or scheme-relative URL in redirect_url and induce a victim to complete the login flow"
+  reviewCategory: request_forgery
+  reviewCondition: "ownCloud login success redirects to a request-supplied redirect_url without a same-webroot or relative-target guard"
+  reviewConfidence: high
+  reviewEvidence: "redirectToDefaultPage context {pattern} builds a Location header from $_REQUEST['redirect_url'] before checking it against OC::$WEBROOT"
+  vulnerableTo: [request_forgery.OpenRedirect]
+}

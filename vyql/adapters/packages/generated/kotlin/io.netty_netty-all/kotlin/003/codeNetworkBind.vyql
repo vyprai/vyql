@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me2e5bdec;
+
+binding networkBind3 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

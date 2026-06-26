@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-adapter perl {
-  package "Module-Setup" {
-    sink method "system" -> code.CommandExecution
-    sink method "shell" -> code.CommandExecution
-  }
-}

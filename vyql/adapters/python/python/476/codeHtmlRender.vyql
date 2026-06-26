@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding htmlRender476 {
+  query pattern callExpr where callee.path ~= "django.utils.safestring.mark_safe"
+  emit sink code.HtmlRender at args[0]
+}

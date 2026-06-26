@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m948c362a;
+
+binding deserialization0 {
+  requires {
+    dependency("shotgun")
+  }
+  query pattern callExpr where callee.method == "Loader.call!"
+  emit sink code.Deserialization at args[0]
+}

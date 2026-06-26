@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter kotlin {
-  package "eu.bitwalker:UserAgentUtils" {
-    source method "parseUserAgentString" -> core.UserControlledData
-  }
-}

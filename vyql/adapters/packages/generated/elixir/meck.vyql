@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter elixir {
-  package "meck" {
-    sink method "exec" -> code.CodeEval
-  }
-}

@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter elixir {
-  package "hound" {
-    sink method "make_req" -> code.NetworkSend
-  }
-}

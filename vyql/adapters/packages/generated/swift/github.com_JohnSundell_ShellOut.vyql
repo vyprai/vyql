@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter swift {
-  package "github.com/JohnSundell/ShellOut" {
-    sink method "shellOut" -> code.CommandExecution
-  }
-}

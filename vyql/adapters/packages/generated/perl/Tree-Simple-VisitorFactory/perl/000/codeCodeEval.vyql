@@ -1,0 +1,9 @@
+module bindings.perl.migration.m9f883811;
+
+binding codeEval0 {
+  requires {
+    dependency("Tree-Simple-VisitorFactory")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.CodeEval at args[0]
+}

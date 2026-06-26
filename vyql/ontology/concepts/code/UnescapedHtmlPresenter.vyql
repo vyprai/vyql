@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedHtmlPresenter : issue {
+  cwe: [CWE_79]
+  review_assumption: "the presenter output is rendered as HTML in the application UI"
+  reviewCategory: xss
+  reviewCondition: "an operation presenter returns HTML containing computed or input-derived values without escaping"
+  reviewConfidence: medium
+  reviewEvidence: "HTML presenter context {pattern} interpolates printable values into returned markup"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept DnsInterfaceNewlineValidationMissing : issue {
+  cwe: [CWE_20, CWE_74]
+  review_assumption: "the interface setting can be written through configuration input and later rendered into dnsmasq or resolver configuration"
+  reviewCategory: input_validation
+  reviewCondition: "DNS interface configuration accepts newline characters before being used in resolver configuration syntax"
+  reviewConfidence: high
+  reviewEvidence: "DNS interface config context {pattern} registers the interface option with a stub validator instead of a no-newline validator"
+  vulnerableTo: [validation.ImproperInputValidation, injection.ConfigurationInjection]
+}

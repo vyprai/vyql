@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3b3c1efb;
+
+binding userControlledData2 {
+  requires {
+    dependency("commons-digester:commons-digester")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source core.UserControlledData at call.result
+}

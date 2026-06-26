@@ -1,0 +1,9 @@
+module bindings.php.migration.m0e26dbfb;
+
+binding networkConnect6 {
+  requires {
+    dependency("abraham/twitteroauth")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}

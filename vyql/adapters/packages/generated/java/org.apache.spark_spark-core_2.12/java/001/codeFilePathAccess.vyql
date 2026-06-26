@@ -1,0 +1,9 @@
+module bindings.java.migration.ma7dec98b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.spark:spark-core_2.12")
+  }
+  query pattern callExpr where callee.method == "getAbsolutePathFromExecutable"
+  emit sink code.FilePathAccess at args[0]
+}

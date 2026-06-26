@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mabd4eead;
+
+binding deserialization2 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "nextTo"
+  emit sink code.Deserialization at args[0]
+}

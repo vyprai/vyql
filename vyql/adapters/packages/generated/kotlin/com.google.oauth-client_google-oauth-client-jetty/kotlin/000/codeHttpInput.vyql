@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m6a5f58e7;
+
+binding httpInput0 {
+  requires {
+    dependency("com.google.oauth-client:google-oauth-client-jetty")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}

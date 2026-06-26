@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.maefccb10;
+
+binding codeEval0 {
+  requires {
+    dependency("org.jboss.arquillian.junit:arquillian-junit-container")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CodeEval at args[0]
+}

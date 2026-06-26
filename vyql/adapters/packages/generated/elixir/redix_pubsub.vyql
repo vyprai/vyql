@@ -1,8 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter elixir {
-  package "redix_pubsub" {
-    source method "subscribe" -> code.NetworkData
-    source method "psubscribe" -> code.NetworkData
-    sink method "send" -> code.NetworkSend
-  }
-}

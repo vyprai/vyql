@@ -1,8 +1,0 @@
-import code.{Deserialization}
-import core.{HtmlEscape}
-adapter kotlin {
-  package "com.github.spullara.mustache.java:compiler" {
-    sink method "compile" -> code.Deserialization
-    control method "escape" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m21faa055;
+
+binding codeEval0 {
+  requires {
+    dependency("org.fusesource.jansi:jansi")
+  }
+  query pattern callExpr where callee.method == "org.fusesource.jansi.io.AnsiOutputStream.write"
+  emit sink code.CodeEval at args[0]
+}

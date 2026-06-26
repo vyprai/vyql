@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3d963edd;
+
+binding commandExecution0 {
+  requires {
+    dependency("guard-spork")
+  }
+  query pattern callExpr where callee.method == "launch_sporks"
+  emit sink code.CommandExecution at args[0]
+}

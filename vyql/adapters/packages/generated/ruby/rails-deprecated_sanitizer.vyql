@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "rails-deprecated_sanitizer" {
-    control method "sanitize" -> core.HtmlEscape
-  }
-}

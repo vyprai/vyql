@@ -1,0 +1,9 @@
+module bindings.java.migration.m844dec46;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.bgee.log4jdbc-log4j2:log4jdbc-log4j2-jdbc4")
+  }
+  query pattern callExpr where callee.method == "sqlOccurred"
+  emit sink code.SqlExecution at args[0]
+}

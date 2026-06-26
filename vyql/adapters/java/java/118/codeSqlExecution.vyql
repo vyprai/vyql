@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding sqlExecution118 {
+  query pattern callExpr where callee.method == "queryForInt"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding csvCell617 {
+  query pattern callExpr where callee.method == "writerows"
+  emit sink code.CsvCell at args[0].collection
+}

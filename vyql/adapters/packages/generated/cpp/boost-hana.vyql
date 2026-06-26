@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "boost-hana" {
-    sink method "parse" -> code.Deserialization
-  }
-}

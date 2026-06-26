@@ -1,0 +1,11 @@
+module code;
+
+concept AuthenticodeSignaturePathBindingBypass : issue {
+  cwe: [CWE_347, CWE_154]
+  review_assumption: "the update path can contain shell-expanded environment-variable syntax or other manifest-controlled path tricks that make PowerShell verify a different file"
+  reviewCategory: crypto
+  reviewCondition: "Windows Authenticode verification accepts signer metadata without confirming the signed file path is the intended update file"
+  reviewConfidence: high
+  reviewEvidence: "Authenticode verifier context {pattern} parses Get-AuthenticodeSignature output and compares publisher names before using returned data.Path as a LiteralPath binding check"
+  vulnerableTo: [crypto.ImproperSignatureCheck, injection.ArgumentInjection]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept MissingSessionRotationAfterAuthentication : issue {
+  cwe: [CWE_384]
+  review_assumption: "the pre-authentication session identifier can be fixed or known before login"
+  reviewCategory: auth
+  reviewCondition: "authentication completes without rotating or invalidating the existing HTTP session"
+  reviewConfidence: medium
+  reviewEvidence: "authentication context {pattern} sets the authenticated security context while reusing session state"
+  vulnerableTo: [session.SessionFixation]
+}

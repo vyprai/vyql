@@ -1,0 +1,14 @@
+module bindings.c.migration.m2816daee;
+
+binding sqlParameterization15 {
+  requires {
+    dependency("sqlite")
+  }
+  query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

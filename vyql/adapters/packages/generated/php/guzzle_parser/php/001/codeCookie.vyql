@@ -1,0 +1,9 @@
+module bindings.php.migration.m895b0ce3;
+
+binding cookie1 {
+  requires {
+    dependency("guzzle/parser")
+  }
+  query pattern callExpr where callee.method == "parseCookie"
+  emit source code.Cookie at call.result
+}

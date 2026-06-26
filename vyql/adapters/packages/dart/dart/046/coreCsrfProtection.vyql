@@ -1,0 +1,14 @@
+module bindings.dart.migration.m5342780c;
+
+binding csrfProtection46 {
+  requires {
+    dependency("shelf_csrf")
+  }
+  query pattern callExpr where callee.path ~= "csrf"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

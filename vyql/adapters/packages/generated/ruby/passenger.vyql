@@ -1,6 +1,0 @@
-adapter ruby {
-  package "passenger" {
-    source path "disableRequestNote" -> code.HttpInput
-    sink path "start_response" -> code.ResponseHeaderWrite
-  }
-}

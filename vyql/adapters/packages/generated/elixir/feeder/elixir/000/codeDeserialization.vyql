@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf70d9fc6;
+
+binding deserialization0 {
+  requires {
+    dependency("feeder")
+  }
+  query pattern callExpr where callee.method == "start_element"
+  emit sink code.Deserialization at args[0]
+}

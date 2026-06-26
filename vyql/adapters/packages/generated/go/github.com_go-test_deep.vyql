@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/go-test/deep" {
-    control method "Equal" -> core.InputValidation
-  }
-}

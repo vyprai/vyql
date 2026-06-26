@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md5e354d6;
+
+binding deserialization1 {
+  requires {
+    dependency("hexate")
+  }
+  query pattern callExpr where callee.method == "decode_to_list"
+  emit sink code.Deserialization at args[0]
+}

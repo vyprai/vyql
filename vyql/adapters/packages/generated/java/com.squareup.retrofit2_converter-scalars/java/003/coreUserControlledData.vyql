@@ -1,0 +1,9 @@
+module bindings.java.migration.mf77137b7;
+
+binding userControlledData3 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters.CharacterResponseBodyConverter.convert"
+  emit source core.UserControlledData at call.result
+}

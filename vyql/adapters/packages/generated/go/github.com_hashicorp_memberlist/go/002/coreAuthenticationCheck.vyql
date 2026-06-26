@@ -1,0 +1,14 @@
+module bindings.go.migration.m661a4dfb;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("github.com/hashicorp/memberlist")
+  }
+  query pattern callExpr where callee.method == "ValidateKey"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

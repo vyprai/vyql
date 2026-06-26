@@ -1,0 +1,9 @@
+module bindings.java.migration.m9dc8eae2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.itextpdf:itextpdf")
+  }
+  query pattern callExpr where callee.method == "insertFile"
+  emit sink code.FilePathAccess at args[0]
+}

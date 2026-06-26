@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc927b36e;
+
+binding userControlledData0 {
+  requires {
+    dependency("neuron")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source core.UserControlledData at call.result
+}

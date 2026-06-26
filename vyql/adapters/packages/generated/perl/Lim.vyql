@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter perl {
-  package "Lim" {
-    sink method "QueryDecode" -> code.Deserialization
-    sink method "run_cmd" -> code.CommandExecution
-  }
-}

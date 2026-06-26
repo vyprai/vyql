@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding xpathQuery27 {
+  requires {
+    dependency("nokogiri")
+  }
+  query pattern callExpr where callee.method == "xpath"
+  emit sink code.XpathQuery at args[0]
+}

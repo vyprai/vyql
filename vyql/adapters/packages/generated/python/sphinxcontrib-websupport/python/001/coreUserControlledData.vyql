@@ -1,0 +1,9 @@
+module bindings.python.migration.me5b1aa4f;
+
+binding userControlledData1 {
+  requires {
+    dependency("sphinxcontrib-websupport")
+  }
+  query pattern callExpr where callee.method == "handle_query"
+  emit source core.UserControlledData at call.result
+}

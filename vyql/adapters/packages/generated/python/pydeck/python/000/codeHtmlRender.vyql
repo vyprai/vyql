@@ -1,0 +1,9 @@
+module bindings.python.migration.m0f98f510;
+
+binding htmlRender0 {
+  requires {
+    dependency("pydeck")
+  }
+  query pattern callExpr where callee.method == "Deck.to_html"
+  emit sink code.HtmlRender at args[0]
+}

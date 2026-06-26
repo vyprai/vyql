@@ -1,0 +1,9 @@
+module bindings.javascript.migration.md2fd4000;
+
+binding deserialization5 {
+  requires {
+    dependency("cosmiconfig")
+  }
+  query pattern callExpr where callee.method == "loadTs"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mb2000e52;
+
+binding filePathAccess0 {
+  requires {
+    dependency("circuits_uart")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

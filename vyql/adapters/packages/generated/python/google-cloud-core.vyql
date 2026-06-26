@@ -1,8 +1,0 @@
-import code.{NetworkSend, SecretValue}
-
-adapter python {
-  package "google-cloud-core" {
-    sink method "api_request" -> code.NetworkSend
-    source method "from_service_account_json" -> code.SecretValue
-  }
-}

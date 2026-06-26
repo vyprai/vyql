@@ -1,8 +1,0 @@
-adapter scala {
-  package "org.fusesource.leveldbjni:leveldbjni-all" {
-    sink method "open" -> code.FilePathAccess
-    sink method "put" -> code.StoredDataWrite
-    sink method "delete" -> code.StoredDataWrite
-    sink method "write" -> code.StoredDataWrite
-  }
-}

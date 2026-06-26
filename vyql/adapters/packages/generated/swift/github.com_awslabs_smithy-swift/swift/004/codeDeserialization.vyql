@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdb7d904e;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/awslabs/smithy-swift")
+  }
+  query pattern callExpr where callee.method == "readByte"
+  emit sink code.Deserialization at args[0]
+}

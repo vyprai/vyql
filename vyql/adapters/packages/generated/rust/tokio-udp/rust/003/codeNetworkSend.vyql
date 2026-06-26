@@ -1,0 +1,9 @@
+module bindings.rust.migration.m669268ae;
+
+binding networkSend3 {
+  requires {
+    dependency("tokio-udp")
+  }
+  query pattern callExpr where callee.method == "send_to"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3d3597aa;
+
+binding cookie2 {
+  requires {
+    dependency("weber")
+  }
+  query pattern callExpr where callee.method == "get_cookie"
+  emit source code.Cookie at call.result
+}

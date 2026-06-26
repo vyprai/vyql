@@ -1,0 +1,9 @@
+module bindings.php.migration.mba691072;
+
+binding sqlExecution4 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "truncate"
+  emit sink code.SqlExecution at args[0]
+}

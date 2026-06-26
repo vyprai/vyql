@@ -1,0 +1,9 @@
+module bindings.swift.migration.mde09ad90;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/gcharita/XMLMapper")
+  }
+  query pattern callExpr where callee.method == "map"
+  emit sink code.Deserialization at args[0]
+}

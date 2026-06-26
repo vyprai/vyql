@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "Iterator" {
-    sink method "new" -> code.CodeEval
-    sink method "value" -> code.CodeEval
-  }
-}

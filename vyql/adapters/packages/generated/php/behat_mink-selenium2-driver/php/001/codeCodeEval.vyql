@@ -1,0 +1,9 @@
+module bindings.php.migration.me7183244;
+
+binding codeEval1 {
+  requires {
+    dependency("behat/mink-selenium2-driver")
+  }
+  query pattern callExpr where callee.method == "executeJsOnElement"
+  emit sink code.CodeEval at args[0]
+}

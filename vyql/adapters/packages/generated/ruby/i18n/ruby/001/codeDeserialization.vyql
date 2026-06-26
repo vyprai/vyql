@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m26711ef0;
+
+binding deserialization1 {
+  requires {
+    dependency("i18n")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.Deserialization at args[0]
+}

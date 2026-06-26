@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "aruba" {
-    sink method "run_command" -> code.CommandExecution
-    sink method "run_command_and_stop" -> code.CommandExecution
-  }
-}

@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter swift {
-  package "github.com/httpswift/swifter" {
-    source method "readHttpRequest" -> code.HttpInput
-  }
-}

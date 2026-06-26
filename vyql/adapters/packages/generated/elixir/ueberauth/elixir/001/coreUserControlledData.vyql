@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m12d01f1e;
+
+binding userControlledData1 {
+  requires {
+    dependency("ueberauth")
+  }
+  query pattern callExpr where callee.method == "uid"
+  emit source core.UserControlledData at call.result
+}

@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.robolectric:robolectric" {
-    sink method "parse" -> code.Deserialization
-  }
-}

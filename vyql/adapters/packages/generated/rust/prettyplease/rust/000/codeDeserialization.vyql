@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5f120308;
+
+binding deserialization0 {
+  requires {
+    dependency("prettyplease")
+  }
+  query pattern callExpr where callee.method == "unparse"
+  emit sink code.Deserialization at args[0]
+}

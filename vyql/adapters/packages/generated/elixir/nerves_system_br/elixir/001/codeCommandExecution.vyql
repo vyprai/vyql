@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md531326f;
+
+binding commandExecution1 {
+  requires {
+    dependency("nerves_system_br")
+  }
+  query pattern callExpr where callee.method == "System.Env.ld_library_path_add"
+  emit sink code.CommandExecution at args[0]
+}

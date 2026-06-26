@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m39791a19;
+
+binding htmlEscape2 {
+  requires {
+    dependency("org.thymeleaf:thymeleaf-spring5")
+  }
+  query pattern callExpr where callee.method == "getDisplayString"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

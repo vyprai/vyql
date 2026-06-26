@@ -1,9 +1,0 @@
-import code.{FilePathAccess, UrlFetch}
-
-adapter objc {
-  package "VTAcknowledgementsViewController" {
-    sink method "initWithAcknowledgementsPlistPath:" -> code.FilePathAccess
-    sink method "firstLinkInText:" -> code.UrlFetch
-    sink method "openLink:" -> code.UrlFetch
-  }
-}

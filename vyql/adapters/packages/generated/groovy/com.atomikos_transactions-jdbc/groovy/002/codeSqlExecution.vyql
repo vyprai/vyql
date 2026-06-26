@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m653b3336;
+
+binding sqlExecution2 {
+  requires {
+    dependency("com.atomikos:transactions-jdbc")
+  }
+  query pattern callExpr where callee.method == "setTestQuery"
+  emit sink code.SqlExecution at args[0]
+}

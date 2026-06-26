@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding filePathAccess350 {
+  query pattern callExpr where callee.path ~= "fsp.readFile"
+  emit sink code.FilePathAccess at args[0]
+}

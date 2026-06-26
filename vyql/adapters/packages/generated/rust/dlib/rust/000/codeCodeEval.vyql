@@ -1,0 +1,9 @@
+module bindings.rust.migration.m862faa7f;
+
+binding codeEval0 {
+  requires {
+    dependency("dlib")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.CodeEval at args[0]
+}

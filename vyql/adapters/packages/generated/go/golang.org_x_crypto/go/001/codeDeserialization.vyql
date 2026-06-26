@@ -1,0 +1,9 @@
+module bindings.go.migration.m32669f83;
+
+binding deserialization1 {
+  requires {
+    dependency("golang.org/x/crypto")
+  }
+  query pattern callExpr where callee.method == "ParseResponse"
+  emit sink code.Deserialization at args[0]
+}

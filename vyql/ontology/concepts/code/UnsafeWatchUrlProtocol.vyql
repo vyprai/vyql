@@ -1,0 +1,11 @@
+module code;
+
+concept UnsafeWatchUrlProtocol : issue {
+  cwe: [CWE_79]
+  review_assumption: "watch URLs can be created by an attacker and are later rendered as clickable links"
+  reviewCategory: xss
+  reviewCondition: "stored watch URLs are returned for browser links without validating the protocol scheme"
+  reviewConfidence: high
+  reviewEvidence: "watch link property {pattern} returns a stored URL before checking allowed schemes"
+  vulnerableTo: [injection.Xss]
+}

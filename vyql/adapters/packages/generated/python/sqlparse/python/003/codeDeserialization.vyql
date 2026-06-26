@@ -1,0 +1,9 @@
+module bindings.python.migration.m9e9508d7;
+
+binding deserialization3 {
+  requires {
+    dependency("sqlparse")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}

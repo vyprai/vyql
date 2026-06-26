@@ -1,9 +1,0 @@
-adapter c {
-  package "grpc" {
-    source method "grpc_byte_buffer_reader_init" -> core.UserControlledData
-    source method "grpc_byte_buffer_reader_next" -> core.UserControlledData
-    flag code.RegexCompile on any {
-      method "CreateFromStringMatcher"
-    }
-  }
-}

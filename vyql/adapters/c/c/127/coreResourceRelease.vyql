@@ -1,0 +1,11 @@
+module bindings.c.migration.mce54b166;
+
+binding resourceRelease127 {
+  query pattern callExpr where callee.path ~= "m_freem"
+  emit check core.ResourceRelease at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

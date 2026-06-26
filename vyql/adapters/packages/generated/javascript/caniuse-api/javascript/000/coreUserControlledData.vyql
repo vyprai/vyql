@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mae52a612;
+
+binding userControlledData0 {
+  requires {
+    dependency("caniuse-api")
+  }
+  query pattern callExpr where callee.method == "getSupport"
+  emit source core.UserControlledData at call.result
+}

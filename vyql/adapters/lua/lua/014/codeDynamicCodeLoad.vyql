@@ -1,0 +1,6 @@
+module bindings.lua.migration.ma99d12f7;
+
+binding dynamicCodeLoad14 {
+  query pattern callExpr where callee.path ~= "require"
+  emit sink code.DynamicCodeLoad at args[0]
+}

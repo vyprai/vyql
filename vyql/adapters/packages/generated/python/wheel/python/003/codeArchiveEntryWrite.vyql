@@ -1,0 +1,9 @@
+module bindings.python.migration.md01d46f3;
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "writestr"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

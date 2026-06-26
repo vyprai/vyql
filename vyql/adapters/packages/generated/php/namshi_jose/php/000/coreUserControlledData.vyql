@@ -1,0 +1,9 @@
+module bindings.php.migration.m32a5d7f2;
+
+binding userControlledData0 {
+  requires {
+    dependency("namshi/jose")
+  }
+  query pattern callExpr where callee.method == "JWS::load"
+  emit source core.UserControlledData at call.result
+}

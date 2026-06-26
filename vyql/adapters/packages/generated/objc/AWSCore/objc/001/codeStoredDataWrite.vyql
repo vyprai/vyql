@@ -1,0 +1,9 @@
+module bindings.objc.migration.m05e7deec;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("AWSCore")
+  }
+  query pattern callExpr where callee.method == "setUp"
+  emit sink code.StoredDataWrite at args[0]
+}

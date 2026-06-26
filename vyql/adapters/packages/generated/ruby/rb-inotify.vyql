@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter ruby {
-  package "rb-inotify" {
-    sink method "watch" -> code.FilePathAccess
-  }
-}

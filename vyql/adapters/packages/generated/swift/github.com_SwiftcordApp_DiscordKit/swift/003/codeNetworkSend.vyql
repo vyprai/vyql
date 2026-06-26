@@ -1,0 +1,9 @@
+module bindings.swift.migration.m2cfc0059;
+
+binding networkSend3 {
+  requires {
+    dependency("github.com/SwiftcordApp/DiscordKit")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

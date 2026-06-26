@@ -1,0 +1,9 @@
+module bindings.php.migration.m321695dd;
+
+binding deserialization6 {
+  requires {
+    dependency("wp-cli/i18n-command")
+  }
+  query pattern callExpr where callee.method == "MakeJsonCommand::make_json"
+  emit sink code.Deserialization at args[0]
+}

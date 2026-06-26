@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb7e61a2b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/JohnSundell/Ink")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

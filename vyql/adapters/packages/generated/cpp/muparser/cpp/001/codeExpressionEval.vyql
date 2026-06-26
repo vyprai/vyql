@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m536c1410;
+
+binding expressionEval1 {
+  requires {
+    dependency("muparser")
+  }
+  query pattern callExpr where callee.method == "mupEval"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter kotlin {
-  package "org.apache.hadoop:hadoop-mapreduce-client-core" {
-    sink method "run" -> code.CommandExecution
-  }
-}

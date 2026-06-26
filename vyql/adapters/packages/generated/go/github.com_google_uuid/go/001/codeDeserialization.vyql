@@ -1,0 +1,9 @@
+module bindings.go.migration.m000d1d82;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/uuid")
+  }
+  query pattern callExpr where callee.method == "ParseBytes"
+  emit sink code.Deserialization at args[0]
+}

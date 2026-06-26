@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SamlXmlRoundtripValidationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_347]
+    id: "VYQL-AUTH-038"
+    severity: critical
+  }
+  issue code.SamlXmlRoundtripValidationBypass as verifier
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m01035edf;
+
+binding deserialization0 {
+  requires {
+    dependency("facebook")
+  }
+  query pattern callExpr where callee.method == "DeserializeObject"
+  emit sink code.Deserialization at args[0]
+}

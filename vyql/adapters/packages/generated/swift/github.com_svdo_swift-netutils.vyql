@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter swift {
-  package "github.com/svdo/swift-netutils" {
-    source method "allInterfaces" -> code.NetworkData
-  }
-}

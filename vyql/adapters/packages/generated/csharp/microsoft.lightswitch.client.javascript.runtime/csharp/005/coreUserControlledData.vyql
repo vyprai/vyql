@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m18f63b07;
+
+binding userControlledData5 {
+  requires {
+    dependency("microsoft.lightswitch.client.javascript.runtime")
+  }
+  query pattern callExpr where callee.method == "parseUrlHash"
+  emit source core.UserControlledData at call.result
+}

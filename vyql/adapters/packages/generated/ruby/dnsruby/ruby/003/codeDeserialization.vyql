@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m11e43799;
+
+binding deserialization3 {
+  requires {
+    dependency("dnsruby")
+  }
+  query pattern callExpr where callee.method == "parse_config"
+  emit sink code.Deserialization at args[0]
+}

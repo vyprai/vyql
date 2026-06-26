@@ -1,0 +1,9 @@
+module bindings.objc.migration.m8ed02bed;
+
+binding userControlledData20 {
+  requires {
+    dependency("Crashlytics")
+  }
+  query pattern callExpr where callee.method == "setUserEmail"
+  emit source core.UserControlledData at call.result
+}

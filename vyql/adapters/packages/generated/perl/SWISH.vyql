@@ -1,9 +1,0 @@
-import code.{CodeEval, NosqlQuery}
-import core.{UserControlledData}
-
-adapter perl {
-  package "SWISH" {
-    sink method "connect" -> code.CodeEval
-    source method "query" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m75f7f2b1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("guzzlehttp/streams")
+  }
+  query pattern callExpr where callee.method == "GuzzleHttpStreamUtils::open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m14870e48;
+
+binding codeEval0 {
+  requires {
+    dependency("Sprocket")
+  }
+  query pattern callExpr where callee.method == "import"
+  emit sink code.CodeEval at args[0]
+}

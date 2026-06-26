@@ -1,0 +1,9 @@
+module bindings.rust.migration.mad4a9235;
+
+binding deserialization0 {
+  requires {
+    dependency("stdweb")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

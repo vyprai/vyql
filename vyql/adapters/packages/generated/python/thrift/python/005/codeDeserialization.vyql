@@ -1,0 +1,9 @@
+module bindings.python.migration.m7083342f;
+
+binding deserialization5 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readBool"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.perl.migration.ma164dcec;
+
+binding xmlHardening23 {
+  requires {
+    dependency("XML::LibXML")
+  }
+  query pattern callExpr where callee.path ~= "XML.LibXML.load_xml" and args.any.literal contains "no_network=true"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

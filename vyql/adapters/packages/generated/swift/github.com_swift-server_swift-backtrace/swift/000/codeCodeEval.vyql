@@ -1,0 +1,9 @@
+module bindings.swift.migration.m694eabf8;
+
+binding codeEval0 {
+  requires {
+    dependency("github.com/swift-server/swift-backtrace")
+  }
+  query pattern callExpr where callee.method == "print"
+  emit sink code.CodeEval at args[0]
+}

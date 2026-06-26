@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m0ad5c370;
+
+binding htmlEscape0 {
+  requires {
+    dependency("ex_admin")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m97579f60;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/opencontainers/runtime-spec")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.CliArgument at call.result
+}

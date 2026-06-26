@@ -1,0 +1,6 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding urlFetch51 {
+  query pattern callExpr where callee.path ~= "ureq.request"
+  emit sink code.UrlFetch at args[0]
+}

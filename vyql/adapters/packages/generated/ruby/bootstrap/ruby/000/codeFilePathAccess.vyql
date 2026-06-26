@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m90787a7a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("bootstrap")
+  }
+  query pattern callExpr where callee.method == "save_file"
+  emit sink code.FilePathAccess at args[0]
+}

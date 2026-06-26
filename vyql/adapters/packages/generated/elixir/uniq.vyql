@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "uniq" {
-    sink method "parse" -> code.Deserialization
-  }
-}

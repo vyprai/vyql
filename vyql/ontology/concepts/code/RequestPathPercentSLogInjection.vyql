@@ -1,0 +1,11 @@
+module code;
+
+concept RequestPathPercentSLogInjection : issue {
+  cwe: [CWE_117, CWE_150]
+  review_assumption: "request paths can contain encoded control characters or terminal/log separators supplied by remote clients"
+  reviewCategory: injection
+  reviewCondition: "HTTP request paths are written to diagnostic logs through string-format substitution without repr-style escaping"
+  reviewConfidence: high
+  reviewEvidence: "request-path log context {pattern} passes request.path to a debug log whose format string uses %s for the path slot"
+  vulnerableTo: [injection.LogInjection]
+}

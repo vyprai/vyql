@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m85a76522;
+
+binding sqlExecution1 {
+  requires {
+    dependency("tds")
+  }
+  query pattern callExpr where callee.method == "query!"
+  emit sink code.SqlExecution at args[0]
+}

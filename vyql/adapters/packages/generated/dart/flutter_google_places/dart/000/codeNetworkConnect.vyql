@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma13f11d4;
+
+binding networkConnect0 {
+  requires {
+    dependency("flutter_google_places")
+  }
+  query pattern callExpr where callee.method == "PlacesAutocomplete.show"
+  emit sink code.NetworkConnectSink at args[0]
+}

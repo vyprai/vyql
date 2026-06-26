@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding filePathAccess166 {
+  query pattern callExpr where callee.path ~= "Files.lines"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m8bc2ae53;
+
+binding networkSend1 {
+  requires {
+    dependency("cboden/ratchet")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

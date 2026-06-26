@@ -1,0 +1,9 @@
+module bindings.rust.migration.mbcf696d3;
+
+binding userControlledData1 {
+  requires {
+    dependency("lzw")
+  }
+  query pattern callExpr where callee.method == "encode_bytes"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf40bf532;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpcore")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "KinoSearch" {
-    sink method "parse" -> code.Deserialization
-  }
-}

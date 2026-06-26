@@ -1,0 +1,9 @@
+module bindings.perl.migration.meecde81b;
+
+binding httpInput2 {
+  requires {
+    dependency("JSORB")
+  }
+  query pattern callExpr where callee.method == "Catalyst::Action::JSORB::execute"
+  emit source code.HttpInput at call.result
+}

@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "proper_case" {
-    source method "ProperCase.Plug.SnakeCaseParams.call" -> core.UserControlledData
-  }
-}

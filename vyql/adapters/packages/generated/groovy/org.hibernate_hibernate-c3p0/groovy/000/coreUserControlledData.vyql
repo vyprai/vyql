@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1723f41a;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.hibernate:hibernate-c3p0")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m009d1f7a;
+
+binding userControlledData4 {
+  requires {
+    dependency("com.alipay.sdk:alipay-sdk-java")
+  }
+  query pattern callExpr where callee.method == "getParams"
+  emit source core.UserControlledData at call.result
+}

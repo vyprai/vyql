@@ -1,0 +1,7 @@
+module code;
+
+review code.CraftAnonymousTemplateRenderActionXss {
+  category: xss
+  kind: attention
+  text: "review Craft TemplatesController for a beforeAction direct-access guard before anonymous template rendering"
+}

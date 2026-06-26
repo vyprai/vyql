@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m6435333a;
+
+binding filePathAccess3 {
+  requires {
+    dependency("jose")
+  }
+  query pattern callExpr where callee.method == "from_openssh_key_file"
+  emit sink code.FilePathAccess at args[0]
+}

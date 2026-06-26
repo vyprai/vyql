@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "sqlalchemy" {
-    sink method "execute" -> code.SqlExecution
-  }
-}

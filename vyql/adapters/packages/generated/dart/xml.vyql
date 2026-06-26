@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "xml" {
-    sink method "XmlDocument.parse" -> code.Deserialization
-    sink method "XmlDocumentFragment.parse" -> code.Deserialization
-  }
-}

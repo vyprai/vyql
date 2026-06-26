@@ -1,0 +1,9 @@
+module bindings.python.migration.m57cb186a;
+
+binding htmlRender0 {
+  requires {
+    dependency("django-js-asset")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

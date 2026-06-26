@@ -1,0 +1,14 @@
+module bindings.perl.migration.m8a4090f2;
+
+binding inputValidation1 {
+  requires {
+    dependency("AuthCAS")
+  }
+  query pattern callExpr where callee.method == "_escape_chars"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

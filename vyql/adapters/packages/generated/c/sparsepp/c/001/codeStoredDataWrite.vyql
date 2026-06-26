@@ -1,0 +1,9 @@
+module bindings.c.migration.m16c042af;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("sparsepp")
+  }
+  query pattern callExpr where callee.method == "write_data"
+  emit sink code.StoredDataWrite at args[0]
+}

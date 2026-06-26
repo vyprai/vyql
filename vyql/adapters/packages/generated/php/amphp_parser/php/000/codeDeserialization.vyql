@@ -1,0 +1,9 @@
+module bindings.php.migration.mad9c612a;
+
+binding deserialization0 {
+  requires {
+    dependency("amphp/parser")
+  }
+  query pattern callExpr where callee.method == "push"
+  emit sink code.Deserialization at args[0]
+}

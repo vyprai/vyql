@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "symfony/process" {
-    sink method "fromShellCommandline" -> CommandExecution
-    sink method "run" -> CommandExecution
-    sink method "mustRun" -> CommandExecution
-  }
-}

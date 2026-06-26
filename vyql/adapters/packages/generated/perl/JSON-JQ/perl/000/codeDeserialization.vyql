@@ -1,0 +1,9 @@
+module bindings.perl.migration.mbead7aff;
+
+binding deserialization0 {
+  requires {
+    dependency("JSON-JQ")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

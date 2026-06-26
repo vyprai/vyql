@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/swift-extras/swift-extras-base64" {
-    sink method "Base32.decode" -> code.Deserialization
-    sink method "Base64.decode" -> code.Deserialization
-  }
-}

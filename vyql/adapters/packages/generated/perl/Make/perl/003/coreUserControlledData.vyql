@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2c6e877b;
+
+binding userControlledData3 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "parse_makefile"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2661708c;
+
+binding fileUse4 {
+  requires {
+    dependency("cocoyaxi")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

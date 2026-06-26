@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdae004e9;
+
+binding sqlExecution0 {
+  requires {
+    dependency("winrm")
+  }
+  query pattern callExpr where callee.method == "run_wql"
+  emit sink code.SqlExecution at args[0]
+}

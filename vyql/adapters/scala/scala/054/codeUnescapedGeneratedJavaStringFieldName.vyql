@@ -1,0 +1,10 @@
+module bindings.scala.migration.m06d0685b;
+
+binding unescapedGeneratedJavaStringFieldName54 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=scala" and node.token contains "function_name:generateRowConverter" and node.token contains "call_path:LogicalTypeChecks.getFieldNames" and node.token contains "call_path:fieldNames.zipWithIndex.map" and node.token contains "call_path:createNullableNodeTerm" and node.token contains "call_path:ctx.addReusableMember" and node.token contains "selector:?.stripMargin" and not (node.token contains "selector:EncodingUtils.escapeJava")
+  emit issue code.UnescapedGeneratedJavaStringFieldName at node
+}

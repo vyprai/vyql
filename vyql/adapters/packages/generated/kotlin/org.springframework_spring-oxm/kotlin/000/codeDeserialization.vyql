@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.macb6fa6f;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework:spring-oxm")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

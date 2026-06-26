@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "com.nimbusds:nimbus-jose-jwt" {
-    sink method "JOSEObject.parse" -> code.Deserialization
-  }
-}

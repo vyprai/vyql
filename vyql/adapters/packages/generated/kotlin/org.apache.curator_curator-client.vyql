@@ -1,7 +1,0 @@
-import code.{NetworkConnect, StoredDataRead}
-adapter kotlin {
-  package "org.apache.curator:curator-client" {
-    sink method "start" -> code.NetworkConnect
-    source method "getZooKeeper" -> code.StoredDataRead
-  }
-}

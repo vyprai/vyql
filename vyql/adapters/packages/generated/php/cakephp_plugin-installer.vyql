@@ -1,6 +1,0 @@
-adapter php {
-  package "cakephp/plugin-installer" {
-    sink method "file_put_contents" -> code.FilePathAccess
-    control method "getFullPath" -> core.PathCanonicalization
-  }
-}

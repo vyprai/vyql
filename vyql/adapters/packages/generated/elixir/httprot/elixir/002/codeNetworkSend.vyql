@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2b4a7232;
+
+binding networkSend2 {
+  requires {
+    dependency("httprot")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

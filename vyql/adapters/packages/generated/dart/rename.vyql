@@ -1,9 +1,0 @@
-import code.{FilePathAccess, CommandExecution}
-
-adapter dart {
-  package "rename" {
-    sink method "setAppName" -> code.FilePathAccess
-    sink method "setBundleId" -> code.FilePathAccess
-    sink method "run" -> code.CommandExecution
-  }
-}

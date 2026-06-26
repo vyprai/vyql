@@ -1,0 +1,8 @@
+module code;
+
+concept SqlExecution : sink {
+  cwe: [CWE_89]
+  enabledBy: [taint.UntrustedData]
+  excluded_chars: "'\"\\;"
+  vulnerableTo: [injection.SqlInjection]
+}

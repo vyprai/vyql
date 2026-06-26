@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding ldapQuery192 {
+  query pattern callExpr where callee.method == "search" and callee.receiver.type in [DirContext, InitialDirContext, InitialLdapContext]
+  emit sink code.LdapQuery at args[1]
+}

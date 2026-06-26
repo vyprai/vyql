@@ -1,0 +1,9 @@
+module bindings.c.migration.mc021190d;
+
+binding storedDataRead5 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_read"
+  emit source code.StoredDataRead at call.result
+}

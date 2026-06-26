@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mee840174;
+
+binding networkData4 {
+  requires {
+    dependency("io-like")
+  }
+  query pattern callExpr where callee.method == "readpartial"
+  emit source code.NetworkData at call.result
+}

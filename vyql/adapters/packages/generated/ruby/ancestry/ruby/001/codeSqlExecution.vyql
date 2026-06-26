@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m373ebbc3;
+
+binding sqlExecution1 {
+  requires {
+    dependency("ancestry")
+  }
+  query pattern callExpr where callee.method == "scope_depth"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.ma509b286;
+
+binding userControlledData1 {
+  requires {
+    dependency("qtvirtualkeyboard")
+  }
+  query pattern callExpr where callee.method == "QVirtualKeyboardPlugin::create"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m60131e1f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "getNode"
+  emit sink code.FilePathAccess at args[0]
+}

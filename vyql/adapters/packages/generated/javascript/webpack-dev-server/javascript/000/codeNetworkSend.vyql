@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m27cf45a6;
+
+binding networkSend0 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

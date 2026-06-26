@@ -1,0 +1,9 @@
+module bindings.python.migration.m7083342f;
+
+binding deserialization1 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "readI32"
+  emit sink code.Deserialization at args[0]
+}

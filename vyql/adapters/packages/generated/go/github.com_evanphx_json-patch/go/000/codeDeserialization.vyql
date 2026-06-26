@@ -1,0 +1,9 @@
+module bindings.go.migration.mc40f830d;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/evanphx/json-patch")
+  }
+  query pattern callExpr where callee.method == "DecodePatch"
+  emit sink code.Deserialization at args[0]
+}

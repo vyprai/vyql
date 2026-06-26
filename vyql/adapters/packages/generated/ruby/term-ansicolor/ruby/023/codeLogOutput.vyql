@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mde62ae8b;
+
+binding logOutput23 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "hide_cursor"
+  emit sink code.LogOutput at args[0]
+}

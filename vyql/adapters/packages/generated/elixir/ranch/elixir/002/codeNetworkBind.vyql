@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2a361423;
+
+binding networkBind2 {
+  requires {
+    dependency("ranch")
+  }
+  query pattern callExpr where callee.method == "do_listen"
+  emit sink code.NetworkBind at args[0]
+}

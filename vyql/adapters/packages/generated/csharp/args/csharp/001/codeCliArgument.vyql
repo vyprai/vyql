@@ -1,0 +1,9 @@
+module bindings.csharp.migration.md76d1bac;
+
+binding cliArgument1 {
+  requires {
+    dependency("args")
+  }
+  query pattern callExpr where callee.method == "WatchesFor"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1bec26d4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("boost-filesystem")
+  }
+  query pattern callExpr where callee.path ~= "boost.filesystem.open"
+  emit sink code.FilePathAccess at args[0]
+}

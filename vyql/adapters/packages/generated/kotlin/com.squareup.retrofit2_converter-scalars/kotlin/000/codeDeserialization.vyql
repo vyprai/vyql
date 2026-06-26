@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m0bb7f272;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

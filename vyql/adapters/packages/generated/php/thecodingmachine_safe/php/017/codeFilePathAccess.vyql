@@ -1,0 +1,9 @@
+module bindings.php.migration.mdc1ba520;
+
+binding filePathAccess17 {
+  requires {
+    dependency("thecodingmachine/safe")
+  }
+  query pattern callExpr where callee.method == "eio_statvfs"
+  emit sink code.FilePathAccess at args[0]
+}

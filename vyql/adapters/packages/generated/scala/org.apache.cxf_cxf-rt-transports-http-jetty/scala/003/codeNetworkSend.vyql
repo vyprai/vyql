@@ -1,0 +1,9 @@
+module bindings.scala.migration.m46290a3b;
+
+binding networkSend3 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.NetworkSend at args[0]
+}

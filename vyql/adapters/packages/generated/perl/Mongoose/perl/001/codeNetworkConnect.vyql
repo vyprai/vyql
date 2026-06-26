@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2e91238a;
+
+binding networkConnect1 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "connection"
+  emit sink code.NetworkConnectSink at args[0]
+}

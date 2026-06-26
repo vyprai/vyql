@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9c201208;
+
+binding deserialization4 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_tuple"
+  emit sink code.Deserialization at args[0]
+}

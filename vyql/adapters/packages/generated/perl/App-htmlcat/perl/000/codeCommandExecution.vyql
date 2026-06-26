@@ -1,0 +1,9 @@
+module bindings.perl.migration.m9a80f6a4;
+
+binding commandExecution0 {
+  requires {
+    dependency("App-htmlcat")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

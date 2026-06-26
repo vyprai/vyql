@@ -1,0 +1,8 @@
+module code;
+
+review code.UnverifiedFederationMissingEvents {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review Matrix federation missing-events handling for VerifyEventSignatures before caching or accepting untrusted events"
+}

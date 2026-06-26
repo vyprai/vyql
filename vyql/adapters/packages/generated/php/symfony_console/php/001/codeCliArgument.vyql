@@ -1,0 +1,9 @@
+module bindings.php.migration.ma5f048d3;
+
+binding cliArgument1 {
+  requires {
+    dependency("symfony/console")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf0edf472;
+
+binding codeEval0 {
+  requires {
+    dependency("con_cache")
+  }
+  query pattern callExpr where callee.method == "ConCache.Lock.exec"
+  emit sink code.CodeEval at args[0]
+}

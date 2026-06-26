@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter java {
-  package "org.eclipse.jetty:jetty-io" {
-    source method "read" -> code.NetworkData
-  }
-}

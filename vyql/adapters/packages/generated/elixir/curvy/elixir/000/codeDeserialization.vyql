@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m71668adc;
+
+binding deserialization0 {
+  requires {
+    dependency("curvy")
+  }
+  query pattern callExpr where callee.method == "Curvy.Signature.parse"
+  emit sink code.Deserialization at args[0]
+}

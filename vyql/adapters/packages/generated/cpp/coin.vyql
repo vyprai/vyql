@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "coin" {
-    sink method "coin_parse_versionstring" -> code.Deserialization
-  }
-}

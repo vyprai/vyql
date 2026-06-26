@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbb90c2c8;
+
+binding expressionEval0 {
+  requires {
+    dependency("erubis")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.ExpressionEval at args[0]
+}

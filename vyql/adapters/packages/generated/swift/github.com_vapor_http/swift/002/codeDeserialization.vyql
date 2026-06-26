@@ -1,0 +1,9 @@
+module bindings.swift.migration.m18260689;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/vapor/http")
+  }
+  query pattern callExpr where callee.method == "onText"
+  emit sink code.Deserialization at args[0]
+}

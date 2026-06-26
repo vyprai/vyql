@@ -1,0 +1,9 @@
+module bindings.rust.migration.m73c78517;
+
+binding filePathAccess6 {
+  requires {
+    dependency("xattr")
+  }
+  query pattern callExpr where callee.method == "remove_fd"
+  emit sink code.FilePathAccess at args[0]
+}

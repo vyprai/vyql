@@ -1,0 +1,9 @@
+module bindings.swift.migration.maf802223;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/swiftwasm/JavaScriptKit")
+  }
+  query pattern callExpr where callee.method == "JSSymbol.match"
+  emit source core.UserControlledData at call.result
+}

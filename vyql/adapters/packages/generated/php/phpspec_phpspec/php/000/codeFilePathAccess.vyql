@@ -1,0 +1,9 @@
+module bindings.php.migration.m0aaff6fb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("phpspec/phpspec")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

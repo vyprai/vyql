@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "asn1lib" {
-    sink method "decodeInt" -> code.Deserialization
-    sink method "decodeBigInt" -> code.Deserialization
-    sink method "decodeOctetString" -> code.Deserialization
-    sink method "nextObject" -> code.Deserialization
-  }
-}

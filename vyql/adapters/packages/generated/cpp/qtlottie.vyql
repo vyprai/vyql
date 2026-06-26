@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "qtlottie" {
-    sink method "parse" -> code.Deserialization
-  }
-}

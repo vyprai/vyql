@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding xmlHardening28 {
+  requires {
+    dependency("nokogiri")
+  }
+  query pattern callExpr where callee.path ~= "Nokogiri.XML" and args.any.literal contains "NONET"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

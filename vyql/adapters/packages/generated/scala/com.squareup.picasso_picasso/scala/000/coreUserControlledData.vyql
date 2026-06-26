@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8981735e;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.squareup.picasso:picasso")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit source core.UserControlledData at call.result
+}

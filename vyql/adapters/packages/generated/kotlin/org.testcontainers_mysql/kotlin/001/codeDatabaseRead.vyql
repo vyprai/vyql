@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m41ec4d0a;
+
+binding databaseRead1 {
+  requires {
+    dependency("org.testcontainers:mysql")
+  }
+  query pattern callExpr where callee.method == "constructUrlForConnection"
+  emit sink code.DatabaseReadSink at args[0]
+}

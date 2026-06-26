@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m3d689c4e;
+
+binding codeEval0 {
+  requires {
+    dependency("org.codehaus.groovy:groovy-jsr223")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

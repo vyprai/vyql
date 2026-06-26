@@ -1,9 +1,0 @@
-import code.{CliArgument}
-
-adapter rust {
-  package "structopt" {
-    source method "from_clap" -> code.CliArgument
-    source method "from_args" -> code.CliArgument
-    source method "from_args_safe" -> code.CliArgument
-  }
-}

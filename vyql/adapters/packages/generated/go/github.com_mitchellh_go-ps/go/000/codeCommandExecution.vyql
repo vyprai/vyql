@@ -1,0 +1,9 @@
+module bindings.go.migration.md84009be;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/mitchellh/go-ps")
+  }
+  query pattern callExpr where callee.method == "Processes"
+  emit sink code.CommandExecution at args[0]
+}

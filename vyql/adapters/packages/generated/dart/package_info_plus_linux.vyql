@@ -1,6 +1,0 @@
-import code.{StoredDataRead}
-adapter dart {
-  package "package_info_plus_linux" {
-    source method "PackageInfoLinux.getAll" -> code.StoredDataRead
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m027d8482;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/nodes-vapor/gatekeeper")
+  }
+  query pattern callExpr where callee.method == "respond"
+  emit source code.HttpInput at call.result
+}

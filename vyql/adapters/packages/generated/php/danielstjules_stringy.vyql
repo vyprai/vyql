@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter php {
-  package "danielstjules/stringy" {
-    control method "htmlDecode" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m512f25a5;
+
+binding urlFetch1 {
+  requires {
+    dependency("github.com/swift-server/async-http-client")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.UrlFetch at args[0]
+}

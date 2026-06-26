@@ -1,0 +1,9 @@
+module bindings.go.migration.mfbb031d6;
+
+binding networkSend3 {
+  requires {
+    dependency("github.com/btcsuite/websocket")
+  }
+  query pattern callExpr where callee.method == "WriteMessage"
+  emit sink code.NetworkSend at args[0]
+}

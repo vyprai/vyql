@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding regexCompile26 {
+  requires {
+    dependency("grep")
+  }
+  query pattern callExpr where callee.path ~= "grep"
+  emit sink code.RegexCompileSink at args.any
+}

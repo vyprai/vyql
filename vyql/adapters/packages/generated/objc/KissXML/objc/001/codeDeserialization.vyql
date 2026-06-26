@@ -1,0 +1,9 @@
+module bindings.objc.migration.mf243987b;
+
+binding deserialization1 {
+  requires {
+    dependency("KissXML")
+  }
+  query pattern callExpr where callee.method == "initWithXMLString:error:"
+  emit sink code.Deserialization at args[0]
+}

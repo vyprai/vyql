@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding jenkinsRemoteValidationMissingPostPermission231 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:doCheck" and node.token contains "call:testConnection" and node.token contains "call:CrowdConfigurationService" and not (node.token contains "annotation:POST") and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  emit issue code.JenkinsRemoteValidationMissingPostPermission at node
+}

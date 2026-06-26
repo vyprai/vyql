@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m117f5ed3;
+
+binding deserialization2 {
+  requires {
+    dependency("docker-api")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

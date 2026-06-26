@@ -1,0 +1,9 @@
+module bindings.perl.migration.m86f51f50;
+
+binding codeEval0 {
+  requires {
+    dependency("Math-Evol")
+  }
+  query pattern callExpr where callee.method == "text_evol"
+  emit sink code.CodeEval at args[0]
+}

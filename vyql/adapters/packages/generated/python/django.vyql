@@ -1,8 +1,0 @@
-import code.{Cookie, HttpInput}
-
-adapter python {
-  package "django" {
-    source method "read" -> core.UserControlledData
-    source method "parse_cookie" -> code.Cookie
-  }
-}

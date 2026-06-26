@@ -1,0 +1,9 @@
+module bindings.php.migration.m23fc1340;
+
+binding filePathAccess7 {
+  requires {
+    dependency("codeception/module-filesystem")
+  }
+  query pattern callExpr where callee.method == "seeThisFileMatches"
+  emit sink code.FilePathAccess at args[0]
+}

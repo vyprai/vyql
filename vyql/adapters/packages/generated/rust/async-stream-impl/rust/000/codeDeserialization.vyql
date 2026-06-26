@@ -1,0 +1,9 @@
+module bindings.rust.migration.ma0c7d08e;
+
+binding deserialization0 {
+  requires {
+    dependency("async-stream-impl")
+  }
+  query pattern callExpr where callee.method == "parse_input"
+  emit sink code.Deserialization at args[0]
+}

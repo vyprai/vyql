@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m26c8fea4;
+
+binding htmlRender0 {
+  requires {
+    dependency("phoenix_markdown")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.HtmlRender at args[0]
+}

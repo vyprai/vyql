@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m20d1aa9d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rails-observers")
+  }
+  query pattern callExpr where callee.method == "action_path_for"
+  emit sink code.FilePathAccess at args[0]
+}

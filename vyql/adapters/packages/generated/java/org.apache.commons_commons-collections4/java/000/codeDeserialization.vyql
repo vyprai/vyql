@@ -1,0 +1,9 @@
+module bindings.java.migration.md37da5a3;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.commons:commons-collections4")
+  }
+  query pattern callExpr where callee.method == "readObject"
+  emit sink code.Deserialization at args[0]
+}

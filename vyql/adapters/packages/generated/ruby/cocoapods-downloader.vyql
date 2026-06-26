@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter ruby {
-  package "cocoapods-downloader" {
-    sink method "execute_command" -> code.CommandExecution
-  }
-}

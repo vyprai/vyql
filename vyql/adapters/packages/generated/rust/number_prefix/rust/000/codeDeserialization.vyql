@@ -1,0 +1,9 @@
+module bindings.rust.migration.maf156e18;
+
+binding deserialization0 {
+  requires {
+    dependency("number_prefix")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

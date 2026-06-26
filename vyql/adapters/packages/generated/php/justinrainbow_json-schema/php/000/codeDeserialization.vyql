@@ -1,0 +1,9 @@
+module bindings.php.migration.m8c804d7e;
+
+binding deserialization0 {
+  requires {
+    dependency("justinrainbow/json-schema")
+  }
+  query pattern callExpr where callee.method == "JsonSchemaValidator::validate"
+  emit sink code.Deserialization at args[0]
+}

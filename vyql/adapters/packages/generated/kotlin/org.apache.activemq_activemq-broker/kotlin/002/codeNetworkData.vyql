@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.md572087c;
+
+binding networkData2 {
+  requires {
+    dependency("org.apache.activemq:activemq-broker")
+  }
+  query pattern callExpr where callee.method == "postProcessDispatch"
+  emit source code.NetworkData at call.result
+}

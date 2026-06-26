@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.bouncycastle:bcprov-jdk15on" {
-    sink method "readObject" -> code.Deserialization
-  }
-}

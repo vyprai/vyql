@@ -1,8 +1,0 @@
-adapter cpp {
-  package "tinyply" {
-    sink method "read" -> code.Deserialization
-    sink method "parse_header" -> code.Deserialization
-    sink method "parse_data" -> code.Deserialization
-    sink method "parse_data_impl" -> code.Deserialization
-  }
-}

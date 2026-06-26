@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m95bedc5b;
+
+binding deserialization0 {
+  requires {
+    dependency("org.bouncycastle:bcprov-jdk15on")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

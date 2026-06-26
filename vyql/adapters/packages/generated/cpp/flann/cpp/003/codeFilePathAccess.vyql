@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc34f9126;
+
+binding filePathAccess3 {
+  requires {
+    dependency("flann")
+  }
+  query pattern callExpr where callee.method == "flann_load_index_byte"
+  emit sink code.FilePathAccess at args[0]
+}

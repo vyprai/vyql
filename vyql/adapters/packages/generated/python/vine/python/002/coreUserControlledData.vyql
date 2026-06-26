@@ -1,0 +1,9 @@
+module bindings.python.migration.m0ba53fc6;
+
+binding userControlledData2 {
+  requires {
+    dependency("vine")
+  }
+  query pattern callExpr where callee.method == "read_body"
+  emit source core.UserControlledData at call.result
+}

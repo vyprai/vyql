@@ -1,0 +1,9 @@
+module bindings.scala.migration.m32a4f913;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.apache.xmlbeans:xmlbeans")
+  }
+  query pattern callExpr where callee.method == "XmlObject.Factory.parse"
+  emit sink code.XmlParse at args[0]
+}

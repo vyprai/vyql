@@ -1,0 +1,9 @@
+module bindings.c.migration.m0519de0e;
+
+binding deserialization0 {
+  requires {
+    dependency("chartdir")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

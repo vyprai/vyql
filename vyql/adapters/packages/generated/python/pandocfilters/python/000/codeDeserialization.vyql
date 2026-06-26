@@ -1,0 +1,9 @@
+module bindings.python.migration.m09861dfc;
+
+binding deserialization0 {
+  requires {
+    dependency("pandocfilters")
+  }
+  query pattern callExpr where callee.method == "applyJSONFilters"
+  emit sink code.Deserialization at args[0]
+}

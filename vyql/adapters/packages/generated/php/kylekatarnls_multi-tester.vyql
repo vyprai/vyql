@@ -1,9 +1,0 @@
-import code.{Deserialization, CommandExecution}
-import core.{UserControlledData}
-
-adapter php {
-  package "kylekatarnls/multi-tester" {
-    sink method "MultiTester\\File::parse" -> code.Deserialization
-    source method "MultiTester\\MultiTester::run" -> core.UserControlledData
-  }
-}

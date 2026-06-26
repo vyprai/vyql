@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m25bd8a20;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ring_logger")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

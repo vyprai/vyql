@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m765c6045;
+
+binding userControlledData2 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "handle_channel_command"
+  emit source core.UserControlledData at call.result
+}

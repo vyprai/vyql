@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter php {
-  package "tightenco/ziggy" {
-    source method "jsonSerialize" -> code.NetworkData
-  }
-}

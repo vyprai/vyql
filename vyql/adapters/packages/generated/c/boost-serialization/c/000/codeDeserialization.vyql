@@ -1,0 +1,9 @@
+module bindings.c.migration.mfd531f33;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-serialization")
+  }
+  query pattern callExpr where callee.method == "load_override"
+  emit sink code.Deserialization at args[0]
+}

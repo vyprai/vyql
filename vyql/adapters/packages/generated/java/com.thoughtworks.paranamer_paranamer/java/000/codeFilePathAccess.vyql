@@ -1,0 +1,9 @@
+module bindings.java.migration.m4f5e6077;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.thoughtworks.paranamer:paranamer")
+  }
+  query pattern callExpr where callee.method == "JavadocParanamer"
+  emit sink code.FilePathAccess at args[0]
+}

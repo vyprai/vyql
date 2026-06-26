@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.springframework.cloud:spring-cloud-cloudfoundry-connector" {
-    source method "CloudFoundryServiceInfoCreator.getCredentials" -> code.SecretValue
-  }
-}

@@ -1,0 +1,8 @@
+module code;
+
+review code.WordPressOptionUpdateMissingCsrf {
+  category: csrf
+  expected: [core.CsrfProtection]
+  kind: target
+  text: "review WordPress option updates for check_admin_referer or wp_verify_nonce before saving request data"
+}

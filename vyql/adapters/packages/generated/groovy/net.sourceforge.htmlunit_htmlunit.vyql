@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter groovy {
-  package "net.sourceforge.htmlunit:htmlunit" {
-    sink method "JSObject.eval" -> code.CodeEval
-  }
-}

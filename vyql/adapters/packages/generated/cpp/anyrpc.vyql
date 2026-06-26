@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "anyrpc" {
-    sink method "ParseStream" -> code.Deserialization
-  }
-}

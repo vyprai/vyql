@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7439df2b;
+
+binding sqlExecution1 {
+  requires {
+    dependency("com.datastax.cassandra:cassandra-driver-mapping")
+  }
+  query pattern callExpr where callee.method == "getQuery"
+  emit sink code.SqlExecution at args[0]
+}

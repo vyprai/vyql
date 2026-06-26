@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc02e5a58;
+
+binding userControlledData3 {
+  requires {
+    dependency("slugger")
+  }
+  query pattern callExpr where callee.method == "slugify_downcase"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mb6100542;
+
+binding filePathAccess1 {
+  requires {
+    dependency("unisharp/laravel-filemanager")
+  }
+  query pattern callExpr where callee.method == "move"
+  emit sink code.FilePathAccess at args[0]
+}

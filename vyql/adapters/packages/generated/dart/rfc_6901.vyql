@@ -1,9 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter dart {
-  package "rfc_6901" {
-    source method "read" -> code.StoredDataRead
-    sink method "write" -> code.StoredDataWrite
-    control method "escape" -> core.InputValidation
-    control method "unescape" -> core.InputValidation
-  }
-}

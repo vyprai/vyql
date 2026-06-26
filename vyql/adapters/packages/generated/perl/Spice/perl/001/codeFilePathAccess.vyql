@@ -1,0 +1,9 @@
+module bindings.perl.migration.m780bfafd;
+
+binding filePathAccess1 {
+  requires {
+    dependency("Spice")
+  }
+  query pattern callExpr where callee.method == "processSpice"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-adapter kotlin {
-  package "org.hdrhistogram:HdrHistogram" {
-    sink method "decodeFromByteBuffer" -> code.Deserialization
-    sink method "decodeFromCompressedByteBuffer" -> code.Deserialization
-    sink method "readObject" -> code.Deserialization
-  }
-}

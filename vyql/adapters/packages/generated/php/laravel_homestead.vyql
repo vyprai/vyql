@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter php {
-  package "laravel/homestead" {
-    sink method "shell_exec" -> CommandExecution
-  }
-}

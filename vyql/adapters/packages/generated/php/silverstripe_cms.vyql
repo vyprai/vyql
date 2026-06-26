@@ -1,8 +1,0 @@
-import core.{InputValidation, PathCanonicalization}
-
-adapter php {
-  package "silverstripe/cms" {
-    control method "validate" -> core.InputValidation
-    control method "generateURLSegment" -> core.PathCanonicalization
-  }
-}

@@ -1,0 +1,8 @@
+module code;
+
+review code.CommandOptionInjection {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review command arguments for end-of-options delimiters or option allowlist validation before passing escaped user values to option-taking CLI commands"
+}

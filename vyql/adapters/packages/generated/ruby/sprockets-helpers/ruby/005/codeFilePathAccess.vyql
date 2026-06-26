@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me5a43a74;
+
+binding filePathAccess5 {
+  requires {
+    dependency("sprockets-helpers")
+  }
+  query pattern callExpr where callee.method == "stylesheet_path"
+  emit sink code.FilePathAccess at args[0]
+}

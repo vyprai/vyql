@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb451c9ce;
+
+binding deserialization2 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m0d70c000;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/yaslab/CSV.swift")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

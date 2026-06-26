@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding domInput81 {
+  query pattern callExpr where callee.path ~= "sessionStorage.getItem"
+  emit source code.DomInput at call.result
+}

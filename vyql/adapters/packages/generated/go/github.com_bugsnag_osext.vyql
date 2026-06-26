@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/bugsnag/osext" {
-    sink method "Executable" -> code.FilePathAccess
-    sink method "ExecutableFolder" -> code.FilePathAccess
-    sink method "GetExePath" -> code.FilePathAccess
-  }
-}

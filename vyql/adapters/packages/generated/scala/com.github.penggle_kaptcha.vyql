@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter scala {
-  package "com.github.penggle:kaptcha" {
-    source method "doGet" -> code.HttpInput
-  }
-}

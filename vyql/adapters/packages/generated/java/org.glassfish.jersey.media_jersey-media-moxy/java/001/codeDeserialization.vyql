@@ -1,0 +1,9 @@
+module bindings.java.migration.mf731867a;
+
+binding deserialization1 {
+  requires {
+    dependency("org.glassfish.jersey.media:jersey-media-moxy")
+  }
+  query pattern callExpr where callee.method == "preReadFrom"
+  emit sink code.Deserialization at args[0]
+}

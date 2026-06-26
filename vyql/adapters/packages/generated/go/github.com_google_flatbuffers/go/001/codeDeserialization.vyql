@@ -1,0 +1,9 @@
+module bindings.go.migration.mc2425dbf;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/flatbuffers")
+  }
+  query pattern callExpr where callee.method == "GetSizePrefixedRootAs"
+  emit sink code.Deserialization at args[0]
+}

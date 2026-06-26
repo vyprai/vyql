@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/google/renameio" {
-    sink method "TempFile" -> code.FilePathAccess
-    sink method "WriteFile" -> code.FilePathAccess
-    sink method "Symlink" -> code.FilePathAccess
-  }
-}

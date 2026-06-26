@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me63ad5d0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("omplapp")
+  }
+  query pattern callExpr where callee.method == "readOptions"
+  emit sink code.FilePathAccess at args[0]
+}

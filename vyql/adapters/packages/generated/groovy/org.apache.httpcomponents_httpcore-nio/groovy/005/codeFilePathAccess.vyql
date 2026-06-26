@@ -1,0 +1,9 @@
+module bindings.groovy.migration.ma54663b1;
+
+binding filePathAccess5 {
+  requires {
+    dependency("org.apache.httpcomponents:httpcore-nio")
+  }
+  query pattern callExpr where callee.method == "NFileEntity"
+  emit sink code.FilePathAccess at args[0]
+}

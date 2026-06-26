@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m6fc3a462;
+
+binding filePathAccess1 {
+  requires {
+    dependency("youtubeextractor")
+  }
+  query pattern callExpr where callee.method == "VideoDownloader.#ctor"
+  emit sink code.FilePathAccess at args[0]
+}

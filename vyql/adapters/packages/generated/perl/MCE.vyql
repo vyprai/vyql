@@ -1,5 +1,0 @@
-adapter perl {
-  package "MCE" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

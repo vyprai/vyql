@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/yahoojapan/SwiftyXMLParser" {
-    sink method "XML.parse" -> code.Deserialization
-  }
-}

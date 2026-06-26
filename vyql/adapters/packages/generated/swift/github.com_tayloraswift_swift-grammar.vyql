@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/tayloraswift/swift-grammar" {
-    sink method "parse" -> code.Deserialization
-    sink method "init" -> code.Deserialization
-  }
-}

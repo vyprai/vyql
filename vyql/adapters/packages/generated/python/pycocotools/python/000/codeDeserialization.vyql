@@ -1,0 +1,9 @@
+module bindings.python.migration.m9dbce3e0;
+
+binding deserialization0 {
+  requires {
+    dependency("pycocotools")
+  }
+  query pattern callExpr where callee.method == "jsonParse"
+  emit sink code.Deserialization at args[0]
+}

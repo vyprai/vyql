@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding mcpSqlExecutionMissingValidation128 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=execute_sql_for_mcp" and node.token contains "QueryRequest(" and node.token contains "sql=sql" and node.token contains "self.execute_query(query_request,auth_context)" and not (node.token contains "validate_sql_security") and not (node.token contains "DorisSecurityManager")
+  emit issue code.McpSqlExecutionMissingValidation at node
+}

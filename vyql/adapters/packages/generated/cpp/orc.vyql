@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "orc" {
-    sink method "read" -> code.Deserialization
-    sink method "ParseError" -> code.Deserialization
-  }
-}

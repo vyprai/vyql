@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdbd80cdc;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/Alamofire/AlamofireImage")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.NetworkSend at args[0]
+}

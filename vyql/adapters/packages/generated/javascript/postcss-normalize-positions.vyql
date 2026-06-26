@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "postcss-normalize-positions" {
-    sink method "transform" -> code.Deserialization
-  }
-}

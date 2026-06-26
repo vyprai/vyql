@@ -1,7 +1,0 @@
-import core.{ShellEscape}
-adapter ruby {
-  package "ffi-compiler" {
-    control method "shellescape" -> core.ShellEscape
-    control method "shelljoin" -> core.ShellEscape
-  }
-}

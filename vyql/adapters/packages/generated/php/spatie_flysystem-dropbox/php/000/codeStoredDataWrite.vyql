@@ -1,0 +1,9 @@
+module bindings.php.migration.m3b3da65e;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("spatie/flysystem-dropbox")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m68bf71d8;
+
+binding filePathAccess4 {
+  requires {
+    dependency("SPTPersistentCache")
+  }
+  query pattern callExpr where callee.method == "removeDataForKey:"
+  emit sink code.FilePathAccess at args[0]
+}

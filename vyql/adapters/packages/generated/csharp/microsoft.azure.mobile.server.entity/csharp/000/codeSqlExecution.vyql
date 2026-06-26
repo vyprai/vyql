@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mc2476898;
+
+binding sqlExecution0 {
+  requires {
+    dependency("microsoft.azure.mobile.server.entity")
+  }
+  query pattern callExpr where callee.method == "GetSqlCommand"
+  emit sink code.SqlExecution at args[0]
+}

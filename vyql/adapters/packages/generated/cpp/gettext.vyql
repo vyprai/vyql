@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter cpp {
-  package "gettext" {
-    sink method "PLURAL_PARSE" -> code.Deserialization
-    sink method "EXTRACT_PLURAL_EXPRESSION" -> code.Deserialization
-    sink method "bindtextdomain" -> code.FilePathAccess
-  }
-}

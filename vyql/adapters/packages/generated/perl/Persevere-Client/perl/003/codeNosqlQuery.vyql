@@ -1,0 +1,9 @@
+module bindings.perl.migration.md518033e;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "queryRange"
+  emit sink code.NosqlQuery at args[0]
+}

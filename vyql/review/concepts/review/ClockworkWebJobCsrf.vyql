@@ -1,0 +1,8 @@
+module code;
+
+review code.ClockworkWebJobCsrf {
+  category: csrf
+  expected: [core.CsrfProtection]
+  kind: target
+  text: "verify Clockwork Web job enable/disable actions require Rails forgery protection"
+}

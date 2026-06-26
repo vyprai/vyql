@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding incompleteHtmlEventHandlerStrip113 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "ViewSource" and node.token contains "stripScripts" and node.token contains "stripIFrames" and node.token contains "stripComments" and node.token contains "_stripScripts" and node.token contains "_stripIFrames" and node.token contains "_filter" and not (node.token contains "stripEventHandlers") and not (node.token contains "_stripEventHandlers")
+  emit issue code.IncompleteHtmlEventHandlerStrip at node
+}

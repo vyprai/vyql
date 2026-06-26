@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mdd8b2330;
+
+binding codeEval1 {
+  requires {
+    dependency("org.mongodb:mongo-java-driver")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

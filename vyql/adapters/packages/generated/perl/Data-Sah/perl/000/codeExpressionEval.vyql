@@ -1,0 +1,9 @@
+module bindings.perl.migration.m436fe6c6;
+
+binding expressionEval0 {
+  requires {
+    dependency("Data-Sah")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.ExpressionEval at args[0]
+}

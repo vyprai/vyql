@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding convertSvgMultiSvgSanitizerBypass304 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "cheerio.default.html" and node.token contains "this[_sanitize]" and node.token contains "cheerio.load(input,null,false)('svg')" and node.token contains "<body>${svg}</body>" and node.token contains "this[_getPage](html)" and not (node.token contains "cheerio.load(input,null,false)('svg:first')")
+  emit issue code.ConvertSvgMultiSvgSanitizerBypass at node
+}

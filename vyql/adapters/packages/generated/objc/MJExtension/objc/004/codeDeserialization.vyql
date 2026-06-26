@@ -1,0 +1,9 @@
+module bindings.objc.migration.mbdd4817a;
+
+binding deserialization4 {
+  requires {
+    dependency("MJExtension")
+  }
+  query pattern callExpr where callee.method == "mj_objectArrayWithFilename"
+  emit sink code.Deserialization at args[0]
+}

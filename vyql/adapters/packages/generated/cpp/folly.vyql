@@ -1,5 +1,0 @@
-adapter cpp {
-  package "folly" {
-    sink method "File" -> code.FilePathAccess
-  }
-}

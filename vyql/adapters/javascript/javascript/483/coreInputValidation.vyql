@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding inputValidation483 {
+  query pattern callExpr where callee.path ~= "validator.isAlphanumeric"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

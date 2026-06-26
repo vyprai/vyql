@@ -1,0 +1,9 @@
+module bindings.swift.migration.mddce653c;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/brokenhandsio/leaf-error-middleware")
+  }
+  query pattern callExpr where callee.method == "respond"
+  emit source code.HttpInput at call.result
+}

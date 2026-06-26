@@ -1,8 +1,0 @@
-import code.{NosqlQuery}
-adapter elixir {
-  package "mongodb_ecto" {
-    sink method "read" -> code.NosqlQuery
-    sink method "command" -> code.NosqlQuery
-    sink method "query" -> code.NosqlQuery
-  }
-}

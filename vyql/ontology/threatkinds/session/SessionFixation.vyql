@@ -1,0 +1,6 @@
+module session;
+
+threat SessionFixation {
+  cwe: [CWE_384]
+  desc: "Session fixation"
+}

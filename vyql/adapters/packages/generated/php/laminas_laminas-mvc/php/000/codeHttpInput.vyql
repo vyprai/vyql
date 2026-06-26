@@ -1,0 +1,9 @@
+module bindings.php.migration.mad065374;
+
+binding httpInput0 {
+  requires {
+    dependency("laminas/laminas-mvc")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.HttpInput at call.result
+}

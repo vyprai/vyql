@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md3359d57;
+
+binding networkData26 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

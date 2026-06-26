@@ -1,6 +1,0 @@
-adapter scala {
-  package "com.google.oauth-client:google-oauth-client-jetty" {
-    source method "handle" -> code.HttpInput
-    sink method "queryToMap" -> code.Deserialization
-  }
-}

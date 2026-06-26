@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter javascript {
-  package "workbox-window" {
-    source method "Workbox.messageSW" -> core.UserControlledData
-    source method "Workbox.register" -> core.UserControlledData
-  }
-}

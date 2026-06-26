@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter java {
-  package "org.glassfish:javax.el" {
-    sink method "eval" -> code.CodeEval
-  }
-}

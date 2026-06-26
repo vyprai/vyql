@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter python {
-  package "sendgrid" {
-    sink method "send" -> code.NetworkSend
-  }
-}

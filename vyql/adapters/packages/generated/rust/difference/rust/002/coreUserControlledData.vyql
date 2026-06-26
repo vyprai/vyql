@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3b2e92cf;
+
+binding userControlledData2 {
+  requires {
+    dependency("difference")
+  }
+  query pattern callExpr where callee.method == "diff"
+  emit source core.UserControlledData at call.result
+}

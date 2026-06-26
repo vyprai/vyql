@@ -1,0 +1,14 @@
+module bindings.swift.migration.mffd03dc4;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/nerdishbynature/octokit.swift")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m57e95632;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/oklog/oklog")
+  }
+  query pattern callExpr where callee.method == "parseAddr"
+  emit source core.UserControlledData at call.result
+}

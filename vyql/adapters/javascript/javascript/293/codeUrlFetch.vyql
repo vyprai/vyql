@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding urlFetch293 {
+  query pattern callExpr where callee.path ~= "cross-fetch"
+  emit sink code.UrlFetch at args[0]
+}

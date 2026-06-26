@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "FontBlaster" {
-    sink method "loadFont" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m7c47fee5;
+
+binding expressionEval1 {
+  requires {
+    dependency("ognl:ognl")
+  }
+  query pattern callExpr where callee.method == "compileExpression"
+  emit sink code.ExpressionEval at args[0]
+}

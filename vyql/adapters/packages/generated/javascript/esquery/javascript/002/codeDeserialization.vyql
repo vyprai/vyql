@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2bc4859d;
+
+binding deserialization2 {
+  requires {
+    dependency("esquery")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.Deserialization at args[0]
+}

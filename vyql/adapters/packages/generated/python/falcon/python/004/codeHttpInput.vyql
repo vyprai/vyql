@@ -1,0 +1,9 @@
+module bindings.python.migration.m2982b66d;
+
+binding httpInput4 {
+  requires {
+    dependency("falcon")
+  }
+  query pattern callExpr where callee.method == "falcon.request.Request.get_all_headers"
+  emit source code.HttpInput at call.result
+}

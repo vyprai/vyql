@@ -1,0 +1,9 @@
+module bindings.php.migration.m338caa5a;
+
+binding filePathAccess3 {
+  requires {
+    dependency("symfony/dotenv")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

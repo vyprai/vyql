@@ -1,0 +1,9 @@
+module bindings.perl.migration.mea29fe20;
+
+binding httpInput0 {
+  requires {
+    dependency("Starlet")
+  }
+  query pattern callExpr where callee.path ~= "_write_mymeta_data"
+  emit source code.HttpInput at call.result
+}

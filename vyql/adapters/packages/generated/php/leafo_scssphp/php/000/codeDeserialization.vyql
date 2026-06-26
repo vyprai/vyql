@@ -1,0 +1,9 @@
+module bindings.php.migration.m1909c948;
+
+binding deserialization0 {
+  requires {
+    dependency("leafo/scssphp")
+  }
+  query pattern callExpr where callee.method == "LeafoScssPhpParser::parse"
+  emit sink code.Deserialization at args[0]
+}

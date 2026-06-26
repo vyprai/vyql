@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mca05011a;
+
+binding userControlledData4 {
+  requires {
+    dependency("ueberauth_twitter")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source core.UserControlledData at call.result
+}

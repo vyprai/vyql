@@ -1,9 +1,0 @@
-import code.{FilePathAccess, CodeEval}
-
-adapter ruby {
-  package "sprockets-sass" {
-    sink method "resolve" -> code.FilePathAccess
-    sink method "resolve_glob" -> code.FilePathAccess
-    sink method "evaluate" -> code.CodeEval
-  }
-}

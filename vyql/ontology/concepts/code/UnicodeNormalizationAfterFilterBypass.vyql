@@ -1,0 +1,11 @@
+module code;
+
+concept UnicodeNormalizationAfterFilterBypass : issue {
+  cwe: [CWE_176, CWE_74]
+  review_assumption: "callers can supply Unicode compatibility characters that normalize into characters the filter intended to remove"
+  reviewCategory: input_validation
+  reviewCondition: "security lookup preprocessing should normalize Unicode before removing ignored separator characters"
+  reviewConfidence: high
+  reviewEvidence: "normalization context {pattern} applies a character filter before Unicode normalization"
+  vulnerableTo: [validation.ImproperInputValidation, injection.CodeInjection]
+}

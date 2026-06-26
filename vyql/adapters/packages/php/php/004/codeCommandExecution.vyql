@@ -1,0 +1,9 @@
+module bindings.php.migration.mc5601031;
+
+binding commandExecution4 {
+  requires {
+    dependency("php")
+  }
+  query pattern callExpr where callee.path ~= "shell_exec"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m96bbc96e;
+
+binding httpInput3 {
+  requires {
+    dependency("ruby-openid")
+  }
+  query pattern callExpr where callee.method == "decode_request"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m1a204c51;
+
+binding filePathAccess0 {
+  requires {
+    dependency("doteki")
+  }
+  query pattern callExpr where callee.method == "set_env_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,5 +1,0 @@
-adapter csharp {
-  package "microsoft.toolkit.ui.xamlhost" {
-    sink method "CreateXamlContentByType" -> code.HtmlRender
-  }
-}

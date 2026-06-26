@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m10ff4845;
+
+binding networkConnect1 {
+  requires {
+    dependency("ueberauth_auth0")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit sink code.NetworkConnectSink at args[0]
+}

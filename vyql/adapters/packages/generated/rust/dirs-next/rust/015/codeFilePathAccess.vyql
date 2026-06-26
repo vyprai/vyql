@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3e745044;
+
+binding filePathAccess15 {
+  requires {
+    dependency("dirs-next")
+  }
+  query pattern callExpr where callee.method == "video_dir"
+  emit sink code.FilePathAccess at args[0]
+}

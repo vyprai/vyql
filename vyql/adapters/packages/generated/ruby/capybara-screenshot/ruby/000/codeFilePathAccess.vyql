@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m31d37cb6;
+
+binding filePathAccess0 {
+  requires {
+    dependency("capybara-screenshot")
+  }
+  query pattern callExpr where callee.method == "screenshot_and_save_page"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.mde87c791;
+
+binding deserialization0 {
+  requires {
+    dependency("net.bytebuddy:byte-buddy")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

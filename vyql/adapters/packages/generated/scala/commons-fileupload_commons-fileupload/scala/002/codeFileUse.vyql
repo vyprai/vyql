@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3e7f9d53;
+
+binding fileUse2 {
+  requires {
+    dependency("commons-fileupload:commons-fileupload")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FileUseSink at args[0]
+}

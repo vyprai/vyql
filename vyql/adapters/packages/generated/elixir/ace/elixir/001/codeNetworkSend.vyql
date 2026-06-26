@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfd2ebdec;
+
+binding networkSend1 {
+  requires {
+    dependency("ace")
+  }
+  query pattern callExpr where callee.method == "Ace.HTTP2.send"
+  emit sink code.NetworkSend at args[0]
+}

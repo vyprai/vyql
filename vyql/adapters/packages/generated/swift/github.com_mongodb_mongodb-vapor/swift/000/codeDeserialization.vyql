@@ -1,0 +1,9 @@
+module bindings.swift.migration.m5ae74304;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/mongodb/mongodb-vapor")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

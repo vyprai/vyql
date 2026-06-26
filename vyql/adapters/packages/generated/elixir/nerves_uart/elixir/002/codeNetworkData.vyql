@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m38422b8f;
+
+binding networkData2 {
+  requires {
+    dependency("nerves_uart")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

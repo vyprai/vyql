@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.felix:org.apache.felix.framework" {
-    sink method "getDataFile" -> code.FilePathAccess
-  }
-}

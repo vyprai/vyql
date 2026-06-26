@@ -1,0 +1,9 @@
+module bindings.php.migration.me53b1936;
+
+binding sqlExecution2 {
+  requires {
+    dependency("doctrine/data-fixtures")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

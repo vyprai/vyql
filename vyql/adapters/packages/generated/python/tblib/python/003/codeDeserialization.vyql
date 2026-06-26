@@ -1,0 +1,9 @@
+module bindings.python.migration.m3f900891;
+
+binding deserialization3 {
+  requires {
+    dependency("tblib")
+  }
+  query pattern callExpr where callee.method == "install"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter c {
-  package "qtactiveqt" {
-    sink path "src/tools/dumpcpp/moc.cpp::runProcess" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb6febd7c;
+
+binding filePathAccess3 {
+  requires {
+    dependency("@typescript-eslint/parser")
+  }
+  query pattern callExpr where callee.method == "getLib"
+  emit sink code.FilePathAccess at args[0]
+}

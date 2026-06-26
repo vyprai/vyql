@@ -1,0 +1,9 @@
+module bindings.swift.migration.me93ce8b4;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/elegantchaos/XCTestExtensions")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

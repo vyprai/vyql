@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter java {
-  package "org.apache.curator:curator-recipes" {
-    source method "ChildData.getData" -> code.NetworkData
-  }
-}

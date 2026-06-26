@@ -1,0 +1,9 @@
+module bindings.perl.migration.m93be72f0;
+
+binding networkSend0 {
+  requires {
+    dependency("App-starbucksloginator")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.NetworkSend at args[0]
+}

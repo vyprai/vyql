@@ -1,0 +1,9 @@
+module bindings.perl.migration.m75692fae;
+
+binding userControlledData1 {
+  requires {
+    dependency("CSS")
+  }
+  query pattern callExpr where callee.method == "read_string"
+  emit source core.UserControlledData at call.result
+}

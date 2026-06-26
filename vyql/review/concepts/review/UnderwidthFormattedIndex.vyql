@@ -1,0 +1,7 @@
+module code;
+
+review code.UnderwidthFormattedIndex {
+  category: numeric
+  kind: attention
+  text: "review formatted numeric strings before fixed-position indexing"
+}

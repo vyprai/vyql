@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5b4e1865;
+
+binding deserialization0 {
+  requires {
+    dependency("wkt_parser")
+  }
+  query pattern callExpr where callee.method == "parseWKT"
+  emit sink code.Deserialization at args[0]
+}

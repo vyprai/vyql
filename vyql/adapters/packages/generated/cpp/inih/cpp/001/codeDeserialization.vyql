@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m510cd015;
+
+binding deserialization1 {
+  requires {
+    dependency("inih")
+  }
+  query pattern callExpr where callee.method == "ini_parse_file"
+  emit sink code.Deserialization at args[0]
+}

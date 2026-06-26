@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "Nimbus" {
-    sink method "cssConsume" -> code.Deserialization
-  }
-}

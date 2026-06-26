@@ -1,7 +1,0 @@
-import code.{FileUse}
-
-adapter elixir {
-  package "sitemap" {
-    sink method "Sitemap.Location.write" -> FileUse
-  }
-}

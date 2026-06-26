@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0af96ee2;
+
+binding deserialization0 {
+  requires {
+    dependency("icalendar")
+  }
+  query pattern callExpr where callee.method == "ICalendar.Deserialize.from_ics"
+  emit sink code.Deserialization at args[0]
+}

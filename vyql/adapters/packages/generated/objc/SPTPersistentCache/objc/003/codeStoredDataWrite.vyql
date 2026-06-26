@@ -1,0 +1,9 @@
+module bindings.objc.migration.m68bf71d8;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("SPTPersistentCache")
+  }
+  query pattern callExpr where callee.method == "storeData:forKey:completion:"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mf44fbe20;
+
+binding filePathAccess0 {
+  requires {
+    dependency("mikey179/vfsstream")
+  }
+  query pattern callExpr where callee.method == "copyFromFileSystem"
+  emit sink code.FilePathAccess at args[0]
+}

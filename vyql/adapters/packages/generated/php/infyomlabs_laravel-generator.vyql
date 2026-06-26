@@ -1,9 +1,0 @@
-import code.{FileUse}
-adapter php {
-  package "infyomlabs/laravel-generator" {
-    sink method "getFile" -> code.FileUse
-    sink method "createFile" -> code.FileUse
-    sink method "createDirectoryIfNotExist" -> code.FileUse
-    sink method "deleteFile" -> code.FileUse
-  }
-}

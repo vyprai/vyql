@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/tid-kijyun/Kanna" {
-    sink method "XML" -> code.Deserialization
-    sink method "HTML" -> code.Deserialization
-  }
-}

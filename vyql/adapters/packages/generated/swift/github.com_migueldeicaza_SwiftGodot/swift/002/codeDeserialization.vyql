@@ -1,0 +1,9 @@
+module bindings.swift.migration.mef427669;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/migueldeicaza/SwiftGodot")
+  }
+  query pattern callExpr where callee.method == "withUnsafeMutableAccessToData"
+  emit sink code.Deserialization at args[0]
+}

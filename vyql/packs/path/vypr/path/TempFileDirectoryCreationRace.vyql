@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule TempFileDirectoryCreationRace {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_377, CWE_367, CWE_59]
+    id: "VYQL-PATH-055"
+    severity: high
+  }
+  issue code.TempFileDirectoryCreationRace as sink
+}

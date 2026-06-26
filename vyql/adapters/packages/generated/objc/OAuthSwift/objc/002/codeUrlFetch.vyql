@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc6062c70;
+
+binding urlFetch2 {
+  requires {
+    dependency("OAuthSwift")
+  }
+  query pattern callExpr where callee.method == "startAuthorizedRequest"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2830a609;
+
+binding httpInput0 {
+  requires {
+    dependency("Squatting")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbeef8f9f;
+
+binding networkConnect2 {
+  requires {
+    dependency("com.ning:async-http-client")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m649aa045;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Oryx")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.SqlExecution at args[0]
+}

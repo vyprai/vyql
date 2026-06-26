@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7355f118;
+
+binding userControlledData1 {
+  requires {
+    dependency("dio_cookie_manager")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source core.UserControlledData at call.result
+}

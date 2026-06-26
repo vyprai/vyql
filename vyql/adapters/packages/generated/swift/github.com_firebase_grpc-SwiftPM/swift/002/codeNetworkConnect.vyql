@@ -1,0 +1,9 @@
+module bindings.swift.migration.m1a3534f9;
+
+binding networkConnect2 {
+  requires {
+    dependency("github.com/firebase/grpc-SwiftPM")
+  }
+  query pattern callExpr where callee.method == "ChannelConnectivityTest"
+  emit sink code.NetworkConnectSink at args[0]
+}

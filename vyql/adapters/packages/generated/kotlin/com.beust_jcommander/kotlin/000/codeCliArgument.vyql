@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7cbfc8f2;
+
+binding cliArgument0 {
+  requires {
+    dependency("com.beust:jcommander")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

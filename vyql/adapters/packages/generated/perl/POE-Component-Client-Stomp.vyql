@@ -1,7 +1,0 @@
-import code.{NetworkData, NetworkSend}
-adapter perl {
-  package "POE-Component-Client-Stomp" {
-    sink method "send_data" -> code.NetworkSend
-    source method "handle_message" -> code.NetworkData
-  }
-}

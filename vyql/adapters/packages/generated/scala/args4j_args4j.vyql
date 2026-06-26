@@ -1,5 +1,0 @@
-adapter scala {
-  package "args4j:args4j" {
-    source method "parseArgument" -> code.CliArgument
-  }
-}

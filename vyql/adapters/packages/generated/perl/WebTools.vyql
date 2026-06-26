@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter perl {
-  package "WebTools" {
-    sink method "eval_webtools_code" -> code.CodeEval
-  }
-}

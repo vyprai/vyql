@@ -1,0 +1,8 @@
+module code;
+
+review code.IncompleteMassAssignmentIdUnset {
+  category: mass_assignment
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review generic add handlers that unset identifier fields before request normalization rather than from the normalized input"
+}

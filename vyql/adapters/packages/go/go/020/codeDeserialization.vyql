@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding deserialization20 {
+  requires {
+    dependency("gopkg.in/yaml.v3")
+  }
+  query pattern callExpr where callee.path ~= "yaml.Unmarshal"
+  emit sink code.Deserialization at args[0]
+}

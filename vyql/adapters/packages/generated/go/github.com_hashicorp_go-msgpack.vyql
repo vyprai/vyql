@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/hashicorp/go-msgpack" {
-    sink method "NewDecoder" -> code.Deserialization
-    sink method "NewDecoderBytes" -> code.Deserialization
-  }
-}

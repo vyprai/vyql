@@ -1,0 +1,9 @@
+module bindings.php.migration.m53ec04e0;
+
+binding deserialization0 {
+  requires {
+    dependency("spatie/laravel-ignition")
+  }
+  query pattern callExpr where callee.method == "json_decode"
+  emit sink code.Deserialization at args[0]
+}

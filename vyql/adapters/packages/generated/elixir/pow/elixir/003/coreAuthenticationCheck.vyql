@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m2470c987;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("pow")
+  }
+  query pattern callExpr where callee.method == "Pow.Plug.authenticate_user"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

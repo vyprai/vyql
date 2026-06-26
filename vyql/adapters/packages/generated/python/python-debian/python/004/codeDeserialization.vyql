@@ -1,0 +1,9 @@
+module bindings.python.migration.mfe250756;
+
+binding deserialization4 {
+  requires {
+    dependency("python-debian")
+  }
+  query pattern callExpr where callee.method == "parse_archs"
+  emit sink code.Deserialization at args[0]
+}

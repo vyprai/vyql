@@ -1,0 +1,9 @@
+module bindings.objc.migration.m1e67191d;
+
+binding deserialization1 {
+  requires {
+    dependency("GHKit")
+  }
+  query pattern callExpr where callee.method == "gh_decode"
+  emit sink code.Deserialization at args[0]
+}

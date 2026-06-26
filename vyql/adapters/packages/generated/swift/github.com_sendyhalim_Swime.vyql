@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter swift {
-  package "github.com/sendyhalim/Swime" {
-    source method "Swime.init(data:)" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding sqlExecution5 {
+  requires {
+    dependency("django")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0f13fa05;
+
+binding networkSend9 {
+  requires {
+    dependency("httpi")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

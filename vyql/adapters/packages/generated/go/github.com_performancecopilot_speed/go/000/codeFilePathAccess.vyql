@@ -1,0 +1,9 @@
+module bindings.go.migration.m994ad20f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/performancecopilot/speed")
+  }
+  query pattern callExpr where callee.method == "mmvFileLocation"
+  emit sink code.FilePathAccess at args[0]
+}

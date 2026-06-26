@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m5ca61460;
+
+binding deserialization4 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

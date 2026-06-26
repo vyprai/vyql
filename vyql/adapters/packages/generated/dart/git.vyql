@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter dart {
-  package "git" {
-    sink method "runGit" -> code.CommandExecution
-    sink method "runCommand" -> code.CommandExecution
-  }
-}

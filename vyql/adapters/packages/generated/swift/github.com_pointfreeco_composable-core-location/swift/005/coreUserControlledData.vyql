@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdb125fb2;
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startMonitoringSignificantLocationChanges"
+  emit source core.UserControlledData at call.result
+}

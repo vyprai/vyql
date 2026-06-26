@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "git_cli" {
-    sink method "execute_command" -> code.CommandExecution
-  }
-}

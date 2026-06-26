@@ -1,0 +1,14 @@
+module bindings.c.migration.m253caba6;
+
+binding htmlEscape1 {
+  requires {
+    dependency("crow")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m22216d57;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pyinotify")
+  }
+  query pattern callExpr where callee.method == "add_watch"
+  emit sink code.FilePathAccess at args[0]
+}

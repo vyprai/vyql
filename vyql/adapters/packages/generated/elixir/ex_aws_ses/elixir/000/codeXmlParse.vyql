@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4c6cccc8;
+
+binding xmlParse0 {
+  requires {
+    dependency("ex_aws_ses")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

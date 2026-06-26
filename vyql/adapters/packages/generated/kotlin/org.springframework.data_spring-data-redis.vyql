@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter kotlin {
-  package "org.springframework.data:spring-data-redis" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

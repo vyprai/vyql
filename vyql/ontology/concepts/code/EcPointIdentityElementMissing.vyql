@@ -1,0 +1,11 @@
+module code;
+
+concept EcPointIdentityElementMissing : issue {
+  cwe: [CWE_347, CWE_20]
+  review_assumption: "attackers can supply public keys or signature values that drive point-at-infinity arithmetic during ECDSA verification"
+  reviewCategory: crypto
+  reviewCondition: "elliptic-curve point arithmetic omits identity-element handling before modular inversion or scalar multiplication"
+  reviewConfidence: high
+  reviewEvidence: "elliptic-curve point context {pattern} performs point double/add/mul operations without checking or returning the point at infinity"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.me49ac867;
+
+binding httpInput0 {
+  requires {
+    dependency("org.springframework:spring-webflux")
+  }
+  query pattern callExpr where callee.method == "cookie"
+  emit source code.HttpInput at call.result
+}

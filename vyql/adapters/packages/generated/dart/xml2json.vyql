@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "xml2json" {
-    sink method "Xml2Json.parse" -> code.Deserialization
-  }
-}

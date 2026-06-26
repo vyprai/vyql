@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me24dd41b;
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework.kafka:spring-kafka")
+  }
+  query pattern callExpr where callee.method == "getKeyDeserializer"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m6331c3af;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("hive")
+  }
+  query pattern callExpr where callee.method == "BoxImpl.putAll"
+  emit sink code.StoredDataWrite at args[0]
+}

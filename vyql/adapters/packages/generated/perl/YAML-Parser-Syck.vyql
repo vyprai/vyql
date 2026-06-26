@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "YAML-Parser-Syck" {
-    sink method "YAML::Parser::Syck::Parse" -> code.Deserialization
-  }
-}

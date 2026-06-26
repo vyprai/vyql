@@ -1,8 +1,0 @@
-import code.{FileUse, XmlParse}
-adapter scala {
-  package "org.apache.hadoop:hadoop-common" {
-    sink method "writeXml" -> code.FileUse
-    sink method "write" -> code.FileUse
-    sink method "parse" -> code.XmlParse
-  }
-}

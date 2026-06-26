@@ -1,0 +1,9 @@
+module bindings.go.migration.m600cfa6d;
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/Microsoft/go-winio")
+  }
+  query pattern callExpr where callee.method == "parseEa"
+  emit sink code.Deserialization at args[0]
+}

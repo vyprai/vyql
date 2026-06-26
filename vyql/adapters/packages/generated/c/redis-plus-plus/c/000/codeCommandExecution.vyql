@@ -1,0 +1,9 @@
+module bindings.c.migration.m814dc436;
+
+binding commandExecution0 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.ruby.migration.m71618453;
+
+binding weakHash1 {
+  requires {
+    dependency("sorcery")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "encrypt"
+  emit issue code.WeakHash at node
+}

@@ -1,0 +1,14 @@
+module bindings.perl.migration.m5aa70a56;
+
+binding inputValidation1 {
+  requires {
+    dependency("CGI-Safe")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

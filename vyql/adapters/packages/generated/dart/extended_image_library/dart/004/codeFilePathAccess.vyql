@@ -1,0 +1,9 @@
+module bindings.dart.migration.m22d0a444;
+
+binding filePathAccess4 {
+  requires {
+    dependency("extended_image_library")
+  }
+  query pattern callExpr where callee.method == "cachedImageExists"
+  emit sink code.FilePathAccess at args[0]
+}

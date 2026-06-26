@@ -1,0 +1,9 @@
+module bindings.dart.migration.mf7b93d2b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("image_picker_ios")
+  }
+  query pattern callExpr where callee.method == "ImagePickerIOS.pickVideo"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.me87f9701;
+
+binding networkData0 {
+  requires {
+    dependency("qtconnectivity")
+  }
+  query pattern callExpr where callee.method == "QBluetoothSocket::read"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb60e1d5b;
+
+binding userControlledData1 {
+  requires {
+    dependency("io.jsonwebtoken:jjwt-impl")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source core.UserControlledData at call.result
+}

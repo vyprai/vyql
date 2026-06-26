@@ -1,0 +1,11 @@
+module code;
+
+concept KubernetesNamespaceNotInEgressPolicy : issue {
+  cwe: [CWE_284, CWE_863]
+  review_assumption: "the policy was intended to isolate workloads from adjacent namespaces, but NetworkPolicy egress rules are allow rules"
+  reviewCategory: auth
+  reviewCondition: "a Kubernetes NetworkPolicy egress rule allows namespaces selected by metadata.name NotIn the current namespace"
+  reviewConfidence: high
+  reviewEvidence: "Kubernetes NetworkPolicy context {pattern} builds an egress peer NamespaceSelector with kubernetes.io/metadata.name NotIn the resource namespace"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

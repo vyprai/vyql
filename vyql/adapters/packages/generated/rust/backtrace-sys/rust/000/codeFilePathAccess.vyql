@@ -1,0 +1,9 @@
+module bindings.rust.migration.m56281902;
+
+binding filePathAccess0 {
+  requires {
+    dependency("backtrace-sys")
+  }
+  query pattern callExpr where callee.method == "backtrace_create_state"
+  emit sink code.FilePathAccess at args[0]
+}

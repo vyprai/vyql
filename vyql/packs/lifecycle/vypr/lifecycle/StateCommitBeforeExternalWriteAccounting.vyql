@@ -1,0 +1,11 @@
+module vypr.lifecycle;
+
+rule StateCommitBeforeExternalWriteAccounting {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_696, CWE_755]
+    id: "VYQL-LIFE-006"
+    severity: high
+  }
+  issue code.StateCommitBeforeExternalWriteAccounting as op
+}

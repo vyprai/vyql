@@ -1,8 +1,0 @@
-import code.{HttpInput, CodeEval}
-
-adapter elixir {
-  package "master_proxy" {
-    source method "init" -> code.HttpInput
-    sink method "call" -> code.CodeEval
-  }
-}

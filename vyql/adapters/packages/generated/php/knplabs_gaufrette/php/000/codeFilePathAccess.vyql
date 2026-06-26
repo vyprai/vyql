@@ -1,0 +1,9 @@
+module bindings.php.migration.m001f1d31;
+
+binding filePathAccess0 {
+  requires {
+    dependency("knplabs/gaufrette")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

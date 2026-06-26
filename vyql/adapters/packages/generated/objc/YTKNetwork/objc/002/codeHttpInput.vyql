@@ -1,0 +1,9 @@
+module bindings.objc.migration.mea34866a;
+
+binding httpInput2 {
+  requires {
+    dependency("YTKNetwork")
+  }
+  query pattern callExpr where callee.method == "requestHeaderFieldValueDictionary"
+  emit source code.HttpInput at call.result
+}

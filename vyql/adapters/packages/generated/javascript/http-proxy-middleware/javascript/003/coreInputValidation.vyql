@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m5ea2d965;
+
+binding inputValidation3 {
+  requires {
+    dependency("http-proxy-middleware")
+  }
+  query pattern callExpr where callee.method == "matchPathFilter"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

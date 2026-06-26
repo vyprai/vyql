@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter ruby {
-  package "toml" {
-    sink method "load" -> code.Deserialization
-    sink method "load_file" -> code.Deserialization
-    sink method "load_file" -> code.FilePathAccess
-  }
-}

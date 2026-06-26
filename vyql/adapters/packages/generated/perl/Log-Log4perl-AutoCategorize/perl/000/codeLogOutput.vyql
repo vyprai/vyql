@@ -1,0 +1,9 @@
+module bindings.perl.migration.md5b7d42a;
+
+binding logOutput0 {
+  requires {
+    dependency("Log-Log4perl-AutoCategorize")
+  }
+  query pattern callExpr where callee.method == "AUTOLOAD"
+  emit sink code.LogOutput at args[0]
+}

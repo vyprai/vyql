@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2414ab83;
+
+binding networkData1 {
+  requires {
+    dependency("io.grpc:grpc-netty")
+  }
+  query pattern callExpr where callee.method == "wrap"
+  emit source code.NetworkData at call.result
+}

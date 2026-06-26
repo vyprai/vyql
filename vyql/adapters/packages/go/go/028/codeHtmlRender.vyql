@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding htmlRender28 {
+  requires {
+    dependency("html/template")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit sink code.HtmlRender at args[0]
+}

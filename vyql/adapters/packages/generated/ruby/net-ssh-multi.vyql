@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter ruby {
-  package "net-ssh-multi" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

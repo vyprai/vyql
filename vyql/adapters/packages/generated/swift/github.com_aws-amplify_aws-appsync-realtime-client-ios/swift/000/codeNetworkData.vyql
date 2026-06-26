@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf29f2323;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/aws-amplify/aws-appsync-realtime-client-ios")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit source code.NetworkData at call.result
+}

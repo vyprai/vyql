@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding authorizationCheck214 {
+  query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "call:canAlterTable" and args.any.literal contains "call:ThriftSecurityException"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

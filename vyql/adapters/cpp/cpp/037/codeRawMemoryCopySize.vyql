@@ -1,0 +1,7 @@
+module bindings.cpp.migration.m4e783366;
+
+binding rawMemoryCopySize37 {
+  query pattern callExpr where callee.path ~= "strncat"
+  emit sink code.RawMemoryCopySizeSink at args[2]
+  emit issue code.RawMemoryCopySize at call
+}

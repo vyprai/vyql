@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mfa69ad3c;
+
+binding cliArgument1 {
+  requires {
+    dependency("rubocop")
+  }
+  query pattern callExpr where callee.method == "Options.parse"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb0eafb50;
+
+binding filePathAccess0 {
+  requires {
+    dependency("is-path-cwd")
+  }
+  query pattern callExpr where callee.method == "isPathCwd"
+  emit sink code.FilePathAccess at args[0]
+}

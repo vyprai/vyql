@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" {
-    sink method "YAMLParser" -> code.Deserialization
-  }
-}

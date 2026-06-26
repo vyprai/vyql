@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "flake8-isort" {
-    source method "add_options" -> code.CliArgument
-    source method "parse_options" -> code.CliArgument
-  }
-}

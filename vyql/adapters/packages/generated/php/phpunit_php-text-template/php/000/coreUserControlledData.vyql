@@ -1,0 +1,9 @@
+module bindings.php.migration.m1fe52f0a;
+
+binding userControlledData0 {
+  requires {
+    dependency("phpunit/php-text-template")
+  }
+  query pattern callExpr where callee.method == "setVar"
+  emit source core.UserControlledData at call.result
+}

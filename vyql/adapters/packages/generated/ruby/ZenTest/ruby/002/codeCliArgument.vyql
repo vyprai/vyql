@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m488f1ef7;
+
+binding cliArgument2 {
+  requires {
+    dependency("ZenTest")
+  }
+  query pattern callExpr where callee.path ~= "bin/unit_diff"
+  emit source code.CliArgument at call.result
+}

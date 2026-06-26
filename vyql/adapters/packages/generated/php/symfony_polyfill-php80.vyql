@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "symfony/polyfill-php80" {
-    sink method "tokenize" -> code.Deserialization
-  }
-}

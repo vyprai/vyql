@@ -1,0 +1,7 @@
+module code;
+
+review code.UnderboundedProtocolCountLimit {
+  category: resource
+  kind: attention
+  text: "review protocol parser count limits against consensus or wire-format maximums"
+}

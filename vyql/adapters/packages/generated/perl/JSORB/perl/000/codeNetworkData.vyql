@@ -1,0 +1,9 @@
+module bindings.perl.migration.meecde81b;
+
+binding networkData0 {
+  requires {
+    dependency("JSORB")
+  }
+  query pattern callExpr where callee.method == "JSORB::Server::Simple::run"
+  emit source code.NetworkData at call.result
+}

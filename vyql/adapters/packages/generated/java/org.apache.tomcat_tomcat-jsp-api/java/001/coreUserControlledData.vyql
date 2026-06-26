@@ -1,0 +1,9 @@
+module bindings.java.migration.m97f81708;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jsp-api")
+  }
+  query pattern callExpr where callee.method == "getQueryString"
+  emit source core.UserControlledData at call.result
+}

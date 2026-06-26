@@ -1,0 +1,6 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding archiveEntryWrite113 {
+  query pattern callExpr where callee.method == "extract_entry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

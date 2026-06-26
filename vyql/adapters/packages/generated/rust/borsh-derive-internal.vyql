@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "borsh-derive-internal" {
-    sink method "enum_de" -> code.Deserialization
-    sink method "struct_de" -> code.Deserialization
-    sink method "union_de" -> code.Deserialization
-  }
-}

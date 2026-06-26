@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter c {
-  package "loguru" {
-    sink method "add_file" -> code.FilePathAccess
-    sink method "create_directories" -> code.FilePathAccess
-  }
-}

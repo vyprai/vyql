@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1aec25d5;
+
+binding filePathAccess3 {
+  requires {
+    dependency("sassc-rails")
+  }
+  query pattern callExpr where callee.method == "globbed_files"
+  emit sink code.FilePathAccess at args[0]
+}

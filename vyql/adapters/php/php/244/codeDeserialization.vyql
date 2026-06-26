@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding deserialization244 {
+  query pattern callExpr where callee.path ~= "unserialize"
+  emit sink code.Deserialization at args[0]
+}

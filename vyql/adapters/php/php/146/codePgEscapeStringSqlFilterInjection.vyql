@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding pgEscapeStringSqlFilterInjection146 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=freedomrss_search" and node.token contains "call_path:GetHttpVars" and node.token contains "call_path:pg_escape_string" and node.token contains "call_path:SearchDoc" and node.token contains "call_path:addFilter" and not (node.token contains "call_path:pg_escape_literal")
+  emit issue code.PgEscapeStringSqlFilterInjection at node
+}

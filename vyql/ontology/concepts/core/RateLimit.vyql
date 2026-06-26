@@ -1,0 +1,9 @@
+module core;
+
+concept RateLimit : check {
+  applies: endpoint
+  coverage_reserved_control: true
+  covers: [path]
+  cwe: [CWE_400]
+  neutralizes: [dos.UncontrolledResourceConsumption]
+}

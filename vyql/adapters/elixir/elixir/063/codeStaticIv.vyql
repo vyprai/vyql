@@ -1,0 +1,10 @@
+module bindings.elixir.migration.m728b8a72;
+
+binding staticIv63 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "crypto_one_time" and node.token contains "0000000000000000"
+  emit issue code.StaticIv at node
+}

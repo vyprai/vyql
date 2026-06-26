@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter scala {
-  package "org.glassfish.web:jstl-impl" {
-    control method "org.apache.taglibs.standard.functions.Functions.escapeXml" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbc122e26;
+
+binding urlFetch0 {
+  requires {
+    dependency("email_spec")
+  }
+  query pattern callExpr where callee.method == "request_uri"
+  emit sink code.UrlFetch at args[0]
+}

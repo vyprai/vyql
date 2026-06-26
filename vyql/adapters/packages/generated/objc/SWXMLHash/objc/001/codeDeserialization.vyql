@@ -1,0 +1,9 @@
+module bindings.objc.migration.m34f47f67;
+
+binding deserialization1 {
+  requires {
+    dependency("SWXMLHash")
+  }
+  query pattern callExpr where callee.method == "lazy"
+  emit sink code.Deserialization at args[0]
+}

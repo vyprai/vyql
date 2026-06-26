@@ -1,0 +1,12 @@
+module bindings.powershell.owasp;
+
+binding replaceShellEscape {
+  query pattern callExpr where callee.path ~= "powershell.replace" and args.any.literal contains "[^a-zA-Z0-9_.-]"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+

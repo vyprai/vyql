@@ -1,0 +1,9 @@
+module bindings.swift.migration.md13648fb;
+
+binding sqlExecution2 {
+  requires {
+    dependency("github.com/vapor-community/vapor-ext")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2bcacd66;
+
+binding storedDataWrite10 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "swapdb"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter python {
-  package "requests-unixsocket" {
-    sink method "request" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m3a703d01;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/kelseyhightower/envconfig")
+  }
+  query pattern callExpr where callee.method == "Process"
+  emit source core.UserControlledData at call.result
+}

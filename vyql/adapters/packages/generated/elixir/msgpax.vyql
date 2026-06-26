@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "msgpax" {
-    sink method "unpack" -> code.Deserialization
-    sink method "unpack!" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

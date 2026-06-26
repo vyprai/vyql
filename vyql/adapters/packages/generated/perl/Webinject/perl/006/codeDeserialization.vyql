@@ -1,0 +1,9 @@
+module bindings.perl.migration.m214f1c8e;
+
+binding deserialization6 {
+  requires {
+    dependency("Webinject")
+  }
+  query pattern callExpr where callee.method == "_parseresponse"
+  emit sink code.Deserialization at args[0]
+}

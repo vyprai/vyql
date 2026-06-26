@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedLinterIssueMessageXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-166"
+    severity: high
+  }
+  issue code.UnescapedLinterIssueMessageXss as sink
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m1fcb5247;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("asm89/stack-cors")
+  }
+  query pattern callExpr where callee.method == "addPreflightRequestHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

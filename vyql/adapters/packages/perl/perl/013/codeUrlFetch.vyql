@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding urlFetch13 {
+  requires {
+    dependency("LWP::UserAgent")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.UrlFetch at args[0]
+}

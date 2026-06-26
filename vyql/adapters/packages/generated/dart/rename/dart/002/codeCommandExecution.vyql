@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8750043f;
+
+binding commandExecution2 {
+  requires {
+    dependency("rename")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

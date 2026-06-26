@@ -1,0 +1,9 @@
+module bindings.scala.migration.m4a4ad117;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "MockResponse.setHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

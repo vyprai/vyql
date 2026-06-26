@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "click-repl" {
-    sink method "dispatch_repl_commands" -> code.CommandExecution
-  }
-}

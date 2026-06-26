@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbaedb6e4;
+
+binding deserialization2 {
+  requires {
+    dependency("yaml_elixir")
+  }
+  query pattern callExpr where callee.method == "read_from_file!"
+  emit sink code.Deserialization at args[0]
+}

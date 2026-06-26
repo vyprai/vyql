@@ -1,8 +1,0 @@
-import code.{FileUse}
-
-adapter php {
-  package "sonata-project/exporter" {
-    sink method "fputcsv" -> code.FileUse
-    sink method "file_put_contents" -> code.FileUse
-  }
-}

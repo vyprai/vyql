@@ -1,8 +1,0 @@
-import code.{CommandExecution, FilePathAccess, FileUse}
-adapter ruby {
-  package "image_processing" {
-    sink method "load_image" -> code.FileUse
-    sink method "save_image" -> code.FilePathAccess
-    sink method "convert_to_path" -> code.FilePathAccess
-  }
-}

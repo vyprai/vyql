@@ -1,0 +1,10 @@
+module bindings.cpp.migration.m4e783366;
+
+binding recursiveCompressedPacketDecompression74 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "identifier:COMPRESSION_BORDER" and node.token contains "identifier:JUMBO_SIZE" and node.token contains "call_path:uncompress" and node.token contains "call_path:fc_realloc" and node.token contains "call_path:memmove" and node.token contains "call_path:memcpy" and node.token contains "call_path:get_packet_from_connection"
+  emit issue code.RecursiveCompressedPacketDecompression at node
+}

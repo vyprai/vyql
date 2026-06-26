@@ -25,17 +25,27 @@ type Engine struct {
 	contextConfirmsSet bool
 	cfg                map[string]bool
 	labelsByNode       map[string][]usg.Label
+	nodesByConcept     map[string][]string
 	flowGuards         map[string][]string
+	dominanceGuards    map[string][]string
+	sameReceiverGuards map[string]map[string]bool
+	sameScopeGuards    map[string]map[string]bool
+	globalGuards       map[string]bool
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{
-		Onto:         onto,
-		Store:        store,
-		analysisRole: map[string]map[string]bool{},
-		cfg:          map[string]bool{},
-		labelsByNode: map[string][]usg.Label{},
-		flowGuards:   map[string][]string{},
+		Onto:               onto,
+		Store:              store,
+		analysisRole:       map[string]map[string]bool{},
+		cfg:                map[string]bool{},
+		labelsByNode:       map[string][]usg.Label{},
+		nodesByConcept:     map[string][]string{},
+		flowGuards:         map[string][]string{},
+		dominanceGuards:    map[string][]string{},
+		sameReceiverGuards: map[string]map[string]bool{},
+		sameScopeGuards:    map[string]map[string]bool{},
+		globalGuards:       map[string]bool{},
 	}
 }
 
@@ -59,8 +69,10 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 			return e.evalTaint(cr)
 		case "reach":
 			return e.evalReach(cr)
+		case "grant":
+			return e.evalPrivilegeClosure(cr, "grant")
 		case "assume":
-			return e.evalAssume(cr)
+			return e.evalPrivilegeClosure(cr, "assume")
 		}
 	case *parser.MatchStmt:
 		return e.evalMatch(cr)
@@ -74,8 +86,8 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 // A-operation can reach a B-operation on a CFG path.
 func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.OrderStmt)
-	firsts, _ := e.Store.NodesWithConcept(body.First.Concept)
-	seconds, _ := e.Store.NodesWithConcept(body.Second.Concept)
+	firsts := e.nodesWithConcept(body.First.Concept)
+	seconds := e.nodesWithConcept(body.Second.Concept)
 	var out []*findings.Finding
 	for _, a := range firsts {
 		for _, b := range seconds {
@@ -98,8 +110,8 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 
 func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
-	sources, _ := e.Store.NodesWithConcept(body.Src.Concept)
-	targets, _ := e.Store.NodesWithConcept(body.Dst.Concept)
+	sources := e.nodesWithConcept(body.Src.Concept)
+	targets := e.nodesWithConcept(body.Dst.Concept)
 	if req := e.whereAssetKinds(cr.Rule); len(req) > 0 {
 		var keep []string
 		for _, t := range targets {
@@ -131,10 +143,10 @@ func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 	return out, nil
 }
 
-func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
+func (e *Engine) evalPrivilegeClosure(cr *CompiledRule, witnessKind string) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
-	sources, _ := e.Store.NodesWithConcept(body.Src.Concept)
-	targets, _ := e.Store.NodesWithConcept(body.Dst.Concept)
+	sources := e.nodesWithConcept(body.Src.Concept)
+	targets := e.nodesWithConcept(body.Dst.Concept)
 	paths, err := solvers.FindAssume(e.Store, sources, targets, e.assumeMinLevel(body.Dst.Concept))
 	if err != nil {
 		return nil, err
@@ -146,7 +158,7 @@ func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
 			w = append(w, s.From+" -> "+s.To+"  ["+s.Ability+"]")
 		}
 		out = append(out, &findings.Finding{
-			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "assume", Witness: w,
+			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: witnessKind, Witness: w,
 			Confidence: e.confConcept(p.SourceID, body.Src.Concept),
 			Bindings: []findings.Binding{
 				{Name: "principal", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
@@ -200,7 +212,7 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 		if _, ok, _ := e.Store.GetNode(target); !ok {
 			continue
 		}
-		sourceIDs, _ := e.Store.NodesWithConcept(src.Concept)
+		sourceIDs := e.nodesWithConcept(src.Concept)
 		if paths, _ := solvers.FindReach(e.Store, sourceIDs, []string{target}, nil); len(paths) > 0 {
 			h := paths[0].Hops
 			via := ""
@@ -304,7 +316,7 @@ func renderContextLabel(template, target string, kinds []string) string {
 func (e *Engine) contextConfirmations(target string) []string {
 	var out []string
 	for _, c := range e.contextConfirmationSpecs() {
-		ids, _ := e.Store.NodesWithConcept(c.Concept)
+		ids := e.nodesWithConcept(c.Concept)
 		for _, id := range ids {
 			n, _, _ := e.Store.GetNode(id)
 			if n.Prop(c.DstProp) != target {
@@ -494,30 +506,23 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 
 func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.FlowStmt)
-	srcConcepts := e.Onto.Descendants(body.Src.Concept)
-	sinkConcepts := e.Onto.Descendants(body.Dst.Concept)
-	taintKinds := map[string]bool{}
-	for c := range srcConcepts {
-		if cc, err := e.Onto.Get(c); err == nil {
-			for _, t := range cc.Taint {
-				taintKinds[t] = true
-			}
-		}
+	srcConcepts := cr.SourceConcepts
+	if srcConcepts == nil {
+		srcConcepts = e.Onto.Descendants(body.Src.Concept)
 	}
-
-	// excluded characters for this sink threat (declared on the sink concept(s) via
-	// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
-	excluded := ""
-	seenRune := map[rune]bool{}
-	for c := range sinkConcepts {
-		if cc, err := e.Onto.Get(c); err == nil {
-			for _, r := range cc.ExcludedChars {
-				if !seenRune[r] {
-					seenRune[r] = true
-					excluded += string(r)
-				}
-			}
-		}
+	sinkConcepts := cr.SinkConcepts
+	if sinkConcepts == nil {
+		sinkConcepts = e.Onto.Descendants(body.Dst.Concept)
+	}
+	taintKinds := cr.TaintKinds
+	if taintKinds == nil {
+		taintKinds = taintKindsFor(e.Onto, srcConcepts)
+	}
+	excluded := cr.ExcludedChars
+	if cr.SinkConcepts == nil {
+		// excluded characters for this sink threat (declared on the sink concept(s) via
+		// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
+		excluded = excludedCharsFor(e.Onto, sinkConcepts)
 	}
 
 	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter))
@@ -525,7 +530,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 
-	var guards []string
+	var guards, dominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards []string
 	var sanitizer string
 	for _, cl := range cr.Rule.Clauses {
 		if cl.Kind != "unless" {
@@ -534,6 +539,14 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		switch ex := cl.Unless.(type) {
 		case parser.GuardedBy:
 			guards = append(guards, ex.Concept)
+		case parser.DominatesCoveredBy:
+			dominanceGuards = append(dominanceGuards, ex.Concept)
+		case parser.SameReceiverCoveredBy:
+			sameReceiverGuards = append(sameReceiverGuards, ex.Concept)
+		case parser.SameScopeCoveredBy:
+			sameScopeGuards = append(sameScopeGuards, ex.Concept)
+		case parser.GlobalCoveredBy:
+			globalGuards = append(globalGuards, ex.Concept)
 		case parser.SanitizedBy:
 			sanitizer = ex.Concept
 		}
@@ -577,6 +590,42 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				detail = "guard covers sink"
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok, Detail: detail})
+			suppressed = suppressed || ok
+		}
+		for _, g := range dominanceGuards {
+			ok := e.dominatesGuarded(fl.SinkID, g)
+			detail := "no dominating guard on sink"
+			if ok {
+				detail = "guard dominates sink"
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok, Detail: detail})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameReceiverGuards {
+			ok := e.sameReceiverGuarded(fl.SinkID, g)
+			detail := "no same-receiver guard on sink"
+			if ok {
+				detail = "same-receiver guard covers sink"
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "same_receiver_covered_by " + g, Satisfied: ok, Detail: detail})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameScopeGuards {
+			ok := e.sameScopeGuarded(fl.SinkID, g)
+			detail := "no same-scope guard on sink"
+			if ok {
+				detail = "same-scope guard covers sink"
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "same_scope_covered_by " + g, Satisfied: ok, Detail: detail})
+			suppressed = suppressed || ok
+		}
+		for _, g := range globalGuards {
+			ok := e.globalGuarded(g)
+			detail := "no global guard"
+			if ok {
+				detail = "global guard exists"
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "global_covered_by " + g, Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		if suppressed {
@@ -681,6 +730,15 @@ func (e *Engine) labels(nodeID string) []usg.Label {
 	ls, _ := e.Store.Labels(nodeID)
 	e.labelsByNode[nodeID] = ls
 	return ls
+}
+
+func (e *Engine) nodesWithConcept(concept string) []string {
+	if ids, ok := e.nodesByConcept[concept]; ok {
+		return ids
+	}
+	ids, _ := e.Store.NodesWithConcept(concept)
+	e.nodesByConcept[concept] = ids
+	return ids
 }
 
 func (e *Engine) conceptsWithAnalysisRole(role string) map[string]bool {
@@ -875,7 +933,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		edges, _ := e.Store.InEdges(sinkID, et)
 		for _, ed := range edges {
 			for _, l := range e.labels(ed.Src) {
-				if l.Concept != control {
+				if l.Concept != control || labelIsAdvisory(l) {
 					continue
 				}
 				if sinkCFG && e.hasCFG(ed.Src) {
@@ -894,19 +952,28 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
-	guards, _ := e.Store.NodesWithConcept(control)
+	guards := e.nodesWithConcept(control)
 	for _, gid := range guards {
+		if e.nodeHasAdvisoryConceptOnly(gid, control) {
+			continue
+		}
 		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) {
 			return true
 		}
 	}
 	if sinkCFG {
 		for _, gid := range guards {
+			if e.nodeHasAdvisoryConceptOnly(gid, control) {
+				continue
+			}
 			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
 				return true
 			}
 		}
 		for _, gid := range guards {
+			if e.nodeHasAdvisoryConceptOnly(gid, control) {
+				continue
+			}
 			if gid != sinkID && e.preflightLoopGuarded(gid, sinkID) {
 				return true
 			}
@@ -961,23 +1028,139 @@ func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
 		return false
 	}
 	sinkRecv := receiverPrefix(sink.Prop("callee_path"))
+	if recvID := sink.Prop("recv"); recvID != "" && nodeHasConcreteConcept(e.labels(recvID), control) {
+		return true
+	}
 	if sinkRecv == "" {
 		return false
 	}
-	guardNodes, _ := e.Store.NodesWithConcept(control)
-	for _, gid := range guardNodes {
-		if gid == sinkID {
+	return e.sameReceiverGuardReceivers(control)[sinkRecv]
+}
+
+func (e *Engine) dominatesGuarded(targetID, control string) bool {
+	if !e.hasCFG(targetID) {
+		return false
+	}
+	for _, gid := range e.dominanceGuardCandidates(control) {
+		if gid != targetID && solvers.Dominates(e.Store, gid, targetID) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Engine) dominanceGuardCandidates(control string) []string {
+	if ids, ok := e.dominanceGuards[control]; ok {
+		return ids
+	}
+	var out []string
+	for _, gid := range e.nodesWithConcept(control) {
+		if !e.hasCFG(gid) || !nodeHasConcreteConcept(e.labels(gid), control) {
+			continue
+		}
+		out = append(out, gid)
+	}
+	e.dominanceGuards[control] = out
+	return out
+}
+
+func (e *Engine) sameReceiverGuardReceivers(control string) map[string]bool {
+	if receivers, ok := e.sameReceiverGuards[control]; ok {
+		return receivers
+	}
+	receivers := map[string]bool{}
+	for _, gid := range e.nodesWithConcept(control) {
+		if e.nodeHasAdvisoryConceptOnly(gid, control) {
 			continue
 		}
 		guard, ok, _ := e.Store.GetNode(gid)
 		if !ok {
 			continue
 		}
-		if receiverPrefix(guard.Prop("callee_path")) == sinkRecv {
+		if recv := receiverPrefix(guard.Prop("callee_path")); recv != "" {
+			receivers[recv] = true
+		}
+	}
+	e.sameReceiverGuards[control] = receivers
+	return receivers
+}
+
+func (e *Engine) sameScopeGuarded(targetID, control string) bool {
+	target, ok, _ := e.Store.GetNode(targetID)
+	if !ok {
+		return false
+	}
+	targetScope := lexicalScopeKey(target)
+	if targetScope == "" {
+		return false
+	}
+	for scope := range e.sameScopeGuardScopes(control) {
+		if lexicalScopeCovers(scope, targetScope) {
 			return true
 		}
 	}
 	return false
+}
+
+func (e *Engine) sameScopeGuardScopes(control string) map[string]bool {
+	if scopes, ok := e.sameScopeGuards[control]; ok {
+		return scopes
+	}
+	scopes := map[string]bool{}
+	for _, gid := range e.nodesWithConcept(control) {
+		if e.nodeHasAdvisoryConceptOnly(gid, control) {
+			continue
+		}
+		guard, ok, _ := e.Store.GetNode(gid)
+		if !ok {
+			continue
+		}
+		if scope := lexicalScopeKey(guard); scope != "" {
+			scopes[scope] = true
+		}
+	}
+	e.sameScopeGuards[control] = scopes
+	return scopes
+}
+
+func (e *Engine) globalGuarded(control string) bool {
+	if ok, cached := e.globalGuards[control]; cached {
+		return ok
+	}
+	for _, id := range e.nodesWithConcept(control) {
+		for _, l := range e.labels(id) {
+			if l.Concept == control && !labelIsAdvisory(l) && l.Detail["coverage"] == "global" {
+				e.globalGuards[control] = true
+				return true
+			}
+		}
+	}
+	e.globalGuards[control] = false
+	return false
+}
+
+func lexicalScopeKey(n usg.Node) string {
+	scope := n.Scope
+	if scope == "" {
+		scope = n.Prop("scope")
+	}
+	if scope == "" {
+		scope = n.Prop("region")
+	}
+	if scope == "" {
+		scope = n.Region
+	}
+	if at := strings.IndexByte(scope, '@'); at >= 0 {
+		scope = scope[:at]
+	}
+	return strings.TrimRight(scope, "/")
+}
+
+func lexicalScopeCovers(guardScope, targetScope string) bool {
+	if guardScope == "" || targetScope == "" {
+		return false
+	}
+	return targetScope == guardScope || strings.HasPrefix(targetScope, guardScope+"/")
 }
 
 func nodeHasAnyConcept(labels []usg.Label, concepts map[string]bool) bool {
@@ -987,6 +1170,33 @@ func nodeHasAnyConcept(labels []usg.Label, concepts map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+func labelIsAdvisory(l usg.Label) bool {
+	return l.Detail != nil && l.Detail["advisory"] == "true"
+}
+
+func nodeHasConcreteConcept(labels []usg.Label, concept string) bool {
+	for _, l := range labels {
+		if l.Concept == concept && !labelIsAdvisory(l) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Engine) nodeHasAdvisoryConceptOnly(nodeID, concept string) bool {
+	seen := false
+	for _, l := range e.labels(nodeID) {
+		if l.Concept != concept {
+			continue
+		}
+		if !labelIsAdvisory(l) {
+			return false
+		}
+		seen = true
+	}
+	return seen
 }
 
 func receiverPrefix(path string) string {
@@ -1021,7 +1231,7 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 		return false
 	}
 	for i, pid := range path {
-		if i < len(path)-1 && e.nodeHasConcept(pid, control) {
+		if i < len(path)-1 && nodeHasConcreteConcept(e.labels(pid), control) {
 			return true
 		}
 		for _, gid := range e.flowGuardCandidates(pid, control) {
@@ -1046,7 +1256,7 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(id string) {
-		if id == "" || seen[id] || !e.nodeHasConcept(id, control) {
+		if id == "" || seen[id] || !nodeHasConcreteConcept(e.labels(id), control) {
 			return
 		}
 		seen[id] = true
@@ -1106,8 +1316,11 @@ func nearestLoopParent(region string) (string, bool) {
 // suppresses — conservative, to avoid leak false positives on unconverted frontends).
 func (e *Engine) endpointClosed(allocID, control string) bool {
 	allocCFG := e.hasCFG(allocID)
-	releases, _ := e.Store.NodesWithConcept(control)
+	releases := e.nodesWithConcept(control)
 	for _, rid := range releases {
+		if e.nodeHasAdvisoryConceptOnly(rid, control) {
+			continue
+		}
 		if rid == allocID {
 			continue
 		}

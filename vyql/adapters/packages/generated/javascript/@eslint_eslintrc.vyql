@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter javascript {
-  package "@eslint/eslintrc" {
-    control method "validate" -> core.InputValidation
-  }
-}

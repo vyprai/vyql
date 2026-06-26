@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding conn11 {
+  query pattern callExpr where callee.path ~= "support.NewLDAP"
+  emit fact runtime.ReceiverType at call.result {
+    about: ldap.Conn
+  }
+}

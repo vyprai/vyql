@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m2e2792f5;
+
+binding deserialization1 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "JsonDeserializer"
+  emit sink code.Deserialization at args[0]
+}

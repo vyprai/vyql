@@ -1,7 +1,0 @@
-import code.{NetworkData, Deserialization}
-adapter elixir {
-  package "elastix" {
-    source method "request" -> code.NetworkData
-    sink method "decode" -> code.Deserialization
-  }
-}

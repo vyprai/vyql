@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkData}
-
-adapter kotlin {
-  package "com.facebook.fresco:imagepipeline-okhttp3" {
-    sink method "fetch" -> code.NetworkConnect
-    sink method "fetchWithRequest" -> code.NetworkConnect
-    source method "onResponse" -> code.NetworkData
-  }
-}

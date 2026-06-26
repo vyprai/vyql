@@ -1,0 +1,11 @@
+module code;
+
+concept BasicAuthStreamAuthBypass : issue {
+  cwe: [CWE_287, CWE_306]
+  review_assumption: "the returned options protect streaming endpoints and the middleware allows unauthenticated requests when AuthRequired is false"
+  reviewCategory: auth
+  reviewCondition: "streaming or SSE auth options enable Basic authentication without requiring authentication"
+  reviewConfidence: high
+  reviewEvidence: "stream auth option builder {pattern} sets BasicAuthEnabled but omits AuthRequired=true"
+  vulnerableTo: [authentication.AuthenticationBypass, authentication.MissingAuthentication]
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter perl {
-  package "Proc-WaitStat" {
-    source method "close_die" -> core.UserControlledData
-    source method "waitstat_die" -> core.UserControlledData
-  }
-}

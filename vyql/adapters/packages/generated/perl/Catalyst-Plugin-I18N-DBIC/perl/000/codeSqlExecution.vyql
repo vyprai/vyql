@@ -1,0 +1,9 @@
+module bindings.perl.migration.m32f803a8;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Catalyst-Plugin-I18N-DBIC")
+  }
+  query pattern callExpr where callee.method == "load_lexicon"
+  emit sink code.SqlExecution at args[0]
+}

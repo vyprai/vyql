@@ -1,0 +1,11 @@
+module code;
+
+concept TemplateDirectoryHiddenGlobCopy : issue {
+  cwe: [CWE_22, CWE_200]
+  review_assumption: "template contents or package extraction paths can include hidden entries that expose files outside the intended template directory"
+  reviewCategory: path
+  reviewCondition: "downloaded template directories are recursively copied with hidden dot-glob entries enabled"
+  reviewConfidence: high
+  reviewEvidence: "template copy context {pattern} passes a downloaded directory to a recursive copy helper without disabling hidden-entry glob copying"
+  vulnerableTo: [path.PathTraversal, secrets.SecretLeak]
+}

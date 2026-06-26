@@ -1,0 +1,9 @@
+module bindings.go.migration.me8299431;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/grpc-ecosystem/go-grpc-middleware")
+  }
+  query pattern callExpr where callee.method == "TagBasedRequestFieldExtractor"
+  emit sink code.UrlFetch at args[0]
+}

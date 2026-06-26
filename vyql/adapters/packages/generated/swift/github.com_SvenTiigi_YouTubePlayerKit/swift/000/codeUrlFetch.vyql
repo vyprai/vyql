@@ -1,0 +1,9 @@
+module bindings.swift.migration.m4806c3f7;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/SvenTiigi/YouTubePlayerKit")
+  }
+  query pattern callExpr where callee.method == "youTubePlayerIframeAPISourceURL"
+  emit sink code.UrlFetch at args[0]
+}

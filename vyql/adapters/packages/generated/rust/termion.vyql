@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-adapter rust {
-  package "termion" {
-    source method "read" -> core.UserControlledData
-    source method "read_line" -> core.UserControlledData
-    source method "async_stdin" -> core.UserControlledData
-    source method "async_stdin_until" -> core.UserControlledData
-  }
-}

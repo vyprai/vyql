@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter kotlin {
-  package "org.dbunit:dbunit" {
-    sink method "setSql" -> code.SqlExecution
-    sink method "assertEqualsByQuery" -> code.SqlExecution
-    sink method "getSql" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.maf9a3517;
+
+binding networkSend0 {
+  requires {
+    dependency("googletrans")
+  }
+  query pattern callExpr where callee.method == "translate"
+  emit sink code.NetworkSend at args[0]
+}

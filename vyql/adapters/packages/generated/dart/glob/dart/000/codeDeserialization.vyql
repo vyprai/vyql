@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb06f65f7;
+
+binding deserialization0 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

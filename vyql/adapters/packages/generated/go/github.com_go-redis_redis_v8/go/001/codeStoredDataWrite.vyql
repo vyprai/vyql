@@ -1,0 +1,9 @@
+module bindings.go.migration.ma589c2b6;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("github.com/go-redis/redis/v8")
+  }
+  query pattern callExpr where callee.method == "setCmdsErr"
+  emit sink code.StoredDataWrite at args[0]
+}

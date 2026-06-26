@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m692e4a2e;
+
+binding deserialization0 {
+  requires {
+    dependency("kf5configwidgets")
+  }
+  query pattern callExpr where callee.method == "KTipDatabase"
+  emit sink code.Deserialization at args[0]
+}

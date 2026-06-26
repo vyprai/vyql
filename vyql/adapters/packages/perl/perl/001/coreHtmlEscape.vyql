@@ -1,0 +1,14 @@
+module bindings.perl.migration.ma164dcec;
+
+binding htmlEscape1 {
+  requires {
+    dependency("CGI")
+  }
+  query pattern callExpr where callee.path ~= "CGI.escapeHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

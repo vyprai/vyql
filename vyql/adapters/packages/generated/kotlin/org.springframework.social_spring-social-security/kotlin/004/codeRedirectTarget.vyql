@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m1fdb3140;
+
+binding redirectTarget4 {
+  requires {
+    dependency("org.springframework.social:spring-social-security")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "postLoginUrl"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

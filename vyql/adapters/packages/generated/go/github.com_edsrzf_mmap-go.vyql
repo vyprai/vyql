@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/edsrzf/mmap-go" {
-    sink method "Map" -> code.FilePathAccess
-    sink method "MapRegion" -> code.FilePathAccess
-  }
-}

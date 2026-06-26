@@ -1,0 +1,9 @@
+module bindings.objc.migration.m725dbc57;
+
+binding userControlledData5 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "registerForProvisionalAuthorization:"
+  emit source core.UserControlledData at call.result
+}

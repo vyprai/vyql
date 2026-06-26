@@ -1,0 +1,9 @@
+module bindings.dart.migration.mfca7f1af;
+
+binding commandExecution2 {
+  requires {
+    dependency("melos")
+  }
+  query pattern callExpr where callee.method == "PersistentShell.sendCommand"
+  emit sink code.CommandExecution at args[0]
+}

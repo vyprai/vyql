@@ -1,0 +1,9 @@
+module bindings.python.migration.m7b761a9b;
+
+binding userControlledData4 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "summary"
+  emit source core.UserControlledData at call.result
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter dart {
-  package "dotenv" {
-    sink method "DotEnv.load" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.md3c1f255;
+
+binding networkConnect0 {
+  requires {
+    dependency("Starscream")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

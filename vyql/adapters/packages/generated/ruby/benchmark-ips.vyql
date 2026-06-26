@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter ruby {
-  package "benchmark-ips" {
-    sink method "compile_string" -> code.CodeEval
-  }
-}

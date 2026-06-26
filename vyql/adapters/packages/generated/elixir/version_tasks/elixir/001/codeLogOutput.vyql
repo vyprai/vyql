@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma959295a;
+
+binding logOutput1 {
+  requires {
+    dependency("version_tasks")
+  }
+  query pattern callExpr where callee.method == "VersionTasks.Shell.error"
+  emit sink code.LogOutput at args[0]
+}

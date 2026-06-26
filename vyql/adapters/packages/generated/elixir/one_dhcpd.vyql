@@ -1,5 +1,0 @@
-adapter elixir {
-  package "one_dhcpd" {
-    source method "handle_dhcp" -> code.NetworkData
-  }
-}

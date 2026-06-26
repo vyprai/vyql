@@ -1,6 +1,10 @@
 package ontology
 
-import "github.com/vyprai/vyql/parser"
+import (
+	"strconv"
+
+	"github.com/vyprai/vyql/parser"
+)
 
 // ConceptFromDecl converts a parsed textual concept declaration
 // (`concept <Name> : <kind> { … }`, docs/06) into a Concept. The kind is the
@@ -54,7 +58,7 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 // `package` declarations) into Concepts. Non-concept declarations are ignored,
 // so a file may mix concepts with rules.
 func LoadConceptText(src string) ([]Concept, error) {
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +72,11 @@ func LoadConceptText(src string) ([]Concept, error) {
 }
 
 func str(fields map[string]any, key string) string {
-	if v, ok := fields[key].(string); ok {
+	switch v := fields[key].(type) {
+	case string:
 		return v
+	case bool:
+		return strconv.FormatBool(v)
 	}
 	return ""
 }

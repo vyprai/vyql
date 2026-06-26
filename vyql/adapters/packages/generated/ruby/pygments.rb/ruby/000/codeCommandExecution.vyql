@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4c5c84e3;
+
+binding commandExecution0 {
+  requires {
+    dependency("pygments.rb")
+  }
+  query pattern callExpr where callee.method == "popen4"
+  emit sink code.CommandExecution at args[0]
+}

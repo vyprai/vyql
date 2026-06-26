@@ -1,0 +1,9 @@
+module bindings.php.migration.m6090f3e0;
+
+binding codeEval0 {
+  requires {
+    dependency("doctrine/common")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

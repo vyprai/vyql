@@ -1,0 +1,9 @@
+module bindings.go.migration.m90840e9a;
+
+binding htmlRender0 {
+  requires {
+    dependency("github.com/gookit/color")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit sink code.HtmlRender at args[0]
+}

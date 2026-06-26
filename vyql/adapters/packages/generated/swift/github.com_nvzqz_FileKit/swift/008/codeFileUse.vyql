@@ -1,0 +1,9 @@
+module bindings.swift.migration.mba9fec3c;
+
+binding fileUse8 {
+  requires {
+    dependency("github.com/nvzqz/FileKit")
+  }
+  query pattern callExpr where callee.method == "inputStream"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter groovy {
-  package "info.picocli:picocli" {
-    source method "run" -> code.CliArgument
-  }
-}

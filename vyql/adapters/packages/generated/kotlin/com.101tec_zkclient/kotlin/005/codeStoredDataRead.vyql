@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m348ae5bd;
+
+binding storedDataRead5 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "getAcl"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m4e86e118;
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework.data:spring-data-jpa")
+  }
+  query pattern callExpr where callee.method == "extractQueryString"
+  emit sink code.SqlExecution at args[0]
+}

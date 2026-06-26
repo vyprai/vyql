@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdcbba98f;
+
+binding networkSend11 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "addText:parameterName:"
+  emit sink code.NetworkSend at args[0]
+}

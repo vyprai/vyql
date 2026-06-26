@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcbb5b18a;
+
+binding userControlledData2 {
+  requires {
+    dependency("com.sun.mail:javax.mail")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

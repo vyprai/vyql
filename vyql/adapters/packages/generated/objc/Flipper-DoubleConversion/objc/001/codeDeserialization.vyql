@@ -1,0 +1,9 @@
+module bindings.objc.migration.m85057eda;
+
+binding deserialization1 {
+  requires {
+    dependency("Flipper-DoubleConversion")
+  }
+  query pattern callExpr where callee.method == "Strtof"
+  emit sink code.Deserialization at args[0]
+}

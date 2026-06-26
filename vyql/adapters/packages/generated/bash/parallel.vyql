@@ -1,5 +1,0 @@
-adapter bash {
-  package "parallel" {
-    source path "parallel.argv" -> code.CliArgument
-  }
-}

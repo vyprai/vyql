@@ -1,9 +1,0 @@
-adapter go {
-  package "github.com/mattn/go-sqlite3" {
-    source method "Token" -> code.SecretValue
-    sink method "Parse" -> code.Deserialization
-    flag code.WeakHash on any {
-      method "Hash"
-    }
-  }
-}

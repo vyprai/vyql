@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven" {
-    sink method "loadPomFromFile" -> code.Deserialization
-    sink method "loadPomFromClassLoaderResource" -> code.Deserialization
-  }
-}

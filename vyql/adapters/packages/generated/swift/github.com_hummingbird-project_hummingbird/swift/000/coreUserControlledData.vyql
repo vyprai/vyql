@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3f105c19;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/hummingbird-project/hummingbird")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source core.UserControlledData at call.result
+}

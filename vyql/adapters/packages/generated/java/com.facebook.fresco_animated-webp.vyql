@@ -1,9 +1,0 @@
-adapter java {
-  package "com.facebook.fresco:animated-webp" {
-    sink method "createFromByteArray" -> code.Deserialization
-    sink method "createFromByteBuffer" -> code.Deserialization
-    sink method "decodeFromNativeMemory" -> code.Deserialization
-    sink method "decodeFromByteBuffer" -> code.Deserialization
-    sink method "nativeCreateFromDirectByteBuffer" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m46290a3b;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source core.UserControlledData at call.result
+}

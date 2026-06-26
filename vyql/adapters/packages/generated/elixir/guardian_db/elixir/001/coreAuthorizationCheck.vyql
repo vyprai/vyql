@@ -1,0 +1,14 @@
+module bindings.elixir.migration.med6b4913;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("guardian_db")
+  }
+  query pattern callExpr where callee.method == "on_revoke"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

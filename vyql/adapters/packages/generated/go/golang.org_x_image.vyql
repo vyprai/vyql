@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "golang.org/x/image" {
-    sink method "Decode" -> code.Deserialization
-    sink method "DecodeConfig" -> code.Deserialization
-  }
-}

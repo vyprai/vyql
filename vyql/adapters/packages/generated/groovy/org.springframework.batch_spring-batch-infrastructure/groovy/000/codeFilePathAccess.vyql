@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m0167a8e8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.springframework.batch:spring-batch-infrastructure")
+  }
+  query pattern callExpr where callee.method == "setUpOutputFile"
+  emit sink code.FilePathAccess at args[0]
+}

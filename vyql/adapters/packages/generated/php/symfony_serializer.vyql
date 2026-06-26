@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "symfony/serializer" {
-    sink method "deserialize" -> code.Deserialization
-    sink method "denormalize" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

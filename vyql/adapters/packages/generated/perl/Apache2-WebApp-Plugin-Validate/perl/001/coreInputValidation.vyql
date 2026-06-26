@@ -1,0 +1,14 @@
+module bindings.perl.migration.m8cbcb66c;
+
+binding inputValidation1 {
+  requires {
+    dependency("Apache2-WebApp-Plugin-Validate")
+  }
+  query pattern callExpr where callee.method == "date"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

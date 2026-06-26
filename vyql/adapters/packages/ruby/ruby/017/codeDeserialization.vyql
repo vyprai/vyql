@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding deserialization17 {
+  requires {
+    dependency("ruby")
+  }
+  query pattern callExpr where callee.path ~= "Marshal.load"
+  emit sink code.Deserialization at args[0]
+}

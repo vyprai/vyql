@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding cookie35 {
+  query pattern callExpr where callee.path ~= "$request.cookies.get"
+  emit source code.Cookie at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m96c6968f;
+
+binding deserialization0 {
+  requires {
+    dependency("google_mlkit_commons")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9c81201c;
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("github.com/vapor/fluent-kit")
+  }
+  query pattern callExpr where callee.path ~= "set"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

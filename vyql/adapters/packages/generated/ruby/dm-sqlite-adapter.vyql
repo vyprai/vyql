@@ -1,7 +1,0 @@
-import code.{SqlExecution, FilePathAccess}
-
-adapter ruby {
-  package "dm-sqlite-adapter" {
-    sink method "normalize_options" -> code.FilePathAccess
-  }
-}

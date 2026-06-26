@@ -1,5 +1,0 @@
-adapter ruby {
-  package "actionmailbox" {
-    sink method "post" -> code.UrlFetch
-  }
-}

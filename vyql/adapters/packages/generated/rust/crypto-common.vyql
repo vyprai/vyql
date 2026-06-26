@@ -1,5 +1,0 @@
-adapter rust {
-  package "crypto-common" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

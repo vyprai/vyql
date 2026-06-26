@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding sqlExecution10 {
+  requires {
+    dependency("groovy-sql")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

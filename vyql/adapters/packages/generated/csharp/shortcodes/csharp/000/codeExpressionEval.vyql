@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m4c2fb84b;
+
+binding expressionEval0 {
+  requires {
+    dependency("shortcodes")
+  }
+  query pattern callExpr where callee.method == "ShortcodesProcessor.EvaluateAsync"
+  emit sink code.ExpressionEval at args[0]
+}

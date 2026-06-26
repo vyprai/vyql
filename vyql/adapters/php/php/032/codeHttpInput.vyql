@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding httpInput32 {
+  query pattern callExpr where callee.path ~= "$request.request.all"
+  emit source code.HttpInput at call.result
+}

@@ -1,8 +1,0 @@
-import code.{XmlParse}
-adapter cpp {
-  package "pugixml" {
-    sink method "load" -> code.XmlParse
-    sink method "load_file" -> code.XmlParse
-    sink method "load_string" -> code.XmlParse
-  }
-}

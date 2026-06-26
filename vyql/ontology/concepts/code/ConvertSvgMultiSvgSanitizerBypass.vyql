@@ -1,0 +1,11 @@
+module code;
+
+concept ConvertSvgMultiSvgSanitizerBypass : issue {
+  cwe: [CWE_22, CWE_79]
+  review_assumption: "an attacker can provide SVG input where an early benign SVG lets a later SVG execute markup that loads local file URLs"
+  reviewCategory: path
+  reviewCondition: "convert-svg sanitizes a multi-SVG selection before embedding all selected SVG elements in a headless-browser page"
+  reviewConfidence: high
+  reviewEvidence: "convert-svg conversion context {pattern} sanitizes cheerio's broad svg selection, serializes it into the page body, and navigates the generated HTML through Puppeteer"
+  vulnerableTo: [path.PathTraversal, injection.Xss]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mdfdacd9b;
+
+binding commandExecution0 {
+  requires {
+    dependency("spatie/db-dumper")
+  }
+  query pattern callExpr where callee.method == "getDumpCommand"
+  emit sink code.CommandExecution at args[0]
+}

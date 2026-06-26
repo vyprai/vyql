@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m388c9efd;
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.activemq:activemq-pool")
+  }
+  query pattern callExpr where callee.method == "setProperties"
+  emit source core.UserControlledData at call.result
+}

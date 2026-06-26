@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/SwiftyJSON/SwiftyJSON" {
-    sink method "init(data:options:)" -> code.Deserialization
-  }
-}

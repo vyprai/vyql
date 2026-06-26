@@ -1,0 +1,9 @@
+module bindings.python.migration.ma5f4999f;
+
+binding deserialization0 {
+  requires {
+    dependency("black")
+  }
+  query pattern callExpr where callee.method == "parse_pyproject_toml"
+  emit sink code.Deserialization at args[0]
+}

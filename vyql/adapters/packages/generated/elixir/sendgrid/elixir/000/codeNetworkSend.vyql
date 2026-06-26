@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m944a22ed;
+
+binding networkSend0 {
+  requires {
+    dependency("sendgrid")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

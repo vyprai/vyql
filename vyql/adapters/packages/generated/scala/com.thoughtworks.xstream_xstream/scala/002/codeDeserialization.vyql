@@ -1,0 +1,9 @@
+module bindings.scala.migration.m05c772e3;
+
+binding deserialization2 {
+  requires {
+    dependency("com.thoughtworks.xstream:xstream")
+  }
+  query pattern callExpr where callee.method == "readFromStream"
+  emit sink code.Deserialization at args[0]
+}

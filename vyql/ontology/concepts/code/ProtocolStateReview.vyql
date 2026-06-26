@@ -1,0 +1,6 @@
+module code;
+
+concept ProtocolStateReview : issue {
+  cwe: [CWE_287, CWE_290, CWE_349, CWE_404, CWE_841]
+  vulnerableTo: [injection.ProtocolStateConfusion]
+}

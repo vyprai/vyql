@@ -1,5 +1,0 @@
-adapter dart {
-  package "device_info_plus_web" {
-    source method "webBrowserInfo" -> code.NetworkData
-  }
-}

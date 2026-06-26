@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1fe87d91;
+
+binding networkData1 {
+  requires {
+    dependency("IOMux")
+  }
+  query pattern callExpr where callee.method == "readline"
+  emit source code.NetworkData at call.result
+}

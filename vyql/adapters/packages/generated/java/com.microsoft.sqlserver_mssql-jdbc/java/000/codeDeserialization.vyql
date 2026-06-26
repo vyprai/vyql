@@ -1,0 +1,9 @@
+module bindings.java.migration.mfd0fdab3;
+
+binding deserialization0 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

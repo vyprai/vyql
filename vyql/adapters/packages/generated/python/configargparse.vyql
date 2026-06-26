@@ -1,8 +1,0 @@
-import code.{CliArgument, FilePathAccess}
-adapter python {
-  package "configargparse" {
-    source method "parse_args" -> code.CliArgument
-    source method "parse_known_args" -> code.CliArgument
-    sink method "write_config_file" -> code.FilePathAccess
-  }
-}

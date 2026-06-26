@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding codeEval2 {
+  requires {
+    dependency("bash")
+  }
+  query pattern callExpr where callee.path ~= "eval"
+  emit sink code.CodeEval at args[0]
+}

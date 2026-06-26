@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding httpInput4 {
+  query pattern callExpr where callee.path ~= "cookies"
+  emit source code.HttpInput at call.result
+}

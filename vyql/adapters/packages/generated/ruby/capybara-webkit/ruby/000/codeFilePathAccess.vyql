@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m29c37658;
+
+binding filePathAccess0 {
+  requires {
+    dependency("capybara-webkit")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

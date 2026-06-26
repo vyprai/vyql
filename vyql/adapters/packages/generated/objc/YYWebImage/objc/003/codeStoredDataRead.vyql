@@ -1,0 +1,9 @@
+module bindings.objc.migration.mca543c21;
+
+binding storedDataRead3 {
+  requires {
+    dependency("YYWebImage")
+  }
+  query pattern callExpr where callee.method == "imageWithContentsOfFile:"
+  emit source code.StoredDataRead at call.result
+}

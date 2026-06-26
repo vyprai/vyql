@@ -1,0 +1,9 @@
+module bindings.python.migration.m240fa5ae;
+
+binding userControlledData10 {
+  requires {
+    dependency("trio-websocket")
+  }
+  query pattern callExpr where callee.method == "proposed_subprotocols"
+  emit source core.UserControlledData at call.result
+}

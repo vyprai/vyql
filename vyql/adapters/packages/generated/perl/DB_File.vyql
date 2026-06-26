@@ -1,8 +1,0 @@
-adapter perl {
-  package "DB_File" {
-    sink method "tie_hash_or_array" -> code.FilePathAccess
-    sink method "FETCH" -> code.DatabaseRead
-    sink method "STORE" -> code.NosqlQuery
-    sink method "DELETE" -> code.NosqlQuery
-  }
-}

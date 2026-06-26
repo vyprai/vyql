@@ -1,0 +1,9 @@
+module bindings.perl.migration.m46b9c614;
+
+binding filePathAccess0 {
+  requires {
+    dependency("doxygen-filter-perl")
+  }
+  query pattern callExpr where callee.method == "ReadFile"
+  emit sink code.FilePathAccess at args[0]
+}

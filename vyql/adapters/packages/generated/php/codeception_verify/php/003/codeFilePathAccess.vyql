@@ -1,0 +1,9 @@
+module bindings.php.migration.m09af7c2f;
+
+binding filePathAccess3 {
+  requires {
+    dependency("codeception/verify")
+  }
+  query pattern callExpr where callee.method == "notToEqualXmlFile"
+  emit sink code.FilePathAccess at args[0]
+}

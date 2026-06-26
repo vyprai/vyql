@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3ea6117f;
+
+binding networkBind1 {
+  requires {
+    dependency("actix-server")
+  }
+  query pattern callExpr where callee.method == "Server::run"
+  emit sink code.NetworkBind at args[0]
+}

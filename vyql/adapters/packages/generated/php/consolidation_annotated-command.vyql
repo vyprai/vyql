@@ -1,5 +1,0 @@
-adapter php {
-  package "consolidation/annotated-command" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7cc62fdd;
+
+binding commandExecution0 {
+  requires {
+    dependency("husky")
+  }
+  query pattern callExpr where callee.method == "execute_cmd"
+  emit sink code.CommandExecution at args[0]
+}

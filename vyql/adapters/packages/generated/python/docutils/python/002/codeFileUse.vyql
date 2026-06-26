@@ -1,0 +1,9 @@
+module bindings.python.migration.mb35a327f;
+
+binding fileUse2 {
+  requires {
+    dependency("docutils")
+  }
+  query pattern callExpr where callee.method == "publish_file"
+  emit sink code.FileUseSink at args[0]
+}

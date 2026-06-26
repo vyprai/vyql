@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m132a1317;
+
+binding storedDataRead4 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "read_snapshot"
+  emit source code.StoredDataRead at call.result
+}

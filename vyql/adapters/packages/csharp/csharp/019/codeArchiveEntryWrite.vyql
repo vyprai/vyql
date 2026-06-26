@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding archiveEntryWrite19 {
+  requires {
+    dependency("System.IO.Compression")
+  }
+  query pattern callExpr where callee.method == "ExtractToDirectory"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedLocalFileContentHtmlRender {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-180"
+    severity: high
+  }
+  issue code.UnescapedLocalFileContentHtmlRender as sink
+}

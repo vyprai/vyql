@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mca8a4cf4;
+
+binding filePathAccess2 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "ReadFileToBuffer"
+  emit sink code.FilePathAccess at args[0]
+}

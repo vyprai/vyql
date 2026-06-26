@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m09350e3a;
+
+binding deserialization4 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "locate_signed"
+  emit sink code.Deserialization at args[0]
+}

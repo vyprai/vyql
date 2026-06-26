@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m3fb6e4cf;
+
+binding networkData1 {
+  requires {
+    dependency("select-hose")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit source code.NetworkData at call.result
+}

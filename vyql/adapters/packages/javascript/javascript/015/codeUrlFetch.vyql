@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding urlFetch15 {
+  requires {
+    dependency("axios")
+  }
+  query pattern callExpr where callee.path ~= "axios.get"
+  emit sink code.UrlFetch at args[0]
+}

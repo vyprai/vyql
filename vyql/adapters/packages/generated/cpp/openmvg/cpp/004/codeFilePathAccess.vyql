@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m81b76ec1;
+
+binding filePathAccess4 {
+  requires {
+    dependency("openmvg")
+  }
+  query pattern callExpr where callee.method == "ReadTiff"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.powershell.migration.m390f1180;
+
+binding archiveEntryWrite36 {
+  query pattern callExpr where callee.path ~= "System.IO.Compression.ZipFileExtensions.ExtractToFile"
+  emit sink code.ArchiveEntryWrite at args[1]
+}

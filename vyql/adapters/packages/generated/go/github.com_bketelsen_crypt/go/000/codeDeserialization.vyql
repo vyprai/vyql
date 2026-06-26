@@ -1,0 +1,9 @@
+module bindings.go.migration.mf8a88b7b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/bketelsen/crypt")
+  }
+  query pattern callExpr where callee.method == "Decode"
+  emit sink code.Deserialization at args[0]
+}

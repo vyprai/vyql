@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m041f7d8e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pdf-core")
+  }
+  query pattern callExpr where callee.method == "render_file"
+  emit sink code.FilePathAccess at args[0]
+}

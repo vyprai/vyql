@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding protocolFrameBindingReview116 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=match" and node.token contains "cur->peercallno==callno" and node.token contains "dcallno==cur->callno" and not (node.token contains "full_frame?dcallno==cur->callno")
+  emit issue code.ProtocolFrameBindingReview at node
+}

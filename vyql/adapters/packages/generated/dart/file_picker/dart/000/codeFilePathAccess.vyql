@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma4094cd0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "pickFiles"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7b46012f;
+
+binding deserialization1 {
+  requires {
+    dependency("snappyer")
+  }
+  query pattern callExpr where callee.method == "GetUncompressedLength"
+  emit sink code.Deserialization at args[0]
+}

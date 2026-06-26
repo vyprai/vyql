@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding dynamicCodeLoad70 {
+  query pattern callExpr where callee.path ~= "Assembly.Load"
+  emit sink code.DynamicCodeLoad at args[0]
+}

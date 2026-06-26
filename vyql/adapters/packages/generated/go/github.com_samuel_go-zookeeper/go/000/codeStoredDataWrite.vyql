@@ -1,0 +1,9 @@
+module bindings.go.migration.m7d6b69dc;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("github.com/samuel/go-zookeeper")
+  }
+  query pattern callExpr where callee.method == "Create"
+  emit sink code.StoredDataWrite at args[0]
+}

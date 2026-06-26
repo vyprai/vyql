@@ -1,0 +1,9 @@
+module bindings.objc.migration.m826b8d26;
+
+binding deserialization0 {
+  requires {
+    dependency("SDWebImage")
+  }
+  query pattern callExpr where callee.method == "SDImageLoaderDecodeImageData"
+  emit sink code.Deserialization at args[0]
+}

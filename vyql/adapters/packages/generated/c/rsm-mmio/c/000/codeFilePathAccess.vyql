@@ -1,0 +1,9 @@
+module bindings.c.migration.m1542b362;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rsm-mmio")
+  }
+  query pattern callExpr where callee.method == "mapped_file.mapped_file"
+  emit sink code.FilePathAccess at args[0]
+}

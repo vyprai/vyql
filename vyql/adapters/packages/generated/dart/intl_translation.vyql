@@ -1,6 +1,0 @@
-adapter dart {
-  package "intl_translation" {
-    sink method "parseFile" -> code.Deserialization
-    sink method "parseContent" -> code.Deserialization
-  }
-}

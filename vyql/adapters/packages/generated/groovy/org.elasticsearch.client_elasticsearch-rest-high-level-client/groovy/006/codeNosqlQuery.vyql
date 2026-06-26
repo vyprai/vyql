@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb80e1451;
+
+binding nosqlQuery6 {
+  requires {
+    dependency("org.elasticsearch.client:elasticsearch-rest-high-level-client")
+  }
+  query pattern callExpr where callee.method == "forgetFollower"
+  emit sink code.NosqlQuery at args[0]
+}

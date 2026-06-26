@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9b427b95;
+
+binding codeEval1 {
+  requires {
+    dependency("org.apache.xmlbeans:xmlbeans")
+  }
+  query pattern callExpr where callee.method == "compilePath"
+  emit sink code.CodeEval at args[0]
+}

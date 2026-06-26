@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "azure-core" {
-    sink method "register_deserializer" -> code.Deserialization
-    sink method "get_deserializer" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m3e32678b;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("vary")
+  }
+  query pattern callExpr where callee.method == "vary"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

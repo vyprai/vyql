@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter perl {
-  package "Valiemon" {
-    sink method "validate" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m04edae14;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("org.mongodb:mongodb-driver")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NosqlQuery at args[0]
+}

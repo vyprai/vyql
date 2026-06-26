@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mb8201a6c;
+
+binding networkSend2 {
+  requires {
+    dependency("eqc_ex")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

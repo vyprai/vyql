@@ -1,0 +1,9 @@
+module bindings.go.migration.m4f608b1f;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/gobwas/httphead")
+  }
+  query pattern callExpr where callee.method == "ParseRequestLine"
+  emit sink code.Deserialization at args[0]
+}

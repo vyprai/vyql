@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule PartiallyEscapedSshCommand {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_77]
+    id: "VYQL-INJ-052"
+    severity: critical
+  }
+  issue code.PartiallyEscapedSshCommand as sink
+}

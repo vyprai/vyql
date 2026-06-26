@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter groovy {
-  package "com.datastax.cassandra:cassandra-driver-core" {
-    sink method "execute" -> code.SqlExecution
-    sink method "prepare" -> code.SqlExecution
-  }
-}

@@ -1,5 +1,0 @@
-adapter perl {
-  package "Complete-FS" {
-    sink method "complete_fs" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m48107932;
+
+binding codeEval0 {
+  requires {
+    dependency("broadway")
+  }
+  query pattern callExpr where callee.method == "Broadway.Message.update_data"
+  emit sink code.CodeEval at args[0]
+}

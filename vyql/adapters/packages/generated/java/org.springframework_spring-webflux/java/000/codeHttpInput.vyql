@@ -1,0 +1,9 @@
+module bindings.java.migration.mce5e8387;
+
+binding httpInput0 {
+  requires {
+    dependency("org.springframework:spring-webflux")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit source code.HttpInput at call.result
+}

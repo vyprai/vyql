@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4ce0caf1;
+
+binding filePathAccess3 {
+  requires {
+    dependency("SSZipArchive")
+  }
+  query pattern callExpr where callee.method == "unzipFileAtPath:toDestination:delegate:"
+  emit sink code.FilePathAccess at args[0]
+}

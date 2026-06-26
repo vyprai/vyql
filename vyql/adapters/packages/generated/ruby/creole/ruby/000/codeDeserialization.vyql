@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1f3e101e;
+
+binding deserialization0 {
+  requires {
+    dependency("creole")
+  }
+  query pattern callExpr where callee.method == "creolize"
+  emit sink code.Deserialization at args[0]
+}

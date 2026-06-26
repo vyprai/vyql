@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3aedab92;
+
+binding networkData1 {
+  requires {
+    dependency("github.com/Kitura/BlueSocket")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

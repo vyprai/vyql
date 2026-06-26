@@ -13,10 +13,10 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	if body.TargetKind == "transition" {
 		return e.evalTransition(cr)
 	}
-	candidates, _ := e.Store.NodesWithConcept(body.Concept)
+	candidates := e.nodesWithConcept(body.Concept)
 
 	var where parser.Expr
-	var guards, closers []string
+	var guards, dominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards, closers []string
 	for _, cl := range cr.Rule.Clauses {
 		switch cl.Kind {
 		case "where":
@@ -25,6 +25,14 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 			switch ex := cl.Unless.(type) {
 			case parser.GuardedBy:
 				guards = append(guards, ex.Concept)
+			case parser.DominatesCoveredBy:
+				dominanceGuards = append(dominanceGuards, ex.Concept)
+			case parser.SameReceiverCoveredBy:
+				sameReceiverGuards = append(sameReceiverGuards, ex.Concept)
+			case parser.SameScopeCoveredBy:
+				sameScopeGuards = append(sameScopeGuards, ex.Concept)
+			case parser.GlobalCoveredBy:
+				globalGuards = append(globalGuards, ex.Concept)
 			case parser.ClosedBy:
 				closers = append(closers, ex.Concept)
 			}
@@ -47,6 +55,26 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		for _, g := range guards {
 			ok := e.endpointGuarded(node, g)
 			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range dominanceGuards {
+			ok := e.dominatesGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameReceiverGuards {
+			ok := e.sameReceiverGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: "same_receiver_covered_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range sameScopeGuards {
+			ok := e.sameScopeGuarded(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: "same_scope_covered_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
+		for _, g := range globalGuards {
+			ok := e.globalGuarded(g)
+			ne = append(ne, findings.NegationEvidence{Clause: "global_covered_by " + g, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, rel := range closers {
@@ -186,14 +214,14 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 			}
 			return true, w
 		}
-	case "assume":
+	case "grant", "assume":
 		bConcept := call.Args[1].Ref.String()
 		bIDs := e.resolveArg(call.Args[1], env)
 		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))
 		if len(paths) > 0 {
 			var w []string
 			for _, s := range paths[0].Steps {
-				w = append(w, "assume "+s.From+"->"+s.To+" ["+s.Ability+"]")
+				w = append(w, call.Verb+" "+s.From+"->"+s.To+" ["+s.Ability+"]")
 			}
 			return true, w
 		}
@@ -214,8 +242,7 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 // expands to its labeled nodes; a binding ref resolves to a single node.
 func (e *Engine) resolveArg(arg parser.Arg, env map[string]string) []string {
 	if e.Onto.Exists(arg.Ref.String()) {
-		ids, _ := e.Store.NodesWithConcept(arg.Ref.String())
-		return ids
+		return e.nodesWithConcept(arg.Ref.String())
 	}
 	if id := e.resolveRef(arg.Ref, env); id != "" {
 		return []string{id}
@@ -229,7 +256,7 @@ func (e *Engine) resolveRef(ref parser.Ref, env map[string]string) string {
 	head := ref.Parts[0]
 	id := env[head]
 	if id == "" && e.Onto.Exists(ref.String()) {
-		if ids, _ := e.Store.NodesWithConcept(ref.String()); len(ids) > 0 {
+		if ids := e.nodesWithConcept(ref.String()); len(ids) > 0 {
 			return ids[0]
 		}
 		return ""

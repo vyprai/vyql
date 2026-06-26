@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter kotlin {
-  package "org.quartz-scheduler:quartz-jobs" {
-    source method "setPassword" -> code.SecretValue
-  }
-}

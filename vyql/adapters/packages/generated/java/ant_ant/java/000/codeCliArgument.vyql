@@ -1,0 +1,9 @@
+module bindings.java.migration.ma182ced9;
+
+binding cliArgument0 {
+  requires {
+    dependency("ant:ant")
+  }
+  query pattern callExpr where callee.method == "startAnt"
+  emit source code.CliArgument at call.result
+}

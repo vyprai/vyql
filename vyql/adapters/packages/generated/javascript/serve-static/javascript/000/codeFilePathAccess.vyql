@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb7d1638b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("serve-static")
+  }
+  query pattern callExpr where callee.method == "serveStatic"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "org.hdrhistogram:HdrHistogram" {
-    sink method "decodeFromByteBuffer" -> code.Deserialization
-    sink method "decodeFromCompressedByteBuffer" -> code.Deserialization
-  }
-}

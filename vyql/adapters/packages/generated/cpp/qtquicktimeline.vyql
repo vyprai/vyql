@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter cpp {
-  package "qtquicktimeline" {
-    sink method "loadKeyframes" -> code.Deserialization
-    sink method "loadKeyframes" -> code.FilePathAccess
-    sink method "qQuickKeyframeReadProperty" -> code.Deserialization
-  }
-}

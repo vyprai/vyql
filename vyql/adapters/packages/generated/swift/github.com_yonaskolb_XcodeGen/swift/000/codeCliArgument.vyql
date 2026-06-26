@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma9b463e6;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/yonaskolb/XcodeGen")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit source code.CliArgument at call.result
+}

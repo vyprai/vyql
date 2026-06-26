@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding ldapQuery31 {
+  requires {
+    dependency("spring-ldap")
+  }
+  query pattern callExpr where callee.path ~= "LdapTemplate.search"
+  emit sink code.LdapQuery at args[1]
+}

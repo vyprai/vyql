@@ -1,0 +1,9 @@
+module bindings.python.migration.m4ec7167b;
+
+binding userControlledData1 {
+  requires {
+    dependency("flask-restful")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source core.UserControlledData at call.result
+}

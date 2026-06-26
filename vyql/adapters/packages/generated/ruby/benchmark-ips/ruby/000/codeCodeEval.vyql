@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me5438618;
+
+binding codeEval0 {
+  requires {
+    dependency("benchmark-ips")
+  }
+  query pattern callExpr where callee.method == "compile_string"
+  emit sink code.CodeEval at args[0]
+}

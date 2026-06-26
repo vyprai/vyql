@@ -1,8 +1,0 @@
-import code.{ResponseHeaderWrite}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "net-http-digest_auth" {
-    sink method "Net::HTTP::DigestAuth.auth_header" -> code.ResponseHeaderWrite
-  }
-}

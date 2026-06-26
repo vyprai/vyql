@@ -1,9 +1,0 @@
-import code.{CodeEval}
-adapter swift {
-  package "github.com/pvieito/PythonKit" {
-    sink method "useLibrary" -> code.CodeEval
-    sink method "useVersion" -> code.CodeEval
-    sink method "attemptImport" -> code.CodeEval
-    sink method "dynamicallyCall" -> code.CodeEval
-  }
-}

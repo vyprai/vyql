@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, NetworkData}
-adapter kotlin {
-  package "io.ktor:ktor-client-core" {
-    sink method "execute" -> code.NetworkSend
-    sink method "HttpClient" -> code.NetworkConnect
-    source method "body" -> code.NetworkData
-    source method "bodyNullable" -> code.NetworkData
-  }
-}

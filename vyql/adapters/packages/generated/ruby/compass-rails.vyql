@@ -1,5 +1,0 @@
-adapter ruby {
-  package "compass-rails" {
-    sink method "setup_fake_rails_env_paths" -> code.FilePathAccess
-  }
-}

@@ -1,5 +1,0 @@
-adapter php {
-  package "spatie/laravel-package-tools" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

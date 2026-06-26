@@ -1,0 +1,9 @@
+module bindings.swift.migration.m8f2b4498;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/Nef10/RogersBankDownloader")
+  }
+  query pattern callExpr where callee.method == "downloadStatement"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcbc57de5;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}

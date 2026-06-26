@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding client6 {
+  query pattern callExpr where callee.path ~= "redis.NewClient"
+  emit fact runtime.ReceiverType at call.result {
+    about: redis.Client
+  }
+}

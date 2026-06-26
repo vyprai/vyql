@@ -1,5 +1,0 @@
-adapter groovy {
-  package "org.apache.solr:solr-solrj" {
-    sink method "JSONParser" -> code.Deserialization
-  }
-}

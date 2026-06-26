@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m6808ed81;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("exredis")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mab94231f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("File-ShareDir-ProjectDistDir")
+  }
+  query pattern callExpr where callee.method == "build_dist_dir"
+  emit sink code.FilePathAccess at args[0]
+}

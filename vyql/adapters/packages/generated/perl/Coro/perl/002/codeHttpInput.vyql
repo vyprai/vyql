@@ -1,0 +1,9 @@
+module bindings.perl.migration.m8a1130b6;
+
+binding httpInput2 {
+  requires {
+    dependency("Coro")
+  }
+  query pattern callExpr where callee.method == "session"
+  emit source code.HttpInput at call.result
+}

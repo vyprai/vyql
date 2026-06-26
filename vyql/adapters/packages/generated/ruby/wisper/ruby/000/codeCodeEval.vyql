@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb2012c50;
+
+binding codeEval0 {
+  requires {
+    dependency("wisper")
+  }
+  query pattern callExpr where callee.method == "on"
+  emit sink code.CodeEval at args[0]
+}

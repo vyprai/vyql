@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m48c87789;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("omniauth-google-oauth2")
+  }
+  query pattern callExpr where callee.method == "verify_token"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

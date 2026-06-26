@@ -1,0 +1,9 @@
+module bindings.swift.migration.m5ca9f18c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/Frizlab/FSEventsWrapper")
+  }
+  query pattern callExpr where callee.method == "FSEventAsyncStream.init(path:flags:)"
+  emit sink code.FilePathAccess at args[0]
+}

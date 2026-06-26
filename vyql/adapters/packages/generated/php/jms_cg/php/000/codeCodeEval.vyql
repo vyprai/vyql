@@ -1,0 +1,9 @@
+module bindings.php.migration.mc4d98c95;
+
+binding codeEval0 {
+  requires {
+    dependency("jms/cg")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

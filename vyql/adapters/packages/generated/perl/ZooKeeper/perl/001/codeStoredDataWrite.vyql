@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2f5cafad;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("ZooKeeper")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.StoredDataWrite at args[0]
+}

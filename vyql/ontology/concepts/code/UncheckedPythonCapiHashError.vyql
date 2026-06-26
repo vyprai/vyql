@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedPythonCapiHashError : issue {
+  cwe: [CWE_252, CWE_400]
+  review_assumption: "attacker-controlled recursive or erroring values can make the hash callback fail and leave the extension in an inconsistent error state"
+  reviewCategory: resource
+  reviewCondition: "a Python C API hash error return is not checked before later cleanup continues"
+  reviewConfidence: medium
+  reviewEvidence: "C extension hash context {pattern} calls PyObject_Hash and then mutates cleanup state without first exiting on -1"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

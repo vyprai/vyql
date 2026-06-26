@@ -1,0 +1,9 @@
+module bindings.php.migration.m2ed8d90a;
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/property-access")
+  }
+  query pattern callExpr where callee.method == "setValue"
+  emit sink code.Deserialization at args[0]
+}

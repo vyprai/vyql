@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2f5cafad;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ZooKeeper")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.FilePathAccess at args[0]
+}

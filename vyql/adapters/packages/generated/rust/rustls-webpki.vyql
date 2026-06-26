@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{AuthenticationCheck}
-
-adapter rust {
-  package "rustls-webpki" {
-    control method "validate" -> core.AuthenticationCheck
-    sink method "from_der" -> code.Deserialization
-  }
-}

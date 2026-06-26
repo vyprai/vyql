@@ -1,0 +1,9 @@
+module bindings.scala.migration.m17ef70a0;
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-core")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source code.HttpInput at call.result
+}

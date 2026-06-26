@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter objc {
-  package "MPMessagePack" {
-    sink method "readObject" -> code.Deserialization
-    sink method "readData" -> code.Deserialization
-  }
-}

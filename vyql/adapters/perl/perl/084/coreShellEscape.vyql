@@ -1,0 +1,11 @@
+module bindings.perl.migration.mfca40a44;
+
+binding shellEscape84 {
+  query pattern callExpr where callee.path ~= "escapeShell"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8c5a273d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("kerosene")
+  }
+  query pattern callExpr where callee.method == "paginate"
+  emit sink code.SqlExecution at args[0]
+}

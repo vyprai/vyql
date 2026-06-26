@@ -1,0 +1,9 @@
+module bindings.perl.migration.m13b06a8a;
+
+binding codeEval0 {
+  requires {
+    dependency("Alt")
+  }
+  query pattern callExpr where callee.method == "Alt::Assert::assert"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6d7f9c5d;
+
+binding filePathAccess1 {
+  requires {
+    dependency("alsa-sys")
+  }
+  query pattern callExpr where callee.method == "snd_input_stdio_open"
+  emit sink code.FilePathAccess at args[0]
+}

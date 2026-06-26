@@ -1,6 +1,0 @@
-adapter perl {
-  package "Collection" {
-    sink method "get_ids_where" -> code.SqlExecution
-    sink method "_query_dbh" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m658442c0;
+
+binding logOutput2 {
+  requires {
+    dependency("libjuice")
+  }
+  query pattern callExpr where callee.method == "juice_log_write"
+  emit sink code.LogOutput at args[0]
+}

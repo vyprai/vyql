@@ -1,0 +1,9 @@
+module bindings.java.migration.mcd3e9a8d;
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.mybatis:mybatis-spring")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}

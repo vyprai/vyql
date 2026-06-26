@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m5d6a286e;
+
+binding fileUse9 {
+  requires {
+    dependency("gklib")
+  }
+  query pattern callExpr where callee.method == "gk_cwritefilebin"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.bash.migration.m930da95c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("trash")
+  }
+  query pattern callExpr where callee.path ~= "trash"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{HttpInput, FilePathAccess}
-adapter php {
-  package "darkaonline/l5-swagger" {
-    source method "docs" -> code.HttpInput
-    sink method "saveJson" -> code.FilePathAccess
-  }
-}

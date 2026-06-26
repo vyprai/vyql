@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m007c12d5;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.hive:hive-exec")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

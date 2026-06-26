@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding unboundedCopy60 {
+  query pattern callExpr where callee.path ~= "sprintf"
+  emit sink code.UnboundedCopy at args.any
+}

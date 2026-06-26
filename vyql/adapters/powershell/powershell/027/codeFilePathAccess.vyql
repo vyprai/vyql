@@ -1,0 +1,6 @@
+module bindings.powershell.migration.m390f1180;
+
+binding filePathAccess27 {
+  query pattern callExpr where callee.path ~= "Add-Content"
+  emit sink code.FilePathAccess at args[0]
+}

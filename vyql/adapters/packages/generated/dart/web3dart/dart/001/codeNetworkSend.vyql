@@ -1,0 +1,9 @@
+module bindings.dart.migration.m808e7a0f;
+
+binding networkSend1 {
+  requires {
+    dependency("web3dart")
+  }
+  query pattern callExpr where callee.method == "sendRawTransaction"
+  emit sink code.NetworkSend at args[0]
+}

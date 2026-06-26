@@ -1,0 +1,9 @@
+module bindings.java.migration.mb5554c62;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
+  }
+  query pattern callExpr where callee.method == "resolve"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m116f8cc1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("composer/composer")
+  }
+  query pattern callExpr where callee.method == "ComposerCache.read"
+  emit sink code.FilePathAccess at args[0]
+}

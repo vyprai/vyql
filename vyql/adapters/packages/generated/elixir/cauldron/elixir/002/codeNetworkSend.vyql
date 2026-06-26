@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4513d69d;
+
+binding networkSend2 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.Response.send"
+  emit sink code.NetworkSend at args[0]
+}

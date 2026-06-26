@@ -1,6 +1,0 @@
-adapter objc {
-  package "TheAmazingAudioEngine" {
-    sink method "beginRecordingToFileAtPath:fileType:error:" -> code.FilePathAccess
-    sink method "prepareRecordingToFileAtPath:fileType:error:" -> code.FilePathAccess
-  }
-}

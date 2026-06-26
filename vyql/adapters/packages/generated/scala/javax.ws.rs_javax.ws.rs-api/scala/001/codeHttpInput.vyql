@@ -1,0 +1,9 @@
+module bindings.scala.migration.m553320b6;
+
+binding httpInput1 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getPathParameters"
+  emit source code.HttpInput at call.result
+}

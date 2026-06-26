@@ -1,0 +1,9 @@
+module bindings.python.migration.m957082ec;
+
+binding userControlledData0 {
+  requires {
+    dependency("flake8-docstrings")
+  }
+  query pattern callExpr where callee.method == "add_options"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m0d9c05cb;
+
+binding htmlRender2 {
+  requires {
+    dependency("realrashid/sweet-alert")
+  }
+  query pattern callExpr where callee.method == "footer"
+  emit sink code.HtmlRender at args[0]
+}

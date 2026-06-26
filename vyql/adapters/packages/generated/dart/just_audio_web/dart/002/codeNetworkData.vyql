@@ -1,0 +1,9 @@
+module bindings.dart.migration.m4d3ee093;
+
+binding networkData2 {
+  requires {
+    dependency("just_audio_web")
+  }
+  query pattern callExpr where callee.method == "HlsAudioSourcePlayer"
+  emit source code.NetworkData at call.result
+}

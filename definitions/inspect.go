@@ -1,7 +1,6 @@
 package definitions
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -147,7 +146,8 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	if !info.IsDir() {
 		return nil
 	}
-	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	var sources []parser.V2RuntimeSource
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -158,15 +158,56 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(b))
-		if err != nil {
-			return fmt.Errorf("%s: %w", relPath(path), err)
-		}
-		for _, d := range decls {
-			addDecl(cat, relPath(path), d)
-		}
+		sources = append(sources, parser.V2RuntimeSource{Name: relPath(path), Source: string(b)})
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	selected := map[string]bool{}
+	for _, source := range sources {
+		selected[source.Name] = true
+	}
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesWithCore(sources), func(src parser.V2RuntimeSource) bool {
+		return selected[src.Name]
+	})
+	if err != nil {
+		return err
+	}
+	for _, d := range decls {
+		addDecl(cat, "", d)
+	}
+	return nil
+}
+
+func v2RuntimeSourcesWithCore(sources []parser.V2RuntimeSource) []parser.V2RuntimeSource {
+	hasOntology, hasMechanics := false, false
+	for _, source := range sources {
+		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
+		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+	}
+	out := make([]parser.V2RuntimeSource, 0, len(sources)+32)
+	if !hasOntology {
+		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	if !hasMechanics {
+		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	out = append(out, sources...)
+	return out
 }
 
 func addDecl(cat *Catalog, source string, d parser.Decl) {

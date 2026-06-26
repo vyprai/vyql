@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc6e73337;
+
+binding fileUse2 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "retrieve"
+  emit sink code.FileUseSink at args[0]
+}

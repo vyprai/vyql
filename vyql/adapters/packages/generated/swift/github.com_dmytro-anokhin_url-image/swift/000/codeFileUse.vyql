@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdd81cf06;
+
+binding fileUse0 {
+  requires {
+    dependency("github.com/dmytro-anokhin/url-image")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

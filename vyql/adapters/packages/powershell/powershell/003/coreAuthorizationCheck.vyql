@@ -1,0 +1,14 @@
+module bindings.powershell.migration.m92132a18;
+
+binding authorizationCheck3 {
+  requires {
+    dependency("Microsoft.PowerShell.Core")
+  }
+  query pattern callExpr where callee.path ~= "ValidateSet"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

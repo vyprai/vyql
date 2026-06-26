@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter kotlin {
-  package "joda-time:joda-time" {
-    source method "parse" -> core.UserControlledData
-    source method "parseDays" -> core.UserControlledData
-    source method "parseHours" -> core.UserControlledData
-  }
-}

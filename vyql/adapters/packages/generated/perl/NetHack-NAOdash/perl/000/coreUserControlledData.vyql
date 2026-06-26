@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2d32aa40;
+
+binding userControlledData0 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source core.UserControlledData at call.result
+}

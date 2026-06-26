@@ -1,0 +1,9 @@
+module bindings.perl.migration.md4409c72;
+
+binding htmlRender4 {
+  requires {
+    dependency("Pod-Xhtml")
+  }
+  query pattern callExpr where callee.method == "addBodyOpenText"
+  emit sink code.HtmlRender at args[0]
+}

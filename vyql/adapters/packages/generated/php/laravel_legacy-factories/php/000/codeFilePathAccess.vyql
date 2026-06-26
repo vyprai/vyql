@@ -1,0 +1,9 @@
+module bindings.php.migration.m8cf018a8;
+
+binding filePathAccess0 {
+  requires {
+    dependency("laravel/legacy-factories")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m2a0a8d4a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fsspec")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

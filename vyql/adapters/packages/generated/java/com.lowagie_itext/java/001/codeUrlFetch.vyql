@@ -1,0 +1,9 @@
+module bindings.java.migration.mafdb53dc;
+
+binding urlFetch1 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "com.itextpdf.text.Image.Image"
+  emit sink code.UrlFetch at args[0]
+}

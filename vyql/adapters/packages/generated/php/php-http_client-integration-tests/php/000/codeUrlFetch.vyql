@@ -1,0 +1,9 @@
+module bindings.php.migration.mfde799ce;
+
+binding urlFetch0 {
+  requires {
+    dependency("php-http/client-integration-tests")
+  }
+  query pattern callExpr where callee.method == "requestProvider"
+  emit sink code.UrlFetch at args[0]
+}

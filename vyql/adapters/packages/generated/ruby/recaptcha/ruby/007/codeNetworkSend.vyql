@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdeee483b;
+
+binding networkSend7 {
+  requires {
+    dependency("recaptcha")
+  }
+  query pattern callExpr where callee.method == "api_verification_enterprise"
+  emit sink code.NetworkSend at args[0]
+}

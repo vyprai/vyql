@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding htmlRender269 {
+  query pattern callExpr where callee.path ~= "print"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0994f068;
+
+binding networkSend1 {
+  requires {
+    dependency("bunny")
+  }
+  query pattern callExpr where callee.method == "basic_publish"
+  emit sink code.NetworkSend at args[0]
+}

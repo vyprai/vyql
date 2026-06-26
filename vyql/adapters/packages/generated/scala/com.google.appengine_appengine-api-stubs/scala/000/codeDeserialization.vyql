@@ -1,0 +1,9 @@
+module bindings.scala.migration.m6b691ede;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.appengine:appengine-api-stubs")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

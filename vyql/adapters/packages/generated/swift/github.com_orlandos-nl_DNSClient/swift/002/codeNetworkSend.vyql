@@ -1,0 +1,9 @@
+module bindings.swift.migration.mfb24ffc8;
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/orlandos-nl/DNSClient")
+  }
+  query pattern callExpr where callee.method == "initiateAAAAQuery"
+  emit sink code.NetworkSend at args[0]
+}

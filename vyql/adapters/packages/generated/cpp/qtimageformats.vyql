@@ -1,6 +1,0 @@
-adapter cpp {
-  package "qtimageformats" {
-    sink method "TIFFFileName" -> code.FilePathAccess
-    sink method "LogL16Decode" -> code.Deserialization
-  }
-}

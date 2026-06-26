@@ -1,0 +1,9 @@
+module bindings.go.migration.m859cab60;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/VictoriaMetrics/fastcache")
+  }
+  query pattern callExpr where callee.method == "LoadFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

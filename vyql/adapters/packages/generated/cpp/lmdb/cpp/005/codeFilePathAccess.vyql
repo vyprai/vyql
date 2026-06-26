@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m7b583f38;
+
+binding filePathAccess5 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_copyfd2"
+  emit sink code.FilePathAccess at args[0]
+}

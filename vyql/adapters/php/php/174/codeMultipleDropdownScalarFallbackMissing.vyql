@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding multipleDropdownScalarFallbackMissing174 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=prepareHtmlFields" and node.token contains "call_arg:json_decode:(string)$value" and node.token contains "subscript:$field['multiple']" and node.token contains "subscript:$field['default_value']" and not (node.token contains "call_arg:json_decode:true") and not (node.token contains "identifier:$decoded")
+  emit issue code.MultipleDropdownScalarFallbackMissing at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mfcc3a662;
+
+binding filePathAccess2 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "gzip"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.me6449f68;
+
+binding deserialization1 {
+  requires {
+    dependency("MLKitBarcodeScanning")
+  }
+  query pattern callExpr where callee.method == "resultsInImage:error:"
+  emit sink code.Deserialization at args[0]
+}

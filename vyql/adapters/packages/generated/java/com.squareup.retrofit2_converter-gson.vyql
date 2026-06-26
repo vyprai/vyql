@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "com.squareup.retrofit2:converter-gson" {
-    sink method "retrofit2.converter.gson.GsonResponseBodyConverter.convert" -> code.Deserialization
-    sink method "retrofit2.converter.gson.GsonRequestBodyConverter.convert" -> code.Deserialization
-  }
-}

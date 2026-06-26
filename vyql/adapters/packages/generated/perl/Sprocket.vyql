@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Sprocket" {
-    sink method "import" -> code.CodeEval
-  }
-}

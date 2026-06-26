@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter scala {
-  package "io.netty:netty-codec" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

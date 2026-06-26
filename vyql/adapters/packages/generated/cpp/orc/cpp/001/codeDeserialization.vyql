@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2f319cdb;
+
+binding deserialization1 {
+  requires {
+    dependency("orc")
+  }
+  query pattern callExpr where callee.method == "ParseError"
+  emit sink code.Deserialization at args[0]
+}

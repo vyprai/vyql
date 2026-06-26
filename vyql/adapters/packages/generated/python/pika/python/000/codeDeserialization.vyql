@@ -1,0 +1,9 @@
+module bindings.python.migration.m18fe1f6f;
+
+binding deserialization0 {
+  requires {
+    dependency("pika")
+  }
+  query pattern callExpr where callee.method == "decode_value"
+  emit sink code.Deserialization at args[0]
+}

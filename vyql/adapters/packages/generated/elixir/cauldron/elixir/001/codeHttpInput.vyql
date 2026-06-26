@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4513d69d;
+
+binding httpInput1 {
+  requires {
+    dependency("cauldron")
+  }
+  query pattern callExpr where callee.method == "Cauldron.Request.read"
+  emit source code.HttpInput at call.result
+}

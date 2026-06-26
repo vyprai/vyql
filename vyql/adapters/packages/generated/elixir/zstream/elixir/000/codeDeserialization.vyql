@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m250d7a6b;
+
+binding deserialization0 {
+  requires {
+    dependency("zstream")
+  }
+  query pattern callExpr where callee.method == "Zstream.Unzip.Extra.parse"
+  emit sink code.Deserialization at args[0]
+}

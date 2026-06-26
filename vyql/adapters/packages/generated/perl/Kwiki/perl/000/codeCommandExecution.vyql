@@ -1,0 +1,9 @@
+module bindings.perl.migration.m60116a70;
+
+binding commandExecution0 {
+  requires {
+    dependency("Kwiki")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

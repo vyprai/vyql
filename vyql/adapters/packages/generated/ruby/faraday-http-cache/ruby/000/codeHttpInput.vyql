@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf59a0146;
+
+binding httpInput0 {
+  requires {
+    dependency("faraday-http-cache")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source code.HttpInput at call.result
+}

@@ -1,6 +1,0 @@
-import core.{AuthenticationCheck}
-adapter scala {
-  package "org.springframework.social:spring-social-security" {
-    control method "SocialAuthenticationFilter.attemptAuthentication" -> core.AuthenticationCheck
-  }
-}

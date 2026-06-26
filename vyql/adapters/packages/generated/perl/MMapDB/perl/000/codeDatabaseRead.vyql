@@ -1,0 +1,9 @@
+module bindings.perl.migration.me97ae6d2;
+
+binding databaseRead0 {
+  requires {
+    dependency("MMapDB")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.DatabaseReadSink at args[0]
+}

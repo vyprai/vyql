@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m049b7543;
+
+binding storedDataRead7 {
+  requires {
+    dependency("activerecord-deprecated_finders")
+  }
+  query pattern callExpr where callee.method == "scope"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m9b00bd79;
+
+binding deserialization1 {
+  requires {
+    dependency("parallel")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

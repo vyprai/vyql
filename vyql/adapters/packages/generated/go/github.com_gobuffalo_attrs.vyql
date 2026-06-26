@@ -1,9 +1,0 @@
-import code.{CliArgument}
-
-adapter go {
-  package "github.com/gobuffalo/attrs" {
-    source method "Parse" -> code.CliArgument
-    source method "ParseArgs" -> code.CliArgument
-    source method "ParseNamedArgs" -> code.CliArgument
-  }
-}

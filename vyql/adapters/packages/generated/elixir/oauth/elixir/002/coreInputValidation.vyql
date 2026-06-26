@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m65273f90;
+
+binding inputValidation2 {
+  requires {
+    dependency("oauth")
+  }
+  query pattern callExpr where callee.method == "verify_in_constant_time"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

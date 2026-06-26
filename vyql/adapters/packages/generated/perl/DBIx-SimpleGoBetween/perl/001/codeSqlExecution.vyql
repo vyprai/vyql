@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6ba04fab;
+
+binding sqlExecution1 {
+  requires {
+    dependency("DBIx-SimpleGoBetween")
+  }
+  query pattern callExpr where callee.method == "sql_do"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8fee42b5;
+
+binding deserialization0 {
+  requires {
+    dependency("racc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

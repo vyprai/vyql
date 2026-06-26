@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter php {
-  package "doctrine/orm" {
-    sink method "parse" -> code.SqlExecution
-  }
-}

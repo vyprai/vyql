@@ -1,0 +1,9 @@
+module bindings.objc.migration.m942721f9;
+
+binding commandExecution22 {
+  requires {
+    dependency("libc")
+  }
+  query pattern callExpr where callee.path ~= "system"
+  emit sink code.CommandExecution at args[0]
+}

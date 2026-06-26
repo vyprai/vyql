@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4b7ff71b;
+
+binding expressionEval0 {
+  requires {
+    dependency("PromiseKit")
+  }
+  query pattern callExpr where callee.method == "promiseWithResolverBlock"
+  emit sink code.ExpressionEval at args[0]
+}

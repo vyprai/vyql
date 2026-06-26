@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2d6107fb;
+
+binding deserialization0 {
+  requires {
+    dependency("cssstyle")
+  }
+  query pattern callExpr where callee.method == "parseCSS"
+  emit sink code.Deserialization at args[0]
+}

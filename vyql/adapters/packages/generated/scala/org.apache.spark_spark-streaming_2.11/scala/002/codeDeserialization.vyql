@@ -1,0 +1,9 @@
+module bindings.scala.migration.m761cb333;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.spark:spark-streaming_2.11")
+  }
+  query pattern callExpr where callee.method == "org.apache.spark.streaming.Checkpoint.deserialize"
+  emit sink code.Deserialization at args[0]
+}

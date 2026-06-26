@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mc202cc7c;
+
+binding httpInput0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-commons")
+  }
+  query pattern callExpr where callee.method == "getHttpMethod"
+  emit source code.HttpInput at call.result
+}

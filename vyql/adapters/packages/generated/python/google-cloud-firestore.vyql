@@ -1,6 +1,0 @@
-adapter python {
-  package "google-cloud-firestore" {
-    sink method "query" -> code.NosqlQuery
-    sink method "set" -> code.StoredDataWrite
-  }
-}

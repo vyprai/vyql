@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "pastel" {
-    sink method "ColorParser.parse" -> code.Deserialization
-  }
-}

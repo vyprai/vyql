@@ -1,8 +1,0 @@
-import core.{AuthenticationCheck}
-adapter python {
-  package "gspread" {
-    control method "authorize" -> core.AuthenticationCheck
-    control method "oauth" -> core.AuthenticationCheck
-    control method "api_key" -> core.AuthenticationCheck
-  }
-}

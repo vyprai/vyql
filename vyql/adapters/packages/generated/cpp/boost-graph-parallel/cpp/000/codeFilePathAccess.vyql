@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mecdc3ee1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}

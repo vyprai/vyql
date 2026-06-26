@@ -1,0 +1,9 @@
+module bindings.php.migration.mf0bf601c;
+
+binding userControlledData0 {
+  requires {
+    dependency("zendframework/zend-inputfilter")
+  }
+  query pattern callExpr where callee.method == "getRawValue"
+  emit source core.UserControlledData at call.result
+}

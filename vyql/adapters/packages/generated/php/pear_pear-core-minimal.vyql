@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter php {
-  package "pear/pear-core-minimal" {
-    sink method "eval" -> code.CodeEval
-  }
-}

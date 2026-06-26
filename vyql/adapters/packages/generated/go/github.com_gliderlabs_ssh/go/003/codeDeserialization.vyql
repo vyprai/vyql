@@ -1,0 +1,9 @@
+module bindings.go.migration.m785e0061;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/gliderlabs/ssh")
+  }
+  query pattern callExpr where callee.method == "ParsePublicKey"
+  emit sink code.Deserialization at args[0]
+}

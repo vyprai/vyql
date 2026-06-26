@@ -1,0 +1,9 @@
+module bindings.rust.migration.mb9083406;
+
+binding deserialization1 {
+  requires {
+    dependency("html5ever")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.Deserialization at args[0]
+}

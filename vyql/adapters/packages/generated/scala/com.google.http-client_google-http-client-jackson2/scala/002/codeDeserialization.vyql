@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb34f7181;
+
+binding deserialization2 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "JacksonParser.skipChildren"
+  emit sink code.Deserialization at args[0]
+}

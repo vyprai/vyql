@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m6ae24d03;
+
+binding commandExecution1 {
+  requires {
+    dependency("terrapin")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

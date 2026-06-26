@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding contaoListingModuleSqlIdentifierInjection195 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=compile" and node.token contains "$strWhere=(!$this->list_where?\"WHERE\":\"AND\").\\Input::get('search').\"LIKE?\"" and node.token contains "$strQuery.=$strWhere" and node.token contains "\\Input::get('order_by')" and node.token contains "\\Input::get('sort')" and node.token contains "$this->Database->prepare($strQuery)" and not (node.token contains "!in_array($strSearch,$arrSearchFields,true)") and not (node.token contains "!in_array($order_by,$arrFields,true)")
+  emit issue code.ContaoListingModuleSqlIdentifierInjection at node
+}

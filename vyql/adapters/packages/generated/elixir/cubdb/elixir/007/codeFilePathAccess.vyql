@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m50eb1b2d;
+
+binding filePathAccess7 {
+  requires {
+    dependency("cubdb")
+  }
+  query pattern callExpr where callee.method == "back_up"
+  emit sink code.FilePathAccess at args[0]
+}

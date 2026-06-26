@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2c6e877b;
+
+binding commandExecution1 {
+  requires {
+    dependency("Make")
+  }
+  query pattern callExpr where callee.method == "shell"
+  emit sink code.CommandExecution at args[0]
+}

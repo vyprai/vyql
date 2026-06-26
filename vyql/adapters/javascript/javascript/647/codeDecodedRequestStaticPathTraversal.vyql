@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding decodedRequestStaticPathTraversal647 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "attr_path:config.staticFilePath" and node.token contains "call_path:decodeURIComponent" and node.token contains "call_path:utils.file.existsSync" and node.token contains "call_path:handleStaticFile" and not (node.token contains "call_path:indexOf") and not (node.token contains "call_path:startsWith") and not (node.token contains "call_path:path.relative")
+  emit issue code.DecodedRequestStaticPathTraversal at node
+}

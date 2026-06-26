@@ -1,0 +1,7 @@
+module code;
+
+review code.StateCommitBeforeExternalWriteAccounting {
+  category: lifecycle
+  kind: target
+  text: "verify durable state is not committed before fallible external write accounting or metering succeeds"
+}

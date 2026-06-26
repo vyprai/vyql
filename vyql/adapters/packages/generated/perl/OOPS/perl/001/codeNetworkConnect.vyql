@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6e81f840;
+
+binding networkConnect1 {
+  requires {
+    dependency("OOPS")
+  }
+  query pattern callExpr where callee.method == "dbiconnect"
+  emit sink code.NetworkConnectSink at args[0]
+}

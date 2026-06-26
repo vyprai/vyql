@@ -1,6 +1,0 @@
-adapter dart {
-  package "google_sign_in_web" {
-    sink method "getJwtTokenPayload" -> code.Deserialization
-    sink method "decodeJwtPayload" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m1d81b222;
+
+binding deserialization1 {
+  requires {
+    dependency("olefile")
+  }
+  query pattern callExpr where callee.method == "isOleFile"
+  emit sink code.Deserialization at args[0]
+}

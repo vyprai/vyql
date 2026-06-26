@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbbe1ca32;
+
+binding networkData0 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}

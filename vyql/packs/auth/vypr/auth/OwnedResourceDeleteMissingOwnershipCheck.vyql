@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule OwnedResourceDeleteMissingOwnershipCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_639, CWE_862, CWE_863]
+    id: "VYQL-AUTH-076"
+    severity: high
+  }
+  issue code.OwnedResourceDeleteMissingOwnershipCheck as delete
+}

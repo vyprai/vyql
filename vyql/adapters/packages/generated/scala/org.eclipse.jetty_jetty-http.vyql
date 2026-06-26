@@ -1,7 +1,0 @@
-import code.{HttpInput}
-adapter scala {
-  package "org.eclipse.jetty:jetty-http" {
-    source method "parse" -> code.HttpInput
-    source method "query" -> code.HttpInput
-  }
-}

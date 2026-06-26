@@ -1,0 +1,9 @@
+module bindings.dart.migration.ma4094cd0;
+
+binding fileUse3 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "saveFile"
+  emit sink code.FileUseSink at args[0]
+}

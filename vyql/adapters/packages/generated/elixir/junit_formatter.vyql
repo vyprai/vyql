@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter elixir {
-  package "junit_formatter" {
-    sink method "generate_testsuite_xml" -> code.XmlParse
-  }
-}

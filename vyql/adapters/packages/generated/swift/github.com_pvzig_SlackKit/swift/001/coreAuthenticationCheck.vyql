@@ -1,0 +1,14 @@
+module bindings.swift.migration.m3180263b;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "oauthAccess"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

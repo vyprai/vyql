@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "com.facebook.fresco:animated-webp" {
-    sink method "createFromByteArray" -> code.Deserialization
-    sink method "createFromByteBuffer" -> code.Deserialization
-  }
-}

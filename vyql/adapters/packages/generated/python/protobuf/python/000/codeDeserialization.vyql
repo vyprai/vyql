@@ -1,0 +1,9 @@
+module bindings.python.migration.m1b2762eb;
+
+binding deserialization0 {
+  requires {
+    dependency("protobuf")
+  }
+  query pattern callExpr where callee.method == "PyUnicode_DecodeUTF8"
+  emit sink code.Deserialization at args[0]
+}

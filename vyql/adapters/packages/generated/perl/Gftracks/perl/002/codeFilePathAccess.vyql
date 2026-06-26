@@ -1,0 +1,9 @@
+module bindings.perl.migration.mccbdae7a;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Gftracks")
+  }
+  query pattern callExpr where callee.method == "shellsave"
+  emit sink code.FilePathAccess at args[0]
+}

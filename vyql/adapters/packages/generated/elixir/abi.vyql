@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "abi" {
-    sink method "ABI.Parser.parse!" -> code.Deserialization
-    sink method "ABI.decode" -> code.Deserialization
-    sink method "ABI.parse_specification" -> code.Deserialization
-  }
-}

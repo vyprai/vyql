@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbb5418d9;
+
+binding codeEval0 {
+  requires {
+    dependency("ripl-rack")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit sink code.CodeEval at args[0]
+}

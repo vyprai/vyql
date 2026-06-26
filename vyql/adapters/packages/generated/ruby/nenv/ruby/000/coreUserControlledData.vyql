@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md14e983b;
+
+binding userControlledData0 {
+  requires {
+    dependency("nenv")
+  }
+  query pattern callExpr where callee.method == "Nenv"
+  emit source core.UserControlledData at call.result
+}

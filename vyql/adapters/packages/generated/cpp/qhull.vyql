@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter cpp {
-  package "qhull" {
-    source method "qh_rboxpoints" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding templateDirectoryHiddenGlobCopy583 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=downloadTemplate" and node.token contains "call_path:fs.statSync" and node.token contains "call_path:d.copy" and not (node.token contains "prop:hide=false")
+  emit issue code.TemplateDirectoryHiddenGlobCopy at node
+}

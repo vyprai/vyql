@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6d1b67dc;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/aciidb0mb3r/SwiftMQTT")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}

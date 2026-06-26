@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{ShellEscape}
-
-adapter javascript {
-  package "shell-quote" {
-    sink method "parse" -> code.Deserialization
-    control method "quote" -> core.ShellEscape
-  }
-}

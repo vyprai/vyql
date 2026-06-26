@@ -1,0 +1,14 @@
+module bindings.python.migration.mc0f39fb7;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("djangorestframework-jwt")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

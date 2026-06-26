@@ -1,8 +1,0 @@
-adapter cpp {
-  package "kubazip" {
-    sink method "zip_open" -> code.FilePathAccess
-    source method "zip_entry_read" -> core.UserControlledData
-    sink method "zip_entry_write" -> code.ArchiveEntryWrite
-    sink method "zip_entry_fwrite" -> code.ArchiveEntryWrite
-  }
-}

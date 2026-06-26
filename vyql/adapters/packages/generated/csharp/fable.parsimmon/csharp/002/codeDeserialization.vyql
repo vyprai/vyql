@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m59d4f4d9;
+
+binding deserialization2 {
+  requires {
+    dependency("fable.parsimmon")
+  }
+  query pattern callExpr where callee.method == "parseBufferFor"
+  emit sink code.Deserialization at args[0]
+}

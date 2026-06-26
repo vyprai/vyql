@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter elixir {
-  package "apex" {
-    control method "escape" -> core.HtmlEscape
-  }
-}

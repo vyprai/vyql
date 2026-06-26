@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding jpegSubsamplingRatioValidationMissing144 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=stbi__process_frame_header" and node.token contains "if(z->img_comp[i].h>h_max)h_max=z->img_comp[i].h;" and node.token contains "if(z->img_comp[i].v>v_max)v_max=z->img_comp[i].v;" and node.token contains "z->img_comp[i].x=(s->img_x*z->img_comp[i].h+h_max-1)/h_max;" and node.token contains "z->img_comp[i].y=(s->img_y*z->img_comp[i].v+v_max-1)/v_max;" and node.token contains "stbi__malloc_mad2(z->img_comp[i].w2,z->img_comp[i].h2,15)" and not (node.token contains "h_max%z->img_comp[i].h") and not (node.token contains "v_max%z->img_comp[i].v")
+  emit issue code.JpegSubsamplingRatioValidationMissing at node
+}

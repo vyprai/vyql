@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter rust {
-  package "serialize-to-javascript-impl" {
-    sink method "derive_template" -> code.CodeEval
-    sink method "default_template" -> code.CodeEval
-  }
-}

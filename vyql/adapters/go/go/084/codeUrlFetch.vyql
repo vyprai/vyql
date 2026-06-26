@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding urlFetch84 {
+  query pattern callExpr where callee.path ~= "http.Head"
+  emit sink code.UrlFetch at args[0]
+}

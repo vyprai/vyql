@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcff52bc3;
+
+binding xmlParse0 {
+  requires {
+    dependency("fast_html")
+  }
+  query pattern callExpr where callee.method == "lxb_css_parser_fail"
+  emit sink code.XmlParse at args[0]
+}

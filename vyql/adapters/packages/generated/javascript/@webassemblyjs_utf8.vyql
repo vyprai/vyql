@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter javascript {
-  package "@webassemblyjs/utf8" {
-    source method "decode" -> core.UserControlledData
-    source method "encode" -> core.UserControlledData
-  }
-}

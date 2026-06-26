@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter cpp {
-  package "matio" {
-    sink method "Mat_Open" -> code.FilePathAccess
-  }
-}

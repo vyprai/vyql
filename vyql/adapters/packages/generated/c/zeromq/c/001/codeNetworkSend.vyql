@@ -1,0 +1,9 @@
+module bindings.c.migration.m7c6729a3;
+
+binding networkSend1 {
+  requires {
+    dependency("zeromq")
+  }
+  query pattern callExpr where callee.method == "sendpipe"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter php {
-  package "clue/stream-filter" {
-    sink method "append" -> code.CodeEval
-    sink method "prepend" -> code.CodeEval
-  }
-}

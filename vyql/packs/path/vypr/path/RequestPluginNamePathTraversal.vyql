@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule RequestPluginNamePathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-054"
+    severity: high
+  }
+  issue code.RequestPluginNamePathTraversal as sink
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md5b130f9;
+
+binding networkSend0 {
+  requires {
+    dependency("slack")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.NetworkSend at args[0]
+}

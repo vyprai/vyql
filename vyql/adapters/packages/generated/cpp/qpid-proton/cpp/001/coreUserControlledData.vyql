@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m03265c34;
+
+binding userControlledData1 {
+  requires {
+    dependency("qpid-proton")
+  }
+  query pattern callExpr where callee.method == "pn_connection_set_user"
+  emit source core.UserControlledData at call.result
+}

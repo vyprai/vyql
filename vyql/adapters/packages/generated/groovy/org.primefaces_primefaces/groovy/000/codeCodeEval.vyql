@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mf7de89b3;
+
+binding codeEval0 {
+  requires {
+    dependency("org.primefaces:primefaces")
+  }
+  query pattern callExpr where callee.method == "executeInitScript"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept CommandStringWrapperExecution : issue {
+  cwe: [CWE_78, CWE_88, CWE_150, CWE_157]
+  review_assumption: "caller- or request-controlled command fragments can contain shell or argument delimiter characters interpreted by the wrapper"
+  reviewCategory: command
+  reviewCondition: "a command execution wrapper receives one formatted shell command string instead of an argv array"
+  reviewConfidence: high
+  reviewEvidence: "command wrapper context {pattern} builds a command string from caller- or request-controlled values before execute"
+  vulnerableTo: [injection.CommandInjection, injection.ArgumentInjection]
+}

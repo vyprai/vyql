@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter dart {
-  package "android_intent" {
-    sink method "launch" -> code.CommandExecution
-  }
-}

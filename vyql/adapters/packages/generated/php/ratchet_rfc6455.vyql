@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{NetworkData}
-
-adapter php {
-  package "ratchet/rfc6455" {
-    source method "ServerNegotiator::handshake" -> core.UserControlledData
-    source method "MessageBuffer::processData" -> code.NetworkData
-  }
-}

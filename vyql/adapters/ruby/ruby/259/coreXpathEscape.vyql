@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding xpathEscape259 {
+  query pattern callExpr where callee.path ~= "xpath_escape"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

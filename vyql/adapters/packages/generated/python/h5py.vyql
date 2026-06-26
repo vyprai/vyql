@@ -1,5 +1,0 @@
-adapter python {
-  package "h5py" {
-    sink method "copy" -> code.FilePathAccess
-  }
-}

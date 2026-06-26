@@ -1,0 +1,9 @@
+module bindings.php.migration.m52ebe637;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("mongodb/mongodb")
+  }
+  query pattern callExpr where callee.method == "dropSearchIndex"
+  emit sink code.NosqlQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb190fccd;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/MakeAWishFoundation/SwiftyMocky")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit sink code.FilePathAccess at args[0]
+}

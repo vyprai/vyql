@@ -1,5 +1,0 @@
-adapter php {
-  package "pdepend/pdepend" {
-    sink method "system" -> code.CommandExecution
-  }
-}

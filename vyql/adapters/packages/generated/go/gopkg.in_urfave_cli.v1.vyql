@@ -1,9 +1,0 @@
-import code.{CliArgument}
-import core.{UserControlledData}
-
-adapter go {
-  package "gopkg.in/urfave/cli.v1" {
-    source method "Run" -> core.UserControlledData
-    source method "RunAndExitOnError" -> core.UserControlledData
-  }
-}

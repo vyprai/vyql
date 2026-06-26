@@ -1,0 +1,9 @@
+module bindings.c.migration.m2816daee;
+
+binding xpathQuery26 {
+  requires {
+    dependency("libxml2")
+  }
+  query pattern callExpr where callee.path ~= "xmlXPathEvalExpression"
+  emit sink code.XpathQuery at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-
-adapter groovy {
-  package "com.jolbox:bonecp" {
-    sink method "getConnection" -> code.SqlExecution
-    sink method "obtainInternalConnection" -> code.SqlExecution
-    sink method "obtainRawInternalConnection" -> code.SqlExecution
-  }
-}

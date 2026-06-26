@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8bed1530;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.hibernate.validator:hibernate-validator")
+  }
+  query pattern callExpr where callee.method == "regexp"
+  emit sink code.ExpressionEval at args[0]
+}

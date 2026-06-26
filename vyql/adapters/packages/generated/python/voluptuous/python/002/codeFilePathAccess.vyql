@@ -1,0 +1,9 @@
+module bindings.python.migration.m5edd1caa;
+
+binding filePathAccess2 {
+  requires {
+    dependency("voluptuous")
+  }
+  query pattern callExpr where callee.method == "PathExists"
+  emit sink code.FilePathAccess at args[0]
+}

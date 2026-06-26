@@ -1,0 +1,9 @@
+module bindings.dart.migration.mea92f8eb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("syncfusion_pdfviewer_macos")
+  }
+  query pattern callExpr where callee.method == "loadPdfFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

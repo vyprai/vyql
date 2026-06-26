@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6ab5858a;
+
+binding codeEval1 {
+  requires {
+    dependency("build_const")
+  }
+  query pattern callExpr where callee.method == "add_value_raw"
+  emit sink code.CodeEval at args[0]
+}

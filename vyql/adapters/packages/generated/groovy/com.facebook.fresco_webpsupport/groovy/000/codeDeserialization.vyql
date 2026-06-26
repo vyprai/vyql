@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md40e5fb5;
+
+binding deserialization0 {
+  requires {
+    dependency("com.facebook.fresco:webpsupport")
+  }
+  query pattern callExpr where callee.method == "decodeByteBuffer"
+  emit sink code.Deserialization at args[0]
+}

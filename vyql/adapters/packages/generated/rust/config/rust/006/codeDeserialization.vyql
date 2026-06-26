@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9c201208;
+
+binding deserialization6 {
+  requires {
+    dependency("config")
+  }
+  query pattern callExpr where callee.method == "deserialize_struct"
+  emit sink code.Deserialization at args[0]
+}

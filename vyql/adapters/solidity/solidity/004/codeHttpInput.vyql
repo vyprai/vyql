@@ -1,0 +1,6 @@
+module bindings.solidity.migration.m88e544d8;
+
+binding httpInput4 {
+  query pattern callExpr where callee.path ~= "msg.value"
+  emit source code.HttpInput at call.result
+}

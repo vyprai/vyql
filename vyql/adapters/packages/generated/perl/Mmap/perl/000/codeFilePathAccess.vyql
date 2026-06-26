@@ -1,0 +1,9 @@
+module bindings.perl.migration.mcabe6480;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Mmap")
+  }
+  query pattern callExpr where callee.method == "mmap"
+  emit sink code.FilePathAccess at args[0]
+}

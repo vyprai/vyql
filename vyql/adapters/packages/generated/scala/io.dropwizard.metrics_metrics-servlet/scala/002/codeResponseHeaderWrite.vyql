@@ -1,0 +1,9 @@
+module bindings.scala.migration.mec6bfcab;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-servlet")
+  }
+  query pattern callExpr where callee.method == "setStatus"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

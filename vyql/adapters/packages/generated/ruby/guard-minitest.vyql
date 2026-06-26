@@ -1,5 +1,0 @@
-adapter ruby {
-  package "guard-minitest" {
-    sink method "Runner.run" -> code.CommandExecution
-  }
-}

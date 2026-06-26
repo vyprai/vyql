@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "pip-tools" {
-    sink method "run_python_snippet" -> code.CommandExecution
-  }
-}

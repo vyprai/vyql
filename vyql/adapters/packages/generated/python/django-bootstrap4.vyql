@@ -1,5 +1,0 @@
-adapter python {
-  package "django-bootstrap4" {
-    control method "sanitize_url_dict" -> core.InputValidation
-  }
-}

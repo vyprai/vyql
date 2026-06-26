@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbbe1ca32;
+
+binding networkSend2 {
+  requires {
+    dependency("fog-dynect")
+  }
+  query pattern callExpr where callee.method == "post_record"
+  emit sink code.NetworkSend at args[0]
+}

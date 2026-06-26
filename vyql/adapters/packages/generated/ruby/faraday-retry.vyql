@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter ruby {
-  package "faraday-retry" {
-    sink method "call" -> code.NetworkSend
-  }
-}

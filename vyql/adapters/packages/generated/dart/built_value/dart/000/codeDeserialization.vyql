@@ -1,0 +1,9 @@
+module bindings.dart.migration.m44b23fc5;
+
+binding deserialization0 {
+  requires {
+    dependency("built_value")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

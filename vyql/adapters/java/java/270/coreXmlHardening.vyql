@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding xmlHardening270 {
+  query pattern callExpr where callee.path ~= "setFeature" and args.any.literal contains "disallow-doctype-decl"
+  emit check core.XmlHardening at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

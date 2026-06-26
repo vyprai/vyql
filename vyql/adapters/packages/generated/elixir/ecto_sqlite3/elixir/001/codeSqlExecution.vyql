@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3ab4eece;
+
+binding sqlExecution1 {
+  requires {
+    dependency("ecto_sqlite3")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

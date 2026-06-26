@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7d915844;
+
+binding userControlledData0 {
+  requires {
+    dependency("appsignal_phoenix")
+  }
+  query pattern callExpr where callee.method == "handle_in"
+  emit source core.UserControlledData at call.result
+}

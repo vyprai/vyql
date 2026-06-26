@@ -1,0 +1,9 @@
+module bindings.java.migration.m30f2cdf5;
+
+binding networkConnect0 {
+  requires {
+    dependency("io.micrometer:micrometer-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}

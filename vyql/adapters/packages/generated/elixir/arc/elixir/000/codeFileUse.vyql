@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me26f4c89;
+
+binding fileUse0 {
+  requires {
+    dependency("arc")
+  }
+  query pattern callExpr where callee.method == "write_binary"
+  emit sink code.FileUseSink at args[0]
+}

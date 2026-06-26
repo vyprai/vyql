@@ -1,8 +1,0 @@
-import code.{CodeEval, DatabaseRead}
-
-adapter groovy {
-  package "com.baomidou:mybatis-plus-generator" {
-    sink method "FastAutoGenerator.create" -> code.DatabaseRead
-    sink method "FastAutoGenerator.execute" -> code.CodeEval
-  }
-}

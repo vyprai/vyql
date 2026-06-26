@@ -1,0 +1,9 @@
+module bindings.php.migration.m0e26dbfb;
+
+binding networkSend11 {
+  requires {
+    dependency("abraham/twitteroauth")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

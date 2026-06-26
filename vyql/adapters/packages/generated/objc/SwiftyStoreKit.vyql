@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter objc {
-  package "SwiftyStoreKit" {
-    sink method "SwiftyStoreKit.verifyReceipt" -> code.NetworkSend
-    sink method "validate" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,14 @@
+module bindings.powershell.migration.m92132a18;
+
+binding htmlEscape21 {
+  requires {
+    dependency("System.Web")
+  }
+  query pattern callExpr where callee.path ~= "HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

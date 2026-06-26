@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m50799a04;
+
+binding codeEval2 {
+  requires {
+    dependency("boost-compute")
+  }
+  query pattern callExpr where callee.method == "create_with_il_file"
+  emit sink code.CodeEval at args[0]
+}

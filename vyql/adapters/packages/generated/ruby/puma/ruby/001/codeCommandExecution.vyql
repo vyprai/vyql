@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3fc09aaf;
+
+binding commandExecution1 {
+  requires {
+    dependency("puma")
+  }
+  query pattern callExpr where callee.method == "restart_command"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept FlarumTranslatorRawStringParameterXss : issue {
+  cwe: [CWE_79]
+  review_assumption: "translation parameters include user-controlled UI strings such as the forum search query"
+  reviewCategory: xss
+  reviewCondition: "Flarum translator parameters return raw string values that rich ICU rendering can convert into HTML DOM nodes"
+  reviewConfidence: high
+  reviewEvidence: "Translator preprocessParameters context {pattern} returns parameters directly before the patched escapedParameters JSX text-node wrapping"
+  vulnerableTo: [injection.Xss]
+}

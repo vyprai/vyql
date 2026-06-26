@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m79d1f5be;
+
+binding fileUse0 {
+  requires {
+    dependency("benchee_json")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

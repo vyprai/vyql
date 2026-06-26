@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9ceef9fb;
+
+binding networkSend10 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

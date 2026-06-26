@@ -1,0 +1,9 @@
+module bindings.java.migration.m85297d63;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.springframework:spring-context-support")
+  }
+  query pattern callExpr where callee.method == "setTo"
+  emit source core.UserControlledData at call.result
+}

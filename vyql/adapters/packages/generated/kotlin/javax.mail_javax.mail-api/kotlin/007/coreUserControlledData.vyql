@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.maf65a911;
+
+binding userControlledData7 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "getHeader"
+  emit source core.UserControlledData at call.result
+}

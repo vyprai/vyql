@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding commandExecution272 {
+  query pattern callExpr where callee.path ~= "os.spawnl"
+  emit sink code.CommandExecution at args[0]
+}

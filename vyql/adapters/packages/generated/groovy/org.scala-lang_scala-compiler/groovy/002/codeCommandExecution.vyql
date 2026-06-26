@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9be6e150;
+
+binding commandExecution2 {
+  requires {
+    dependency("org.scala-lang:scala-compiler")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

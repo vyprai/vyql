@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m9cef22f1;
+
+binding userControlledData0 {
+  requires {
+    dependency("jsx-ast-utils")
+  }
+  query pattern callExpr where callee.method == "getPropValue"
+  emit source core.UserControlledData at call.result
+}

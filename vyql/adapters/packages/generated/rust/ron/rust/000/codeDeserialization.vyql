@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc3bf5d2b;
+
+binding deserialization0 {
+  requires {
+    dependency("ron")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

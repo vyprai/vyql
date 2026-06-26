@@ -1,9 +1,0 @@
-adapter objc {
-  package "FacebookSDK" {
-    sink method "startGraphRequestWithGraphPath" -> code.NetworkConnect
-    sink method "startGraphRequestWithGraphPath" -> code.NetworkSend
-    control method "URLEncode" -> core.InputValidation
-    control method "URLDecode" -> core.InputValidation
-    source method "handleURL" -> core.UserControlledData
-  }
-}

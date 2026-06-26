@@ -1,0 +1,14 @@
+module bindings.scala.migration.mddcab803;
+
+binding inputValidation0 {
+  requires {
+    dependency("io.undertow:undertow-core")
+  }
+  query pattern callExpr where callee.method == "urlDecoding"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

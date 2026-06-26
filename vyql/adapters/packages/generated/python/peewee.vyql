@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "peewee" {
-    sink method "execute" -> code.SqlExecution
-    sink method "query" -> code.SqlExecution
-  }
-}

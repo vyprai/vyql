@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mba4a391f;
+
+binding logOutput2 {
+  requires {
+    dependency("ubiety.logging.core")
+  }
+  query pattern callExpr where callee.method == "Warning"
+  emit sink code.LogOutput at args[0]
+}

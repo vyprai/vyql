@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding shopwareStoreApiManyToManyCriteriaBypass171 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=processCriteria" and node.token contains "SalesChannelDefinitionInterface" and node.token contains "$definition->processCriteria" and node.token contains "$criteria->getAssociations" and node.token contains "$definition->getField" and node.token contains "AssociationField" and node.token contains "$field->getReferenceDefinition" and node.token contains "$processed[$definition::class]" and not (node.token contains "ManyToManyAssociationField") and not (node.token contains "$field->getToManyReferenceDefinition") and not (node.token contains "getToManyReferenceDefinition") and not (node.token contains "$processedKey")
+  emit issue code.ShopwareStoreApiManyToManyCriteriaBypass at node
+}

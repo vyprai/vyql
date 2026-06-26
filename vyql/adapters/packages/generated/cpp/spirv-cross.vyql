@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "spirv-cross" {
-    sink method "spvc_context_parse_spirv" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m6a7d744e;
+
+binding deserialization0 {
+  requires {
+    dependency("Cordova")
+  }
+  query pattern callExpr where callee.method == "parser:didStartElement:namespaceURI:qualifiedName:attributes:"
+  emit sink code.Deserialization at args[0]
+}

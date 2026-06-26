@@ -1,0 +1,9 @@
+module bindings.perl.migration.m637a43fb;
+
+binding codeEval0 {
+  requires {
+    dependency("Padre")
+  }
+  query pattern callExpr where callee.method == "Padre::TaskWorker::spawn"
+  emit sink code.CodeEval at args[0]
+}

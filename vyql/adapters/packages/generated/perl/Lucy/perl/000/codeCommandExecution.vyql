@@ -1,0 +1,9 @@
+module bindings.perl.migration.m74c84e28;
+
+binding commandExecution0 {
+  requires {
+    dependency("Lucy")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

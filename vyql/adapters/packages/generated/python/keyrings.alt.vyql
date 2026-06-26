@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter python {
-  package "keyrings.alt" {
-    control method "escape" -> core.InputValidation
-  }
-}

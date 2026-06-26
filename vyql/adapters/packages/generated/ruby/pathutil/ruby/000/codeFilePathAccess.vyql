@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb81e8809;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pathutil")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit sink code.FilePathAccess at args[0]
+}

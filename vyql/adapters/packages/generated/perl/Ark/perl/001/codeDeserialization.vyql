@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1a63e167;
+
+binding deserialization1 {
+  requires {
+    dependency("Ark")
+  }
+  query pattern callExpr where callee.method == "load_plugins"
+  emit sink code.Deserialization at args[0]
+}

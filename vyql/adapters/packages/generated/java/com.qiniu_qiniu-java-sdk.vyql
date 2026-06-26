@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter java {
-  package "com.qiniu:qiniu-java-sdk" {
-    sink method "send" -> code.NetworkSend
-  }
-}

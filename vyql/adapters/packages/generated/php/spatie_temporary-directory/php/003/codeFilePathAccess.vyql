@@ -1,0 +1,9 @@
+module bindings.php.migration.mfa2f56a4;
+
+binding filePathAccess3 {
+  requires {
+    dependency("spatie/temporary-directory")
+  }
+  query pattern callExpr where callee.method == "deleteDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

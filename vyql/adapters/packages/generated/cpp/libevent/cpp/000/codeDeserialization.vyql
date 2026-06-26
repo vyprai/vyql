@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2521da14;
+
+binding deserialization0 {
+  requires {
+    dependency("libevent")
+  }
+  query pattern callExpr where callee.method == "evhttp_parse_firstline_"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9343860d;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("com.github.sgroschupf:zkclient")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.me0725372;
+
+binding filePathAccess0 {
+  requires {
+    dependency("futures")
+  }
+  query pattern callExpr where callee.method == "let"
+  emit sink code.FilePathAccess at args[0]
+}

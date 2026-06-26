@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mbba09c33;
+
+binding filePathAccess1 {
+  requires {
+    dependency("loader-fs-cache")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

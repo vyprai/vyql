@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter javascript {
-  package "iconv-lite" {
-    sink method "decode" -> code.Deserialization
-    sink method "decodeStream" -> code.Deserialization
-  }
-}

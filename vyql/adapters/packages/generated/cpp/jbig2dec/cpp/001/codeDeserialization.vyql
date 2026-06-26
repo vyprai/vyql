@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mcca5bff5;
+
+binding deserialization1 {
+  requires {
+    dependency("jbig2dec")
+  }
+  query pattern callExpr where callee.method == "jbig2_parse_segment"
+  emit sink code.Deserialization at args[0]
+}

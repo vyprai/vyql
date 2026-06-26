@@ -1,0 +1,11 @@
+module code;
+
+concept ArchiveMarkerSymlinkOverwrite : issue {
+  cwe: [CWE_22, CWE_59]
+  review_assumption: "archive entries may include symlinks and the marker path is inside the extraction root"
+  reviewCategory: path
+  reviewCondition: "archive extraction writes a post-extraction marker path that an archive entry could replace with a symlink"
+  reviewConfidence: medium
+  reviewEvidence: "archive extraction context {pattern} unpacks entries and opens the marker with create instead of create_new"
+  vulnerableTo: [path.PathTraversal, path.LinkFollowing]
+}

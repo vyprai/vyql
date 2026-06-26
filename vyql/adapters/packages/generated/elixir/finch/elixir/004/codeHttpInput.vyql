@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7bdd805f;
+
+binding httpInput4 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}

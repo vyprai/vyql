@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m88bcc516;
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.zxing:javase")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

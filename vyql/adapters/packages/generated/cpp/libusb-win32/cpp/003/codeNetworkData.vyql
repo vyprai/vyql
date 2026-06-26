@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m736e2978;
+
+binding networkData3 {
+  requires {
+    dependency("libusb-win32")
+  }
+  query pattern callExpr where callee.method == "usb_interrupt_read"
+  emit source code.NetworkData at call.result
+}

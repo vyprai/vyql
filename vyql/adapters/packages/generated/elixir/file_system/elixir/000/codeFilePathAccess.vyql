@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbc17582f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("file_system")
+  }
+  query pattern callExpr where callee.path ~= "file_system.open"
+  emit sink code.FilePathAccess at args[0]
+}

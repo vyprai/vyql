@@ -1,0 +1,9 @@
+module bindings.go.migration.m01c27bc4;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/antlr/antlr4/runtime/Go/antlr")
+  }
+  query pattern callExpr where callee.method == "NewInputStream"
+  emit source core.UserControlledData at call.result
+}

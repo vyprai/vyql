@@ -1,0 +1,9 @@
+module bindings.swift.migration.m92198b06;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/raphaelmor/Polyline")
+  }
+  query pattern callExpr where callee.method == "decodeLevels"
+  emit sink code.Deserialization at args[0]
+}

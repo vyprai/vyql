@@ -1,9 +1,0 @@
-import code.{CommandExecution, FileUse, Deserialization, FilePathAccess}
-adapter perl {
-  package "Mildew" {
-    sink method "system" -> code.CommandExecution
-    sink method "exec" -> code.CommandExecution
-    source method "parse" -> core.UserControlledData
-    sink method "output" -> code.FileUse
-  }
-}

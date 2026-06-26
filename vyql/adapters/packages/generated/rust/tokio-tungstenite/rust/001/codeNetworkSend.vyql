@@ -1,0 +1,9 @@
+module bindings.rust.migration.m578f71d7;
+
+binding networkSend1 {
+  requires {
+    dependency("tokio-tungstenite")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

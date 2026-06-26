@@ -1,0 +1,9 @@
+module bindings.go.migration.m7ae6a71e;
+
+binding userControlledData1 {
+  requires {
+    dependency("k8s.io/csi-translation-lib")
+  }
+  query pattern callExpr where callee.method == "getFileShareInfo"
+  emit source core.UserControlledData at call.result
+}

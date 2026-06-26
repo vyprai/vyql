@@ -1,0 +1,9 @@
+module bindings.go.migration.m2fb4adf2;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/urfave/cli/v2")
+  }
+  query pattern callExpr where callee.method == "Run"
+  emit source code.CliArgument at call.result
+}

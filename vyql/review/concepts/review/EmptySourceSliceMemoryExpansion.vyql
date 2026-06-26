@@ -1,0 +1,8 @@
+module code;
+
+review code.EmptySourceSliceMemoryExpansion {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "verify empty source slices cannot still expand memory or zero-fill a caller-selected target size"
+}

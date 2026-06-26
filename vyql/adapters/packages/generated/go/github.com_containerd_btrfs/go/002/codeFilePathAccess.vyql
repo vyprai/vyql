@@ -1,0 +1,9 @@
+module bindings.go.migration.mce0b0ff2;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/containerd/btrfs")
+  }
+  query pattern callExpr where callee.method == "SubvolDelete"
+  emit sink code.FilePathAccess at args[0]
+}

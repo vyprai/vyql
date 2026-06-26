@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding sizeComputation72 {
+  query pattern callExpr where callee.path ~= "realloc"
+  emit sink code.SizeComputation at args[1]
+}

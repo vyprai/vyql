@@ -1,8 +1,0 @@
-import code.{StoredDataWrite, SqlExecution}
-
-adapter python {
-  package "influxdb" {
-    sink method "query" -> code.SqlExecution
-    sink method "write" -> code.StoredDataWrite
-  }
-}

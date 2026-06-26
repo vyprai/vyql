@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mba879610;
+
+binding xmlParse1 {
+  requires {
+    dependency("w3c-xmlserializer")
+  }
+  query pattern callExpr where callee.method == "serializeAttributeValue"
+  emit sink code.XmlParse at args[0]
+}

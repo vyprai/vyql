@@ -1,0 +1,9 @@
+module bindings.objc.migration.m916e8c29;
+
+binding codeEval0 {
+  requires {
+    dependency("WeexPluginLoader")
+  }
+  query pattern callExpr where callee.method == "registerPlugins"
+  emit sink code.CodeEval at args[0]
+}

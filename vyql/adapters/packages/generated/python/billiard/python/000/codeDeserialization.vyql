@@ -1,0 +1,9 @@
+module bindings.python.migration.m08555c59;
+
+binding deserialization0 {
+  requires {
+    dependency("billiard")
+  }
+  query pattern callExpr where callee.method == "ForkingPickler.loads"
+  emit sink code.Deserialization at args[0]
+}

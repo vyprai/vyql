@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter javascript {
-  package "pirates" {
-    sink method "addHook" -> code.CodeEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m14559cfe;
+
+binding deserialization0 {
+  requires {
+    dependency("is-svg")
+  }
+  query pattern callExpr where callee.method == "isSvg"
+  emit sink code.Deserialization at args[0]
+}

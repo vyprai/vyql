@@ -1,8 +1,0 @@
-import code.{SqlExecution, NetworkConnect}
-adapter python {
-  package "mysql-connector" {
-    sink method "execute" -> code.SqlExecution
-    sink method "executemany" -> code.SqlExecution
-    sink method "connect" -> code.NetworkConnect
-  }
-}

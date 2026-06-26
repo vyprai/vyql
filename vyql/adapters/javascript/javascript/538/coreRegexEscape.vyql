@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding regexEscape538 {
+  query pattern callExpr where callee.method == "replace" and args.any.literal contains "\\$&"
+  emit check core.RegexEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

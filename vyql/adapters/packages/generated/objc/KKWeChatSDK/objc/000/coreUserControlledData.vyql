@@ -1,0 +1,9 @@
+module bindings.objc.migration.m72980242;
+
+binding userControlledData0 {
+  requires {
+    dependency("KKWeChatSDK")
+  }
+  query pattern callExpr where callee.method == "handleOpenURL"
+  emit source core.UserControlledData at call.result
+}

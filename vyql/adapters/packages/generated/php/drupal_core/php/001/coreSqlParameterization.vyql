@@ -1,0 +1,14 @@
+module bindings.php.migration.m5d32eb5a;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "prepareMachineName"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

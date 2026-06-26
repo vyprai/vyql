@@ -1,0 +1,9 @@
+module bindings.perl.migration.m8d035404;
+
+binding expressionEval0 {
+  requires {
+    dependency("MMS-Mail-Message")
+  }
+  query pattern callExpr where callee.method == "cleanse_map"
+  emit sink code.ExpressionEval at args[0]
+}

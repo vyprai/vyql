@@ -1,0 +1,7 @@
+module code;
+
+concept CsvCell : sink {
+  cwe: [CWE_1236]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.CsvInjection]
+}

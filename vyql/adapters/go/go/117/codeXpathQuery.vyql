@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding xpathQuery117 {
+  query pattern callExpr where callee.method == "Find" and callee.receiver.type == "xpath.Doc"
+  emit sink code.XpathQuery at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m132a1317;
+
+binding deserialization6 {
+  requires {
+    dependency("commanded_eventstore_adapter")
+  }
+  query pattern callExpr where callee.method == "to_snapshot_data"
+  emit sink code.Deserialization at args[0]
+}

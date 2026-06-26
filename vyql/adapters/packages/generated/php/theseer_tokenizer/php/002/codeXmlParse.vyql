@@ -1,0 +1,9 @@
+module bindings.php.migration.m845f0980;
+
+binding xmlParse2 {
+  requires {
+    dependency("theseer/tokenizer")
+  }
+  query pattern callExpr where callee.method == "toXML"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md237ae6d;
+
+binding cookie4 {
+  requires {
+    dependency("javax.ws.rs:jsr311-api")
+  }
+  query pattern callExpr where callee.method == "valueOf"
+  emit source code.Cookie at call.result
+}

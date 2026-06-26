@@ -1,0 +1,9 @@
+module bindings.java.migration.m6cedf005;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("org.fusesource.leveldbjni:leveldbjni-all")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.StoredDataWrite at args[0]
+}

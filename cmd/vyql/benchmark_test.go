@@ -13,10 +13,10 @@ import (
 	"github.com/vyprai/vyql/parser"
 )
 
-// TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite (Java or Python) and
-// prints a per-category Youden scorecard (TPR-FPR). Gated by VYQL_BENCH=1; the suite dir is
-// $BENCH_DIR (default /tmp/bench/BenchmarkPython). This is a measurement harness, not a
-// pass/fail gate — it drives the precision-tuning loop.
+// TestOWASPBenchmark scores VyQL against an OWASP Benchmark suite and prints a
+// per-category Youden scorecard (TPR-FPR). Gated by VYQL_BENCH=1; the suite dir
+// is $BENCH_DIR (default /tmp/bench/BenchmarkPython). Protected suites also
+// enforce the exact checked-in parity target.
 func TestOWASPBenchmark(t *testing.T) {
 	if os.Getenv("VYQL_BENCH") == "" {
 		t.Skip("set VYQL_BENCH=1 to score against an OWASP Benchmark suite")
@@ -96,7 +96,10 @@ func TestOWASPBenchmark(t *testing.T) {
 		}
 	}
 
-	score(t, expected, detected)
+	gotScore := score(t, expected, detected)
+	if want, ok := protectedOWASPBenchmarkExpectation(dir); ok {
+		gotScore.assert(t, dir, want)
+	}
 }
 
 // hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
@@ -155,7 +158,7 @@ func testNameOf(loc string) string {
 
 func benchmarkCategories(t *testing.T, rules string) map[string]string {
 	t.Helper()
-	decls, err := parser.Parse(rules)
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(rules), lowerNonCoreV2RuntimeSource)
 	if err != nil {
 		t.Fatalf("parse rules: %v", err)
 	}
@@ -174,7 +177,48 @@ func benchmarkCategories(t *testing.T, rules string) map[string]string {
 	return out
 }
 
-func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) {
+type benchmarkScore struct {
+	tp, fn, fp, tn int
+	overall        float64
+}
+
+func (s benchmarkScore) assert(t *testing.T, dir string, want benchmarkScore) {
+	t.Helper()
+	if s.tp != want.tp || s.fn != want.fn || s.fp != want.fp || s.tn != want.tn || fmt.Sprintf("%+.2f", s.overall) != fmt.Sprintf("%+.2f", want.overall) {
+		t.Fatalf("protected OWASP benchmark %s = TP=%d FN=%d FP=%d TN=%d overall=%+.2f; want TP=%d FN=%d FP=%d TN=%d overall=%+.2f",
+			dir, s.tp, s.fn, s.fp, s.tn, s.overall, want.tp, want.fn, want.fp, want.tn, want.overall)
+	}
+}
+
+func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
+	base := filepath.Base(filepath.Clean(dir))
+	switch {
+	case base == "BenchmarkJava":
+		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
+	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == "/Users/rizqme/Workspace":
+		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
+	default:
+		return benchmarkScore{}, false
+	}
+}
+
+func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
+	for _, dir := range []string{
+		"/Users/rizqme/Workspace/BenchmarkJava",
+		"/Users/rizqme/Workspace/owasp-python",
+		"/tmp/bench/BenchmarkJava",
+	} {
+		want := filepath.Base(dir) == "BenchmarkJava" || strings.HasPrefix(filepath.Base(dir), "owasp-")
+		if _, ok := protectedOWASPBenchmarkExpectation(dir); ok != want {
+			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) = %v, want %v", dir, ok, want)
+		}
+	}
+	if _, ok := protectedOWASPBenchmarkExpectation("/tmp/bench/BenchmarkPython"); ok {
+		t.Fatal("ad-hoc BenchmarkPython should remain measurement-only")
+	}
+}
+
+func score(t *testing.T, expected map[string]expRow, detected map[string]map[string]bool) benchmarkScore {
 	type tally struct{ tp, fp, fn, tn int }
 	cats := map[string]*tally{}
 	get := func(c string) *tally {
@@ -231,11 +275,16 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		names = append(names, c)
 	}
 	sort.Strings(names)
+	var total benchmarkScore
 	var sumY float64
 	var nCat int
 	fmt.Printf("\n%-16s %5s %5s %5s %5s  %6s %6s  %7s\n", "category", "TP", "FN", "FP", "TN", "TPR", "FPR", "Youden")
 	for _, c := range names {
 		tl := cats[c]
+		total.tp += tl.tp
+		total.fn += tl.fn
+		total.fp += tl.fp
+		total.tn += tl.tn
 		tpr := ratio(tl.tp, tl.tp+tl.fn)
 		fpr := ratio(tl.fp, tl.fp+tl.tn)
 		y := tpr - fpr
@@ -248,6 +297,8 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		overall = sumY / float64(nCat)
 	}
 	fmt.Printf("%-16s %46s %+7.2f\n", "OVERALL (avg Youden)", "", overall)
+	total.overall = overall
+	return total
 }
 
 func ratio(a, b int) float64 {

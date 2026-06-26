@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter rust {
-  package "libsecp256k1-gen-genmult" {
-    sink method "generate_to" -> code.FilePathAccess
-  }
-}

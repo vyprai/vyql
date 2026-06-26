@@ -1,0 +1,9 @@
+module bindings.php.migration.mf5e68596;
+
+binding deserialization8 {
+  requires {
+    dependency("react/http")
+  }
+  query pattern callExpr where callee.method == "ReactHttpIoMultipartParser.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mc661245d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("address")
+  }
+  query pattern callExpr where callee.method == "dns"
+  emit sink code.FilePathAccess at args[0]
+}

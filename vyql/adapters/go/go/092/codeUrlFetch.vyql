@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding urlFetch92 {
+  query pattern callExpr where callee.path ~= "provider.Get" and args.any.literal contains "issuer"
+  emit sink code.UrlFetch at args[1]
+}

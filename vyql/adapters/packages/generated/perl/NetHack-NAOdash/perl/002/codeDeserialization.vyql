@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2d32aa40;
+
+binding deserialization2 {
+  requires {
+    dependency("NetHack-NAOdash")
+  }
+  query pattern callExpr where callee.method == "naodash_xlog"
+  emit sink code.Deserialization at args[0]
+}

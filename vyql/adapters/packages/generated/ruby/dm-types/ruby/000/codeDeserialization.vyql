@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mfdf583cd;
+
+binding deserialization0 {
+  requires {
+    dependency("dm-types")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

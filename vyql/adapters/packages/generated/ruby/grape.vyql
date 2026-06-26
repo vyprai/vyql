@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter ruby {
-  package "grape" {
-    sink method "parse" -> code.Deserialization
-    sink method "parser_for" -> code.Deserialization
-  }
-}

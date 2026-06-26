@@ -1,8 +1,0 @@
-import code.{SecretValue}
-
-adapter swift {
-  package "github.com/rryam/MusadoraKit" {
-    source method "userToken" -> code.SecretValue
-    source method "developerToken" -> code.SecretValue
-  }
-}

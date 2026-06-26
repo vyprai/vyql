@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding unboundedEmailRegexValidation553 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "/^\\S+@\\S+$/.test(email)" and node.token contains "dns.resolveMx(email.split('@')[1]" and not (node.token contains "MAX_EMAIL_LEN<email.length") and not (node.token contains "email.length>300") and not (node.token contains "email.length>=300")
+  emit issue code.UnboundedEmailRegexValidation at node
+}

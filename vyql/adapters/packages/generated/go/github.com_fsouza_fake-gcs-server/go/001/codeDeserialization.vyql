@@ -1,0 +1,9 @@
+module bindings.go.migration.m0f601fe9;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/fsouza/fake-gcs-server")
+  }
+  query pattern callExpr where callee.method == "parseContentRange"
+  emit sink code.Deserialization at args[0]
+}

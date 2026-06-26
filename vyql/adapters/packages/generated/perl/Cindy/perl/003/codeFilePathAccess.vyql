@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc0f0dde0;
+
+binding filePathAccess3 {
+  requires {
+    dependency("Cindy")
+  }
+  query pattern callExpr where callee.method == "get_xml_doc"
+  emit sink code.FilePathAccess at args[0]
+}

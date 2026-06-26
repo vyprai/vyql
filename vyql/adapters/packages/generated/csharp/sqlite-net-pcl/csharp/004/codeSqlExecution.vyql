@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m78741b33;
+
+binding sqlExecution4 {
+  requires {
+    dependency("sqlite-net-pcl")
+  }
+  query pattern callExpr where callee.method == "Update"
+  emit sink code.SqlExecution at args[0]
+}

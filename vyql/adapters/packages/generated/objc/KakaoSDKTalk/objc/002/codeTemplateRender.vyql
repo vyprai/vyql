@@ -1,0 +1,9 @@
+module bindings.objc.migration.m29559e25;
+
+binding templateRender2 {
+  requires {
+    dependency("KakaoSDKTalk")
+  }
+  query pattern callExpr where callee.method == "sendDefaultMemo"
+  emit sink code.TemplateRender at args[0]
+}

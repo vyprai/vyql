@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "com.google.protobuf:protobuf-java-util" {
-    sink method "merge" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-    sink method "parseUnchecked" -> code.Deserialization
-  }
-}

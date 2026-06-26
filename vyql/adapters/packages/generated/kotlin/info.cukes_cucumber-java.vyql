@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter kotlin {
-  package "info.cukes:cucumber-java" {
-    source method "addStepDefinition" -> core.UserControlledData
-    source method "addBeforeHookDefinition" -> core.UserControlledData
-    source method "addAfterHookDefinition" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m6fa857dd;
+
+binding commandExecution0 {
+  requires {
+    dependency("heroku3")
+  }
+  query pattern callExpr where callee.method == "run_command_on_app"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,7 +1,0 @@
-adapter perl {
-  package "Mozilla-Mechanize-GUITester" {
-    sink method "run_js" -> code.CodeEval
-    source method "set_confirm_result" -> core.UserControlledData
-    source method "set_prompt_result" -> core.UserControlledData
-  }
-}

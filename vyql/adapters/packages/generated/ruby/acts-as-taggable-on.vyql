@@ -1,8 +1,0 @@
-import core.{SqlParameterization}
-adapter ruby {
-  package "acts-as-taggable-on" {
-    control method "sanitize_sql_for_named_any" -> core.SqlParameterization
-    control method "escape_like" -> core.SqlParameterization
-    control method "safe_to_sql" -> core.SqlParameterization
-  }
-}

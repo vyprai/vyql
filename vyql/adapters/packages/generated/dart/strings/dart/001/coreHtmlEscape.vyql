@@ -1,0 +1,14 @@
+module bindings.dart.migration.m63949ee1;
+
+binding htmlEscape1 {
+  requires {
+    dependency("strings")
+  }
+  query pattern callExpr where callee.method == "toEscape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

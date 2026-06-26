@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5e849dd9;
+
+binding deserialization1 {
+  requires {
+    dependency("libphonenumber")
+  }
+  query pattern callExpr where callee.method == "isValidPhoneNumber"
+  emit sink code.Deserialization at args[0]
+}

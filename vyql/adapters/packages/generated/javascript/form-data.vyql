@@ -1,9 +1,0 @@
-import code.{HttpInput}
-import core.{HtmlEscape, UserControlledData}
-
-adapter javascript {
-  package "form-data" {
-    source method "append" -> core.UserControlledData
-    control method "escapeHeaderParam" -> core.HtmlEscape
-  }
-}

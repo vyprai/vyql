@@ -1,9 +1,0 @@
-import code.{HtmlRender}
-
-adapter elixir {
-  package "rss" {
-    sink method "feed" -> code.HtmlRender
-    sink method "item" -> code.HtmlRender
-    sink method "channel" -> code.HtmlRender
-  }
-}

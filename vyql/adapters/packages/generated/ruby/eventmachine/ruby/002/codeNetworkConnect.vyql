@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mdb4485cf;
+
+binding networkConnect2 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

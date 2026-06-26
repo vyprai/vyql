@@ -1,7 +1,0 @@
-adapter rust {
-  package "regex-automata" {
-    flag code.RegexCompile on any {
-      method "search"
-    }
-  }
-}

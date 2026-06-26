@@ -1,0 +1,8 @@
+module bindings.java.migration.m420f6b67;
+
+binding cSVWriter55 {
+  query pattern callExpr where callee.path ~= "CSVWriter"
+  emit fact runtime.ReceiverType at call.result {
+    about: CSVWriter
+  }
+}

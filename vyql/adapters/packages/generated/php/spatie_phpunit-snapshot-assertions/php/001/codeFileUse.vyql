@@ -1,0 +1,9 @@
+module bindings.php.migration.mdef2ed9c;
+
+binding fileUse1 {
+  requires {
+    dependency("spatie/phpunit-snapshot-assertions")
+  }
+  query pattern callExpr where callee.method == "SpatieSnapshotsFilesystem::put"
+  emit sink code.FileUseSink at args[0]
+}

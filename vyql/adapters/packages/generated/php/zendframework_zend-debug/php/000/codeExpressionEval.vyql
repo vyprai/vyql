@@ -1,0 +1,9 @@
+module bindings.php.migration.mcdb286b7;
+
+binding expressionEval0 {
+  requires {
+    dependency("zendframework/zend-debug")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit sink code.ExpressionEval at args[0]
+}

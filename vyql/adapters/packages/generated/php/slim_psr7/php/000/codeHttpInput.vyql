@@ -1,0 +1,9 @@
+module bindings.php.migration.m9055bcf2;
+
+binding httpInput0 {
+  requires {
+    dependency("slim/psr7")
+  }
+  query pattern callExpr where callee.method == "getCookieParams"
+  emit source code.HttpInput at call.result
+}

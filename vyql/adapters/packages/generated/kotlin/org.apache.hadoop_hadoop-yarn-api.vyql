@@ -1,9 +1,0 @@
-import code.{SecretValue}
-
-adapter kotlin {
-  package "org.apache.hadoop:hadoop-yarn-api" {
-    source method "getDelegationToken" -> code.SecretValue
-    source method "renewDelegationToken" -> code.SecretValue
-    source method "cancelDelegationToken" -> code.SecretValue
-  }
-}

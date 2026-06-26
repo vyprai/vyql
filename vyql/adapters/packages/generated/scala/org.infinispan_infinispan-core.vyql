@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.infinispan:infinispan-core" {
-    sink method "readObject" -> code.Deserialization
-  }
-}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ChefUserManagementWithoutAdminGuard {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-016"
+    severity: high
+  }
+  issue code.ChefUserManagementWithoutAdminGuard as controller
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma9962ec0;
+
+binding fileUse1 {
+  requires {
+    dependency("speex")
+  }
+  query pattern callExpr where callee.method == "write_wav_header"
+  emit sink code.FileUseSink at args[0]
+}

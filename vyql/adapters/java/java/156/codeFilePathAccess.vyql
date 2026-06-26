@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding filePathAccess156 {
+  query pattern callExpr where callee.path ~= "FileReader"
+  emit sink code.FilePathAccess at args[0]
+}

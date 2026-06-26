@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma1da0d8f;
+
+binding fileUse8 {
+  requires {
+    dependency("google-apis-storage_v1")
+  }
+  query pattern callExpr where callee.method == "copy_object"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept WeakRedirectUrlValidation : issue {
+  cwe: [CWE_601, CWE_20]
+  review_assumption: "attackers can provide a next/redirect URL that reaches this validation helper"
+  reviewCategory: request_forgery
+  reviewCondition: "redirect URL validation allows external netloc checks without scheme parity, slash normalization, and control-character rejection"
+  reviewConfidence: high
+  reviewEvidence: "redirect validation context {pattern} parses target and request host but uses a weak netloc/external-host check before redirect"
+  vulnerableTo: [request_forgery.OpenRedirect, validation.ImproperInputValidation]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.mde0c0649;
+
+binding deserialization5 {
+  requires {
+    dependency("rome:rome")
+  }
+  query pattern callExpr where callee.method == "SAXBuilder"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m8b0bbbbb;
+
+binding filePathAccess3 {
+  requires {
+    dependency("MMKV")
+  }
+  query pattern callExpr where callee.method == "expandAndWriteBack"
+  emit sink code.FilePathAccess at args[0]
+}

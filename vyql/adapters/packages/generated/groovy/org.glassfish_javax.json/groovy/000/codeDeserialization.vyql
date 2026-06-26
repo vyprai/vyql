@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb3e60157;
+
+binding deserialization0 {
+  requires {
+    dependency("org.glassfish:javax.json")
+  }
+  query pattern callExpr where callee.method == "PARSER_GETSTRING_ERR"
+  emit sink code.Deserialization at args[0]
+}

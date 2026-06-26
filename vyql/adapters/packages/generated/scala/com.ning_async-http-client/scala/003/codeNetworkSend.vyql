@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbeef8f9f;
+
+binding networkSend3 {
+  requires {
+    dependency("com.ning:async-http-client")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m8c41488e;
+
+binding networkSend0 {
+  requires {
+    dependency("k8s.io/kube-aggregator")
+  }
+  query pattern callExpr where callee.method == "proxyError"
+  emit sink code.NetworkSend at args[0]
+}

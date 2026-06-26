@@ -1,0 +1,9 @@
+module bindings.perl.migration.m3314d2bf;
+
+binding htmlRender1 {
+  requires {
+    dependency("Petal")
+  }
+  query pattern callExpr where callee.method == "output"
+  emit sink code.HtmlRender at args[0]
+}

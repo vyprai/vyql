@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me584d3c7;
+
+binding deserialization2 {
+  requires {
+    dependency("toml")
+  }
+  query pattern callExpr where callee.method == "Toml.Decoder.decode_stream!"
+  emit sink code.Deserialization at args[0]
+}

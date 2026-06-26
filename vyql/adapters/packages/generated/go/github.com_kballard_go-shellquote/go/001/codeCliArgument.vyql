@@ -1,0 +1,9 @@
+module bindings.go.migration.m69685fd2;
+
+binding cliArgument1 {
+  requires {
+    dependency("github.com/kballard/go-shellquote")
+  }
+  query pattern callExpr where callee.method == "Split"
+  emit source code.CliArgument at call.result
+}

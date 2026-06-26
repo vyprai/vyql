@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedGeneratedJavaStringFieldName : issue {
+  cwe: [CWE_94, CWE_116]
+  review_assumption: "a caller can define row field names containing quote, slash, newline, or other Java-literal metacharacters before code generation"
+  reviewCategory: code_execution
+  reviewCondition: "logical field names are embedded into generated Java string literals without Java string escaping"
+  reviewConfidence: high
+  reviewEvidence: "row codegen context {pattern} reads logical field names and emits generated member code without an observed escapeJava call"
+  vulnerableTo: [injection.CodeInjection]
+}

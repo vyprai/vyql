@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding archiveEntryWrite363 {
+  requires {
+    dependency("adm-zip")
+  }
+  query pattern callExpr where callee.method == "extractAllTo"
+  emit sink code.ArchiveEntryWrite at callee.receiver
+}

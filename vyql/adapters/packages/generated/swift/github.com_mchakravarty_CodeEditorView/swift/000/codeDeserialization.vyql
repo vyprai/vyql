@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma8249451;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/mchakravarty/CodeEditorView")
+  }
+  query pattern callExpr where callee.method == "tokenise"
+  emit sink code.Deserialization at args[0]
+}

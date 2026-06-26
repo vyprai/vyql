@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m238fd72a;
+
+binding commandExecution1 {
+  requires {
+    dependency("porcelain")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

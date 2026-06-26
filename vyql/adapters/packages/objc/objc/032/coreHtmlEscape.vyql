@@ -1,0 +1,14 @@
+module bindings.objc.migration.m942721f9;
+
+binding htmlEscape32 {
+  requires {
+    dependency("hpple")
+  }
+  query pattern callExpr where callee.path ~= "NSString.stringByEscapingHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,14 @@
+module bindings.php.migration.mb6781b83;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("doctrine/doctrine-orm-module")
+  }
+  query pattern callExpr where callee.method == "prepareEvent"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

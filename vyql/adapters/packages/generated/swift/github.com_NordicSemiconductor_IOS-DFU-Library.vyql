@@ -1,9 +1,0 @@
-import code.{ArchiveEntryWrite, FileUse}
-
-adapter swift {
-  package "github.com/NordicSemiconductor/IOS-DFU-Library" {
-    sink method "unzipItem" -> code.FileUse
-    sink method "extract" -> code.FileUse
-    sink method "addEntry" -> code.ArchiveEntryWrite
-  }
-}

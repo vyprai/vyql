@@ -1,0 +1,9 @@
+module bindings.bash.migration.mda4c1fc1;
+
+binding cliArgument0 {
+  requires {
+    dependency("docbook-xsl")
+  }
+  query pattern callExpr where callee.path ~= "dbtoepub"
+  emit source code.CliArgument at call.result
+}

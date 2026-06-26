@@ -1,9 +1,0 @@
-import code.{FilePathAccess, Deserialization, DatabaseRead}
-adapter perl {
-  package "KiokuDB" {
-    sink method "connect" -> code.FilePathAccess
-    sink method "search" -> code.DatabaseRead
-    sink method "STORABLE_freeze" -> code.Deserialization
-    sink method "STORABLE_thaw" -> code.Deserialization
-  }
-}

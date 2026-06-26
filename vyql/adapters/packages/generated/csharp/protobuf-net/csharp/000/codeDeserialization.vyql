@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m49977cd0;
+
+binding deserialization0 {
+  requires {
+    dependency("protobuf-net")
+  }
+  query pattern callExpr where callee.method == "Deserialize"
+  emit sink code.Deserialization at args[0]
+}

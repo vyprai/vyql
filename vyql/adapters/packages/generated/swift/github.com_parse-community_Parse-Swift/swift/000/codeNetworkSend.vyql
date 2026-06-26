@@ -1,0 +1,9 @@
+module bindings.swift.migration.m98e3ffbb;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/parse-community/Parse-Swift")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

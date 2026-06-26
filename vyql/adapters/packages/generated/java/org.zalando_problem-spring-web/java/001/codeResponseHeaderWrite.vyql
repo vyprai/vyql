@@ -1,0 +1,9 @@
+module bindings.java.migration.m00e366aa;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("org.zalando:problem-spring-web")
+  }
+  query pattern callExpr where callee.method == "commence"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

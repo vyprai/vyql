@@ -209,7 +209,7 @@ func TestVyqlSpecs(t *testing.T) {
 	// compile the shipped packs once — `graph` specs evaluate them over a synthetic
 	// asset/identity graph (the code specs scan source instead).
 	onto := ontology.Seed()
-	decls, err := parser.Parse(rules)
+	decls, err := parser.ParseRuntime(rules)
 	if err != nil {
 		t.Fatalf("parse packs: %v", err)
 	}
@@ -229,11 +229,13 @@ func TestVyqlSpecs(t *testing.T) {
 		t.Skip("no .test.vyql specs found")
 	}
 
+	specTempRoot := t.TempDir()
 	total := 0
 	for _, f := range files {
 		for _, s := range parseSpecFile(t, f) {
 			s := s
 			total++
+			specIndex := total
 			t.Run(s.src+"/"+s.name, func(t *testing.T) {
 				if len(s.expect) == 0 && len(s.reject) == 0 && len(s.expectEv) == 0 && len(s.rejectEv) == 0 &&
 					len(s.expectReview) == 0 && len(s.rejectReview) == 0 && len(s.expectLabels) == 0 && len(s.rejectLabels) == 0 {
@@ -284,7 +286,10 @@ func TestVyqlSpecs(t *testing.T) {
 					if len(s.files) == 0 {
 						t.Fatalf("%s:%d: spec %q has no code or graph block", s.src, s.line, s.name)
 					}
-					dir := t.TempDir()
+					dir := filepath.Join(specTempRoot, "spec-"+strconv.Itoa(specIndex))
+					if err := os.MkdirAll(dir, 0o755); err != nil {
+						t.Fatal(err)
+					}
 					for n, fl := range s.files {
 						name := fl.name
 						if name == "" {
@@ -310,7 +315,7 @@ func TestVyqlSpecs(t *testing.T) {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
 					}
-					found, _, _, err := scanPaths([]string{dir}, rules)
+					found, _, scanGraph, err := scanPaths([]string{dir}, rules)
 					if err != nil {
 						t.Fatalf("scan: %v", err)
 					}
@@ -327,11 +332,7 @@ func TestVyqlSpecs(t *testing.T) {
 						}
 					}
 					if len(s.expectReview) > 0 || len(s.rejectReview) > 0 {
-						g, _, err := buildGraph([]string{dir})
-						if err != nil {
-							t.Fatalf("build graph for review: %v", err)
-						}
-						for _, row := range collectReviewItems(g) {
+						for _, row := range collectReviewItems(scanGraph) {
 							reviewed[row.Concept] = true
 						}
 					}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf5b1f173;
+
+binding xmlParse0 {
+  requires {
+    dependency("github.com/malcommac/SwiftRichString")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.XmlParse at args[0]
+}

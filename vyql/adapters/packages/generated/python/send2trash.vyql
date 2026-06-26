@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter python {
-  package "send2trash" {
-    sink method "send2trash" -> code.FilePathAccess
-  }
-}

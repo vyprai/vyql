@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m3e3aad71;
+
+binding filePathAccess13 {
+  requires {
+    dependency("libsystemd")
+  }
+  query pattern callExpr where callee.method == "chase_and_statat"
+  emit sink code.FilePathAccess at args[0]
+}

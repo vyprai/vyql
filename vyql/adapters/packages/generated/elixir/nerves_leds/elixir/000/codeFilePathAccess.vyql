@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mdb3264a9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nerves_leds")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.FilePathAccess at args[0]
+}

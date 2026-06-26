@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter groovy {
-  package "io.dropwizard.metrics:metrics-servlets" {
-    source method "doGet" -> code.HttpInput
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m1d0184d9;
+
+binding userControlledData3 {
+  requires {
+    dependency("nette/bootstrap")
+  }
+  query pattern callExpr where callee.method == "addDynamicParameters"
+  emit source core.UserControlledData at call.result
+}

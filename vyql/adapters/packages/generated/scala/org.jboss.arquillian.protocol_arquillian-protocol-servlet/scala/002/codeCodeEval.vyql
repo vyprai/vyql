@@ -1,0 +1,9 @@
+module bindings.scala.migration.m49d0562d;
+
+binding codeEval2 {
+  requires {
+    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding requestPathPercentSLogInjection158 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:fmt.Sprintf" and node.token contains "selector:.Path" and node.token contains "selector:.ErrorMessage" and node.token contains "literal:%s %s\n%s" and not (node.token contains "literal:%#v")
+  emit issue code.RequestPathPercentSLogInjection at node
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m3d3e6904;
+
+binding commandExecution1 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-ie-driver")
+  }
+  query pattern callExpr where callee.method == "addCommandSwitches"
+  emit sink code.CommandExecution at args[0]
+}

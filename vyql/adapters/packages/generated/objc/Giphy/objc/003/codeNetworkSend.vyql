@@ -1,0 +1,9 @@
+module bindings.objc.migration.m882eaacf;
+
+binding networkSend3 {
+  requires {
+    dependency("Giphy")
+  }
+  query pattern callExpr where callee.method == "downloadAssetData"
+  emit sink code.NetworkSend at args[0]
+}

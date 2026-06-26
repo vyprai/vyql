@@ -1,5 +1,0 @@
-adapter php {
-  package "doctrine/instantiator" {
-    sink method "instantiate" -> code.Deserialization
-  }
-}

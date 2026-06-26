@@ -1,0 +1,9 @@
+module bindings.dart.migration.m0d60f419;
+
+binding deserialization0 {
+  requires {
+    dependency("hydrated_bloc")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}

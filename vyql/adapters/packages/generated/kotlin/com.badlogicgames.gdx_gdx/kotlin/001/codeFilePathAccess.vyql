@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb36ef84f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FilePathAccess at args[0]
+}

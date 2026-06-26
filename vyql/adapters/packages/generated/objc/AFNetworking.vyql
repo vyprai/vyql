@@ -1,8 +1,0 @@
-import code.{CertValidationDisabled}
-adapter objc {
-  package "AFNetworking" {
-    flag code.CertValidationDisabled on any {
-      method "evaluateServerTrust:forDomain:"
-    }
-  }
-}

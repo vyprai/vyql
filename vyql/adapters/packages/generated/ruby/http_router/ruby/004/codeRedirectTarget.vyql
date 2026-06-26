@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m02e745e0;
+
+binding redirectTarget4 {
+  requires {
+    dependency("http_router")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "rewrite_partial_path_info"
+  emit issue code.RedirectTarget at node
+  emit sink code.RedirectTargetSink at node
+}

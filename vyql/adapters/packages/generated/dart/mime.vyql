@@ -1,6 +1,0 @@
-adapter dart {
-  package "mime" {
-    source method "MimeTypeResolver.lookup" -> core.UserControlledData
-    sink method "MimeMultipartTransformer" -> code.Deserialization
-  }
-}

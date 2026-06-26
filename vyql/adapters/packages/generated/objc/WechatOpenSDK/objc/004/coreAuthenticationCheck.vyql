@@ -1,0 +1,14 @@
+module bindings.objc.migration.m9075ca44;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("WechatOpenSDK")
+  }
+  query pattern callExpr where callee.method == "sendAuthReq"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

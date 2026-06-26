@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m4117d2bd;
+
+binding filePathAccess3 {
+  requires {
+    dependency("fsreveal")
+  }
+  query pattern callExpr where callee.method == "GenerateOutputFromMarkdownFile"
+  emit sink code.FilePathAccess at args[0]
+}

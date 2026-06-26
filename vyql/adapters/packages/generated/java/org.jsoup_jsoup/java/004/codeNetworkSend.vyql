@@ -1,0 +1,9 @@
+module bindings.java.migration.mf125e731;
+
+binding networkSend4 {
+  requires {
+    dependency("org.jsoup:jsoup")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}

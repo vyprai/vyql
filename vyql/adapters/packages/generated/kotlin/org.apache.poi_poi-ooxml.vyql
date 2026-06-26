@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.apache.poi:poi-ooxml" {
-    sink method "parse" -> code.Deserialization
-  }
-}

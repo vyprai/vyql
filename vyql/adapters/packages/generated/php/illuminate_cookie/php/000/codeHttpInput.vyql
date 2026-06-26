@@ -1,0 +1,9 @@
+module bindings.php.migration.mad656539;
+
+binding httpInput0 {
+  requires {
+    dependency("illuminate/cookie")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mb7311fac;
+
+binding filePathAccess8 {
+  requires {
+    dependency("cpp-httplib")
+  }
+  query pattern callExpr where callee.method == "set_file_content"
+  emit sink code.FilePathAccess at args[0]
+}

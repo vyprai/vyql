@@ -1,0 +1,9 @@
+module bindings.javascript.migration.md23dcc69;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ignore-walk")
+  }
+  query pattern callExpr where callee.method == "addIgnoreFile"
+  emit sink code.FilePathAccess at args[0]
+}

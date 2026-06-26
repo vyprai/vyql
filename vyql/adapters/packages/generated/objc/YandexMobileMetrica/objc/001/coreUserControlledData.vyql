@@ -1,0 +1,9 @@
+module bindings.objc.migration.m6998ce18;
+
+binding userControlledData1 {
+  requires {
+    dependency("YandexMobileMetrica")
+  }
+  query pattern callExpr where callee.method == "reportReferralUrl"
+  emit source core.UserControlledData at call.result
+}

@@ -6,6 +6,7 @@ test "a vulnerable dependency is flagged (SCA-001)"
   graph
   ```
   node dep sbom.VulnerableDependency
+  label dep sbom.VulnerableDependencyFact
   ```
 
 test "a reachable vulnerable dependency is higher severity (SCA-002)"
@@ -14,6 +15,7 @@ test "a reachable vulnerable dependency is higher severity (SCA-002)"
   graph
   ```
   node dep sbom.VulnerableDependency
+  label dep sbom.VulnerableDependencyFact
   label dep sbom.ReachableSymbol
   ```
 
@@ -22,6 +24,7 @@ test "a typosquatting / known-bad dependency is flagged (SCA-003)"
   graph
   ```
   node dep sbom.SuspiciousDependency
+  label dep sbom.SuspiciousDependencyFact
   ```
 
 test "a confirmed-malicious dependency is flagged (SCA-004)"
@@ -29,6 +32,7 @@ test "a confirmed-malicious dependency is flagged (SCA-004)"
   graph
   ```
   node dep sbom.MaliciousDependency
+  label dep sbom.MaliciousDependencyFact
   ```
 
 test "a vulnerable HTTP parser dependency is request-smuggling relevant (SCA-005)"
@@ -36,4 +40,5 @@ test "a vulnerable HTTP parser dependency is request-smuggling relevant (SCA-005
   graph
   ```
   node dep sbom.HttpRequestSmugglingDependency
+  label dep sbom.HttpRequestSmugglingDependencyFact
   ```

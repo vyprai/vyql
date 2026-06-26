@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.squareup.retrofit:retrofit" {
-    sink method "parse" -> code.Deserialization
-  }
-}

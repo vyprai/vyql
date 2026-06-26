@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m20487d8b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("butteraugli")
+  }
+  query pattern callExpr where callee.method == "ReadJPEG"
+  emit sink code.FilePathAccess at args[0]
+}

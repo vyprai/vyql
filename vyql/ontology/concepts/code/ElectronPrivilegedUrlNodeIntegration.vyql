@@ -1,0 +1,11 @@
+module code;
+
+concept ElectronPrivilegedUrlNodeIntegration : issue {
+  cwe: [CWE_829, CWE_94]
+  review_assumption: "an attacker can combine a navigation or same-origin bypass with the privileged URL to evaluate Node primitives"
+  reviewCategory: desktop
+  reviewCondition: "Electron enables Node integration for a privileged internal URL scheme"
+  reviewConfidence: high
+  reviewEvidence: "renderer initialization context {pattern} grants Node integration to chrome-devtools URLs before the patched false assignment"
+  vulnerableTo: [desktop.InsecureElectronConfig, injection.UnsafeDynamicLoading]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m12c3bcba;
+
+binding deserialization3 {
+  requires {
+    dependency("go.opentelemetry.io/proto/otlp")
+  }
+  query pattern callExpr where callee.method == "local_request_TraceService_Export_0"
+  emit sink code.Deserialization at args[0]
+}

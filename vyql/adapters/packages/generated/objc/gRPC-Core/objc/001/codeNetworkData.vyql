@@ -1,0 +1,9 @@
+module bindings.objc.migration.me76efafa;
+
+binding networkData1 {
+  requires {
+    dependency("gRPC-Core")
+  }
+  query pattern callExpr where callee.method == "grpc_server_request_call"
+  emit source code.NetworkData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter rust {
-  package "ureq" {
-    sink method "send" -> code.NetworkSend
-    sink method "run" -> code.NetworkSend
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m25005db4;
+
+binding networkSend3 {
+  requires {
+    dependency("fog-softlayer")
+  }
+  query pattern callExpr where callee.method == "slapi_request"
+  emit sink code.NetworkSend at args[0]
+}

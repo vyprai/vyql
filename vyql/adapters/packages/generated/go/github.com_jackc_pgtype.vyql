@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter go {
-  package "github.com/jackc/pgtype" {
-    sink method "ParseUntypedTextArray" -> code.Deserialization
-  }
-}

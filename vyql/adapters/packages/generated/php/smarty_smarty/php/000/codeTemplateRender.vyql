@@ -1,0 +1,9 @@
+module bindings.php.migration.m9cc235f9;
+
+binding templateRender0 {
+  requires {
+    dependency("smarty/smarty")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.TemplateRender at args[0]
+}

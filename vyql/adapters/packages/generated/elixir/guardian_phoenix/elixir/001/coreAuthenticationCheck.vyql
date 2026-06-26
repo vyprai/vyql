@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m51dfefb6;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("guardian_phoenix")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

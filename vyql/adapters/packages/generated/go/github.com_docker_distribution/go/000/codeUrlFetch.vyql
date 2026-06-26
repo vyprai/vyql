@@ -1,0 +1,9 @@
+module bindings.go.migration.mca2a6026;
+
+binding urlFetch0 {
+  requires {
+    dependency("github.com/docker/distribution")
+  }
+  query pattern callExpr where callee.method == "WithRequest"
+  emit sink code.UrlFetch at args[0]
+}

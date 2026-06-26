@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter cpp {
-  package "lazy-importer" {
-    sink method "lazy_function" -> code.CodeEval
-    sink method "lazy_module" -> code.CodeEval
-  }
-}

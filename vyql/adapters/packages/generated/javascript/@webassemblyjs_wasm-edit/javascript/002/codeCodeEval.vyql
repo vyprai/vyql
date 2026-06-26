@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb6a49a80;
+
+binding codeEval2 {
+  requires {
+    dependency("@webassemblyjs/wasm-edit")
+  }
+  query pattern callExpr where callee.method == "editWithAST"
+  emit sink code.CodeEval at args[0]
+}

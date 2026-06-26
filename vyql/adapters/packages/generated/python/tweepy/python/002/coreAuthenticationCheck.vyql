@@ -1,0 +1,14 @@
+module bindings.python.migration.m228ea0ce;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("tweepy")
+  }
+  query pattern callExpr where callee.method == "API.request"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

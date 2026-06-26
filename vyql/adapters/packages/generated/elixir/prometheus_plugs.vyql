@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter elixir {
-  package "prometheus_plugs" {
-    source method "Prometheus.PlugExporter.call" -> code.HttpInput
-  }
-}

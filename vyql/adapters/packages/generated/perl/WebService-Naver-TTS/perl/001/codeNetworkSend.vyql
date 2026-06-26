@@ -1,0 +1,9 @@
+module bindings.perl.migration.m857795ab;
+
+binding networkSend1 {
+  requires {
+    dependency("WebService-Naver-TTS")
+  }
+  query pattern callExpr where callee.method == "tts"
+  emit sink code.NetworkSend at args[0]
+}

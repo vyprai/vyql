@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "parse5" {
-    sink method "parse" -> code.Deserialization
-    sink method "parseFragment" -> code.Deserialization
-  }
-}

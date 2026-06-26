@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding objectLookupByUserInput84 {
+  query pattern callExpr where callee.method == "Find"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}

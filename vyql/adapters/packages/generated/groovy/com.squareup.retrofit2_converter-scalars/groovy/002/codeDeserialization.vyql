@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mb7479ee5;
+
+binding deserialization2 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$ByteResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter ruby {
-  package "cocoapods" {
-    sink method "system" -> code.CommandExecution
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7b65d05d;
+
+binding deserialization0 {
+  requires {
+    dependency("pdf")
+  }
+  query pattern callExpr where callee.method == "SvgParser"
+  emit sink code.Deserialization at args[0]
+}

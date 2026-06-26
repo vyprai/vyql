@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding filePathAccess10 {
+  requires {
+    dependency("perl")
+  }
+  query pattern callExpr where callee.path ~= "open"
+  emit sink code.FilePathAccess at args.any
+}

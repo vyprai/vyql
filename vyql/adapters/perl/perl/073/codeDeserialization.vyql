@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding deserialization73 {
+  query pattern callExpr where callee.method == "thaw"
+  emit sink code.Deserialization at args[0]
+}

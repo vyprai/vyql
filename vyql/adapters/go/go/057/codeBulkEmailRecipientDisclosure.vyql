@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding bulkEmailRecipientDisclosure57 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["call_path:SendIssueCommentMail", "call_path:SendIssueMentionMail", "call_path:SendMail", "call_path:SendEmail", "call_path:SendNotification", "call_path:SendNotificationMail", "call_path:SendNotificationEmail"]) and node.token contains "call_path:append" and node.token contains "selector:.Email" and containsAny(node.token, ["call_arg:SendIssueCommentMail:tos", "call_arg:SendIssueMentionMail:getUserEmailsByNames", "call_arg:SendMail:tos", "call_arg:SendMail:recipients", "call_arg:SendEmail:recipients", "call_arg:SendEmail:emails", "call_arg:SendNotification:recipients", "call_arg:SendNotificationMail:recipients", "call_arg:SendNotificationEmail:recipients"]) and not (node.token contains "call_arg:__object_literal") and not (containsAny(node.token, ["call_path:Bcc", "call_path:BlindCopy"]))
+  emit issue code.BulkEmailRecipientDisclosure at node
+}

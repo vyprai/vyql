@@ -10,10 +10,10 @@ import (
 // fields in the body.
 func TestConceptDeclMatchesSeed(t *testing.T) {
 	src := `
-package code;
+module code;
 concept Deserialization : sink {
-  vulnerable_to: [deserialization.DeserializationAbuse]
-  enabled_by: [taint.UntrustedData]
+  vulnerableTo: [deserialization.DeserializationAbuse]
+  enabledBy: [taint.UntrustedData]
   cwe: [CWE_502]
 }
 `
@@ -37,18 +37,21 @@ concept Deserialization : sink {
 	}
 }
 
-// The dotted-header form and a `control` with neutralizes/applies both parse,
+// Multi-module v2 concept text and a neutralizing `check` both parse,
 // and a loaded ontology type-checks `sanitized_by` correctly.
 func TestConceptDeclDottedAndTyping(t *testing.T) {
 	src := `
-concept code.HttpInput : source {
+module code;
+concept HttpInput : source {
   taint: [taint.UntrustedData]
 }
-concept code.SqlExecution : sink {
-  vulnerable_to: [injection.SqlInjection]
-  enabled_by: [taint.UntrustedData]
+concept SqlExecution : sink {
+  vulnerableTo: [injection.SqlInjection]
+  enabledBy: [taint.UntrustedData]
 }
-concept core.SqlParameterization : control {
+
+module core;
+concept SqlParameterization : check {
   neutralizes: [injection.SqlInjection]
   applies: path
 }
@@ -64,13 +67,13 @@ concept core.SqlParameterization : control {
 	if _, err := o.CheckSanitizerTyping("code.HttpInput", "code.SqlExecution", "core.SqlParameterization"); err != nil {
 		t.Fatalf("well-typed sanitizer rejected: %v", err)
 	}
-	// a control bound to the wrong threat must NOT type-check
-	o.Add(Concept{Name: "HtmlEscape", Package: "core", Kind: "control", Neutralizes: []string{"injection.Xss"}})
+	// a neutralizing check bound to the wrong threat must NOT type-check
+	o.Add(Concept{Name: "HtmlEscape", Package: "core", Kind: "check", Neutralizes: []string{"injection.Xss"}})
 	if _, err := o.CheckSanitizerTyping("code.HttpInput", "code.SqlExecution", "core.HtmlEscape"); err == nil {
-		t.Fatal("wrong-threat control should not defend a SQL sink")
+		t.Fatal("wrong-threat check should not defend a SQL sink")
 	}
-	// applies defaulted to "path" on Add for a control with no explicit applies
+	// applies defaulted to "path" on Add for a neutralizing check with no explicit applies
 	if c := o.MustGet("core.HtmlEscape"); c.Applies != "path" {
-		t.Fatalf("control applies should default to path, got %q", c.Applies)
+		t.Fatalf("neutralizing check applies should default to path, got %q", c.Applies)
 	}
 }

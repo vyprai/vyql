@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mae920a2d;
+
+binding deserialization2 {
+  requires {
+    dependency("sourceror")
+  }
+  query pattern callExpr where callee.method == "parse_expression"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess, NetworkSend}
-adapter scala {
-  package "org.springframework.integration:spring-integration-file" {
-    sink method "writeMessageToFile" -> code.FilePathAccess
-    sink method "send" -> code.NetworkSend
-  }
-}

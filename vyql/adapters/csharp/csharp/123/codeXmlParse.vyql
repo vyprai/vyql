@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding xmlParse123 {
+  query pattern callExpr where callee.path ~= "XmlReader.Create"
+  emit sink code.XmlParse at args[0]
+}

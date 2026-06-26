@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding htmlRender25 {
+  requires {
+    dependency("Microsoft.AspNetCore.Html")
+  }
+  query pattern callExpr where callee.method == "Raw"
+  emit sink code.HtmlRender at args[0]
+}

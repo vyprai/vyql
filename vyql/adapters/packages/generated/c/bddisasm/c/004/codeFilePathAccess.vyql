@@ -1,0 +1,9 @@
+module bindings.c.migration.mb980b818;
+
+binding filePathAccess4 {
+  requires {
+    dependency("bddisasm")
+  }
+  query pattern callExpr where callee.method == "read_file"
+  emit sink code.FilePathAccess at args[0]
+}

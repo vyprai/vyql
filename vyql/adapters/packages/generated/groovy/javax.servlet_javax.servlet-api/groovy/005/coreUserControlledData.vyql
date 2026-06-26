@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m4f20c1a4;
+
+binding userControlledData5 {
+  requires {
+    dependency("javax.servlet:javax.servlet-api")
+  }
+  query pattern callExpr where callee.method == "getSubmittedFileName"
+  emit source core.UserControlledData at call.result
+}

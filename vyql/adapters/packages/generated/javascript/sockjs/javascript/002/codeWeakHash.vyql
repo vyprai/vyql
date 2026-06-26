@@ -1,0 +1,13 @@
+module bindings.javascript.migration.m77236a9a;
+
+binding weakHash2 {
+  requires {
+    dependency("sockjs")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "sha1_base64"
+  emit issue code.WeakHash at node
+}

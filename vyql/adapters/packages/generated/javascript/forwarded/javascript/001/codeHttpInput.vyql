@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mdd2d8125;
+
+binding httpInput1 {
+  requires {
+    dependency("forwarded")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.HttpInput at call.result
+}

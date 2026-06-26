@@ -1,0 +1,9 @@
+module bindings.dart.migration.mfd45e819;
+
+binding filePathAccess0 {
+  requires {
+    dependency("permission_handler")
+  }
+  query pattern callExpr where callee.method == "openAppSettings"
+  emit sink code.FilePathAccess at args[0]
+}

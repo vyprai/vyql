@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m7db222d0;
+
+binding networkConnect1 {
+  requires {
+    dependency("clrzmq")
+  }
+  query pattern callExpr where callee.method == "Connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

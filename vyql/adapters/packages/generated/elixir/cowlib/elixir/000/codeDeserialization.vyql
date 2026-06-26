@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf15b86d9;
+
+binding deserialization0 {
+  requires {
+    dependency("cowlib")
+  }
+  query pattern callExpr where callee.method == "parse_event"
+  emit sink code.Deserialization at args[0]
+}

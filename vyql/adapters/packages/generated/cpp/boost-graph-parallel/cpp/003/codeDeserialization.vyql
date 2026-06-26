@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mecdc3ee1;
+
+binding deserialization3 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "unsafe_serialize"
+  emit sink code.Deserialization at args[0]
+}

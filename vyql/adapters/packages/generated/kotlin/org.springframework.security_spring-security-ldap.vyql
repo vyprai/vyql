@@ -1,7 +1,0 @@
-import code.{LdapQuery}
-
-adapter kotlin {
-  package "org.springframework.security:spring-security-ldap" {
-    sink method "search" -> code.LdapQuery
-  }
-}

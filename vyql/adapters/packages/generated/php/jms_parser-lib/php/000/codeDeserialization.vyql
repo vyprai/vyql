@@ -1,0 +1,9 @@
+module bindings.php.migration.m7cbb9c3c;
+
+binding deserialization0 {
+  requires {
+    dependency("jms/parser-lib")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

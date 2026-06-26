@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m788dba71;
+
+binding networkSend0 {
+  requires {
+    dependency("kafka_ex")
+  }
+  query pattern callExpr where callee.method == "KafkaEx.Network.Socket.send"
+  emit sink code.NetworkSend at args[0]
+}

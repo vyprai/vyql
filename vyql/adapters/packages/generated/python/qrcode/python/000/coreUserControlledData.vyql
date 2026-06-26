@@ -1,0 +1,9 @@
+module bindings.python.migration.m62fac934;
+
+binding userControlledData0 {
+  requires {
+    dependency("qrcode")
+  }
+  query pattern callExpr where callee.method == "add_data"
+  emit source core.UserControlledData at call.result
+}

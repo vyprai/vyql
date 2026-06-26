@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9e3f6801;
+
+binding deserialization4 {
+  requires {
+    dependency("com.vaadin.external.google:android-json")
+  }
+  query pattern callExpr where callee.method == "JSONTokener.<init>(String)"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m5157d1e5;
+
+binding httpInput7 {
+  requires {
+    dependency("github.com/zenazn/goji")
+  }
+  query pattern callExpr where callee.method == "Put"
+  emit source code.HttpInput at call.result
+}

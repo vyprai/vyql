@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding defaultPermissiveCorsConfig110 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "prop:CORS_ENABLED=true" and node.token contains "prop:CORS_ORIGIN=true" and not (node.token contains "prop:CORS_ENABLED=false") and not (node.token contains "prop:CORS_ORIGIN=false")
+  emit issue code.DefaultPermissiveCorsConfig at node
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.mcf337d65;
+
+binding filePathAccess4 {
+  requires {
+    dependency("org.jooq:jooq-codegen")
+  }
+  query pattern callExpr where callee.method == "Files.list"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1b5e0d41;
+
+binding deserialization2 {
+  requires {
+    dependency("tinyobjloader")
+  }
+  query pattern callExpr where callee.method == "LoadObj"
+  emit sink code.Deserialization at args[0]
+}

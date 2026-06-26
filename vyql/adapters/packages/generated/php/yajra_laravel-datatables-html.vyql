@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter php {
-  package "yajra/laravel-datatables-html" {
-    sink method "renderJs" -> code.HtmlRender
-  }
-}

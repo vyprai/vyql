@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-adapter objc {
-  package "PersonalizedAdConsent" {
-    sink method "initWithApplicationPrivacyPolicyURL" -> code.UrlFetch
-    sink method "loadWebView" -> code.UrlFetch
-    sink method "showBrowser" -> code.UrlFetch
-  }
-}

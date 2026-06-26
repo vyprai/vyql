@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m71d305b2;
+
+binding userControlledData0 {
+  requires {
+    dependency("trailing_format_plug")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source core.UserControlledData at call.result
+}

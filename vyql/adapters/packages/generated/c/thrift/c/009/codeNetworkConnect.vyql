@@ -1,0 +1,9 @@
+module bindings.c.migration.ma7c2e50a;
+
+binding networkConnect9 {
+  requires {
+    dependency("thrift")
+  }
+  query pattern callExpr where callee.method == "tcp_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

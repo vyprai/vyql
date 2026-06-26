@@ -31,6 +31,29 @@ func compileEval(t *testing.T, src string, s usg.Store) []int {
 	return counts
 }
 
+func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
+	t.Helper()
+	onto := solverContractOntology()
+	decls, err := parser.ParseV2Runtime(src)
+	if err != nil {
+		t.Fatalf("parse v2: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	eng := New(onto, s)
+	var counts []int
+	for _, cr := range compiled {
+		fs, err := eng.Evaluate(cr)
+		if err != nil {
+			t.Fatalf("eval: %v", err)
+		}
+		counts = append(counts, len(fs))
+	}
+	return counts
+}
+
 func TestMatchComposesReachAndAssume(t *testing.T) {
 	src := `
 package test;
@@ -162,6 +185,161 @@ rule GuardedAction {
 	}
 }
 
+func TestMatchSameScopeCoveredBy(t *testing.T) {
+	rule := `
+module test;
+rule SameScopeAction {
+  issue custom.Action as a
+  unless a.sameScope coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Scope: "sample.go/fn1/if1"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("same-scope guard should suppress nested action, got %d", c[0])
+	}
+}
+
+func TestMatchSameScopeCoveredByDifferentScopeDoesNotSuppress(t *testing.T) {
+	rule := `
+module test;
+rule SameScopeAction {
+  issue custom.Action as a
+  unless a.sameScope coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20", Scope: "sample.go/fn2"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("different-scope guard should not suppress action, got %d", c[0])
+	}
+}
+
+func TestMatchGlobalCoveredByRequiresGlobalEvidence(t *testing.T) {
+	rule := `
+module test;
+rule GlobalAction {
+  issue custom.Action as a
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform", Detail: map[string]string{"coverage": "global"}})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("global guard should suppress action, got %d", c[0])
+	}
+}
+
+func TestMatchGlobalCoveredByIgnoresOrdinaryEvidence(t *testing.T) {
+	rule := `
+module test;
+rule GlobalAction {
+  issue custom.Action as a
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10"})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("ordinary guard evidence should not satisfy global coverage, got %d", c[0])
+	}
+}
+
+func TestMatchDominatesCoveredBySuppressesDominatedAction(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("dominating guard should satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestMatchDominatesCoveredByDoesNotUsePostDominance(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+	g.AddNode(usg.Node{ID: "release", Type: "code.Call", Loc: "sample.go:20", Region: "sample.go/fn1", Order: 20, HasOrder: true})
+	g.AddLabel("release", usg.Label{Concept: "custom.Transform"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("post-dominating release must not satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestMatchDominatesCoveredByIgnoresAdvisoryEvidence(t *testing.T) {
+	rule := `
+module test;
+rule DominatedAction {
+  issue custom.Action as a
+  unless a.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform", Detail: map[string]string{"advisory": "true"}})
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t", Order: 11, HasOrder: true})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 1 {
+		t.Fatalf("advisory guard must not satisfy dominates coverage, got %d", c[0])
+	}
+}
+
+func TestTaintDominatesCoveredBySuppressesDominatedSink(t *testing.T) {
+	rule := `
+module test;
+rule DominatedFlow {
+  taint custom.Input -> custom.Target as sink
+  unless sink.dominates coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "input", Type: "code.Call", Loc: "sample.go:5"})
+	g.AddLabel("input", usg.Label{Concept: "custom.Input"})
+	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1", Order: 10, HasOrder: true})
+	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddNode(usg.Node{ID: "sink", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t", Order: 11, HasOrder: true})
+	g.AddLabel("sink", usg.Label{Concept: "custom.Target"})
+	g.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "sink"})
+
+	if c := compileEvalV2(t, rule, g); c[0] != 0 {
+		t.Fatalf("dominating guard should suppress taint finding, got %d", c[0])
+	}
+}
+
 func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
 	rule := `
 package vypr.memory;
@@ -223,5 +401,102 @@ rule XxeUnhardened {
 	}
 	if len(fs) != 0 {
 		t.Fatalf("same XML factory hardening should suppress parser creation, got %d", len(fs))
+	}
+}
+
+func TestMatchGuardedBySameReceiverNodeLabel(t *testing.T) {
+	rule := `
+package vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  match code.XmlParserCreate as p
+  unless guarded_by core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", usg.Label{Concept: "core.XmlHardening"})
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same receiver label should suppress parser creation, got %d", len(fs))
+	}
+}
+
+func TestV2SameReceiverCoveredByIgnoresEndpointEvidence(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10"})
+	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20"})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+	g.AddEdge(usg.Edge{Type: "PROTECTS", Src: "hardening", Dst: "parser"})
+
+	decls, err := parser.ParseV2Runtime(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("endpoint evidence should not satisfy sameReceiver coverage, got %d findings", len(fs))
+	}
+}
+
+func TestV2SameReceiverCoveredByReceiverNodeLabel(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", usg.Label{Concept: "core.XmlHardening"})
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parser.ParseV2Runtime(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same receiver label should satisfy sameReceiver coverage, got %d findings", len(fs))
 	}
 }

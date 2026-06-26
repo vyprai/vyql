@@ -1,0 +1,9 @@
+module bindings.php.migration.m477c4003;
+
+binding networkSend7 {
+  requires {
+    dependency("guzzlehttp/guzzle")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}

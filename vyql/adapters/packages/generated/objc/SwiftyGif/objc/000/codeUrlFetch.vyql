@@ -1,0 +1,9 @@
+module bindings.objc.migration.m78d28cf2;
+
+binding urlFetch0 {
+  requires {
+    dependency("SwiftyGif")
+  }
+  query pattern callExpr where callee.method == "setGifFromURL"
+  emit sink code.UrlFetch at args[0]
+}

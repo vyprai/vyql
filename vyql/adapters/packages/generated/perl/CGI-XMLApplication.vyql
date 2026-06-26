@@ -1,5 +1,0 @@
-adapter perl {
-  package "CGI-XMLApplication" {
-    sink method "new" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter c {
-  package "tinyply" {
-    sink method "PlyFile::read" -> code.FilePathAccess
-    sink method "PlyFile::write" -> code.FilePathAccess
-  }
-}

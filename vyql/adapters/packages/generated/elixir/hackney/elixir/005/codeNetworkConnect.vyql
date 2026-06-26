@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md39518e8;
+
+binding networkConnect5 {
+  requires {
+    dependency("hackney")
+  }
+  query pattern callExpr where callee.method == "connect_via_socks5_proxy"
+  emit sink code.NetworkConnectSink at args[0]
+}

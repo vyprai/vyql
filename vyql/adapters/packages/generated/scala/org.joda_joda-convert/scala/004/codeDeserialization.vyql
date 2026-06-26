@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf8b523ed;
+
+binding deserialization4 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parseBoolean"
+  emit sink code.Deserialization at args[0]
+}

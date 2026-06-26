@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6a53b9a1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("x11-dl")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept AutoActiveSignupAccount : issue {
+  cwe: [CWE_306, CWE_862]
+  review_assumption: "active status grants access to system resources before separate approval"
+  reviewCategory: auth
+  reviewCondition: "self-service signup creates an active account before an observed administrator activation step"
+  reviewConfidence: medium
+  reviewEvidence: "signup context {pattern} initializes a newly registered user as active"
+  vulnerableTo: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+}

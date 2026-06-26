@@ -1,0 +1,9 @@
+module bindings.python.migration.m5b3dafd7;
+
+binding codeEval0 {
+  requires {
+    dependency("pygobject")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.CodeEval at args[0]
+}

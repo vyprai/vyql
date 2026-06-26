@@ -1,0 +1,11 @@
+module code;
+
+concept CryptoImproperBlinding : issue {
+  cwe: [CWE_200, CWE_203, CWE_208]
+  review_assumption: "an attacker can request repeated private-key operations and observe timing or signature differences"
+  reviewCategory: crypto
+  reviewCondition: "a private-key cryptographic operation uses a random blinding factor before applying required subgroup, Jacobi, or square hardening"
+  reviewConfidence: high
+  reviewEvidence: "crypto blinding context {pattern} derives the inverse or unblinding factor from raw randomized material before the required hardening step"
+  vulnerableTo: [crypto.ObservableDiscrepancy]
+}

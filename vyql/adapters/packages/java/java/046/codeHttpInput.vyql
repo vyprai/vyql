@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding httpInput46 {
+  requires {
+    dependency("org.kohsuke.stapler")
+  }
+  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "annotation:QueryParameter"
+  emit source code.HttpInput at call.result
+}

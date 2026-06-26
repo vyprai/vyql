@@ -1,0 +1,9 @@
+module bindings.php.migration.maf0b33c8;
+
+binding fileUse0 {
+  requires {
+    dependency("zendframework/zend-servicemanager")
+  }
+  query pattern callExpr where callee.method == "dumpConfigFile"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mea9a35c7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "addScreenCaptureFromPath"
+  emit sink code.FilePathAccess at args[0]
+}

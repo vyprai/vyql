@@ -1,0 +1,9 @@
+module bindings.scala.migration.m81ddb6fa;
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.commons:commons-email")
+  }
+  query pattern callExpr where callee.method == "sendMimeMessage"
+  emit sink code.NetworkSend at args[0]
+}

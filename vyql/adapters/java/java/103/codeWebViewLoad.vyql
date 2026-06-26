@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding webViewLoad103 {
+  query pattern callExpr where callee.method == "loadDataWithBaseURL"
+  emit sink code.WebViewLoad at args[1]
+}

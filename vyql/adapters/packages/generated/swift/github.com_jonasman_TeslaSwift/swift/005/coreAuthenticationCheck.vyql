@@ -1,0 +1,14 @@
+module bindings.swift.migration.mc6882f18;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("github.com/jonasman/TeslaSwift")
+  }
+  query pattern callExpr where callee.method == "logout"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m19a35966;
+
+binding codeEval0 {
+  requires {
+    dependency("Imager")
+  }
+  query pattern callExpr where callee.method == "load_plugin"
+  emit sink code.CodeEval at args[0]
+}

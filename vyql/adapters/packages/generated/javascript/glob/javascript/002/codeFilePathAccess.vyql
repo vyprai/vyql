@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mf89e9829;
+
+binding filePathAccess2 {
+  requires {
+    dependency("glob")
+  }
+  query pattern callExpr where callee.method == "globSync"
+  emit sink code.FilePathAccess at args[0]
+}

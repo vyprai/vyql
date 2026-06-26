@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, Deserialization}
-adapter objc {
-  package "MQTTClient" {
-    sink method "open" -> code.NetworkConnect
-    sink method "connect" -> code.NetworkConnect
-    sink method "send" -> code.NetworkSend
-    sink method "decodeMessage" -> code.Deserialization
-  }
-}

@@ -1,9 +1,0 @@
-adapter kotlin {
-  package "org.hibernate.javax.persistence:hibernate-jpa-2.0-api" {
-    sink method "createQuery" -> code.SqlExecution
-    sink method "createNamedQuery" -> code.SqlExecution
-    sink method "createNativeQuery" -> code.SqlExecution
-    sink method "executeUpdate" -> code.SqlExecution
-    control method "setParameter" -> core.SqlParameterization
-  }
-}

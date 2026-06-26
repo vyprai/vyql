@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m79d7d424;
+
+binding deserialization1 {
+  requires {
+    dependency("org.jetbrains.kotlinx:kotlinx-serialization-json")
+  }
+  query pattern callExpr where callee.method == "decodeFromJsonElement"
+  emit sink code.Deserialization at args[0]
+}

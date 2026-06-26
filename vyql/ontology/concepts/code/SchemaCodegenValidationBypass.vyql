@@ -1,0 +1,6 @@
+module code;
+
+concept SchemaCodegenValidationBypass : issue {
+  cwe: [CWE_1321, CWE_915]
+  vulnerableTo: [injection.PrototypePollution, injection.MassAssignment]
+}

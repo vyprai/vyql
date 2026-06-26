@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m3c797cdd;
+
+binding codeEval2 {
+  requires {
+    dependency("microsoft.toolkit.wpf.ui.controls.webview")
+  }
+  query pattern callExpr where callee.method == "InvokeScript"
+  emit sink code.CodeEval at args[0]
+}

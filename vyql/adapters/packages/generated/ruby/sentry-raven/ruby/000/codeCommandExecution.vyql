@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m96567a5c;
+
+binding commandExecution0 {
+  requires {
+    dependency("sentry-raven")
+  }
+  query pattern callExpr where callee.method == "sys_command"
+  emit sink code.CommandExecution at args[0]
+}

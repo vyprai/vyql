@@ -1,0 +1,13 @@
+module bindings.perl.migration.mdefe5e10;
+
+binding weakHash0 {
+  requires {
+    dependency("Moo")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "as_md5"
+  emit issue code.WeakHash at node
+}

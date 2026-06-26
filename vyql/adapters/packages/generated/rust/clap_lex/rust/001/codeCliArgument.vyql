@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5de2182e;
+
+binding cliArgument1 {
+  requires {
+    dependency("clap_lex")
+  }
+  query pattern callExpr where callee.method == "RawArgs.new"
+  emit source code.CliArgument at call.result
+}

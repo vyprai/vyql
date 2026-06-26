@@ -1,7 +1,0 @@
-adapter c {
-  package "libsnoretoast" {
-    sink method "tryCreateShortcut" -> code.FilePathAccess
-    sink method "installShortcut" -> code.FilePathAccess
-    source method "backgroundCallback" -> core.UserControlledData
-  }
-}

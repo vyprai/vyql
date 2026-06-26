@@ -1,0 +1,9 @@
+module bindings.python.migration.m3f900891;
+
+binding deserialization2 {
+  requires {
+    dependency("tblib")
+  }
+  query pattern callExpr where callee.method == "unpickle_exception"
+  emit sink code.Deserialization at args[0]
+}

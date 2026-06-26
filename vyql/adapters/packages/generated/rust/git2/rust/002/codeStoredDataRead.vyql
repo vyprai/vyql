@@ -1,0 +1,9 @@
+module bindings.rust.migration.m886322e0;
+
+binding storedDataRead2 {
+  requires {
+    dependency("git2")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

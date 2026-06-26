@@ -1,0 +1,6 @@
+module bindings.lua.migration.ma99d12f7;
+
+binding httpInput1 {
+  query pattern callExpr where callee.path ~= "ngx.req.get_uri_args"
+  emit source code.HttpInput at call.result
+}

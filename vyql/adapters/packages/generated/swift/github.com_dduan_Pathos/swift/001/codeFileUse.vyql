@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc537eea8;
+
+binding fileUse1 {
+  requires {
+    dependency("github.com/dduan/Pathos")
+  }
+  query pattern callExpr where callee.method == "readUTF8String"
+  emit sink code.FileUseSink at args[0]
+}

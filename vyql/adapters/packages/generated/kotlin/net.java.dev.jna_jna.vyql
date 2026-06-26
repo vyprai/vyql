@@ -1,6 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-adapter kotlin {
-  package "net.java.dev.jna:jna" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

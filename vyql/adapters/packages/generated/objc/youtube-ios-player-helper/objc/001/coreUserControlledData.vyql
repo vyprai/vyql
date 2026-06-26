@@ -1,0 +1,9 @@
+module bindings.objc.migration.ma02a3afe;
+
+binding userControlledData1 {
+  requires {
+    dependency("youtube-ios-player-helper")
+  }
+  query pattern callExpr where callee.method == "loadWithVideoId"
+  emit source core.UserControlledData at call.result
+}

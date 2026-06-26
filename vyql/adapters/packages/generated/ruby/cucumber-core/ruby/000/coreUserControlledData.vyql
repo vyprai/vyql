@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc1109f40;
+
+binding userControlledData0 {
+  requires {
+    dependency("cucumber-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

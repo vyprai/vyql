@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.eclipse.jdt.core.compiler:ecj" {
-    sink method "compile" -> code.CodeEval
-  }
-}

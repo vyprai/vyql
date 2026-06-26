@@ -1,0 +1,13 @@
+module vypr.injection;
+
+rule Command {
+  meta {
+    benchmark: cmdi
+    cwe: [CWE_78]
+    id: "VYQL-INJ-002"
+    severity: critical
+  }
+  taint core.UserControlledData -> code.CommandExecution
+  unless path coveredBy core.ShellEscape
+  unless endpoint coveredBy core.CommandArgumentValidation
+}

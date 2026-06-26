@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma4385b30;
+
+binding filePathAccess4 {
+  requires {
+    dependency("bootsnap")
+  }
+  query pattern callExpr where callee.method == "precompile_ruby"
+  emit sink code.FilePathAccess at args[0]
+}

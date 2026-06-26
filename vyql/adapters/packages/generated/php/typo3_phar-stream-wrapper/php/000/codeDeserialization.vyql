@@ -1,0 +1,9 @@
+module bindings.php.migration.mc30de6aa;
+
+binding deserialization0 {
+  requires {
+    dependency("typo3/phar-stream-wrapper")
+  }
+  query pattern callExpr where callee.method == "deserializeMetaData"
+  emit sink code.Deserialization at args[0]
+}

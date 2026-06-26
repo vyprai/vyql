@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding deserialization108 {
+  query pattern callExpr where callee.path ~= "Marshal.restore"
+  emit sink code.Deserialization at args[0]
+}

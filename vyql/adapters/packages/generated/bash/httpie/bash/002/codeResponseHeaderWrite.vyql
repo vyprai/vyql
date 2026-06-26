@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb0418fa4;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("httpie")
+  }
+  query pattern callExpr where callee.path ~= "httpie.response_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

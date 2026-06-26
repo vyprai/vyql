@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding unboundedCopy26 {
+  query pattern callExpr where callee.path ~= "strcpy"
+  emit sink code.UnboundedCopy at args[1]
+}

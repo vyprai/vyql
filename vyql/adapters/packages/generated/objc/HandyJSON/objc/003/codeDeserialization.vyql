@@ -1,0 +1,9 @@
+module bindings.objc.migration.m1bb9a520;
+
+binding deserialization3 {
+  requires {
+    dependency("HandyJSON")
+  }
+  query pattern callExpr where callee.method == "deserializeModelArrayFrom"
+  emit sink code.Deserialization at args[0]
+}

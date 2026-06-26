@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mfd3bf356;
+
+binding networkData0 {
+  requires {
+    dependency("internal-ip")
+  }
+  query pattern callExpr where callee.method == "internalIpV6"
+  emit source code.NetworkData at call.result
+}

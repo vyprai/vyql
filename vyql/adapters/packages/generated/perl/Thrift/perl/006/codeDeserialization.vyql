@@ -1,0 +1,9 @@
+module bindings.perl.migration.mec98890c;
+
+binding deserialization6 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "readMapBegin"
+  emit sink code.Deserialization at args[0]
+}

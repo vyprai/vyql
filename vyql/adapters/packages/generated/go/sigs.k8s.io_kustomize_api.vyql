@@ -1,5 +1,0 @@
-adapter go {
-  package "sigs.k8s.io/kustomize/api" {
-    sink method "parseLiteralSource" -> code.Deserialization
-  }
-}

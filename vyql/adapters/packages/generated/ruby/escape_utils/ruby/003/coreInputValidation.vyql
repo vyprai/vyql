@@ -1,0 +1,14 @@
+module bindings.ruby.migration.md24ea683;
+
+binding inputValidation3 {
+  requires {
+    dependency("escape_utils")
+  }
+  query pattern callExpr where callee.method == "escape_url"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

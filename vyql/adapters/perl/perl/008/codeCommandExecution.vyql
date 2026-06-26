@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding commandExecution8 {
+  query pattern callExpr where callee.path ~= "exec"
+  emit sink code.CommandExecution at args[0]
+}

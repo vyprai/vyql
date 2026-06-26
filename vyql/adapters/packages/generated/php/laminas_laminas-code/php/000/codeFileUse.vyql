@@ -1,0 +1,9 @@
+module bindings.php.migration.mc6f892f7;
+
+binding fileUse0 {
+  requires {
+    dependency("laminas/laminas-code")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

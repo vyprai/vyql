@@ -1,0 +1,9 @@
+module bindings.python.migration.m5eede96e;
+
+binding urlFetch5 {
+  requires {
+    dependency("ndg-httpsclient")
+  }
+  query pattern callExpr where callee.method == "fetch_from_url"
+  emit sink code.UrlFetch at args[0]
+}

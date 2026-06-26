@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "yaml-cpp" {
-    sink method "parse" -> code.Deserialization
-  }
-}

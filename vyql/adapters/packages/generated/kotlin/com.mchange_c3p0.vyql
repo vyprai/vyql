@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter kotlin {
-  package "com.mchange:c3p0" {
-    sink method "getConnection" -> SqlExecution
-  }
-}

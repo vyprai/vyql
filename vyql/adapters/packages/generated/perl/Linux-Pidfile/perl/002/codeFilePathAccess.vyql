@@ -1,0 +1,9 @@
+module bindings.perl.migration.m450c025f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Linux-Pidfile")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.FilePathAccess at args[0]
+}

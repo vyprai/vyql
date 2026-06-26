@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-import code.{Deserialization}
-
-adapter elixir {
-  package "ex_phone_number" {
-    source method "parse" -> core.UserControlledData
-    sink method "parse" -> code.Deserialization
-  }
-}

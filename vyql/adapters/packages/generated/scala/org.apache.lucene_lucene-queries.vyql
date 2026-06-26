@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.apache.lucene:lucene-queries" {
-    sink method "IntervalQuery" -> code.ExpressionEval
-    sink method "CommonTermsQuery" -> code.ExpressionEval
-  }
-}

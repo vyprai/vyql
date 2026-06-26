@@ -1,0 +1,9 @@
+module bindings.dart.migration.m69b0e7fd;
+
+binding deserialization0 {
+  requires {
+    dependency("cached_network_image_web")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

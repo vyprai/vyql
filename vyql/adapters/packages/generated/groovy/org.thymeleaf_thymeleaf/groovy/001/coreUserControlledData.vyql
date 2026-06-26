@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md13c02bf;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.thymeleaf:thymeleaf")
+  }
+  query pattern callExpr where callee.method == "getHeaderValue"
+  emit source core.UserControlledData at call.result
+}

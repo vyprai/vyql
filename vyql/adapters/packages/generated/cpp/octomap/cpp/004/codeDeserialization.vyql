@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m5124a248;
+
+binding deserialization4 {
+  requires {
+    dependency("octomap")
+  }
+  query pattern callExpr where callee.method == "readBinary"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter perl {
-  package "DBI" {
-    sink method "connect" -> code.SqlExecution
-  }
-}

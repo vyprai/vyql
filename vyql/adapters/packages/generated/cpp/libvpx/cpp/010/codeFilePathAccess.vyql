@@ -1,0 +1,9 @@
+module bindings.cpp.migration.md0e9ae1e;
+
+binding filePathAccess10 {
+  requires {
+    dependency("libvpx")
+  }
+  query pattern callExpr where callee.method == "webm_read_frame"
+  emit sink code.FilePathAccess at args[0]
+}

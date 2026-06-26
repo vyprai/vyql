@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m0294a815;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework.security:spring-security-acl")
+  }
+  query pattern callExpr where callee.method == "deleteAcl"
+  emit sink code.SqlExecution at args[0]
+}

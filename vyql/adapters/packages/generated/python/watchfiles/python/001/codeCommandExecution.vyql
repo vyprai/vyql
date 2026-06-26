@@ -1,0 +1,9 @@
+module bindings.python.migration.mdadccbdc;
+
+binding commandExecution1 {
+  requires {
+    dependency("watchfiles")
+  }
+  query pattern callExpr where callee.method == "arun_process"
+  emit sink code.CommandExecution at args[0]
+}

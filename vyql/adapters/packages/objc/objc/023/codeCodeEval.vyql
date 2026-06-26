@@ -1,0 +1,9 @@
+module bindings.objc.migration.m942721f9;
+
+binding codeEval23 {
+  requires {
+    dependency("WebKit")
+  }
+  query pattern callExpr where callee.method == "evaluateJavaScript"
+  emit sink code.CodeEval at args[0]
+}

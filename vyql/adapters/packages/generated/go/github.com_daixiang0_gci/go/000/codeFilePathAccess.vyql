@@ -1,0 +1,9 @@
+module bindings.go.migration.m0131c83a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/daixiang0/gci")
+  }
+  query pattern callExpr where callee.method == "WriteFormattedFiles"
+  emit sink code.FilePathAccess at args[0]
+}

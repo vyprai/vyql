@@ -1,0 +1,14 @@
+module bindings.swift.migration.m3bf59813;
+
+binding regexCompile3 {
+  requires {
+    dependency("github.com/getGuaka/StringScanner")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "groups(_:options:)"
+  emit issue code.RegexCompile at node
+  emit sink code.RegexCompileSink at node
+}

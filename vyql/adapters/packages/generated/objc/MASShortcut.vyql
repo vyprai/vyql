@@ -1,9 +1,0 @@
-import core.{InputValidation}
-
-adapter objc {
-  package "MASShortcut" {
-    control method "isShortcutValid:" -> core.InputValidation
-    control method "isShortcut:alreadyTakenInMenu:explanation:" -> core.InputValidation
-    control method "isShortcutAlreadyTakenBySystem:explanation:" -> core.InputValidation
-  }
-}

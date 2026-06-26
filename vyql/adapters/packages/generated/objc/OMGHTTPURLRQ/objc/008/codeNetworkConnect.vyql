@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdcbba98f;
+
+binding networkConnect8 {
+  requires {
+    dependency("OMGHTTPURLRQ")
+  }
+  query pattern callExpr where callee.method == "DELETE:parameters:error:"
+  emit sink code.NetworkConnectSink at args[0]
+}

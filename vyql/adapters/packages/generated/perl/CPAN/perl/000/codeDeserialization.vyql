@@ -1,0 +1,9 @@
+module bindings.perl.migration.mca17f939;
+
+binding deserialization0 {
+  requires {
+    dependency("CPAN")
+  }
+  query pattern callExpr where callee.method == "_yaml_loadfile"
+  emit sink code.Deserialization at args[0]
+}

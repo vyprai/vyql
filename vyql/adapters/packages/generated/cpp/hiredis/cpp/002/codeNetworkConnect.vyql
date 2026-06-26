@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m8937d91b;
+
+binding networkConnect2 {
+  requires {
+    dependency("hiredis")
+  }
+  query pattern callExpr where callee.method == "redisContextConnectTcp"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter perl {
-  package "Yancy-Plugin-OpenAPI" {
-    source method "_openapi_spec_from_schema" -> core.UserControlledData
-  }
-}

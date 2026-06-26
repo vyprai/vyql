@@ -1,0 +1,9 @@
+module bindings.php.migration.m09900338;
+
+binding filePathAccess1 {
+  requires {
+    dependency("zircote/swagger-php")
+  }
+  query pattern callExpr where callee.method == "scanFile"
+  emit sink code.FilePathAccess at args[0]
+}

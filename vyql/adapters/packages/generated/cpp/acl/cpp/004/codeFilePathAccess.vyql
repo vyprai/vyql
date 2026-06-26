@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me1be6155;
+
+binding filePathAccess4 {
+  requires {
+    dependency("acl")
+  }
+  query pattern callExpr where callee.method == "acl_extended_file_nofollow"
+  emit sink code.FilePathAccess at args[0]
+}

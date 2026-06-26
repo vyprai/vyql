@@ -1,8 +1,0 @@
-import code.{SqlExecution}
-adapter groovy {
-  package "org.mariadb.jdbc:mariadb-java-client" {
-    sink method "executeQuery" -> code.SqlExecution
-    sink method "executeUpdate" -> code.SqlExecution
-    sink method "execute" -> code.SqlExecution
-  }
-}

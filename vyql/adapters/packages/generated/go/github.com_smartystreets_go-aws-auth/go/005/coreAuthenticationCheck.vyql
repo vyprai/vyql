@@ -1,0 +1,14 @@
+module bindings.go.migration.mcd64fc1b;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("github.com/smartystreets/go-aws-auth")
+  }
+  query pattern callExpr where callee.method == "SignS3"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

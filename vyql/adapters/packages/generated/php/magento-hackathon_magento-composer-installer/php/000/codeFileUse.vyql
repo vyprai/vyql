@@ -1,0 +1,9 @@
+module bindings.php.migration.m9906af61;
+
+binding fileUse0 {
+  requires {
+    dependency("magento-hackathon/magento-composer-installer")
+  }
+  query pattern callExpr where callee.method == "MagentoHackathonComposerMagentoGitIgnore::write"
+  emit sink code.FileUseSink at args[0]
+}

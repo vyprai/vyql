@@ -1,0 +1,9 @@
+module bindings.go.migration.m8fd37668;
+
+binding deserialization1 {
+  requires {
+    dependency("cloud.google.com/go/datastore")
+  }
+  query pattern callExpr where callee.method == "decodeCloudKey"
+  emit sink code.Deserialization at args[0]
+}

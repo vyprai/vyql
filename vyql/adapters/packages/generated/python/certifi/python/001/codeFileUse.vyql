@@ -1,0 +1,9 @@
+module bindings.python.migration.m9a36773a;
+
+binding fileUse1 {
+  requires {
+    dependency("certifi")
+  }
+  query pattern callExpr where callee.method == "contents"
+  emit sink code.FileUseSink at args[0]
+}

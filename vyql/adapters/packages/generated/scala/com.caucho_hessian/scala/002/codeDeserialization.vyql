@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb2f466b0;
+
+binding deserialization2 {
+  requires {
+    dependency("com.caucho:hessian")
+  }
+  query pattern callExpr where callee.method == "parseTag"
+  emit sink code.Deserialization at args[0]
+}

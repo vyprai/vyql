@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter java {
-  package "org.apache.commons:commons-io" {
-    sink method "openInputStream" -> code.FilePathAccess
-    sink method "openOutputStream" -> code.FilePathAccess
-  }
-}

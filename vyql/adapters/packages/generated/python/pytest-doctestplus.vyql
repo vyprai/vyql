@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "pytest-doctestplus" {
-    sink method "parse" -> code.Deserialization
-  }
-}

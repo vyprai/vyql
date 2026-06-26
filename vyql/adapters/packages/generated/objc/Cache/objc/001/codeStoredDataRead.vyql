@@ -1,0 +1,9 @@
+module bindings.objc.migration.m03f63460;
+
+binding storedDataRead1 {
+  requires {
+    dependency("Cache")
+  }
+  query pattern callExpr where callee.method == "entry"
+  emit source code.StoredDataRead at call.result
+}

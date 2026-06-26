@@ -1,0 +1,9 @@
+module bindings.php.migration.md072f631;
+
+binding filePathAccess3 {
+  requires {
+    dependency("hoa/protocol")
+  }
+  query pattern callExpr where callee.method == "Protocol.resolve"
+  emit sink code.FilePathAccess at args[0]
+}

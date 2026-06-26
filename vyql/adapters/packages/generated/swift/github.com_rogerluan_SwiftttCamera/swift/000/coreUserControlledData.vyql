@@ -1,0 +1,9 @@
+module bindings.swift.migration.m2ce28750;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/rogerluan/SwiftttCamera")
+  }
+  query pattern callExpr where callee.method == "photoOutput"
+  emit source core.UserControlledData at call.result
+}

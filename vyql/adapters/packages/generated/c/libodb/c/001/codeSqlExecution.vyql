@@ -1,0 +1,9 @@
+module bindings.c.migration.mce355dd5;
+
+binding sqlExecution1 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}

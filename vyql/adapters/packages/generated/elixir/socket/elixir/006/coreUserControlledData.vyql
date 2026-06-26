@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m0319cc00;
+
+binding userControlledData6 {
+  requires {
+    dependency("socket")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

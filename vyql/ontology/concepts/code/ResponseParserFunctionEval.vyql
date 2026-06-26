@@ -1,0 +1,11 @@
+module code;
+
+concept ResponseParserFunctionEval : issue {
+  cwe: [CWE_94, CWE_95]
+  review_assumption: "the parsed response body or any upstream message source can contain attacker-influenced JavaScript syntax"
+  reviewCategory: code_execution
+  reviewCondition: "a response parser compiles response chunks with the Function constructor instead of parsing data"
+  reviewConfidence: high
+  reviewEvidence: "response parser context {pattern} builds a return expression from parsed response data, compiles it with Function, and pushes the evaluated result"
+  vulnerableTo: [injection.CodeInjection]
+}

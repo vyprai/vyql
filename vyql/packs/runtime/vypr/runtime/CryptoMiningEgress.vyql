@@ -1,0 +1,10 @@
+module vypr.runtime;
+
+rule CryptoMiningEgress {
+  meta {
+    id: "VYQL-RTM-001"
+    severity: high
+  }
+  fact runtime.Connection as c
+  where has(c.dst, threat.MiningPool)
+}

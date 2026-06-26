@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5e8670ca;
+
+binding deserialization0 {
+  requires {
+    dependency("ff")
+  }
+  query pattern callExpr where callee.method == "from_str_vartime"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter javascript {
-  package "npm-bundled" {
-    sink method "readPackageJson" -> code.Deserialization
-    sink method "readPackageJson" -> code.FilePathAccess
-  }
-}

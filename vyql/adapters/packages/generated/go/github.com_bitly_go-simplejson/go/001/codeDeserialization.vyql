@@ -1,0 +1,9 @@
+module bindings.go.migration.m8c5bd995;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/bitly/go-simplejson")
+  }
+  query pattern callExpr where callee.method == "NewFromReader"
+  emit sink code.Deserialization at args[0]
+}

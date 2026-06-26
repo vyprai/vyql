@@ -1,0 +1,11 @@
+module code;
+
+concept WebViewServerRedirectUrlValidationBypass : issue {
+  cwe: [CWE_79, CWE_20]
+  review_assumption: "a web response can issue a server redirect to a URL shape that leads to universal cross-site scripting"
+  reviewCategory: xss
+  reviewCondition: "WKWebView server redirects continue without validating the redirected URL through the app's URL-fixup logic"
+  reviewConfidence: high
+  reviewEvidence: "Swift WKNavigationDelegate context {pattern} handles navigation actions but lacks didReceiveServerRedirectForProvisionalNavigation validation before loading proceeds"
+  vulnerableTo: [injection.Xss, validation.ImproperInputValidation]
+}

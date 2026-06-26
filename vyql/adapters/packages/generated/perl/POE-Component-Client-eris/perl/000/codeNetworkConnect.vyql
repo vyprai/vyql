@@ -1,0 +1,9 @@
+module bindings.perl.migration.m6adfb2c9;
+
+binding networkConnect0 {
+  requires {
+    dependency("POE-Component-Client-eris")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{FileUse}
-
-adapter rust {
-  package "cairo-rs" {
-    sink method "write" -> code.FileUse
-    sink method "read" -> code.FileUse
-  }
-}

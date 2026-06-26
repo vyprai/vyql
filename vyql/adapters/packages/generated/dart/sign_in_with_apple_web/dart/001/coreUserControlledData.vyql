@@ -1,0 +1,9 @@
+module bindings.dart.migration.m8338bda1;
+
+binding userControlledData1 {
+  requires {
+    dependency("sign_in_with_apple_web")
+  }
+  query pattern callExpr where callee.method == "signIn"
+  emit source core.UserControlledData at call.result
+}

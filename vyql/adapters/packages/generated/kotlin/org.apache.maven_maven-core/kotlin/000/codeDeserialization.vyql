@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1393c25c;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.maven:maven-core")
+  }
+  query pattern callExpr where callee.method == "setConfiguration"
+  emit sink code.Deserialization at args[0]
+}

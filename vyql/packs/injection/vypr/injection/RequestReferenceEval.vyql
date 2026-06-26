@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule RequestReferenceEval {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_94]
+    id: "VYQL-INJ-038"
+    severity: critical
+  }
+  issue code.RequestReferenceEval as sink
+}

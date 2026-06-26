@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4a6e9236;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("origin")
+  }
+  query pattern callExpr where callee.method == "where"
+  emit sink code.NosqlQuery at args[0]
+}

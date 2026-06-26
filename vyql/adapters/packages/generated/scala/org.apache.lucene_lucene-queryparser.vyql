@@ -1,9 +1,0 @@
-import code.{XmlParse}
-import core.{InputValidation}
-
-adapter scala {
-  package "org.apache.lucene:lucene-queryparser" {
-    sink method "parse" -> code.XmlParse
-    control method "escape" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.me3be893c;
+
+binding networkData4 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.method == "text"
+  emit source code.NetworkData at call.result
+}

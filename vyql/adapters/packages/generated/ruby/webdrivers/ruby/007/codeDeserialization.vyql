@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me3853743;
+
+binding deserialization7 {
+  requires {
+    dependency("webdrivers")
+  }
+  query pattern callExpr where callee.method == "untargz_file"
+  emit sink code.Deserialization at args[0]
+}

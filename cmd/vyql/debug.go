@@ -226,12 +226,12 @@ func cmdExplain(args []string) error {
 	if len(paths) == 0 {
 		return fmt.Errorf("usage: vyql explain [-rules ...] <path>...")
 	}
-	applyProfile(paths, *profileName)
+	prof := applyProfile(paths, *profileName)
 	src, err := loadRules(*rulesPath)
 	if err != nil {
 		return err
 	}
-	all, _, _, err := scanPaths(paths, src)
+	all, _, _, err := scanPathsWithProfile(paths, src, prof.Name)
 	if err != nil {
 		return err
 	}
@@ -458,7 +458,7 @@ func cmdAdapters(args []string) error {
 	if err != nil {
 		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
 	}
-	decls, err := parser.Parse(string(data))
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(string(data)), lowerNonCoreV2RuntimeSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}
@@ -522,7 +522,7 @@ func cmdValidateAdapter(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.Parse(string(data))
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(string(data)), lowerNonCoreV2RuntimeSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}

@@ -1,9 +1,0 @@
-import code.{SecretValue, StoredDataWrite, StoredDataRead}
-
-adapter swift {
-  package "github.com/GroupeMINASTE/Keychain.swift" {
-    sink method "save" -> code.StoredDataWrite
-    source method "value" -> code.StoredDataRead
-    sink method "remove" -> code.StoredDataWrite
-  }
-}

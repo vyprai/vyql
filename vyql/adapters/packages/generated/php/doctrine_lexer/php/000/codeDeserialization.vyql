@@ -1,0 +1,9 @@
+module bindings.php.migration.mf877202f;
+
+binding deserialization0 {
+  requires {
+    dependency("doctrine/lexer")
+  }
+  query pattern callExpr where callee.method == "setInput"
+  emit sink code.Deserialization at args[0]
+}

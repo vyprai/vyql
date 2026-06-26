@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m39417bf3;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.felix:org.apache.felix.framework")
+  }
+  query pattern callExpr where callee.method == "createFilter"
+  emit sink code.Deserialization at args[0]
+}

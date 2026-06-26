@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule CipherWithoutIntegrityHash {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_665]
+    id: "VYQL-CRY-009"
+    severity: high
+  }
+  issue code.CipherWithoutIntegrityHash as c
+}

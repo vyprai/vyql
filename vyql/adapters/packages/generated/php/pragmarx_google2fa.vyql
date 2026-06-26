@@ -1,9 +1,0 @@
-import code.{SecretValue}
-import core.{AuthenticationCheck}
-
-adapter php {
-  package "pragmarx/google2fa" {
-    source method "generateSecretKey" -> code.SecretValue
-    control method "verify" -> core.AuthenticationCheck
-  }
-}

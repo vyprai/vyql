@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "opentelemetry_api" {
-    source method "decode" -> core.UserControlledData
-    source method "raw_decode" -> core.UserControlledData
-    source method "decode_b3_context" -> core.UserControlledData
-  }
-}

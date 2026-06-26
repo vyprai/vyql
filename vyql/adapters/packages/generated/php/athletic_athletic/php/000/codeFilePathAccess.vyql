@@ -1,0 +1,9 @@
+module bindings.php.migration.m96c6cf15;
+
+binding filePathAccess0 {
+  requires {
+    dependency("athletic/athletic")
+  }
+  query pattern callExpr where callee.method == "require_once"
+  emit sink code.FilePathAccess at args[0]
+}

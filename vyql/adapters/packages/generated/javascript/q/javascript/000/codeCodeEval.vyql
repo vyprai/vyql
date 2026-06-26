@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m172b4264;
+
+binding codeEval0 {
+  requires {
+    dependency("q")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CodeEval at args[0]
+}

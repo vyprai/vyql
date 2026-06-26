@@ -1,7 +1,0 @@
-import code.{FilePathAccess, Deserialization}
-adapter elixir {
-  package "envy" {
-    sink method "load" -> code.FilePathAccess
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "multi_xml" {
-    sink method "MultiXml.parse" -> code.Deserialization
-  }
-}

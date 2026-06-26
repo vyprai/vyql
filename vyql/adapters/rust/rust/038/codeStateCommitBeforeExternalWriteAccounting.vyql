@@ -1,0 +1,10 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding stateCommitBeforeExternalWriteAccounting38 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=cleanup_for_create" and node.token contains "record_deposit(out.len())" and node.token contains "letexit_result=self.exit_substate(StackExitKind::Succeeded);ifletErr(e)=self.record_external_operation" and node.token contains "ExternalOperation::Write(U256::from(out.len()))" and node.token contains "self.state.set_code(address,out)"
+  emit issue code.StateCommitBeforeExternalWriteAccounting at node
+}

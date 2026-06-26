@@ -1,0 +1,9 @@
+module bindings.rust.migration.m967f26b1;
+
+binding commandExecution0 {
+  requires {
+    dependency("alsa")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

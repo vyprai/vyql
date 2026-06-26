@@ -1,0 +1,8 @@
+module code;
+
+review code.FilesystemImageDirentTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "reject filesystem image entry names containing '.', '..', absolute paths, or separators before recursive extraction"
+}

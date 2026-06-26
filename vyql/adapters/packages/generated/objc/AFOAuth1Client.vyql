@@ -1,5 +1,0 @@
-adapter objc {
-  package "AFOAuth1Client" {
-    source method "storeCredential" -> code.SecretValue
-  }
-}

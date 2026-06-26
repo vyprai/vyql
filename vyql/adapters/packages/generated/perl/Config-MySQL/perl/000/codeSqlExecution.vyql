@@ -1,0 +1,9 @@
+module bindings.perl.migration.m0209c52a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Config-MySQL")
+  }
+  query pattern callExpr where callee.method == "find_extensions"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{StoredDataRead}
-adapter dart {
-  package "isar" {
-    source method "exportJsonRaw" -> code.StoredDataRead
-    source method "exportJsonRawSync" -> code.StoredDataRead
-  }
-}

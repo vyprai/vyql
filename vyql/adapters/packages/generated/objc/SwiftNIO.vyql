@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-
-adapter objc {
-  package "SwiftNIO" {
-    sink method "connect" -> code.NetworkConnect
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding httpInput0 {
+  requires {
+    dependency("Microsoft.AspNetCore.Http")
+  }
+  query pattern callExpr where callee.method == "Query" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}

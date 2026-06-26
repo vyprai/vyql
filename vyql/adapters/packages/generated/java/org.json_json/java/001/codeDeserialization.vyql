@@ -1,0 +1,9 @@
+module bindings.java.migration.mc025dab7;
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "toJSONArray"
+  emit sink code.Deserialization at args[0]
+}

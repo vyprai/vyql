@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7820389d;
+
+binding deserialization0 {
+  requires {
+    dependency("jiffy")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

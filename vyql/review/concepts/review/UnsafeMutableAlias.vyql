@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsafeMutableAlias {
+  category: memory
+  kind: attention
+  text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m52702f4a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.querydsl:querydsl-jpa")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

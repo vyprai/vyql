@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.ma17503b3;
+
+binding authenticationCheck6 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "AuthUI.Builder.build"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

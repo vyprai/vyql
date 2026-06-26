@@ -1,0 +1,9 @@
+module bindings.go.migration.m5756014b;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/vmihailenco/msgpack")
+  }
+  query pattern callExpr where callee.method == "Decoder.Decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.me53b1936;
+
+binding filePathAccess1 {
+  requires {
+    dependency("doctrine/data-fixtures")
+  }
+  query pattern callExpr where callee.method == "loadFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

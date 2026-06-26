@@ -1,0 +1,9 @@
+module bindings.java.migration.m92151233;
+
+binding sqlExecution0 {
+  requires {
+    dependency("postgresql:postgresql")
+  }
+  query pattern callExpr where callee.method == "createSimpleQuery"
+  emit sink code.SqlExecution at args[0]
+}

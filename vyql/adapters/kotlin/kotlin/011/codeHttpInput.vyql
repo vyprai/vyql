@@ -1,0 +1,6 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding httpInput11 {
+  query pattern callExpr where callee.path ~= ".queryParameters"
+  emit source code.HttpInput at call.result
+}

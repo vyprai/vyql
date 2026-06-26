@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "net.sf.ehcache:ehcache" {
-    sink method "MimeType" -> code.Deserialization
-    sink method "readExternal" -> code.Deserialization
-  }
-}

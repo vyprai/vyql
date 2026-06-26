@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1457a768;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.servlet")
+  }
+  query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
+  emit source code.HttpInput at call.result
+}

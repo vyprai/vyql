@@ -1,0 +1,14 @@
+module bindings.kotlin.migration.m1b4e3db5;
+
+binding authorizationCheck1 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

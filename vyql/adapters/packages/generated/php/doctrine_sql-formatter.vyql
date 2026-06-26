@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter php {
-  package "doctrine/sql-formatter" {
-    sink method "format" -> code.HtmlRender
-  }
-}

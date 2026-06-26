@@ -1,0 +1,9 @@
+module bindings.dart.migration.m664edbfe;
+
+binding filePathAccess1 {
+  requires {
+    dependency("flutter_archive")
+  }
+  query pattern callExpr where callee.method == "extractToDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

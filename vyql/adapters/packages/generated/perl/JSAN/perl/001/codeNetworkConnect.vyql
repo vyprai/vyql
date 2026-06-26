@@ -1,0 +1,9 @@
+module bindings.perl.migration.mdd98cc15;
+
+binding networkConnect1 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.method == "_connected_to"
+  emit sink code.NetworkConnectSink at args[0]
+}

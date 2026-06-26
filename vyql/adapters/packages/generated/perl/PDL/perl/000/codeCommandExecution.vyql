@@ -1,0 +1,9 @@
+module bindings.perl.migration.md1e983ab;
+
+binding commandExecution0 {
+  requires {
+    dependency("PDL")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

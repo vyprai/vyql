@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m8b712879;
+
+binding deserialization0 {
+  requires {
+    dependency("dmlc")
+  }
+  query pattern callExpr where callee.method == "ParseNext"
+  emit sink code.Deserialization at args[0]
+}

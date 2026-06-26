@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mac090037;
+
+binding networkConnect1 {
+  requires {
+    dependency("xam.plugins.messaging")
+  }
+  query pattern callExpr where callee.method == "MakePhoneCall"
+  emit sink code.NetworkConnectSink at args[0]
+}

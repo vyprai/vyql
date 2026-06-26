@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "fsevents" {
-    sink method "watch" -> code.FilePathAccess
-    sink method "getInfo" -> code.FilePathAccess
-  }
-}

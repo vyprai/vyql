@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding embeddedDotSegmentFilenameWrite236 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["call_path:getFilename", "call_path:getOriginalFilename"]) and containsAny(node.token, ["call_path:Files.copy", "call_path:Files.write", "call_path:FileUtils.copyInputStreamToFile", "call_path:MultipartFile.transferTo"]) and containsAny(node.token, ["call_path:createTempFile", "call_path:resolve", "call_path:new File"]) and containsAny(node.token, ["call_path:getCanonicalPath", "call_path:normalize", "call_path:toRealPath"]) and containsAny(node.token, ["call_arg:filename.equals:..", "call_arg:fileName.equals:.."]) and not (containsAny(node.token, ["call_arg:filename.contains:..", "call_arg:fileName.contains:.."]))
+  emit issue code.EmbeddedDotSegmentFilenameWrite at node
+}

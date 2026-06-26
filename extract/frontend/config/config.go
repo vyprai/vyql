@@ -599,10 +599,19 @@ var (
 
 func loadProfile() configProfile {
 	configProfileOnce.Do(func() {
-		raw := string(datadir.MustRead("adapters/config.vyql"))
-		decls, err := parser.Parse(raw)
+		files, err := datadir.ReadVYQL("adapters/config.vyql")
 		if err != nil {
-			panic("config: parse adapters/config.vyql: " + err.Error())
+			panic("config: read adapters/config.vyql: " + err.Error())
+		}
+		selected := map[string]bool{}
+		for _, file := range files {
+			selected[file.Name] = true
+		}
+		decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForProfile(files), func(src parser.V2RuntimeSource) bool {
+			return selected[src.Name]
+		})
+		if err != nil {
+			panic("config: parse adapter corpus: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
@@ -1184,6 +1193,29 @@ func metaList(meta map[string]any, key string) []string {
 		}
 	}
 	return nil
+}
+
+func v2RuntimeSourcesForProfile(files []datadir.Source) []parser.V2RuntimeSource {
+	out := make([]parser.V2RuntimeSource, 0, len(files)+32)
+	if core, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+		for _, file := range core {
+			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if threats, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+		for _, file := range threats {
+			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if mechanics, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+		for _, file := range mechanics {
+			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	for _, file := range files {
+		out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return out
 }
 
 func metaString(meta map[string]any, key string) string {

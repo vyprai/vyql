@@ -1,0 +1,9 @@
+module bindings.perl.migration.m49d8eae4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("DB_File")
+  }
+  query pattern callExpr where callee.method == "tie_hash_or_array"
+  emit sink code.FilePathAccess at args[0]
+}

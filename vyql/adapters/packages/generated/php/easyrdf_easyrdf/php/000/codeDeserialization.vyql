@@ -1,0 +1,9 @@
+module bindings.php.migration.mebd9a39f;
+
+binding deserialization0 {
+  requires {
+    dependency("easyrdf/easyrdf")
+  }
+  query pattern callExpr where callee.method == "EasyRdfGraph::parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.ma20a89e9;
+
+binding deserialization1 {
+  requires {
+    dependency("phpstan/phpdoc-parser")
+  }
+  query pattern callExpr where callee.method == "PHPStanPhpDocParserLexerLexer::tokenize"
+  emit sink code.Deserialization at args[0]
+}

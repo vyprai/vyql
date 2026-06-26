@@ -1,0 +1,9 @@
+module bindings.php.migration.m856f3b76;
+
+binding filePathAccess0 {
+  requires {
+    dependency("blade-ui-kit/blade-icons")
+  }
+  query pattern callExpr where callee.method == "getSvgFromPath"
+  emit sink code.FilePathAccess at args[0]
+}

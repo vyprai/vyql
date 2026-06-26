@@ -1,0 +1,11 @@
+module code;
+
+concept FileUseSink : sink {
+  cwe: [CWE_367]
+  review_assumption: "the use is not protected by atomic open flags or symlink-safe handling"
+  reviewCategory: race
+  reviewCondition: "checked filesystem state is later used"
+  reviewConfidence: medium
+  reviewEvidence: "use primitive {pattern} acts on the path"
+  vulnerableTo: [concurrency.Toctou]
+}

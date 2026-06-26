@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc80df900;
+
+binding cliArgument7 {
+  requires {
+    dependency("tty-prompt")
+  }
+  query pattern callExpr where callee.method == "expand"
+  emit source code.CliArgument at call.result
+}

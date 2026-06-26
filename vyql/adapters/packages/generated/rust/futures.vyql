@@ -1,5 +1,0 @@
-adapter rust {
-  package "futures" {
-    sink method "let" -> code.FilePathAccess
-  }
-}

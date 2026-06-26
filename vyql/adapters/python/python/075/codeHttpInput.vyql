@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding httpInput75 {
+  query pattern callExpr where callee.path ~= "request.params"
+  emit source code.HttpInput at call.result
+}

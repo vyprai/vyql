@@ -1,0 +1,9 @@
+module bindings.c.migration.m1850c2bf;
+
+binding userControlledData0 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "grpc_byte_buffer_reader_init"
+  emit source core.UserControlledData at call.result
+}

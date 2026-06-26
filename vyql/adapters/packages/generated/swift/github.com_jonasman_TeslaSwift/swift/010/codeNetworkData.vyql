@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc6882f18;
+
+binding networkData10 {
+  requires {
+    dependency("github.com/jonasman/TeslaSwift")
+  }
+  query pattern callExpr where callee.method == "getEnergySiteStatus"
+  emit source code.NetworkData at call.result
+}

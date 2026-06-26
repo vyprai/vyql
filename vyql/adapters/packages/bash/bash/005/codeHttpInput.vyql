@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding httpInput5 {
+  requires {
+    dependency("cgi")
+  }
+  query pattern callExpr where callee.path ~= "$HTTP_COOKIE"
+  emit source code.HttpInput at call.result
+}

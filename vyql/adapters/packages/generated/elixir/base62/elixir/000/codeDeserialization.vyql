@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc16fb41c;
+
+binding deserialization0 {
+  requires {
+    dependency("base62")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

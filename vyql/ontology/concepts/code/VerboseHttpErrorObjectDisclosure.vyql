@@ -1,0 +1,11 @@
+module code;
+
+concept VerboseHttpErrorObjectDisclosure : issue {
+  cwe: [CWE_200, CWE_209, CWE_532]
+  review_assumption: "returned errors may be logged or shown to callers and outbound request objects can contain authorization headers, tokens, cookies, or TLS peer details"
+  reviewCategory: secret
+  reviewCondition: "HTTP error construction formats full request, response body, or TLS objects with verbose struct formatting"
+  reviewConfidence: high
+  reviewEvidence: "HTTP error context {pattern} builds an error with %+v formatting over response request/body/TLS internals"
+  vulnerableTo: [secrets.SecretLeak]
+}

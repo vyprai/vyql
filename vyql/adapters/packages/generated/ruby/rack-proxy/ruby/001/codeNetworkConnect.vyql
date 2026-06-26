@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me8cc1b86;
+
+binding networkConnect1 {
+  requires {
+    dependency("rack-proxy")
+  }
+  query pattern callExpr where callee.method == "perform_request"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter kotlin {
-  package "org.powermock:powermock-classloading-xstream" {
-    sink method "clone" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9fcc9b34;
+
+binding networkData1 {
+  requires {
+    dependency("dns")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.NetworkData at call.result
+}

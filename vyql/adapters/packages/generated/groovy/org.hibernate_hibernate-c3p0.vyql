@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter groovy {
-  package "org.hibernate:hibernate-c3p0" {
-    source method "configure" -> core.UserControlledData
-  }
-}

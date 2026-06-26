@@ -1,0 +1,9 @@
+module bindings.scala.migration.mde0459e2;
+
+binding networkSend1 {
+  requires {
+    dependency("org.springframework.batch:spring-batch-infrastructure")
+  }
+  query pattern callExpr where callee.method == "JmsItemWriter.write"
+  emit sink code.NetworkSend at args[0]
+}

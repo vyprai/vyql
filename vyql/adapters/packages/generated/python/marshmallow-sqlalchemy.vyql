@@ -1,9 +1,0 @@
-import code.{Deserialization, StoredDataRead}
-import core.{InputValidation}
-
-adapter python {
-  package "marshmallow-sqlalchemy" {
-    sink method "load" -> code.Deserialization
-    control method "validate" -> core.InputValidation
-  }
-}

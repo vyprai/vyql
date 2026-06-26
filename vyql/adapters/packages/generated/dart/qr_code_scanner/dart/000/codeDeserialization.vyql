@@ -1,0 +1,9 @@
+module bindings.dart.migration.mec90b087;
+
+binding deserialization0 {
+  requires {
+    dependency("qr_code_scanner")
+  }
+  query pattern callExpr where callee.method == "jsQR"
+  emit sink code.Deserialization at args[0]
+}

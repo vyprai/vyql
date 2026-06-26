@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2ad324d3;
+
+binding deserialization1 {
+  requires {
+    dependency("open_api_spex")
+  }
+  query pattern callExpr where callee.method == "cast"
+  emit sink code.Deserialization at args[0]
+}

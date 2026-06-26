@@ -1,0 +1,9 @@
+module bindings.perl.migration.m766d64ac;
+
+binding fileUse1 {
+  requires {
+    dependency("Startup")
+  }
+  query pattern callExpr where callee.method == "log_path"
+  emit sink code.FileUseSink at args[0]
+}

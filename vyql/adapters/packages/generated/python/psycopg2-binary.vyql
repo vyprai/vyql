@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "psycopg2-binary" {
-    sink method "connect" -> code.SqlExecution
-  }
-}

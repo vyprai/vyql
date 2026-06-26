@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding filePathAccess141 {
+  query pattern callExpr where callee.path ~= "Dir.glob"
+  emit sink code.FilePathAccess at args[0]
+}

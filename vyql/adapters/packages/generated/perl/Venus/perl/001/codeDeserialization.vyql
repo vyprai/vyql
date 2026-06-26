@@ -1,0 +1,9 @@
+module bindings.perl.migration.m169431e0;
+
+binding deserialization1 {
+  requires {
+    dependency("Venus")
+  }
+  query pattern callExpr where callee.method == "read_json_file"
+  emit sink code.Deserialization at args[0]
+}

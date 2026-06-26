@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-import core.{UserControlledData}
-
-adapter php {
-  package "consolidation/site-alias" {
-    source method "SiteAliasName::parse" -> core.UserControlledData
-    sink method "DataFileLoaderInterface::load" -> code.FilePathAccess
-  }
-}

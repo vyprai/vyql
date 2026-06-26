@@ -1,0 +1,9 @@
+module bindings.dart.migration.m71c0189e;
+
+binding userControlledData3 {
+  requires {
+    dependency("flutter_svg")
+  }
+  query pattern callExpr where callee.method == "SvgAssetLoader"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedChoiceControlField {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20]
+    id: "VYQL-VAL-007"
+    severity: medium
+  }
+  issue code.UnvalidatedChoiceControlField as choice
+}

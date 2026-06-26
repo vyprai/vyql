@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "darling_core" {
-    sink method "parse" -> code.Deserialization
-  }
-}

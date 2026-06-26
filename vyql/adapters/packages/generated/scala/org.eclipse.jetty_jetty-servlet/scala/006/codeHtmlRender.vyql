@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9f5011ec;
+
+binding htmlRender6 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-servlet")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit sink code.HtmlRender at args[0]
+}

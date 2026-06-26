@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma8c3a007;
+
+binding deserialization0 {
+  requires {
+    dependency("exjsx")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module bindings.go.migration.m48a985c1;
+
+binding lockRelease339 {
+  query pattern callExpr where callee.method == "Unlock"
+  emit check core.LockRelease at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

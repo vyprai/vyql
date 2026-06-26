@@ -1,0 +1,6 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding trustBoundary56 {
+  query pattern callExpr where callee.method == "setAttribute"
+  emit sink code.TrustBoundary at args.any
+}

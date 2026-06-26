@@ -1,7 +1,0 @@
-import code.{Deserialization, CommandExecution}
-adapter objc {
-  package "Cordova" {
-    sink method "parser:didStartElement:namespaceURI:qualifiedName:attributes:" -> code.Deserialization
-    sink method "commandFromJson:" -> code.Deserialization
-  }
-}

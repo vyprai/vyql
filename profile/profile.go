@@ -46,39 +46,37 @@ func (p Profile) ActiveSources() map[string]bool {
 
 // Load parses every vyql/profiles/*.vyql into Profiles (generic always present).
 func Load() ([]Profile, error) {
-	dir := filepath.Join(datadir.Root(), "profiles")
-	entries, err := os.ReadDir(dir)
+	files, err := datadir.ReadVYQLDir("profiles")
 	if err != nil {
 		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
 	}
 	var out []Profile
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".vyql") {
+	decls, err := parser.ParseV2RuntimeSources(v2RuntimeSources(files))
+	if err != nil {
+		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
+	}
+	for _, d := range decls {
+		pd, ok := d.(*parser.ProfileDecl)
+		if !ok {
 			continue
 		}
-		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			continue
-		}
-		decls, err := parser.Parse(string(b))
-		if err != nil {
-			continue
-		}
-		for _, d := range decls {
-			pd, ok := d.(*parser.ProfileDecl)
-			if !ok {
-				continue
-			}
-			out = append(out, Profile{
-				Name:        pd.Name,
-				Title:       str(pd.Fields["title"]),
-				Priority:    intField(pd.Fields["priority"]),
-				Detect:      list(pd.Fields["detect"]),
-				Entrypoints: list(pd.Fields["entrypoints"]),
-			})
-		}
+		out = append(out, Profile{
+			Name:        pd.Name,
+			Title:       str(pd.Fields["title"]),
+			Priority:    intField(pd.Fields["priority"]),
+			Detect:      list(pd.Fields["detect"]),
+			Entrypoints: list(pd.Fields["entrypoints"]),
+		})
 	}
 	return out, nil
+}
+
+func v2RuntimeSources(files []datadir.Source) []parser.V2RuntimeSource {
+	out := make([]parser.V2RuntimeSource, 0, len(files))
+	for _, file := range files {
+		out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return out
 }
 
 // ByName returns the named profile (ok=false if absent).

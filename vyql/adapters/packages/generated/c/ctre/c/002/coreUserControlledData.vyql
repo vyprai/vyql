@@ -1,0 +1,9 @@
+module bindings.c.migration.ma9bf29d9;
+
+binding userControlledData2 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}

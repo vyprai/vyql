@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter php {
-  package "google/recaptcha" {
-    source method "verify" -> core.UserControlledData
-  }
-}

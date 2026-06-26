@@ -1,5 +1,0 @@
-adapter php {
-  package "doctrine/doctrine-fixtures-bundle" {
-    sink method "getPath" -> code.UrlFetch
-  }
-}

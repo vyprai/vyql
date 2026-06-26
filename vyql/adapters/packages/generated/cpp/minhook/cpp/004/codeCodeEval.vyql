@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mcdd63778;
+
+binding codeEval4 {
+  requires {
+    dependency("minhook")
+  }
+  query pattern callExpr where callee.method == "MH_QueueEnableHook"
+  emit sink code.CodeEval at args[0]
+}

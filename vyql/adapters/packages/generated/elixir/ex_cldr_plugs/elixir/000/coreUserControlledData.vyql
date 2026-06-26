@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m98734432;
+
+binding userControlledData0 {
+  requires {
+    dependency("ex_cldr_plugs")
+  }
+  query pattern callExpr where callee.method == "best_match"
+  emit source core.UserControlledData at call.result
+}

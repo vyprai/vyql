@@ -1,0 +1,9 @@
+module bindings.scala.migration.m1dd58189;
+
+binding deserialization0 {
+  requires {
+    dependency("eu.bitwalker:UserAgentUtils")
+  }
+  query pattern callExpr where callee.method == "parseUserAgentString"
+  emit sink code.Deserialization at args[0]
+}

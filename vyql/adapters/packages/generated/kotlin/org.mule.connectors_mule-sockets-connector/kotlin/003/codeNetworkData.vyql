@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7acc0143;
+
+binding networkData3 {
+  requires {
+    dependency("org.mule.connectors:mule-sockets-connector")
+  }
+  query pattern callExpr where callee.method == "sendAndReceive"
+  emit source code.NetworkData at call.result
+}

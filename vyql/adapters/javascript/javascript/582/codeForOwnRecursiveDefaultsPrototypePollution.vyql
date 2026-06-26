@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding forOwnRecursiveDefaultsPrototypePollution582 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=copy" and node.token contains "call_path:lazy.forOwn" and node.token contains "subscript:target[key]" and node.token contains "call_path:defaultsDeep" and not (node.token contains "expr:key==='__proto__'")
+  emit issue code.ForOwnRecursiveDefaultsPrototypePollution at node
+}

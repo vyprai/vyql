@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc8214d25;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/RevenueCat/purchases-ios")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

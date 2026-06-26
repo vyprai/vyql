@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/kkdai/bstream" {
-    source method "NewBStreamReader" -> core.UserControlledData
-  }
-}

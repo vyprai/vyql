@@ -1,0 +1,9 @@
+module bindings.dart.migration.md7c4a903;
+
+binding commandExecution0 {
+  requires {
+    dependency("android_intent")
+  }
+  query pattern callExpr where callee.method == "launch"
+  emit sink code.CommandExecution at args[0]
+}

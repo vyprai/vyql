@@ -1,8 +1,0 @@
-import code.{CliArgument, Deserialization}
-
-adapter kotlin {
-  package "com.google.gwt:gwt-dev" {
-    sink method "GwtVersion.parse" -> code.Deserialization
-    source method "Link.ArgProcessor" -> code.CliArgument
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0fd27f58;
+
+binding htmlRender0 {
+  requires {
+    dependency("font-awesome-sass")
+  }
+  query pattern callExpr where callee.method == "icon"
+  emit sink code.HtmlRender at args[0]
+}

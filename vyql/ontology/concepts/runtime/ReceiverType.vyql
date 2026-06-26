@@ -1,0 +1,4 @@
+module runtime;
+
+concept ReceiverType : fact {
+}

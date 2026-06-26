@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Alt" {
-    sink method "Alt::Assert::assert" -> code.CodeEval
-  }
-}

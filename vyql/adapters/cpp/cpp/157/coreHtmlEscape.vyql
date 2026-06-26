@@ -1,0 +1,11 @@
+module bindings.cpp.migration.m4e783366;
+
+binding htmlEscape157 {
+  query pattern callExpr where callee.path ~= "escape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

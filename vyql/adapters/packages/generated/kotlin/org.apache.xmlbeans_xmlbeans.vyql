@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.apache.xmlbeans:xmlbeans" {
-    sink method "XmlBase64Binary.parse" -> code.Deserialization
-  }
-}

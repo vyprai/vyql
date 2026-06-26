@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m2e2c5f21;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpclient-cache")
+  }
+  query pattern callExpr where callee.method == "copyFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m490e28e4;
+
+binding userControlledData1 {
+  requires {
+    dependency("info.cukes:cucumber-core")
+  }
+  query pattern callExpr where callee.method == "cucumber.runtime.Shellwords.parse"
+  emit source core.UserControlledData at call.result
+}

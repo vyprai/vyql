@@ -1,0 +1,14 @@
+module bindings.rust.migration.m396040fd;
+
+binding htmlEscape0 {
+  requires {
+    dependency("rocket_http")
+  }
+  query pattern callExpr where callee.method == "html_escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

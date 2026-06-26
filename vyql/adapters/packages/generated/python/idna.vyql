@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter python {
-  package "idna" {
-    source method "encode" -> core.UserControlledData
-    source method "decode" -> core.UserControlledData
-  }
-}

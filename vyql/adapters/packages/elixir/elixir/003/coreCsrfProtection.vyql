@@ -1,0 +1,14 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding csrfProtection3 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.path ~= "Plug.CSRFProtection"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

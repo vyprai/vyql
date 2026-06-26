@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mde62ae8b;
+
+binding logOutput21 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "return_to_position"
+  emit sink code.LogOutput at args[0]
+}

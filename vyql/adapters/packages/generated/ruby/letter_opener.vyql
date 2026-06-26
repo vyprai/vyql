@@ -1,6 +1,0 @@
-import code.{FileUse}
-adapter ruby {
-  package "letter_opener" {
-    sink method "deliver!" -> code.FileUse
-  }
-}

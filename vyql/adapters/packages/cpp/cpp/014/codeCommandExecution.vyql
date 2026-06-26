@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1c1357ee;
+
+binding commandExecution14 {
+  requires {
+    dependency("boost")
+  }
+  query pattern callExpr where callee.path ~= "boost.process"
+  emit sink code.CommandExecution at args[0]
+}

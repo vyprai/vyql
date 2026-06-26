@@ -1,0 +1,9 @@
+module bindings.python.migration.mda872f49;
+
+binding commandExecution1 {
+  requires {
+    dependency("virtualenvwrapper")
+  }
+  query pattern callExpr where callee.method == "run_global"
+  emit sink code.CommandExecution at args[0]
+}

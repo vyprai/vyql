@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc61d3835;
+
+binding filePathAccess4 {
+  requires {
+    dependency("Flea")
+  }
+  query pattern callExpr where callee.method == "file"
+  emit sink code.FilePathAccess at args[0]
+}

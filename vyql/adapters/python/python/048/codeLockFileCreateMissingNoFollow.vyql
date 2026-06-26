@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding lockFileCreateMissingNoFollow48 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["function_name:acquire", "function_name:lock"]) and node.token contains "call_path:os.open" and node.token contains "selector:os.O_CREAT" and node.token contains "selector:os.O_EXCL" and not (node.token contains "literal:O_NOFOLLOW")
+  emit issue code.LockFileCreateMissingNoFollow at node
+}

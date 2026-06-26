@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcb2efc93;
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "retrieveImage"
+  emit sink code.FileUseSink at args[0]
+}

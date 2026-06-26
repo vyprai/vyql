@@ -1,0 +1,9 @@
+module bindings.scala.migration.mda9a57d4;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.dagger:dagger")
+  }
+  query pattern callExpr where callee.method == "createWith"
+  emit sink code.Deserialization at args[0]
+}

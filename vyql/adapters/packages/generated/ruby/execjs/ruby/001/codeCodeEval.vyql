@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf5aa3046;
+
+binding codeEval1 {
+  requires {
+    dependency("execjs")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

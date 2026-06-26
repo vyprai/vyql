@@ -1,5 +1,0 @@
-adapter java {
-  package "org.springframework.boot:spring-boot-actuator" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

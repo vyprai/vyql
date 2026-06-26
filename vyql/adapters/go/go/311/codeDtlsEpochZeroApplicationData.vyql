@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding dtlsEpochZeroApplicationData311 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:handleIncomingPacket" and node.token contains "call_path:h.Unmarshal" and node.token contains "selector:h.epoch" and node.token contains "call_path:c.state.cipherSuite.decrypt" and node.token contains "call_path:r.Unmarshal" and node.token contains "selector:c.decrypted" and not (node.token contains "binary:h.epoch==0") and not (node.token contains "binary:0==h.epoch")
+  emit issue code.DtlsEpochZeroApplicationData at node
+}

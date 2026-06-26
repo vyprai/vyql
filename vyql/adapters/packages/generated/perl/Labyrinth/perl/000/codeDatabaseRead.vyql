@@ -1,0 +1,9 @@
+module bindings.perl.migration.m902b303e;
+
+binding databaseRead0 {
+  requires {
+    dependency("Labyrinth")
+  }
+  query pattern callExpr where callee.method == "DBConnect"
+  emit sink code.DatabaseReadSink at args[0]
+}

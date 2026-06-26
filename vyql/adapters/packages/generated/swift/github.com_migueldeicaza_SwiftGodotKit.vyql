@@ -1,7 +1,0 @@
-import code.{NetworkData}
-adapter swift {
-  package "github.com/migueldeicaza/SwiftGodotKit" {
-    source method "emitMessageToHost" -> code.NetworkData
-    source method "receiveMessageFromHost" -> code.NetworkData
-  }
-}

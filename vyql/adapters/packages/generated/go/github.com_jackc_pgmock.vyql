@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter go {
-  package "github.com/jackc/pgmock" {
-    source method "ExpectMessage" -> core.UserControlledData
-    source method "ExpectAnyMessage" -> core.UserControlledData
-    source method "AcceptUnauthenticatedConnRequestSteps" -> core.UserControlledData
-  }
-}

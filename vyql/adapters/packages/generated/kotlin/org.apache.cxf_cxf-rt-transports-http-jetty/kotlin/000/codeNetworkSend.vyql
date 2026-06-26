@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m88420d70;
+
+binding networkSend0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.NetworkSend at args[0]
+}

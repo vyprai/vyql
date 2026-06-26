@@ -1,0 +1,9 @@
+module bindings.scala.migration.mdf5c9fa9;
+
+binding networkData2 {
+  requires {
+    dependency("io.netty:netty-all")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.ma76c4951;
+
+binding deserialization1 {
+  requires {
+    dependency("pandas")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

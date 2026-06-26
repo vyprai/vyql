@@ -1,0 +1,9 @@
+module bindings.swift.migration.m586c3899;
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "requestJSON"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.md3ce4208;
+
+binding userControlledData0 {
+  requires {
+    dependency("setproctitle")
+  }
+  query pattern callExpr where callee.method == "setproctitle"
+  emit source core.UserControlledData at call.result
+}

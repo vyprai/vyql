@@ -1,0 +1,9 @@
+module bindings.go.migration.m4a74693d;
+
+binding codeEval3 {
+  requires {
+    dependency("go.starlark.net")
+  }
+  query pattern callExpr where callee.method == "EvalExprOptions"
+  emit sink code.CodeEval at args[0]
+}

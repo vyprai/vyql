@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding commandExecution242 {
+  query pattern callExpr where callee.path ~= "commands.getoutput"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,5 +1,0 @@
-adapter c {
-  package "protobuf-c" {
-    sink method "get" -> code.Deserialization
-  }
-}

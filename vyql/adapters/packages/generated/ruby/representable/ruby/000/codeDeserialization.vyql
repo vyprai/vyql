@@ -1,0 +1,9 @@
+module bindings.ruby.migration.maace8868;
+
+binding deserialization0 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "from_xml"
+  emit sink code.Deserialization at args[0]
+}

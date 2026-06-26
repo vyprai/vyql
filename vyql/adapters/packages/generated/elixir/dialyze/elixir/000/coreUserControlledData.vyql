@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m598662bd;
+
+binding userControlledData0 {
+  requires {
+    dependency("dialyze")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source core.UserControlledData at call.result
+}

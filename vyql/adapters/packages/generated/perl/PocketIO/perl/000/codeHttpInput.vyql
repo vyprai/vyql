@@ -1,0 +1,9 @@
+module bindings.perl.migration.m186f162b;
+
+binding httpInput0 {
+  requires {
+    dependency("PocketIO")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source code.HttpInput at call.result
+}

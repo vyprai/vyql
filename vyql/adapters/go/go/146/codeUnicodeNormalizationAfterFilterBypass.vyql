@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding unicodeNormalizationAfterFilterBypass146 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["function_name:Preprocess", "function_name:preprocess", "function_name:Normalize", "function_name:normalize", "function_name:Canonical", "function_name:canonical", "function_name:Lookup", "function_name:lookup"]) and node.token contains "call_path:regexp.MustCompile.ReplaceAllString" and node.token contains "call_path:norm.NFKD.String" and node.token contains "call_order:norm.NFKD.String>regexp.MustCompile.ReplaceAllString" and not (node.token contains "call_order:regexp.MustCompile.ReplaceAllString>norm.NFKD.String") and containsAny(node.token, ["literal:-_ .", "literal:[-_ .]", "literal:-_."])
+  emit issue code.UnicodeNormalizationAfterFilterBypass at node
+}

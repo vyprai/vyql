@@ -1,0 +1,9 @@
+module bindings.java.migration.mddb29b43;
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.glassfish.web:jstl-impl")
+  }
+  query pattern callExpr where callee.method == "setSql"
+  emit sink code.SqlExecution at args[0]
+}

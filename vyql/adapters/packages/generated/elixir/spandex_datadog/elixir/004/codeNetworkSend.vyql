@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m73e4dca1;
+
+binding networkSend4 {
+  requires {
+    dependency("spandex_datadog")
+  }
+  query pattern callExpr where callee.method == "push"
+  emit sink code.NetworkSend at args[0]
+}

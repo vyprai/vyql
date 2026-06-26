@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter dart {
-  package "fwfh_webview" {
-    sink method "buildWebViewLinkOnly" -> code.UrlFetch
-  }
-}

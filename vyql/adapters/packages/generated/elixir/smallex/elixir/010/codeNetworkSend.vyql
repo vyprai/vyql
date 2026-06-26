@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9bacb8bf;
+
+binding networkSend10 {
+  requires {
+    dependency("smallex")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

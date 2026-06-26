@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding xmlLeadByteNameValidationMissing92 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=c" and node.token contains "macro_name:CHECK_NAME_CASE" and node.token contains "macro_name:CHECK_NMSTRT_CASE" and node.token contains "macro_body:CHECK_NAME_CASE:" and node.token contains "macro_body:if(!IS_NAME_CHAR(enc,ptr,n))" and node.token contains "macro_body:CHECK_NMSTRT_CASE:" and node.token contains "macro_body:if(!IS_NMSTRT_CHAR(enc,ptr,n))" and not (node.token contains "macro_body:IS_INVALID_CHAR(enc,ptr,n)||!IS_NAME_CHAR(enc,ptr,n)") and not (node.token contains "macro_body:IS_INVALID_CHAR(enc,ptr,n)||!IS_NMSTRT_CHAR(enc,ptr,n)")
+  emit issue code.XmlLeadByteNameValidationMissing at node
+}

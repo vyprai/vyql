@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "modernc.org/cc" {
-    sink method "Parse" -> code.Deserialization
-    sink method "ppParseString" -> code.Deserialization
-    sink method "ppParse" -> code.Deserialization
-  }
-}

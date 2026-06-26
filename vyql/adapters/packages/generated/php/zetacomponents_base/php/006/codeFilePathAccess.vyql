@@ -1,0 +1,9 @@
+module bindings.php.migration.mf8f59ec8;
+
+binding filePathAccess6 {
+  requires {
+    dependency("zetacomponents/base")
+  }
+  query pattern callExpr where callee.method == "ezcBaseFile::copy"
+  emit sink code.FilePathAccess at args[0]
+}

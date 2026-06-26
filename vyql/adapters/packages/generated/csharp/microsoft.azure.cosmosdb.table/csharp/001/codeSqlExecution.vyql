@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2c58812c;
+
+binding sqlExecution1 {
+  requires {
+    dependency("microsoft.azure.cosmosdb.table")
+  }
+  query pattern callExpr where callee.method == "ExecuteBatch"
+  emit sink code.SqlExecution at args[0]
+}

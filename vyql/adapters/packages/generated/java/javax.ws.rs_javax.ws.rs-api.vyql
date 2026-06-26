@@ -1,6 +1,0 @@
-adapter java {
-  package "javax.ws.rs:javax.ws.rs-api" {
-    source method "Cookie" -> code.HttpInput
-    sink method "readEntity" -> code.XmlParse
-  }
-}

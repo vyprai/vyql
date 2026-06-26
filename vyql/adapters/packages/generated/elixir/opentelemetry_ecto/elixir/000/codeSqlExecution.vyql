@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m20fb16e8;
+
+binding sqlExecution0 {
+  requires {
+    dependency("opentelemetry_ecto")
+  }
+  query pattern callExpr where callee.method == "maybe_add_db_statement"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding authenticationCheck298 {
+  query pattern callExpr where callee.path ~= "auth.check"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

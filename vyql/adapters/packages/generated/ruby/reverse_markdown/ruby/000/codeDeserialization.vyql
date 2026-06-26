@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mae281ada;
+
+binding deserialization0 {
+  requires {
+    dependency("reverse_markdown")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.Deserialization at args[0]
+}

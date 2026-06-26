@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mcf1af1b6;
+
+binding urlFetch0 {
+  requires {
+    dependency("poltergeist")
+  }
+  query pattern callExpr where callee.method == "visit"
+  emit sink code.UrlFetch at args[0]
+}

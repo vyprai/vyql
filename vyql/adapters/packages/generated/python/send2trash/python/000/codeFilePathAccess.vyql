@@ -1,0 +1,9 @@
+module bindings.python.migration.m88598f90;
+
+binding filePathAccess0 {
+  requires {
+    dependency("send2trash")
+  }
+  query pattern callExpr where callee.method == "send2trash"
+  emit sink code.FilePathAccess at args[0]
+}

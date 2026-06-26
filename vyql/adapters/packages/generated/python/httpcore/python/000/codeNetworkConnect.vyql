@@ -1,0 +1,9 @@
+module bindings.python.migration.m2f84ffdb;
+
+binding networkConnect0 {
+  requires {
+    dependency("httpcore")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}

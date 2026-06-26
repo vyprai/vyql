@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding phpWindowOpenerCallbackNameXss77 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "call_path:echo" and containsAny(node.token, ["literal:window.opener.", "literal:typeofwindow.opener."]) and containsAny(node.token, ["assign:$func=$_GET", "assign:$func=@$_GET", "assign:$func=(isset($_GET['func']))?$_GET['func']"]) and not (node.token contains "assign:$func=var_out")
+  emit issue code.PhpWindowOpenerCallbackNameXss at node
+}

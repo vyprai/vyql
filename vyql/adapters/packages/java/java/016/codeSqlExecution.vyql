@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding sqlExecution16 {
+  requires {
+    dependency("org.hibernate")
+  }
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}

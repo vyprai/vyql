@@ -1,0 +1,12 @@
+module bindings.c.migration.mce54b166;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "c"
+    meta: {
+      fidelity: "resolved"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m08d39045;
+
+binding commandExecution0 {
+  requires {
+    dependency("sensio/distribution-bundle")
+  }
+  query pattern callExpr where callee.method == "executeCommand"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.PublicRestDataEndpointMissingAuthorization {
+  category: access_control
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify public REST data endpoints enforce resource status, page privacy, ownership, or equivalent view permission inside the handler"
+}

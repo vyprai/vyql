@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter scala {
-  package "org.seleniumhq.selenium:selenium-remote-driver" {
-    sink method "execute" -> code.CodeEval
-  }
-}

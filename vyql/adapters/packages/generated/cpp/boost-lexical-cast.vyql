@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter cpp {
-  package "boost-lexical-cast" {
-    sink method "lexical_cast" -> code.Deserialization
-    sink method "try_lexical_convert" -> code.Deserialization
-  }
-}

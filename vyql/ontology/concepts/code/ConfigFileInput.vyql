@@ -1,0 +1,7 @@
+module code;
+
+concept ConfigFileInput : source {
+  coverage_reserved_source: true
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

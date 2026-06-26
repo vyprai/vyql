@@ -1,0 +1,9 @@
+module bindings.elixir.migration.med39ff58;
+
+binding htmlRender0 {
+  requires {
+    dependency("ex_doc_simple_markdown")
+  }
+  query pattern callExpr where callee.method == "to_html"
+  emit sink code.HtmlRender at args[0]
+}

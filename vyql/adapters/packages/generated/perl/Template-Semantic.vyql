@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter perl {
-  package "Template-Semantic" {
-    sink method "process" -> code.XmlParse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma54ab871;
+
+binding deserialization1 {
+  requires {
+    dependency("html2haml")
+  }
+  query pattern callExpr where callee.method == "parse_text_with_interpolation"
+  emit sink code.Deserialization at args[0]
+}

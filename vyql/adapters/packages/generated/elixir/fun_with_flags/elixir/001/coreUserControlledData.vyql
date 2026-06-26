@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md6ea47c1;
+
+binding userControlledData1 {
+  requires {
+    dependency("fun_with_flags")
+  }
+  query pattern callExpr where callee.method == "disable"
+  emit source core.UserControlledData at call.result
+}

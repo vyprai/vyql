@@ -1,0 +1,9 @@
+module bindings.php.migration.m17304d30;
+
+binding filePathAccess2 {
+  requires {
+    dependency("spryker/code-sniffer")
+  }
+  query pattern callExpr where callee.method == "SprykerToolsTokenizer::getTokens"
+  emit sink code.FilePathAccess at args[0]
+}

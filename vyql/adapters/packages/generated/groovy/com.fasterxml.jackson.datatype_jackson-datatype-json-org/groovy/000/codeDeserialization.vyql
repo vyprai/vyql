@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mf056ac75;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.datatype:jackson-datatype-json-org")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

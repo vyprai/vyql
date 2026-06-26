@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mc556037a;
+
+binding networkSend5 {
+  requires {
+    dependency("org.springframework.social:spring-social-facebook")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "waffle_ecto" {
-    sink method "load" -> code.Deserialization
-  }
-}

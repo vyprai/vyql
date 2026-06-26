@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter dart {
-  package "flutter_masked_text" {
-    source method "MaskedTextController" -> core.UserControlledData
-    source method "MoneyMaskedTextController" -> core.UserControlledData
-  }
-}

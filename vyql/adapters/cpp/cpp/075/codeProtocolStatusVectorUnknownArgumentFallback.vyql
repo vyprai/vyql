@@ -1,0 +1,10 @@
+module bindings.cpp.migration.m4e783366;
+
+binding protocolStatusVectorUnknownArgumentFallback75 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "name=xdr_status_vector" and node.token contains "call_path:xdr_long" and node.token contains "call_path:xdr_wrapstring" and node.token contains "call_path:vectorDecode.push" and not (containsAny(node.token, ["identifier:isc_arg_unix", "identifier:isc_arg_win32", "identifier:isc_arg_gds", "identifier:isc_arg_warning", "identifier:isc_arg_next_mach"]))
+  emit issue code.ProtocolStatusVectorUnknownArgumentFallback at node
+}

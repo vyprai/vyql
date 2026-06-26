@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter elixir {
-  package "deep_merge" {
-    source method "deep_merge" -> core.UserControlledData
-  }
-}

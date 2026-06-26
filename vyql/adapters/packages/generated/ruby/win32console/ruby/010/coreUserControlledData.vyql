@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m6a0cf9c8;
+
+binding userControlledData10 {
+  requires {
+    dependency("win32console")
+  }
+  query pattern callExpr where callee.method == "ReadChar"
+  emit source core.UserControlledData at call.result
+}

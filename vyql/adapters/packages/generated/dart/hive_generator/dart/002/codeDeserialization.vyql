@@ -1,0 +1,9 @@
+module bindings.dart.migration.m545a0d91;
+
+binding deserialization2 {
+  requires {
+    dependency("hive_generator")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.Deserialization at args[0]
+}

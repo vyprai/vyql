@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me11596b9;
+
+binding filePathAccess2 {
+  requires {
+    dependency("hike")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{Deserialization, NetworkData}
-
-adapter objc {
-  package "HappyDNS" {
-    source method "init:networkInfo:" -> code.NetworkData
-    source method "onNetworkChange:" -> code.NetworkData
-    sink method "parse:" -> code.Deserialization
-  }
-}

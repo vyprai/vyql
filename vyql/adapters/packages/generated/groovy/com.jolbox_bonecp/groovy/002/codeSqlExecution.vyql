@@ -1,0 +1,9 @@
+module bindings.groovy.migration.me9edd465;
+
+binding sqlExecution2 {
+  requires {
+    dependency("com.jolbox:bonecp")
+  }
+  query pattern callExpr where callee.method == "obtainRawInternalConnection"
+  emit sink code.SqlExecution at args[0]
+}

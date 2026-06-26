@@ -1,9 +1,0 @@
-import code.{Deserialization, UrlFetch}
-
-adapter go {
-  package "github.com/go-openapi/spec" {
-    sink method "ExpandSchemaWithBasePath" -> code.Deserialization
-    sink method "ResolveResponse" -> code.Deserialization
-    sink method "ResolvePathItem" -> code.Deserialization
-  }
-}

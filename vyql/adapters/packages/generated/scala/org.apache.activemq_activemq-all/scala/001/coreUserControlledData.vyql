@@ -1,0 +1,9 @@
+module bindings.scala.migration.m7576c0d5;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.activemq:activemq-all")
+  }
+  query pattern callExpr where callee.method == "receiveBody"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m40a3b1af;
+
+binding nosqlQuery8 {
+  requires {
+    dependency("ex_aws_dynamo")
+  }
+  query pattern callExpr where callee.method == "transact_get_items"
+  emit sink code.NosqlQuery at args[0]
+}

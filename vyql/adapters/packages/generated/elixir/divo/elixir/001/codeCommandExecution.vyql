@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m89997b43;
+
+binding commandExecution1 {
+  requires {
+    dependency("divo")
+  }
+  query pattern callExpr where callee.method == "Divo.Compose.run"
+  emit sink code.CommandExecution at args[0]
+}

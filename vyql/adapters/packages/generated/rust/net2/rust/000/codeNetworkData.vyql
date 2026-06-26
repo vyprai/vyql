@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7991fff7;
+
+binding networkData0 {
+  requires {
+    dependency("net2")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

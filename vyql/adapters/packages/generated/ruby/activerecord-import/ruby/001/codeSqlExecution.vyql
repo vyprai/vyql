@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1ddd4c05;
+
+binding sqlExecution1 {
+  requires {
+    dependency("activerecord-import")
+  }
+  query pattern callExpr where callee.method == "insert_many"
+  emit sink code.SqlExecution at args[0]
+}

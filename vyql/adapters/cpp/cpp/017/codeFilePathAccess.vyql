@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding filePathAccess17 {
+  query pattern callExpr where callee.path ~= "fopen"
+  emit sink code.FilePathAccess at args[0]
+}

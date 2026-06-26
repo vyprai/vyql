@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5b88e6ef;
+
+binding deserialization1 {
+  requires {
+    dependency("uglifier")
+  }
+  query pattern callExpr where callee.method == "compile_with_map"
+  emit sink code.Deserialization at args[0]
+}

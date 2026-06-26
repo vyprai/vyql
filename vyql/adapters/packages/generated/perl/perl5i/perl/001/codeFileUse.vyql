@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7e8a7804;
+
+binding fileUse1 {
+  requires {
+    dependency("perl5i")
+  }
+  query pattern callExpr where callee.path ~= "perl5i::utf8_open"
+  emit sink code.FileUseSink at args[0]
+}

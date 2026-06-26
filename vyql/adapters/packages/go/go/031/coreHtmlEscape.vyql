@@ -1,0 +1,14 @@
+module bindings.go.migration.m39efcd29;
+
+binding htmlEscape31 {
+  requires {
+    dependency("html")
+  }
+  query pattern callExpr where callee.path ~= "html.EscapeString"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

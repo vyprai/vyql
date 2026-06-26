@@ -1,7 +1,0 @@
-import code.{FileUse}
-
-adapter dart {
-  package "camera_web" {
-    sink method "Camera.takePicture" -> code.FileUse
-  }
-}

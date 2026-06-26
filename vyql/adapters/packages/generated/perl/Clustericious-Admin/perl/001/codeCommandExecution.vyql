@@ -1,0 +1,9 @@
+module bindings.perl.migration.mda3018e3;
+
+binding commandExecution1 {
+  requires {
+    dependency("Clustericious-Admin")
+  }
+  query pattern callExpr where callee.method == "server_command"
+  emit sink code.CommandExecution at args[0]
+}

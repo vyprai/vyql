@@ -1,0 +1,11 @@
+module code;
+
+concept CiliumCliEtcdInitMountMismatch : issue {
+  cwe: [CWE_280, CWE_755]
+  review_assumption: "the main etcd container later starts from the shared /var/run/etcd volume and overwrites or ignores auth state initialized elsewhere"
+  reviewCategory: auth
+  reviewCondition: "Cilium CLI cluster-mesh etcd init container enables etcd auth against a data directory that is not the mounted etcd data volume"
+  reviewConfidence: high
+  reviewEvidence: "cluster-mesh deployment context {pattern} configures etcd auth initialization with a mismatched init-container mount path"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

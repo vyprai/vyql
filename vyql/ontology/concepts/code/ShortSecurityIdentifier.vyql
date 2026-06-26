@@ -1,0 +1,11 @@
+module code;
+
+concept ShortSecurityIdentifier : source {
+  cwe: [CWE_358]
+  review_assumption: "the shortened identifier can collide with a different trusted identity"
+  reviewCategory: crypto
+  reviewCondition: "a security identifier is shortened before it is used for a trust decision"
+  reviewConfidence: medium
+  reviewEvidence: "identifier truncation {pattern} produces a shortened value"
+  taint: [taint.WeakSecurityIdentifier]
+}

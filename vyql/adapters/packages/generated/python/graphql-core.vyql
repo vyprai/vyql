@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter python {
-  package "graphql-core" {
-    sink method "parse" -> code.Deserialization
-  }
-}

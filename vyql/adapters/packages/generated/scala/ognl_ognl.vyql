@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter scala {
-  package "ognl:ognl" {
-    sink method "parseExpression" -> code.ExpressionEval
-    sink method "compileExpression" -> code.ExpressionEval
-  }
-}

@@ -1,0 +1,11 @@
+module code;
+
+concept ReallocFailurePathInputFree : issue {
+  cwe: [CWE_415]
+  review_assumption: "the caller follows realloc semantics and may still own or release the original pointer when the wrapper returns null"
+  reviewCategory: memory
+  reviewCondition: "a realloc wrapper frees the input pointer on the failure path before returning null"
+  reviewConfidence: high
+  reviewEvidence: "reallocation wrapper context {pattern} calls realloc on the owned pointer and also frees a pointer before returning null"
+  vulnerableTo: [memory.DoubleFree]
+}

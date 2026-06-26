@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{InputValidation}
-
-adapter ruby {
-  package "regexp_parser" {
-    sink method "parse" -> code.Deserialization
-    control method "escape" -> core.InputValidation
-  }
-}

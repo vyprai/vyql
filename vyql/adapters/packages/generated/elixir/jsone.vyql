@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "jsone" {
-    sink method "decode" -> code.Deserialization
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding collectivesPublicTrashMissingEditPermission170 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=index" and node.token contains "$this->handleErrorResponse(function():array{" and node.token contains "$this->getCollectiveShare()->getOwner()" and node.token contains "$this->service->findAllTrash($collectiveId,$owner)" and node.token contains "$pageInfo->setShareToken($this->getToken())" and not (node.token contains "$this->checkEditPermissions()")
+  emit issue code.CollectivesPublicTrashMissingEditPermission at node
+}

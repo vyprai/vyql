@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me1392d7c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("tinyexr")
+  }
+  query pattern callExpr where callee.method == "LoadEXRImageFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

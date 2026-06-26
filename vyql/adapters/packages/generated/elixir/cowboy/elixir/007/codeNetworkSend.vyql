@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc8cf5d9a;
+
+binding networkSend7 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_http:sendfile"
+  emit sink code.NetworkSend at args[0]
+}

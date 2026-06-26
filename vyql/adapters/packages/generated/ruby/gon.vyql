@@ -1,6 +1,0 @@
-import core.{HtmlEscape}
-adapter ruby {
-  package "gon" {
-    control method "Gon::Escaper.escape_unicode" -> core.HtmlEscape
-  }
-}

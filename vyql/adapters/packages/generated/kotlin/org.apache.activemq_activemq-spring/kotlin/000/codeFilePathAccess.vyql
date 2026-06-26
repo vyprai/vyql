@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m486c9568;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.activemq:activemq-spring")
+  }
+  query pattern callExpr where callee.method == "resourceFromString"
+  emit sink code.FilePathAccess at args[0]
+}

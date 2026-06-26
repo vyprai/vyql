@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5c270092;
+
+binding sqlExecution18 {
+  requires {
+    dependency("sequelize")
+  }
+  query pattern callExpr where callee.path ~= "sequelize.query"
+  emit sink code.SqlExecution at args[0]
+}

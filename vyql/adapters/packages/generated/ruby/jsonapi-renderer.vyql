@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "jsonapi-renderer" {
-    sink method "parse_include_args" -> code.Deserialization
-  }
-}

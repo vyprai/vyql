@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m605b51dd;
+
+binding filePathAccess0 {
+  requires {
+    dependency("ex_fontawesome")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit sink code.FilePathAccess at args[0]
+}

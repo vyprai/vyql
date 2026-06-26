@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me786f50d;
+
+binding userControlledData0 {
+  requires {
+    dependency("exiv2")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

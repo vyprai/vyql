@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m73cc0529;
+
+binding commandExecution0 {
+  requires {
+    dependency("pigpiox")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.CommandExecution at args[0]
+}

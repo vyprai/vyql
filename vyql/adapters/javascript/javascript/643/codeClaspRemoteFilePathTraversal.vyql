@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding claspRemoteFilePathTraversal643 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=fetchRemote" and node.token contains "script.projects.getContent" and node.token contains "response.data.files" and node.token contains "f.name" and node.token contains "path.resolve(contentDir" and not (node.token contains "isInside")
+  emit issue code.ClaspRemoteFilePathTraversal at node
+}

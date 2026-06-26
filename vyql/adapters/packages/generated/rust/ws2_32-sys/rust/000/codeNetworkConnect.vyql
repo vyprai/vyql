@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5da00152;
+
+binding networkConnect0 {
+  requires {
+    dependency("ws2_32-sys")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

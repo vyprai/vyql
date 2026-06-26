@@ -1,0 +1,11 @@
+module code;
+
+concept RequestTextParamHtmlEscapeMissing : issue {
+  cwe: [CWE_79]
+  review_assumption: "callers may render the returned text parameter into HTML because the helper advertises the value as checked"
+  reviewCategory: xss
+  reviewCondition: "a PHP request-parameter helper returns text or alpha GET/POST data after weak validation without HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "request helper context {pattern} reads GET/POST values, applies an alpha/text branch, and returns the request value without htmlspecialchars or equivalent escaping"
+  vulnerableTo: [injection.Xss]
+}

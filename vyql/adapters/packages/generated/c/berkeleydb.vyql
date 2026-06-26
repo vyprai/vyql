@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter c {
-  package "berkeleydb" {
-    sink method "do_parse" -> code.Deserialization
-  }
-}

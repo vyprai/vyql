@@ -1,0 +1,9 @@
+module bindings.dart.migration.mf77c40b9;
+
+binding userControlledData0 {
+  requires {
+    dependency("fluro")
+  }
+  query pattern callExpr where callee.method == "parseQueryString"
+  emit source core.UserControlledData at call.result
+}

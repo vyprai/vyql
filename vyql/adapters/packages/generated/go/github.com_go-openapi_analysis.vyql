@@ -1,6 +1,0 @@
-import core.{PathCanonicalization}
-adapter go {
-  package "github.com/go-openapi/analysis" {
-    control method "normalizeRef" -> core.PathCanonicalization
-  }
-}

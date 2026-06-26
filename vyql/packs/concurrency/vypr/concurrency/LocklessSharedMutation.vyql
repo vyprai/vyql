@@ -1,0 +1,11 @@
+module vypr.concurrency;
+
+rule LocklessSharedMutation {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_362]
+    id: "VYQL-RACE-002"
+    severity: low
+  }
+  issue code.LocklessSharedMutation as m
+}

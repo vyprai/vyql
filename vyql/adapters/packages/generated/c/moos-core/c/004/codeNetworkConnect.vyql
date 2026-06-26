@@ -1,0 +1,9 @@
+module bindings.c.migration.m734b81f3;
+
+binding networkConnect4 {
+  requires {
+    dependency("moos-core")
+  }
+  query pattern callExpr where callee.method == "XPCTcpSocket"
+  emit sink code.NetworkConnectSink at args[0]
+}

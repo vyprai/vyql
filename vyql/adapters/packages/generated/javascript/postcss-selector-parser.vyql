@@ -1,5 +1,0 @@
-adapter javascript {
-  package "postcss-selector-parser" {
-    sink method "Node" -> code.Deserialization
-  }
-}

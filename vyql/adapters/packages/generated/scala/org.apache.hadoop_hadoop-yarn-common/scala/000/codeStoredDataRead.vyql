@@ -1,0 +1,9 @@
+module bindings.scala.migration.me4c7e1c2;
+
+binding storedDataRead0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-yarn-common")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.StoredDataRead at call.result
+}

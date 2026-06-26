@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "patchwork/utf8" {
-    sink method "json_decode" -> code.Deserialization
-    sink method "unserialize" -> code.Deserialization
-  }
-}

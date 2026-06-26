@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter ruby {
-  package "rack-mini-profiler" {
-    sink method "exec" -> code.SqlExecution
-    sink method "query" -> code.SqlExecution
-  }
-}

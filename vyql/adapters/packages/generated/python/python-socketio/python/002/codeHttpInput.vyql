@@ -1,0 +1,9 @@
+module bindings.python.migration.md81b627e;
+
+binding httpInput2 {
+  requires {
+    dependency("python-socketio")
+  }
+  query pattern callExpr where callee.method == "handle_request"
+  emit source code.HttpInput at call.result
+}

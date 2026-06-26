@@ -1,8 +1,0 @@
-import code.{CodeEval, Deserialization}
-
-adapter cpp {
-  package "shaderc" {
-    sink method "CompileShaderFile" -> code.CodeEval
-    sink method "ParseResourceSettings" -> code.Deserialization
-  }
-}

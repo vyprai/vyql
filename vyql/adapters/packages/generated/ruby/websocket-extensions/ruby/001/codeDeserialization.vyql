@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m551fc110;
+
+binding deserialization1 {
+  requires {
+    dependency("websocket-extensions")
+  }
+  query pattern callExpr where callee.method == "activate"
+  emit sink code.Deserialization at args[0]
+}

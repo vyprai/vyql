@@ -1,0 +1,9 @@
+module bindings.swift.migration.m6aeb2949;
+
+binding htmlRender2 {
+  requires {
+    dependency("github.com/SwiftWebUI/SwiftWebUI")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.HtmlRender at args[0]
+}

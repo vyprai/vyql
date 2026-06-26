@@ -1,0 +1,9 @@
+module bindings.php.migration.m87c81eb4;
+
+binding codeEval0 {
+  requires {
+    dependency("symfony/panther")
+  }
+  query pattern callExpr where callee.method == "executeScript"
+  emit sink code.CodeEval at args[0]
+}

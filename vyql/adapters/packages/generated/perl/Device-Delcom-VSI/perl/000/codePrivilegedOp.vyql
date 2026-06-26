@@ -1,0 +1,14 @@
+module bindings.perl.migration.m6085e27f;
+
+binding privilegedOp0 {
+  requires {
+    dependency("Device-Delcom-VSI")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "_delcom_write_command"
+  emit issue code.PrivilegedOp at node
+  emit sink code.PrivilegedOpSink at node
+}

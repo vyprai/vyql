@@ -1,0 +1,9 @@
+module bindings.php.migration.m488a57e9;
+
+binding userControlledData0 {
+  requires {
+    dependency("illuminate/session")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding codeEval19 {
+  requires {
+    dependency("text/template")
+  }
+  query pattern callExpr where callee.path ~= "template.New"
+  emit sink code.CodeEval at args[0]
+}

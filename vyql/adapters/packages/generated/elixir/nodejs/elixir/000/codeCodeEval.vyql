@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfef0c42a;
+
+binding codeEval0 {
+  requires {
+    dependency("nodejs")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.CodeEval at args[0]
+}

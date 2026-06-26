@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m6d13924b;
+
+binding userControlledData3 {
+  requires {
+    dependency("org.apache.tiles:tiles-jsp")
+  }
+  query pattern callExpr where callee.method == "PutAttributeTag.setExpression"
+  emit source core.UserControlledData at call.result
+}

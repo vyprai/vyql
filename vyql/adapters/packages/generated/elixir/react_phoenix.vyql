@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter elixir {
-  package "react_phoenix" {
-    sink method "ReactPhoenix.ClientSide.react_component" -> code.HtmlRender
-  }
-}

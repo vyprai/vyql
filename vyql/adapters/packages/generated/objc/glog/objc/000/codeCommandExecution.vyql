@@ -1,0 +1,9 @@
+module bindings.objc.migration.meb0a3545;
+
+binding commandExecution0 {
+  requires {
+    dependency("glog")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

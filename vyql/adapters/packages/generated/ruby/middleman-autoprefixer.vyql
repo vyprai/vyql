@@ -1,9 +1,0 @@
-import code.{ExpressionEval}
-import core.{UserControlledData}
-
-adapter ruby {
-  package "middleman-autoprefixer" {
-    source method "extract_styles" -> core.UserControlledData
-    sink method "prefix" -> code.ExpressionEval
-  }
-}

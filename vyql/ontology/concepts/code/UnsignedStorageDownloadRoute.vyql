@@ -1,0 +1,11 @@
+module code;
+
+concept UnsignedStorageDownloadRoute : issue {
+  cwe: [CWE_22, CWE_862, CWE_200, CWE_552]
+  review_assumption: "exported or generated storage files can contain sensitive application data and callers can guess or reuse download paths"
+  reviewCategory: access_control
+  reviewCondition: "a wildcard web route downloads framework storage files without an observed route signature or authorization middleware"
+  reviewConfidence: high
+  reviewEvidence: "storage download route context {pattern} routes a wildcard path parameter into Storage::disk(...)->path(...) and response()->download(...) without signed/auth middleware"
+  vulnerableTo: [access_control.MissingAuthorization, path.PathTraversal, secrets.SecretLeak]
+}

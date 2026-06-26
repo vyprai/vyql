@@ -1,0 +1,9 @@
+module bindings.scala.migration.med41240a;
+
+binding httpInput0 {
+  requires {
+    dependency("org.zalando:problem-spring-web")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit source code.HttpInput at call.result
+}

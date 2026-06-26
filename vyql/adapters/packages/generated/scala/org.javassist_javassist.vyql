@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter scala {
-  package "org.javassist:javassist" {
-    sink method "toClass" -> code.CodeEval
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding commandExecution49 {
+  query pattern callExpr where callee.path ~= "ProcessStartInfo"
+  emit sink code.CommandExecution at args[0]
+}

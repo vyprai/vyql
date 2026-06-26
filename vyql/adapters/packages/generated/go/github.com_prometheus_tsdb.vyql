@@ -1,9 +1,0 @@
-import code.{FilePathAccess, FileUse}
-adapter go {
-  package "github.com/prometheus/tsdb" {
-    sink method "OpenDBReadOnly" -> code.FilePathAccess
-    sink method "Open" -> code.FilePathAccess
-    sink method "readMetaFile" -> code.FilePathAccess
-    sink method "writeMetaFile" -> code.FilePathAccess
-  }
-}

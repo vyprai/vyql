@@ -1,7 +1,0 @@
-import code.{Deserialization, NosqlQuery}
-adapter java {
-  package "org.springframework.data:spring-data-mongodb" {
-    sink method "query" -> code.NosqlQuery
-    sink method "parse" -> code.Deserialization
-  }
-}

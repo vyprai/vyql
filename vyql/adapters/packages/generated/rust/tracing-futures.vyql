@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-adapter rust {
-  package "tracing-futures" {
-    sink method "spawn" -> code.CommandExecution
-    sink method "spawn_obj" -> code.CommandExecution
-  }
-}

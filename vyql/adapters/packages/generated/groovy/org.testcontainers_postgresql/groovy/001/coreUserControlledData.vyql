@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m944f97af;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.testcontainers:postgresql")
+  }
+  query pattern callExpr where callee.method == "withDatabaseName"
+  emit source core.UserControlledData at call.result
+}

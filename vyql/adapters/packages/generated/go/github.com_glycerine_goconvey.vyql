@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter go {
-  package "github.com/glycerine/goconvey" {
-    sink method "NewCommand" -> code.CommandExecution
-  }
-}

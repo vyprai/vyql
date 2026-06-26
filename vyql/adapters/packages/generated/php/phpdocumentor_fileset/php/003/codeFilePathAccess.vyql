@@ -1,0 +1,9 @@
+module bindings.php.migration.m009852a1;
+
+binding filePathAccess3 {
+  requires {
+    dependency("phpdocumentor/fileset")
+  }
+  query pattern callExpr where callee.method == "fread"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "xmltodict" {
-    sink method "parse" -> code.Deserialization
-  }
-}

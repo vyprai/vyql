@@ -1,5 +1,0 @@
-adapter python {
-  package "cython" {
-    sink method "compile" -> code.DynamicCodeLoad
-  }
-}

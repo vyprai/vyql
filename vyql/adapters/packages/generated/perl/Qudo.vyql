@@ -1,5 +1,0 @@
-adapter perl {
-  package "Qudo" {
-    sink method "load" -> code.Deserialization
-  }
-}

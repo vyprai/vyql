@@ -1,0 +1,11 @@
+module code;
+
+concept ClusterDeployFunctionMissingPermission : issue {
+  cwe: [CWE_862, CWE_863, CWE_269]
+  review_assumption: "remote users can execute the function through the cluster function service using lower privileges than required for code deployment"
+  reviewCategory: access_control
+  reviewCondition: "a cluster function can deploy uploaded code without declaring a privileged execution permission"
+  reviewConfidence: high
+  reviewEvidence: "cluster deploy function context {pattern} stages uploaded JAR content and calls the runtime jar deployer without a getRequiredPermissions override or internal-function marker"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter csharp {
-  package "altcover" {
-    sink method "AltCover.OpenCover.JsonToXml" -> code.Deserialization
-    sink method "AltCover.OpenCover.Merge" -> code.Deserialization
-  }
-}

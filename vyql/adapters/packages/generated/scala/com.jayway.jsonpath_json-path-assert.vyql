@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter scala {
-  package "com.jayway.jsonpath:json-path-assert" {
-    sink method "parse" -> code.Deserialization
-  }
-}

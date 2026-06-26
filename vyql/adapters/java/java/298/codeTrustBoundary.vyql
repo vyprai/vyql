@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding trustBoundary298 {
+  query pattern callExpr where callee.path ~= "session.setAttribute"
+  emit sink code.TrustBoundary at args.any
+}

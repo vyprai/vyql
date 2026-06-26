@@ -1,0 +1,9 @@
+module bindings.python.migration.m257e41f9;
+
+binding htmlRender1 {
+  requires {
+    dependency("markdown2")
+  }
+  query pattern callExpr where callee.method == "convert"
+  emit sink code.HtmlRender at args[0]
+}

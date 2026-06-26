@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5254a3a6;
+
+binding codeEval0 {
+  requires {
+    dependency("require-directory")
+  }
+  query pattern callExpr where callee.method == "requireDirectory"
+  emit sink code.CodeEval at args[0]
+}

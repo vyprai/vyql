@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding httpInput0 {
+  requires {
+    dependency("CGI")
+  }
+  query pattern callExpr where callee.path ~= "param"
+  emit source code.HttpInput at call.result
+}

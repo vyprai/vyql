@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc3dfebaa;
+
+binding filePathAccess1 {
+  requires {
+    dependency("pry-doc")
+  }
+  query pattern callExpr where callee.method == "source_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m1c1357ee;
+
+binding codeEval17 {
+  requires {
+    dependency("libdl")
+  }
+  query pattern callExpr where callee.path ~= "dlopen"
+  emit sink code.CodeEval at args[0]
+}

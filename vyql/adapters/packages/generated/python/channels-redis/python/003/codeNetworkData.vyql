@@ -1,0 +1,9 @@
+module bindings.python.migration.m86ffa1d4;
+
+binding networkData3 {
+  requires {
+    dependency("channels-redis")
+  }
+  query pattern callExpr where callee.method == "receive"
+  emit source code.NetworkData at call.result
+}

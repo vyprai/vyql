@@ -1,0 +1,9 @@
+module bindings.scala.migration.ma0def15d;
+
+binding deserialization0 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "addMapping"
+  emit sink code.Deserialization at args[0]
+}

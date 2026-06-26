@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter go {
-  package "github.com/golangci/go-misc" {
-    sink method "ParsePattern" -> code.Deserialization
-    sink method "Open" -> code.FilePathAccess
-  }
-}

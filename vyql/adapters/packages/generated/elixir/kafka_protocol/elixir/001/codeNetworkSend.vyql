@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcc5a44a6;
+
+binding networkSend1 {
+  requires {
+    dependency("kafka_protocol")
+  }
+  query pattern callExpr where callee.method == "send_request"
+  emit sink code.NetworkSend at args[0]
+}

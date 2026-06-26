@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding sqlExecution15 {
+  requires {
+    dependency("gorm.io/gorm")
+  }
+  query pattern callExpr where callee.method == "Where"
+  emit sink code.SqlExecution at args[0]
+}

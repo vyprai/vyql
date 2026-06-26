@@ -1,0 +1,9 @@
+module bindings.php.migration.mf3aa1cae;
+
+binding filePathAccess0 {
+  requires {
+    dependency("respect/validation")
+  }
+  query pattern callExpr where callee.method == "executable"
+  emit sink code.FilePathAccess at args[0]
+}

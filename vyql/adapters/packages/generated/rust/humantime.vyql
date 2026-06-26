@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "humantime" {
-    sink method "parse_duration" -> code.Deserialization
-    sink method "parse_rfc3339" -> code.Deserialization
-    sink method "parse_rfc3339_weak" -> code.Deserialization
-  }
-}

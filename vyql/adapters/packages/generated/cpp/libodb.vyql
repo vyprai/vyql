@@ -1,7 +1,0 @@
-adapter cpp {
-  package "libodb" {
-    sink method "spawn" -> code.CommandExecution
-    sink method "query" -> code.SqlExecution
-    control method "prepared_already_cached" -> core.SqlParameterization
-  }
-}

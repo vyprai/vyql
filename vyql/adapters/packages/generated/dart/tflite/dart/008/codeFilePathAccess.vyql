@@ -1,0 +1,9 @@
+module bindings.dart.migration.m97f3efaf;
+
+binding filePathAccess8 {
+  requires {
+    dependency("tflite")
+  }
+  query pattern callExpr where callee.method == "runSegmentationOnBinary"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m51072c5a;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/sindresorhus/Defaults")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}

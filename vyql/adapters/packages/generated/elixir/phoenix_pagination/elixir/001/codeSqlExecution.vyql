@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m344e2d37;
+
+binding sqlExecution1 {
+  requires {
+    dependency("phoenix_pagination")
+  }
+  query pattern callExpr where callee.method == "get_primary_key"
+  emit sink code.SqlExecution at args[0]
+}

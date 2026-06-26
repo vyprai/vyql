@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding allowlistValidation265 {
+  query pattern callExpr where callee.method == "is_safe_host"
+  emit check core.AllowlistValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mec98890c;
+
+binding networkData22 {
+  requires {
+    dependency("Thrift")
+  }
+  query pattern callExpr where callee.method == "writeFieldBegin"
+  emit source code.NetworkData at call.result
+}

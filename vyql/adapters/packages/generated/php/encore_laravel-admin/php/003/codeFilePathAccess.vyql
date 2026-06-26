@@ -1,0 +1,9 @@
+module bindings.php.migration.mec6b0a22;
+
+binding filePathAccess3 {
+  requires {
+    dependency("encore/laravel-admin")
+  }
+  query pattern callExpr where callee.method == "handleFileDelete"
+  emit sink code.FilePathAccess at args[0]
+}

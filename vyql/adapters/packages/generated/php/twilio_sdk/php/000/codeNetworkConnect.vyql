@@ -1,0 +1,9 @@
+module bindings.php.migration.m17bf60a7;
+
+binding networkConnect0 {
+  requires {
+    dependency("twilio/sdk")
+  }
+  query pattern callExpr where callee.method == "TwilioDomain::request"
+  emit sink code.NetworkConnectSink at args[0]
+}

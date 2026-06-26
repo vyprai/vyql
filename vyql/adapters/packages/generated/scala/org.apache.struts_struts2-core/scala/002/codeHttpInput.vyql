@@ -1,0 +1,9 @@
+module bindings.scala.migration.md67d9be3;
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.struts:struts2-core")
+  }
+  query pattern callExpr where callee.method == "getSession"
+  emit source code.HttpInput at call.result
+}

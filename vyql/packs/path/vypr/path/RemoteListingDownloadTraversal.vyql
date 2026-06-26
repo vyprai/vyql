@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule RemoteListingDownloadTraversal {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22]
+    id: "VYQL-PATH-006"
+    severity: high
+  }
+  issue code.RemoteListingDownloadPath as sink
+}

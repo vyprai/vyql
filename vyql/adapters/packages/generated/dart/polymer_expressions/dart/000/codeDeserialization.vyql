@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5e6ffe49;
+
+binding deserialization0 {
+  requires {
+    dependency("polymer_expressions")
+  }
+  query pattern callExpr where callee.method == "Parser.parse"
+  emit sink code.Deserialization at args[0]
+}

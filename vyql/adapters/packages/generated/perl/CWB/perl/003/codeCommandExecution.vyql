@@ -1,0 +1,9 @@
+module bindings.perl.migration.mb6af0173;
+
+binding commandExecution3 {
+  requires {
+    dependency("CWB")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

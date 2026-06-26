@@ -1,6 +1,0 @@
-import core.{AuthenticationCheck}
-adapter elixir {
-  package "guardian" {
-    control method "decode_and_verify" -> core.AuthenticationCheck
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfbea2ad5;
+
+binding deserialization0 {
+  requires {
+    dependency("rdf")
+  }
+  query pattern callExpr where callee.method == "RDF.IRI.parse"
+  emit sink code.Deserialization at args[0]
+}

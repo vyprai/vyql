@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m6a6c0a69;
+
+binding networkSend1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

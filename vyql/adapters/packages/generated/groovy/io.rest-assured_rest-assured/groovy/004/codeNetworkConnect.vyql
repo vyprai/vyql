@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9ceef9fb;
+
+binding networkConnect4 {
+  requires {
+    dependency("io.rest-assured:rest-assured")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}

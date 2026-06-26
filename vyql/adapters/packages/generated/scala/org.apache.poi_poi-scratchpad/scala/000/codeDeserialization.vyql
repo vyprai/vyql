@@ -1,0 +1,9 @@
+module bindings.scala.migration.m6e0ca957;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.poi:poi-scratchpad")
+  }
+  query pattern callExpr where callee.method == "HSLFParser.parse"
+  emit sink code.Deserialization at args[0]
+}

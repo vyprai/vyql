@@ -1,7 +1,0 @@
-import code.{Deserialization, FileUse}
-adapter cpp {
-  package "json-c" {
-    sink method "json_tokener_parse_ex" -> code.Deserialization
-    sink method "json_object_from_file" -> code.FileUse
-  }
-}

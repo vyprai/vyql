@@ -1,0 +1,9 @@
+module bindings.objc.migration.m03f63460;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("Cache")
+  }
+  query pattern callExpr where callee.method == "setObject"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.me7b72329;
+
+binding storedDataRead1 {
+  requires {
+    dependency("github.com/GroupeMINASTE/Keychain.swift")
+  }
+  query pattern callExpr where callee.method == "value"
+  emit source code.StoredDataRead at call.result
+}

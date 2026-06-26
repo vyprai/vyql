@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md6355825;
+
+binding networkSend15 {
+  requires {
+    dependency("sawyer")
+  }
+  query pattern callExpr where callee.method == "options"
+  emit sink code.NetworkSend at args[0]
+}

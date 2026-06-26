@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-adapter go {
-  package "github.com/cespare/cp" {
-    sink method "CopyFile" -> code.FilePathAccess
-    sink method "CopyFileOverwrite" -> code.FilePathAccess
-    sink method "CopyAll" -> code.FilePathAccess
-    sink method "CopyAllOverwrite" -> code.FilePathAccess
-  }
-}

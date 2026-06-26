@@ -1,7 +1,0 @@
-import code.{CodeEval}
-adapter php {
-  package "jcalderonzumba/mink-phantomjs-driver" {
-    sink method "executeScript" -> code.CodeEval
-    sink method "evaluateScript" -> code.CodeEval
-  }
-}

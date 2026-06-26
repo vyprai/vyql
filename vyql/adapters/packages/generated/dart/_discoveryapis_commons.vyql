@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter dart {
-  package "_discoveryapis_commons" {
-    control method "escapeVariable" -> core.InputValidation
-  }
-}

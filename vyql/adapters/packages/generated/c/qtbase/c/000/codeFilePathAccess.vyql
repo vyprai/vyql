@@ -1,0 +1,9 @@
+module bindings.c.migration.m95b5b663;
+
+binding filePathAccess0 {
+  requires {
+    dependency("qtbase")
+  }
+  query pattern callExpr where callee.method == "installFile"
+  emit sink code.FilePathAccess at args[0]
+}

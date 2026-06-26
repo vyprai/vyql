@@ -1,0 +1,9 @@
+module bindings.java.migration.m5f9cc401;
+
+binding deserialization0 {
+  requires {
+    dependency("javax.xml.bind:jaxb-api")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

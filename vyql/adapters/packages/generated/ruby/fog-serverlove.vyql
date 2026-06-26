@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter ruby {
-  package "fog-serverlove" {
-    sink method "request" -> code.NetworkSend
-  }
-}

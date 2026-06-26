@@ -1,0 +1,9 @@
+module bindings.go.migration.m2941eca5;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/Masterminds/semver/v3")
+  }
+  query pattern callExpr where callee.method == "MustParse"
+  emit sink code.Deserialization at args[0]
+}

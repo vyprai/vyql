@@ -1,9 +1,0 @@
-import code.{Deserialization}
-import core.{UserControlledData}
-
-adapter java {
-  package "com.typesafe:config" {
-    source method "ConfigFactory.load" -> core.UserControlledData
-    sink method "ConfigFactory.parseString" -> code.Deserialization
-  }
-}

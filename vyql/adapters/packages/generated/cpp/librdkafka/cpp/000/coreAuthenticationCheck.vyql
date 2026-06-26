@@ -1,0 +1,14 @@
+module bindings.cpp.migration.m32d2f6a0;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("librdkafka")
+  }
+  query pattern callExpr where callee.method == "Conf::set"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m26887366;
+
+binding filePathAccess2 {
+  requires {
+    dependency("IDMPhotoBrowser")
+  }
+  query pattern callExpr where callee.method == "photosWithFilePaths"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md4d0ed2b;
+
+binding deserialization0 {
+  requires {
+    dependency("rails-dom-testing")
+  }
+  query pattern callExpr where callee.method == "fragment"
+  emit sink code.Deserialization at args[0]
+}

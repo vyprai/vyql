@@ -1,0 +1,11 @@
+module code;
+
+concept ThreadLocalScopeOverwriteWithoutCleanup : issue {
+  cwe: [CWE_362]
+  review_assumption: "the same worker thread can process another request or scope after an unmatched previous lifecycle callback"
+  reviewCategory: race
+  reviewCondition: "a request or scope lifecycle begins by overwriting ThreadLocal state without first ending or clearing the previous scope"
+  reviewConfidence: high
+  reviewEvidence: "lifecycle context {pattern} writes a new ThreadLocal-scoped value before an observed cleanup call"
+  vulnerableTo: [concurrency.RaceCondition, resource.ResourceLeak]
+}

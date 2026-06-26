@@ -1,0 +1,13 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding binding529 {
+  query pattern callExpr where callee.method == "ldapEscape"
+  emit check core.Assumption at call {
+    advisory: true
+    about: code.LdapQuery
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

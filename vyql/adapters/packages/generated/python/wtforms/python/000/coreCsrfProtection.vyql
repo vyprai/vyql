@@ -1,0 +1,14 @@
+module bindings.python.migration.m03dd2918;
+
+binding csrfProtection0 {
+  requires {
+    dependency("wtforms")
+  }
+  query pattern callExpr where callee.method == "generate_csrf_token"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

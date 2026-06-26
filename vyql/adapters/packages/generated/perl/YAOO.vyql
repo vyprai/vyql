@@ -1,9 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "YAOO" {
-    sink method "typed_hash" -> code.Deserialization
-    sink method "set_typed_hash" -> code.Deserialization
-    sink method "deep_clone_ordered_hash" -> code.Deserialization
-    sink method "deep_clone" -> code.Deserialization
-  }
-}

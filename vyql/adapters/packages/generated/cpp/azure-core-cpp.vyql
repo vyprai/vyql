@@ -1,7 +1,0 @@
-import code.{ResponseHeaderWrite}
-
-adapter cpp {
-  package "azure-core-cpp" {
-    sink method "PropagateToHttpHeaders" -> code.ResponseHeaderWrite
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb42317df;
+
+binding deserialization0 {
+  requires {
+    dependency("snapdragon-util")
+  }
+  query pattern callExpr where callee.method == "expect"
+  emit sink code.Deserialization at args[0]
+}

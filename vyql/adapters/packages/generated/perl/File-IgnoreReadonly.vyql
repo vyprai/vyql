@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter perl {
-  package "File-IgnoreReadonly" {
-    sink method "chmod" -> code.FilePathAccess
-  }
-}

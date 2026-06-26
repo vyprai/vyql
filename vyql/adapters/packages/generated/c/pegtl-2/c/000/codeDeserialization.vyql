@@ -1,0 +1,9 @@
+module bindings.c.migration.mb93637e0;
+
+binding deserialization0 {
+  requires {
+    dependency("pegtl-2")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

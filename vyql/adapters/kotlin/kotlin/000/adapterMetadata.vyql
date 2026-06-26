@@ -1,0 +1,13 @@
+module bindings.kotlin.migration.m304d1620;
+
+pattern adapterMetadata {
+  unstable: {
+    owner: "migration"
+    reason: "v1 adapter metadata has no stable v2 declaration form yet"
+    adapter: "kotlin"
+    meta: {
+      fidelity: "resolved"
+      match: "contains"
+    }
+  }
+}

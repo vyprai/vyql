@@ -1,0 +1,9 @@
+module bindings.python.migration.m6750d278;
+
+binding networkSend0 {
+  requires {
+    dependency("fcm-django")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.NetworkSend at args[0]
+}

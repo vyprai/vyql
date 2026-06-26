@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc0662e30;
+
+binding urlFetch7 {
+  requires {
+    dependency("elasticsearch")
+  }
+  query pattern callExpr where callee.method == "delete!"
+  emit sink code.UrlFetch at args[0]
+}

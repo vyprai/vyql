@@ -1,0 +1,14 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding authorizationCheck32 {
+  requires {
+    dependency("bodyguard")
+  }
+  query pattern callExpr where callee.path ~= "Bodyguard.permit"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

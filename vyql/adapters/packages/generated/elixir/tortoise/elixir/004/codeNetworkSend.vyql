@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8b8d5b9a;
+
+binding networkSend4 {
+  requires {
+    dependency("tortoise")
+  }
+  query pattern callExpr where callee.method == "Tortoise.publish_sync"
+  emit sink code.NetworkSend at args[0]
+}

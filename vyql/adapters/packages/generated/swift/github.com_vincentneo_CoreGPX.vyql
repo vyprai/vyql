@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter swift {
-  package "github.com/vincentneo/CoreGPX" {
-    sink method "fallibleParsedData" -> code.Deserialization
-    sink method "parsedData" -> code.Deserialization
-  }
-}

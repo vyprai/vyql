@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m281351c1;
+
+binding cliArgument0 {
+  requires {
+    dependency("ash_phoenix")
+  }
+  query pattern callExpr where callee.method == "parse_opts"
+  emit source code.CliArgument at call.result
+}

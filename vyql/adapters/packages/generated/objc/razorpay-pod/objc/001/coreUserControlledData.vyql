@@ -1,0 +1,9 @@
+module bindings.objc.migration.m42f45fae;
+
+binding userControlledData1 {
+  requires {
+    dependency("razorpay-pod")
+  }
+  query pattern callExpr where callee.method == "openMagicXWithStorefrontUrl"
+  emit source core.UserControlledData at call.result
+}

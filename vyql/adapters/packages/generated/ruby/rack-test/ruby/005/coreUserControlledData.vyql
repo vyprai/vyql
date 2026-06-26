@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc0281a92;
+
+binding userControlledData5 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "basic_authorize"
+  emit source core.UserControlledData at call.result
+}

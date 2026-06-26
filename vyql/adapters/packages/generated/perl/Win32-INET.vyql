@@ -1,7 +1,0 @@
-import code.{UrlFetch, FilePathAccess}
-adapter perl {
-  package "Win32-INET" {
-    sink method "Win32::INET::GetUrlCacheFile" -> code.UrlFetch
-    sink method "Win32::INET::GetUrlCacheFile" -> code.FilePathAccess
-  }
-}

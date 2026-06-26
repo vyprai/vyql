@@ -1,0 +1,9 @@
+module bindings.rust.migration.mb39bb554;
+
+binding deserialization0 {
+  requires {
+    dependency("web-sys")
+  }
+  query pattern callExpr where callee.method == "parse_from_string"
+  emit sink code.Deserialization at args[0]
+}

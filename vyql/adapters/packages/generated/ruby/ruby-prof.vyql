@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter ruby {
-  package "ruby-prof" {
-    sink method "Rack::RubyProf#initialize" -> code.FilePathAccess
-    sink method "Rack::RubyProf#call" -> code.FilePathAccess
-  }
-}

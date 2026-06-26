@@ -1,0 +1,14 @@
+module bindings.objc.migration.ma399f56c;
+
+binding authenticationCheck5 {
+  requires {
+    dependency("ParseFacebookUtilsV4")
+  }
+  query pattern callExpr where callee.method == "authenticateAsyncWithReadPermissions"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

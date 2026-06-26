@@ -1,7 +1,0 @@
-adapter java {
-  package "net.java.dev.jna:jna" {
-    sink method "open" -> code.FilePathAccess
-    source method "read" -> core.UserControlledData
-    source method "write" -> core.UserControlledData
-  }
-}

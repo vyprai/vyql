@@ -1,5 +1,0 @@
-adapter ruby {
-  package "tomlrb" {
-    sink method "Tomlrb::Parser" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m75ec20b4;
+
+binding codeEval0 {
+  requires {
+    dependency("signatures")
+  }
+  query pattern callExpr where callee.method == "inject"
+  emit sink code.CodeEval at args[0]
+}

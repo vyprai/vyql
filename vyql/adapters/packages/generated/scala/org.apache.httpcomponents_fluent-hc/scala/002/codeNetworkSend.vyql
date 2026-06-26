@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf483c1b1;
+
+binding networkSend2 {
+  requires {
+    dependency("org.apache.httpcomponents:fluent-hc")
+  }
+  query pattern callExpr where callee.method == "Put"
+  emit sink code.NetworkSend at args[0]
+}

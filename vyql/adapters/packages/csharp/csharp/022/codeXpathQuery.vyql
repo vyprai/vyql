@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding xpathQuery22 {
+  requires {
+    dependency("System.Xml.XPath")
+  }
+  query pattern callExpr where callee.method == "SelectNodes"
+  emit sink code.XpathQuery at args[0]
+}

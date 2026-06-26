@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb2c9678b;
+
+binding networkSend1 {
+  requires {
+    dependency("backports")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbb3face7;
+
+binding deserialization2 {
+  requires {
+    dependency("org.assertj:assertj-core")
+  }
+  query pattern callExpr where callee.method == "parseDateWith"
+  emit sink code.Deserialization at args[0]
+}

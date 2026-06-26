@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "cached_network_image_web" {
-    sink method "decode" -> code.Deserialization
-  }
-}

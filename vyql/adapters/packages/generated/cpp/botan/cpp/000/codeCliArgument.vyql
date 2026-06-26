@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9e05dd3f;
+
+binding cliArgument0 {
+  requires {
+    dependency("botan")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}

@@ -1,9 +1,0 @@
-adapter php {
-  package "symfony/class-loader" {
-    sink method "loadClass" -> code.FilePathAccess
-    sink method "load" -> code.FilePathAccess
-    sink method "inline" -> code.FilePathAccess
-    sink method "dump" -> code.FileUse
-    sink method "createMap" -> code.FilePathAccess
-  }
-}

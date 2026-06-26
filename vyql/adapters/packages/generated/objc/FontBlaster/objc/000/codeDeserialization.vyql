@@ -1,0 +1,9 @@
+module bindings.objc.migration.m291baca0;
+
+binding deserialization0 {
+  requires {
+    dependency("FontBlaster")
+  }
+  query pattern callExpr where callee.method == "loadFont"
+  emit sink code.Deserialization at args[0]
+}

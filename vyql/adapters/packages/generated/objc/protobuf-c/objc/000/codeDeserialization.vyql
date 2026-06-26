@@ -1,0 +1,9 @@
+module bindings.objc.migration.m8cd69817;
+
+binding deserialization0 {
+  requires {
+    dependency("protobuf-c")
+  }
+  query pattern callExpr where callee.method == "ParseOptions"
+  emit sink code.Deserialization at args[0]
+}

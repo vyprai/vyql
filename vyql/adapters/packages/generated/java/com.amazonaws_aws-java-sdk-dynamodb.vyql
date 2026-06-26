@@ -1,6 +1,0 @@
-import code.{NosqlQuery}
-adapter java {
-  package "com.amazonaws:aws-java-sdk-dynamodb" {
-    sink method "query" -> code.NosqlQuery
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.med3f5d0f;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/apple/swift-openapi-generator")
+  }
+  query pattern callExpr where callee.method == "parseOpenAPIDocument"
+  emit sink code.Deserialization at args[0]
+}

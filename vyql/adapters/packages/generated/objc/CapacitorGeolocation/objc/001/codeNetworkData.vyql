@@ -1,0 +1,9 @@
+module bindings.objc.migration.m49aab0f0;
+
+binding networkData1 {
+  requires {
+    dependency("CapacitorGeolocation")
+  }
+  query pattern callExpr where callee.method == "watchPosition"
+  emit source code.NetworkData at call.result
+}

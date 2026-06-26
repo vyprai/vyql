@@ -1,0 +1,9 @@
+module bindings.cpp.migration.maeacb755;
+
+binding deserialization1 {
+  requires {
+    dependency("boost-lexical-cast")
+  }
+  query pattern callExpr where callee.method == "try_lexical_convert"
+  emit sink code.Deserialization at args[0]
+}

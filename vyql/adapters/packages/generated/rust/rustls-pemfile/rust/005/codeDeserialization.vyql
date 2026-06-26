@@ -1,0 +1,9 @@
+module bindings.rust.migration.m9dbb5270;
+
+binding deserialization5 {
+  requires {
+    dependency("rustls-pemfile")
+  }
+  query pattern callExpr where callee.method == "pkcs8_private_keys"
+  emit sink code.Deserialization at args[0]
+}

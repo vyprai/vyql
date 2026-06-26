@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m88bcc516;
+
+binding cliArgument2 {
+  requires {
+    dependency("com.google.zxing:javase")
+  }
+  query pattern callExpr where callee.method == "CommandLineRunner"
+  emit source code.CliArgument at call.result
+}

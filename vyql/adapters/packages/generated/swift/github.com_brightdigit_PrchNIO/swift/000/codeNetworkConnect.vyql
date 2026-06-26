@@ -1,0 +1,9 @@
+module bindings.swift.migration.m4ba7f8dd;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/brightdigit/PrchNIO")
+  }
+  query pattern callExpr where callee.method == "beginRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}

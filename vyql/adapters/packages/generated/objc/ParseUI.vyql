@@ -1,9 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "ParseUI" {
-    source method "signUpViewController:shouldBeginSignUp:" -> core.UserControlledData
-    source method "signUpViewController:didSignUpUser:" -> core.UserControlledData
-    source method "logInViewController:didLogInUser:" -> core.UserControlledData
-  }
-}

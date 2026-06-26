@@ -1,0 +1,14 @@
+module bindings.python.migration.m6e2eb0d1;
+
+binding inputValidation5 {
+  requires {
+    dependency("django-rest-auth")
+  }
+  query pattern callExpr where callee.method == "validate_username"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

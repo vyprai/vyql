@@ -1,0 +1,6 @@
+module bindings.objc.migration.mccadd221;
+
+binding divisionDenominator50 {
+  query pattern callExpr where callee.path ~= "__binop.div"
+  emit sink code.DivisionDenominator at args[1]
+}

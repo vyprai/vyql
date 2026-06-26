@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule MountStubCleanupPathEscape {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22]
+    id: "VYQL-PATH-009"
+    severity: high
+  }
+  issue code.MountStubCleanupPathEscape as sink
+}

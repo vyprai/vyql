@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb45ff4b5;
+
+binding deserialization1 {
+  requires {
+    dependency("com.googlecode.efficient-java-matrix-library:ejml")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

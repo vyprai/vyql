@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter python {
-  package "loguru" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse" -> code.FilePathAccess
-  }
-}

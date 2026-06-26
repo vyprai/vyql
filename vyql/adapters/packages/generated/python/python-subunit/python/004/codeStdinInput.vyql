@@ -1,0 +1,9 @@
+module bindings.python.migration.m1e4919e3;
+
+binding stdinInput4 {
+  requires {
+    dependency("python-subunit")
+  }
+  query pattern callExpr where callee.method == "read_exactly"
+  emit source code.StdinInput at call.result
+}

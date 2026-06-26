@@ -1,0 +1,11 @@
+module code;
+
+concept SniffCsvExternalAccessBypass : issue {
+  cwe: [CWE_200, CWE_284, CWE_552]
+  review_assumption: "callers can invoke the sniffing function with filesystem paths while external access is expected to be disabled"
+  reviewCategory: access_control
+  reviewCondition: "CSV sniffing or schema-detection table functions honor disabled external filesystem access before binding caller paths"
+  reviewConfidence: high
+  reviewEvidence: "CSV sniff bind context {pattern} stores the caller path and parses reader options without checking enable_external_access"
+  vulnerableTo: [secrets.SecretLeak, access_control.BrokenAccess]
+}

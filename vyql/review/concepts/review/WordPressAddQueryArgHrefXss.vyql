@@ -1,0 +1,8 @@
+module code;
+
+review code.WordPressAddQueryArgHrefXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review WordPress add_query_arg URLs for esc_url or equivalent escaping before href attribute rendering"
+}

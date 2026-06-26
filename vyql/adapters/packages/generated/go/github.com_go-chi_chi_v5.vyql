@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter go {
-  package "github.com/go-chi/chi/v5" {
-    source method "URLParam" -> code.HttpInput
-  }
-}

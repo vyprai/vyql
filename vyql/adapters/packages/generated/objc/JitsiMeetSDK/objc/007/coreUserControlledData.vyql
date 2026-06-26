@@ -1,0 +1,9 @@
+module bindings.objc.migration.mb118e0aa;
+
+binding userControlledData7 {
+  requires {
+    dependency("JitsiMeetSDK")
+  }
+  query pattern callExpr where callee.method == "fromBuilder"
+  emit source core.UserControlledData at call.result
+}

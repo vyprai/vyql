@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb07a9ff9;
+
+binding deserialization1 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "createUnmarshaller"
+  emit sink code.Deserialization at args[0]
+}

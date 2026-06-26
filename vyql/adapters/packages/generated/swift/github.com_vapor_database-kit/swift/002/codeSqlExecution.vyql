@@ -1,0 +1,9 @@
+module bindings.swift.migration.mef276195;
+
+binding sqlExecution2 {
+  requires {
+    dependency("github.com/vapor/database-kit")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit sink code.SqlExecution at args[0]
+}

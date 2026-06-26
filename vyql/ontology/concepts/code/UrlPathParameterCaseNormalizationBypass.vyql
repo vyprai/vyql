@@ -1,0 +1,11 @@
+module code;
+
+concept UrlPathParameterCaseNormalizationBypass : issue {
+  cwe: [CWE_178, CWE_863]
+  review_assumption: "downstream request parameter lookups use canonical lowercase names and can be bypassed with case variants"
+  reviewCategory: input_validation
+  reviewCondition: "URL path parameter names are stored under caller-controlled case before later security or business lookups"
+  reviewConfidence: high
+  reviewEvidence: "URL parameter parsing context {pattern} writes path segment names into a parameter map without canonical case normalization"
+  vulnerableTo: [validation.ImproperInputValidation, access_control.IncorrectAuthorization]
+}

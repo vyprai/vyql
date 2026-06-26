@@ -1,0 +1,9 @@
+module bindings.scala.migration.m338402cf;
+
+binding xmlParse0 {
+  requires {
+    dependency("org.jdom:jdom2")
+  }
+  query pattern callExpr where callee.method == "build"
+  emit sink code.XmlParse at args[0]
+}

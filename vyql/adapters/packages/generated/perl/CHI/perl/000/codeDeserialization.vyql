@@ -1,0 +1,9 @@
+module bindings.perl.migration.mf804badd;
+
+binding deserialization0 {
+  requires {
+    dependency("CHI")
+  }
+  query pattern callExpr where callee.method == "json_decode"
+  emit sink code.Deserialization at args[0]
+}

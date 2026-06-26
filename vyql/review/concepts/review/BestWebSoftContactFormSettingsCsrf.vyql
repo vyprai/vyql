@@ -1,0 +1,8 @@
+module code;
+
+review code.BestWebSoftContactFormSettingsCsrf {
+  category: csrf
+  expected: [core.CsrfProtection]
+  kind: attention
+  text: "review BestWebSoft Contact Form settings saves for check_admin_referer and a matching wp_nonce_field"
+}

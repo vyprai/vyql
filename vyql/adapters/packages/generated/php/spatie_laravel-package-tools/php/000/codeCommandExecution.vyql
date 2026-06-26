@@ -1,0 +1,9 @@
+module bindings.php.migration.m14ee949d;
+
+binding commandExecution0 {
+  requires {
+    dependency("spatie/laravel-package-tools")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

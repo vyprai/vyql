@@ -1,0 +1,7 @@
+module code;
+
+review code.UncheckedPrototypeConfigKey {
+  category: prototype_pollution
+  kind: attention
+  text: "review dynamic config-key copies for __proto__/constructor/prototype filtering before writing plain object properties"
+}

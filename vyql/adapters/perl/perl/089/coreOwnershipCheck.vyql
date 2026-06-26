@@ -1,0 +1,11 @@
+module bindings.perl.migration.mfca40a44;
+
+binding ownershipCheck89 {
+  query pattern callExpr where callee.path ~= "check_ownership"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

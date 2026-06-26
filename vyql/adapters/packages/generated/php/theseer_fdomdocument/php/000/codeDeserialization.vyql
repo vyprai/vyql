@@ -1,0 +1,9 @@
+module bindings.php.migration.m382d8800;
+
+binding deserialization0 {
+  requires {
+    dependency("theseer/fdomdocument")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

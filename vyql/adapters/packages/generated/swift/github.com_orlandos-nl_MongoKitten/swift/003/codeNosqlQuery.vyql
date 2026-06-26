@@ -1,0 +1,9 @@
+module bindings.swift.migration.m64cf68f9;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("github.com/orlandos-nl/MongoKitten")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

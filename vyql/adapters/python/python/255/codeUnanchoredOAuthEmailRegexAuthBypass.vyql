@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding unanchoredOAuthEmailRegexAuthBypass255 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "call" and node.path ~= "re.match" and operand(node, where: operand.path ~= "self.application.options.auth") and operand(node, where: containsAny(operand.key, [email, mail]))
+  emit issue code.UnanchoredOAuthEmailRegexAuthBypass at node
+}

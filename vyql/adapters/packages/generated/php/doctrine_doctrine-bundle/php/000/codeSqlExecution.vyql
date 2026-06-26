@@ -1,0 +1,9 @@
+module bindings.php.migration.m91539972;
+
+binding sqlExecution0 {
+  requires {
+    dependency("doctrine/doctrine-bundle")
+  }
+  query pattern callExpr where callee.method == "replaceQueryParameters"
+  emit sink code.SqlExecution at args[0]
+}

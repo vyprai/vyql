@@ -1,0 +1,9 @@
+module bindings.rust.migration.m397c49ff;
+
+binding filePathAccess1 {
+  requires {
+    dependency("spki")
+  }
+  query pattern callExpr where callee.method == "read_public_key_pem_file"
+  emit sink code.FilePathAccess at args[0]
+}

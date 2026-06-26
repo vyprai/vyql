@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m170c7dbe;
+
+binding deserialization1 {
+  requires {
+    dependency("json")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

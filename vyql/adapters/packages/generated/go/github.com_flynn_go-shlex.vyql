@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/flynn/go-shlex" {
-    sink method "Split" -> code.Deserialization
-    sink method "NewLexer" -> code.Deserialization
-    sink method "NewTokenizer" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m971fbd3c;
+
+binding networkData2 {
+  requires {
+    dependency("payjp")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.NetworkData at call.result
+}

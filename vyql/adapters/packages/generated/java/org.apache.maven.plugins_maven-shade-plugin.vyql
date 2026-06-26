@@ -1,8 +1,0 @@
-import code.{FileUse, Deserialization}
-adapter java {
-  package "org.apache.maven.plugins:maven-shade-plugin" {
-    sink method "shade" -> code.FileUse
-    sink method "shade" -> code.Deserialization
-    sink method "write" -> code.FileUse
-  }
-}

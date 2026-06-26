@@ -1,9 +1,0 @@
-import code.{NetworkConnect, NetworkSend, UrlFetch}
-
-adapter swift {
-  package "github.com/hiddevdploeg/Billboard" {
-    sink method "fetchRandomAd" -> code.UrlFetch
-    sink method "fetchAllAds" -> code.UrlFetch
-    sink method "getAppIcon" -> code.UrlFetch
-  }
-}

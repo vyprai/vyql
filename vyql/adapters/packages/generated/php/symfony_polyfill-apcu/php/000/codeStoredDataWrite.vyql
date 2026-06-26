@@ -1,0 +1,9 @@
+module bindings.php.migration.mc187badd;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("symfony/polyfill-apcu")
+  }
+  query pattern callExpr where callee.method == "apcu_add"
+  emit sink code.StoredDataWrite at args[0]
+}

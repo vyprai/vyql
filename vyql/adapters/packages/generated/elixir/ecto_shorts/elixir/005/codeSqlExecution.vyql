@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m03b1e9d2;
+
+binding sqlExecution5 {
+  requires {
+    dependency("ecto_shorts")
+  }
+  query pattern callExpr where callee.method == "stream"
+  emit sink code.SqlExecution at args[0]
+}

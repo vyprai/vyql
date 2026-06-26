@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.fasterxml.jackson.module:jackson-module-parameter-names" {
-    sink method "getParameters" -> code.Deserialization
-    sink method "findImplicitPropertyName" -> code.Deserialization
-  }
-}

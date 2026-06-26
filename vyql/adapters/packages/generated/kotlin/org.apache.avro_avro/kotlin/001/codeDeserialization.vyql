@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mef47bd72;
+
+binding deserialization1 {
+  requires {
+    dependency("org.apache.avro:avro")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

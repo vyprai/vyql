@@ -1,0 +1,9 @@
+module bindings.perl.migration.m251a76b5;
+
+binding codeEval0 {
+  requires {
+    dependency("Mo")
+  }
+  query pattern callExpr where callee.method == "Mo::Inline::run"
+  emit sink code.CodeEval at args[0]
+}

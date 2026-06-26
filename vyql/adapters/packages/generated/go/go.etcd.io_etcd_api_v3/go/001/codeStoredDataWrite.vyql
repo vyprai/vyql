@@ -1,0 +1,9 @@
+module bindings.go.migration.m50dab3f4;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_Put_0"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.rust.migration.mdc4f74cd;
+
+binding commandExecution12 {
+  query pattern callExpr where callee.method == "arg"
+  emit sink code.CommandExecution at args[0]
+}

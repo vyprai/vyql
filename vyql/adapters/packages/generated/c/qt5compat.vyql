@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter c {
-  package "qt5compat" {
-    sink method "QTextCodec::toUnicode" -> code.Deserialization
-    sink method "QTextCodec::convertToUnicode" -> code.Deserialization
-  }
-}

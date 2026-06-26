@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc4039974;
+
+binding htmlRender0 {
+  requires {
+    dependency("react_phoenix")
+  }
+  query pattern callExpr where callee.method == "ReactPhoenix.ClientSide.react_component"
+  emit sink code.HtmlRender at args[0]
+}

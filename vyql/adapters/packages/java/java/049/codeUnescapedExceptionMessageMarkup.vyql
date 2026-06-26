@@ -1,0 +1,13 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding unescapedExceptionMessageMarkup49 {
+  requires {
+    dependency("org.kohsuke.stapler")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:Pattern.compile" and node.token contains "call_path:FormValidation.errorWithMarkup" and node.token contains "call:getMessage" and not (node.token contains "call_path:Util.escape")
+  emit issue code.UnescapedExceptionMessageMarkup at node
+}

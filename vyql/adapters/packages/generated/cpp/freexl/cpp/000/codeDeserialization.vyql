@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m860acd09;
+
+binding deserialization0 {
+  requires {
+    dependency("freexl")
+  }
+  query pattern callExpr where callee.method == "freexl_open"
+  emit sink code.Deserialization at args[0]
+}

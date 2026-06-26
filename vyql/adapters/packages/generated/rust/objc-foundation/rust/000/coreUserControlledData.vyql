@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6d0ceb32;
+
+binding userControlledData0 {
+  requires {
+    dependency("objc-foundation")
+  }
+  query pattern callExpr where callee.method == "with_bytes"
+  emit source core.UserControlledData at call.result
+}

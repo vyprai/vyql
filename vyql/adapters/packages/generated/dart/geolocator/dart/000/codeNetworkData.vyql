@@ -1,0 +1,9 @@
+module bindings.dart.migration.m11923f86;
+
+binding networkData0 {
+  requires {
+    dependency("geolocator")
+  }
+  query pattern callExpr where callee.method == "getLastKnownPosition"
+  emit source code.NetworkData at call.result
+}

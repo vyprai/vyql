@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "http_parser" {
-    sink method "parseHeader" -> code.Deserialization
-    sink method "parseHttpDate" -> code.Deserialization
-  }
-}

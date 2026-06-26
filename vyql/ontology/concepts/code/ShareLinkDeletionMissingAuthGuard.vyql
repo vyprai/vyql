@@ -1,0 +1,11 @@
+module code;
+
+concept ShareLinkDeletionMissingAuthGuard : issue {
+  cwe: [CWE_306, CWE_352, CWE_862]
+  review_assumption: "the handler is reachable as a state-changing web endpoint and share tokens identify links that should be deleted only by an authorized user"
+  reviewCategory: auth
+  reviewCondition: "share-link deletion endpoint can delete a token-selected public link without requiring an authenticated, CSRF-protected request"
+  reviewConfidence: high
+  reviewEvidence: "share deletion handler {pattern} reads a request token and calls the share-link delete operation without observed auth and CSRF guards"
+  vulnerableTo: [authentication.MissingAuthentication, access_control.MissingAuthorization, request_forgery.Csrf]
+}

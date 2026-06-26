@@ -1,7 +1,0 @@
-import code.{CliArgument}
-adapter perl {
-  package "Docopt" {
-    source method "parse" -> code.CliArgument
-    source method "parse_argv" -> code.CliArgument
-  }
-}

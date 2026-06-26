@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md02b0b59;
+
+binding sqlExecution0 {
+  requires {
+    dependency("database_cleaner-active_record")
+  }
+  query pattern callExpr where callee.method == "delete_tables"
+  emit sink code.SqlExecution at args[0]
+}

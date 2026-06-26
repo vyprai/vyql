@@ -1,0 +1,9 @@
+module bindings.python.migration.m86ffa1d4;
+
+binding networkSend2 {
+  requires {
+    dependency("channels-redis")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}

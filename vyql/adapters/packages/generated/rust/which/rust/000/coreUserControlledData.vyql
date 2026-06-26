@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3ed6ed01;
+
+binding userControlledData0 {
+  requires {
+    dependency("which")
+  }
+  query pattern callExpr where callee.method == "custom_cwd"
+  emit source core.UserControlledData at call.result
+}

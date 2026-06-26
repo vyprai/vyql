@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter java {
-  package "io.cucumber:cucumber-spring" {
-    source method "loadGlue" -> core.UserControlledData
-  }
-}

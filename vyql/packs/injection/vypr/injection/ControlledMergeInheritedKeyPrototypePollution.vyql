@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ControlledMergeInheritedKeyPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-106"
+    severity: high
+  }
+  issue code.ControlledMergeInheritedKeyPrototypePollution as sink
+}

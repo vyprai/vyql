@@ -1,0 +1,9 @@
+module bindings.java.migration.mb0c06481;
+
+binding htmlRender1 {
+  requires {
+    dependency("org.apache.lucene:lucene-highlighter")
+  }
+  query pattern callExpr where callee.method == "highlight"
+  emit sink code.HtmlRender at args[0]
+}

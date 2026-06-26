@@ -1,8 +1,0 @@
-adapter scala {
-  package "org.glassfish.web:el-impl" {
-    sink method "CompositeExpression" -> code.ExpressionEval
-    sink method "Expression" -> code.ExpressionEval
-    sink method "getValue" -> code.ExpressionEval
-    sink method "invoke" -> code.ExpressionEval
-  }
-}

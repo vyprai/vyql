@@ -1,0 +1,9 @@
+module bindings.rust.migration.m18254a31;
+
+binding codeEval0 {
+  requires {
+    dependency("serialize-to-javascript-impl")
+  }
+  query pattern callExpr where callee.method == "derive_template"
+  emit sink code.CodeEval at args[0]
+}

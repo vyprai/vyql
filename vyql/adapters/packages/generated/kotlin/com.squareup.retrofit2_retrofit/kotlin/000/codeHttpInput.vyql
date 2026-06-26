@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4b358a4b;
+
+binding httpInput0 {
+  requires {
+    dependency("com.squareup.retrofit2:retrofit")
+  }
+  query pattern callExpr where callee.method == "RequestFactory.parseAnnotations"
+  emit source code.HttpInput at call.result
+}

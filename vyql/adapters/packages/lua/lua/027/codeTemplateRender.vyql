@@ -1,0 +1,9 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding templateRender27 {
+  requires {
+    dependency("lustache")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}

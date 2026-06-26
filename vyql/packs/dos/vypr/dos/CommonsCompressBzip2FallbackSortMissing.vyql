@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule CommonsCompressBzip2FallbackSortMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_400]
+    id: "VYQL-DOS-017"
+    severity: medium
+  }
+  issue code.CommonsCompressBzip2FallbackSortMissing as s
+}

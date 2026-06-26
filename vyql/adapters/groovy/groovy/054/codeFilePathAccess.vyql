@@ -1,0 +1,6 @@
+module bindings.groovy.migration.m6eabb149;
+
+binding filePathAccess54 {
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}

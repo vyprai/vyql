@@ -1,0 +1,9 @@
+module bindings.solidity.migration.m72929a80;
+
+binding httpInput0 {
+  requires {
+    dependency("solidity")
+  }
+  query pattern callExpr where callee.path ~= "msg.data"
+  emit source code.HttpInput at call.result
+}

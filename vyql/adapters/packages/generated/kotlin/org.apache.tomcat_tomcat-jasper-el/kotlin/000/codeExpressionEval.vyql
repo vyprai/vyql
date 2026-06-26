@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7a188fb6;
+
+binding expressionEval0 {
+  requires {
+    dependency("org.apache.tomcat:tomcat-jasper-el")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.ExpressionEval at args[0]
+}

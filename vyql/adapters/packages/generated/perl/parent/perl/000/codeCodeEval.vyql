@@ -1,0 +1,9 @@
+module bindings.perl.migration.meee79ba5;
+
+binding codeEval0 {
+  requires {
+    dependency("parent")
+  }
+  query pattern callExpr where callee.method == "for"
+  emit sink code.CodeEval at args[0]
+}

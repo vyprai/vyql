@@ -1,0 +1,13 @@
+module bindings.python.migration.m21017d75;
+
+binding binding560 {
+  query pattern callExpr where callee.path ~= "os.path.realpath"
+  emit check core.Assumption at call {
+    advisory: true
+    about: code.FilePathAccess
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

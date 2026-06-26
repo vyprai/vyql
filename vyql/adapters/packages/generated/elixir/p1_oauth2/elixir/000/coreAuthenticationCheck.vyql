@@ -1,0 +1,14 @@
+module bindings.elixir.migration.m2447dec0;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("p1_oauth2")
+  }
+  query pattern callExpr where callee.method == "authorize_password"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

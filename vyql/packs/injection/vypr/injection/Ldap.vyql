@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule Ldap {
+  meta {
+    benchmark: ldapi
+    cwe: [CWE_90]
+    id: "VYQL-INJ-005"
+    severity: high
+  }
+  taint core.UserControlledData -> code.LdapQuery
+  unless path coveredBy core.LdapEscape
+}

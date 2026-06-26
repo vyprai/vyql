@@ -1,6 +1,0 @@
-import code.{LogOutput}
-adapter java {
-  package "log4j:log4j" {
-    sink method "ConsoleAppender.write" -> code.LogOutput
-  }
-}

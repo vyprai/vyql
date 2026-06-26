@@ -1,0 +1,9 @@
+module bindings.scala.migration.mbeef8f9f;
+
+binding httpInput1 {
+  requires {
+    dependency("com.ning:async-http-client")
+  }
+  query pattern callExpr where callee.method == "preparePost"
+  emit source code.HttpInput at call.result
+}

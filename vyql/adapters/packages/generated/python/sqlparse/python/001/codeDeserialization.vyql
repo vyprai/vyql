@@ -1,0 +1,9 @@
+module bindings.python.migration.m9e9508d7;
+
+binding deserialization1 {
+  requires {
+    dependency("sqlparse")
+  }
+  query pattern callExpr where callee.method == "parsestream"
+  emit sink code.Deserialization at args[0]
+}

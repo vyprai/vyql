@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m42d32063;
+
+binding networkConnect1 {
+  requires {
+    dependency("elixir_make")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding sqlExecution131 {
+  query pattern callExpr where callee.method == "fetchval"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m45635220;
+
+binding deserialization1 {
+  requires {
+    dependency("kuchiki")
+  }
+  query pattern callExpr where callee.method == "parse_html_with_options"
+  emit sink code.Deserialization at args[0]
+}

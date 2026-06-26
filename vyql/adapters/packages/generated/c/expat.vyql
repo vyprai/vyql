@@ -1,9 +1,0 @@
-import code.{Deserialization, XmlParse}
-adapter c {
-  package "expat" {
-    sink method "XML_Parse" -> code.Deserialization
-    sink method "XML_ParseBuffer" -> code.Deserialization
-    sink method "XML_ParserCreate" -> code.XmlParse
-    sink method "XML_ParserCreateNS" -> code.XmlParse
-  }
-}

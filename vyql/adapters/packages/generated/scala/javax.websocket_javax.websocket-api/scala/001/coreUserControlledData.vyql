@@ -1,0 +1,9 @@
+module bindings.scala.migration.m204e4c6a;
+
+binding userControlledData1 {
+  requires {
+    dependency("javax.websocket:javax.websocket-api")
+  }
+  query pattern callExpr where callee.method == "getRequestParameterMap"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.mc265bf40;
+
+binding filePathAccess5 {
+  requires {
+    dependency("pip")
+  }
+  query pattern callExpr where callee.method == "read_p5z"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.m3c4a9620;
+
+binding deserialization2 {
+  requires {
+    dependency("parson")
+  }
+  query pattern callExpr where callee.method == "json_parse_string"
+  emit sink code.Deserialization at args[0]
+}

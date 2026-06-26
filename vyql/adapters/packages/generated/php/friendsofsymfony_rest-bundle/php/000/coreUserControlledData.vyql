@@ -1,0 +1,9 @@
+module bindings.php.migration.m3d447b53;
+
+binding userControlledData0 {
+  requires {
+    dependency("friendsofsymfony/rest-bundle")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}

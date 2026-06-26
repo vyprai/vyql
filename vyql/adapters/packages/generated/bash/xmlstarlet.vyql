@@ -1,7 +1,0 @@
-import code.{CliArgument, XmlParse, CommandExecution}
-adapter bash {
-  package "xmlstarlet" {
-    source method "xmlstarlet" -> code.CliArgument
-    sink method "xmlstarlet" -> code.XmlParse
-  }
-}

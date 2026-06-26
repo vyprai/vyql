@@ -1,0 +1,9 @@
+module bindings.java.migration.m3d7da622;
+
+binding deserialization1 {
+  requires {
+    dependency("com.loopj.android:android-async-http")
+  }
+  query pattern callExpr where callee.method == "parseResponse"
+  emit sink code.Deserialization at args[0]
+}

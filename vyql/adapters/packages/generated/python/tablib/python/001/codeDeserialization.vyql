@@ -1,0 +1,9 @@
+module bindings.python.migration.mb9e07678;
+
+binding deserialization1 {
+  requires {
+    dependency("tablib")
+  }
+  query pattern callExpr where callee.method == "import_set"
+  emit sink code.Deserialization at args[0]
+}

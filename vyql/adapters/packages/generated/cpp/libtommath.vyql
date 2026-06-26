@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter cpp {
-  package "libtommath" {
-    sink method "mp_read_radix" -> code.Deserialization
-    sink method "mp_fread" -> code.Deserialization
-    sink method "mp_read_unsigned_bin" -> code.Deserialization
-    sink method "mp_read_signed_bin" -> code.Deserialization
-  }
-}

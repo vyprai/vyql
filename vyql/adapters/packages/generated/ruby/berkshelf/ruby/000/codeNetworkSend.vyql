@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me77b5eaa;
+
+binding networkSend0 {
+  requires {
+    dependency("berkshelf")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.NetworkSend at args[0]
+}

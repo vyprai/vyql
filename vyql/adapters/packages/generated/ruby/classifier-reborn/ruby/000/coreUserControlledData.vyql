@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m18dedbda;
+
+binding userControlledData0 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "add_item"
+  emit source core.UserControlledData at call.result
+}

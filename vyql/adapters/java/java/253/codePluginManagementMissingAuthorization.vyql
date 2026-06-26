@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding pluginManagementMissingAuthorization253 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "annotation:PostMapping" and node.token contains "call_path:pluginService.localInstall" and not (node.token contains "annotation:RequiresPermissions") and not (node.token contains "annotation:PreAuthorize") and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  emit issue code.PluginManagementMissingAuthorization at node
+}

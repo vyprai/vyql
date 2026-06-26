@@ -105,6 +105,18 @@ func TestSolverContractConformance(t *testing.T) {
 			},
 		},
 		{
+			name:     "grant",
+			rule:     "package t;\nrule R { meta { id: \"X-GRANT\" }\n grant custom.Actor -> custom.Capability }",
+			wantKind: "grant", wantFlow: true,
+			build: func(s *usg.InMemStore) {
+				s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor"})
+				s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability"})
+				s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
+				s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
+				s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "capability", Props: map[string]string{"ability": "delegated"}})
+			},
+		},
+		{
 			name:     "match",
 			rule:     "package t;\nrule R { meta { id: \"X-MATCH\" }\n match custom.Marker as s }",
 			wantKind: "match", wantFlow: false,

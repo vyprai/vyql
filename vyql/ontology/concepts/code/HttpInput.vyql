@@ -1,0 +1,7 @@
+module code;
+
+concept HttpInput : source {
+  cwe: [CWE_20]
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

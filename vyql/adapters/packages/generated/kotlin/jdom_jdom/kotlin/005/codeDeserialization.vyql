@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me099a3fc;
+
+binding deserialization5 {
+  requires {
+    dependency("jdom:jdom")
+  }
+  query pattern callExpr where callee.method == "build(java.io.Reader)"
+  emit sink code.Deserialization at args[0]
+}

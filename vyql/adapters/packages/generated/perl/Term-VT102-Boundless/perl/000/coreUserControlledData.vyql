@@ -1,0 +1,9 @@
+module bindings.perl.migration.m7e01c9f9;
+
+binding userControlledData0 {
+  requires {
+    dependency("Term-VT102-Boundless")
+  }
+  query pattern callExpr where callee.method == "_process_text"
+  emit source core.UserControlledData at call.result
+}

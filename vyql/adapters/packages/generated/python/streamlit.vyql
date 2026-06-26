@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter python {
-  package "streamlit" {
-    sink method "query" -> code.SqlExecution
-  }
-}

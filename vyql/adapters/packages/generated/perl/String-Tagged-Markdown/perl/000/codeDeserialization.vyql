@@ -1,0 +1,9 @@
+module bindings.perl.migration.md41253bf;
+
+binding deserialization0 {
+  requires {
+    dependency("String-Tagged-Markdown")
+  }
+  query pattern callExpr where callee.method == "parse_markdown"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.c.migration.m597a0d7b;
+
+binding deserialization0 {
+  requires {
+    dependency("sdl1")
+  }
+  query pattern callExpr where callee.method == "SDL_ParseAudioFormat"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "django-heroku" {
-    sink method "UploadCommand.run" -> code.CommandExecution
-  }
-}

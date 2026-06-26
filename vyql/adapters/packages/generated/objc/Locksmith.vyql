@@ -1,9 +1,0 @@
-import code.{SecretValue}
-adapter objc {
-  package "Locksmith" {
-    source method "loadDataForUserAccount" -> code.SecretValue
-    source method "saveData" -> code.SecretValue
-    source method "deleteDataForUserAccount" -> code.SecretValue
-    source method "updateData" -> code.SecretValue
-  }
-}

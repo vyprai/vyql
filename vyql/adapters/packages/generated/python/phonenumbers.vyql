@@ -1,5 +1,0 @@
-adapter python {
-  package "phonenumbers" {
-    sink method "phonenumberutil.parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mba4ed5dd;
+
+binding dynamicCodeLoad0 {
+  requires {
+    dependency("css-select")
+  }
+  query pattern callExpr where callee.method == "compileNth"
+  emit sink code.DynamicCodeLoad at args[0]
+}

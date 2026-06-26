@@ -1,0 +1,9 @@
+module bindings.objc.migration.me36f2000;
+
+binding httpInput8 {
+  requires {
+    dependency("RxAlamofire")
+  }
+  query pattern callExpr where callee.method == "requestJSON"
+  emit source code.HttpInput at call.result
+}

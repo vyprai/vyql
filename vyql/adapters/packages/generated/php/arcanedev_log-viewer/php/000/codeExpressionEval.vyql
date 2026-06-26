@@ -1,0 +1,9 @@
+module bindings.php.migration.mfe15df09;
+
+binding expressionEval0 {
+  requires {
+    dependency("arcanedev/log-viewer")
+  }
+  query pattern callExpr where callee.method == "ArcanedevLogViewerHelpersLogParser::parse"
+  emit sink code.ExpressionEval at args[0]
+}

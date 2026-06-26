@@ -1,0 +1,9 @@
+module bindings.java.migration.m59753699;
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.jcabi:jcabi-manifests")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.FilePathAccess at args[0]
+}

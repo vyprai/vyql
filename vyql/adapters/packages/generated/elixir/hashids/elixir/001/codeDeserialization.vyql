@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbad6caaf;
+
+binding deserialization1 {
+  requires {
+    dependency("hashids")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}

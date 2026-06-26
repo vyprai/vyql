@@ -1,0 +1,9 @@
+module bindings.dart.migration.m760e6256;
+
+binding codeEval0 {
+  requires {
+    dependency("retrofit_generator")
+  }
+  query pattern callExpr where callee.method == "RetrofitGenerator.generateForAnnotatedElement"
+  emit sink code.CodeEval at args[0]
+}

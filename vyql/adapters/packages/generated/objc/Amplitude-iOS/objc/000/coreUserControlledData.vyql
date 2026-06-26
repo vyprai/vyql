@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7ce48b31;
+
+binding userControlledData0 {
+  requires {
+    dependency("Amplitude-iOS")
+  }
+  query pattern callExpr where callee.method == "logEvent"
+  emit source core.UserControlledData at call.result
+}

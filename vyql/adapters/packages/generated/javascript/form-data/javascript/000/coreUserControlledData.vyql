@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m39bd750e;
+
+binding userControlledData0 {
+  requires {
+    dependency("form-data")
+  }
+  query pattern callExpr where callee.method == "append"
+  emit source core.UserControlledData at call.result
+}

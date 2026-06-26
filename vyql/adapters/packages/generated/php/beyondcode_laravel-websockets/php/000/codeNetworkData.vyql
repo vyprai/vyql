@@ -1,0 +1,9 @@
+module bindings.php.migration.m475851bf;
+
+binding networkData0 {
+  requires {
+    dependency("beyondcode/laravel-websockets")
+  }
+  query pattern callExpr where callee.method == "onMessage"
+  emit source code.NetworkData at call.result
+}

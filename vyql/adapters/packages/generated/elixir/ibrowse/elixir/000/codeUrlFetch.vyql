@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m76035d86;
+
+binding urlFetch0 {
+  requires {
+    dependency("ibrowse")
+  }
+  query pattern callExpr where callee.method == "send_req_1"
+  emit sink code.UrlFetch at args[0]
+}

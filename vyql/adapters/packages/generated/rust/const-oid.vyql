@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "const-oid" {
-    sink method "from_bytes" -> code.Deserialization
-    sink method "from_bytes_sized" -> code.Deserialization
-    sink method "from_str" -> code.Deserialization
-  }
-}

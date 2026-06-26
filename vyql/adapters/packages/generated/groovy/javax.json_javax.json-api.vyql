@@ -1,5 +1,0 @@
-adapter groovy {
-  package "javax.json:javax.json-api" {
-    sink method "read" -> code.Deserialization
-  }
-}

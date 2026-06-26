@@ -1,0 +1,9 @@
+module bindings.go.migration.m266a2bfb;
+
+binding commandExecution0 {
+  requires {
+    dependency("gotest.tools")
+  }
+  query pattern callExpr where callee.method == "Command"
+  emit sink code.CommandExecution at args[0]
+}

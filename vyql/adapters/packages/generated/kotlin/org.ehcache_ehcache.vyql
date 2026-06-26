@@ -1,6 +1,0 @@
-import code.{XmlParse}
-adapter kotlin {
-  package "org.ehcache:ehcache" {
-    sink method "org.ehcache.xml.ResourceConfigurationParser.parse" -> code.XmlParse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf954d0bb;
+
+binding deserialization2 {
+  requires {
+    dependency("zstd")
+  }
+  query pattern callExpr where callee.method == "with_dictionary"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m9b329d65;
+
+binding htmlRender0 {
+  requires {
+    dependency("barryvdh/laravel-dompdf")
+  }
+  query pattern callExpr where callee.method == "loadHTML"
+  emit sink code.HtmlRender at args[0]
+}

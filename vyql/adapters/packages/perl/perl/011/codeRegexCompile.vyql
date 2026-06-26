@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding regexCompile11 {
+  requires {
+    dependency("perl")
+  }
+  query pattern callExpr where callee.path ~= "qr"
+  emit sink code.RegexCompileSink at args[0]
+}

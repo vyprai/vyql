@@ -1,0 +1,9 @@
+module bindings.swift.migration.mfd5810ea;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/swift-server/swift-aws-lambda-runtime")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

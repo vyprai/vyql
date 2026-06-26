@@ -1,0 +1,9 @@
+module bindings.java.migration.ma0754ccd;
+
+binding httpInput1 {
+  requires {
+    dependency("org.jboss.arquillian.protocol:arquillian-protocol-servlet")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}

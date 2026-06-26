@@ -1,0 +1,9 @@
+module bindings.go.migration.m8352f171;
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/golangci/gofmt")
+  }
+  query pattern callExpr where callee.method == "writeFile"
+  emit sink code.FilePathAccess at args[0]
+}

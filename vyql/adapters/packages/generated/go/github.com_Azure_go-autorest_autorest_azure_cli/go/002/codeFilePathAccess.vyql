@@ -1,0 +1,9 @@
+module bindings.go.migration.m4da77d2a;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/cli")
+  }
+  query pattern callExpr where callee.method == "LoadTokens"
+  emit sink code.FilePathAccess at args[0]
+}

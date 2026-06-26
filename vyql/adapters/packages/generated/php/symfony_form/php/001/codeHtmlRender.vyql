@@ -1,0 +1,9 @@
+module bindings.php.migration.m7d34f016;
+
+binding htmlRender1 {
+  requires {
+    dependency("symfony/form")
+  }
+  query pattern callExpr where callee.method == "renderBlock"
+  emit sink code.HtmlRender at args[0]
+}

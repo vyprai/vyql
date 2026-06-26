@@ -1,0 +1,9 @@
+module bindings.dart.migration.m83fcc655;
+
+binding deserialization1 {
+  requires {
+    dependency("mime")
+  }
+  query pattern callExpr where callee.method == "MimeMultipartTransformer"
+  emit sink code.Deserialization at args[0]
+}

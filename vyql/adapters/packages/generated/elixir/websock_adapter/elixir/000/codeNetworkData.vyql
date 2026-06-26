@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m8259ef8b;
+
+binding networkData0 {
+  requires {
+    dependency("websock_adapter")
+  }
+  query pattern callExpr where callee.method == "WebSockAdapter.upgrade"
+  emit source code.NetworkData at call.result
+}

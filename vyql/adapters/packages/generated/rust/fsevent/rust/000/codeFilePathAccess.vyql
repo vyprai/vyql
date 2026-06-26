@@ -1,0 +1,9 @@
+module bindings.rust.migration.m0f5e2fe1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("fsevent")
+  }
+  query pattern callExpr where callee.method == "let"
+  emit sink code.FilePathAccess at args[0]
+}

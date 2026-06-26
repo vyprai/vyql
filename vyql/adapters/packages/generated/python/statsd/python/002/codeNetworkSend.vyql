@@ -1,0 +1,9 @@
+module bindings.python.migration.m0b3f5f0d;
+
+binding networkSend2 {
+  requires {
+    dependency("statsd")
+  }
+  query pattern callExpr where callee.method == "decr"
+  emit sink code.NetworkSend at args[0]
+}

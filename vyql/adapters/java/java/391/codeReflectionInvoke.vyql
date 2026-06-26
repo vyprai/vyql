@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding reflectionInvoke391 {
+  query pattern callExpr where callee.path ~= "Class.forName"
+  emit sink code.ReflectionInvoke at args[0]
+}

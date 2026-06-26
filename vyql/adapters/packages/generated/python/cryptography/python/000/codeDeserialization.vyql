@@ -1,0 +1,9 @@
+module bindings.python.migration.m803b6b78;
+
+binding deserialization0 {
+  requires {
+    dependency("cryptography")
+  }
+  query pattern callExpr where callee.method == "x509.name.Name.parse"
+  emit sink code.Deserialization at args[0]
+}

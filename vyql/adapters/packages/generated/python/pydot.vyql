@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter python {
-  package "pydot" {
-    sink method "parse_dot_data" -> code.Deserialization
-  }
-}

@@ -1,0 +1,11 @@
+module bindings.java.migration.m420f6b67;
+
+binding csrfProtection349 {
+  query pattern callExpr where callee.path ~= "validateCsrfToken"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

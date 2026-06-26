@@ -1,0 +1,14 @@
+module bindings.php.migration.mccc7d20f;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("kreait/firebase-php")
+  }
+  query pattern callExpr where callee.method == "verifyIdToken"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.meb2e0012;
+
+binding databaseRead3 {
+  requires {
+    dependency("firebase_database")
+  }
+  query pattern callExpr where callee.method == "Query.endBefore"
+  emit sink code.DatabaseReadSink at args[0]
+}

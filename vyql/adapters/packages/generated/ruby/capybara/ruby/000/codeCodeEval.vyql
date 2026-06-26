@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5db73ff9;
+
+binding codeEval0 {
+  requires {
+    dependency("capybara")
+  }
+  query pattern callExpr where callee.method == "execute_script"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m10df7187;
+
+binding deserialization2 {
+  requires {
+    dependency("org.codehaus.janino:janino")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

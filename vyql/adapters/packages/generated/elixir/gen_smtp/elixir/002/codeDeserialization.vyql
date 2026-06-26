@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcbf3d81a;
+
+binding deserialization2 {
+  requires {
+    dependency("gen_smtp")
+  }
+  query pattern callExpr where callee.method == "decode_header_tokens_permissive"
+  emit sink code.Deserialization at args[0]
+}

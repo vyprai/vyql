@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mad84ffaf;
+
+binding deserialization1 {
+  requires {
+    dependency("com.googlecode.json-simple:json-simple")
+  }
+  query pattern callExpr where callee.method == "parseWithException"
+  emit sink code.Deserialization at args[0]
+}

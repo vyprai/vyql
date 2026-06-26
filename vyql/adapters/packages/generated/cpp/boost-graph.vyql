@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "boost-graph" {
-    sink method "read_graphml" -> code.Deserialization
-    sink method "read_graphviz" -> code.Deserialization
-  }
-}

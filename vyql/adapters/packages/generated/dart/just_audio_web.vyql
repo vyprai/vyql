@@ -1,8 +1,0 @@
-import code.{NetworkData}
-adapter dart {
-  package "just_audio_web" {
-    source method "ProgressiveAudioSourcePlayer" -> code.NetworkData
-    source method "DashAudioSourcePlayer" -> code.NetworkData
-    source method "HlsAudioSourcePlayer" -> code.NetworkData
-  }
-}

@@ -1,6 +1,0 @@
-adapter ruby {
-  package "formatador" {
-    control method "parse" -> core.InputValidation
-    control method "strip" -> core.InputValidation
-  }
-}

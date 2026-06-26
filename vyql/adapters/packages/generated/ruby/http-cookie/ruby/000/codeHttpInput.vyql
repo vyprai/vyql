@@ -1,0 +1,9 @@
+module bindings.ruby.migration.meb3abca7;
+
+binding httpInput0 {
+  requires {
+    dependency("http-cookie")
+  }
+  query pattern callExpr where callee.method == "HTTP::Cookie.parse"
+  emit source code.HttpInput at call.result
+}

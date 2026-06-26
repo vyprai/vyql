@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m058b6a47;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("redis-rack")
+  }
+  query pattern callExpr where callee.method == "delete_session"
+  emit sink code.StoredDataWrite at args[0]
+}

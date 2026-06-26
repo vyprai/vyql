@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mcc80b170;
+
+binding networkConnect0 {
+  requires {
+    dependency("whatwg-fetch")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.NetworkConnectSink at args[0]
+}

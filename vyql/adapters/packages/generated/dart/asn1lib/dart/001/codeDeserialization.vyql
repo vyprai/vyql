@@ -1,0 +1,9 @@
+module bindings.dart.migration.m02e6465b;
+
+binding deserialization1 {
+  requires {
+    dependency("asn1lib")
+  }
+  query pattern callExpr where callee.method == "decodeBigInt"
+  emit sink code.Deserialization at args[0]
+}

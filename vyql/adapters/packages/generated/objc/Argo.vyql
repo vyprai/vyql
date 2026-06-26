@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter objc {
-  package "Argo" {
-    sink method "parse" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

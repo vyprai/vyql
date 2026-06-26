@@ -1,0 +1,9 @@
+module bindings.java.migration.m6730bdb7;
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.mariadb.jdbc:mariadb-java-client")
+  }
+  query pattern callExpr where callee.method == "nativeSQL"
+  emit sink code.SqlExecution at args[0]
+}

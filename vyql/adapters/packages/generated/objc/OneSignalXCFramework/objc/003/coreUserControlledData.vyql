@@ -1,0 +1,9 @@
+module bindings.objc.migration.m725dbc57;
+
+binding userControlledData3 {
+  requires {
+    dependency("OneSignalXCFramework")
+  }
+  query pattern callExpr where callee.method == "serviceExtensionTimeWillExpireRequest:withMutableNotificationContent:"
+  emit source core.UserControlledData at call.result
+}

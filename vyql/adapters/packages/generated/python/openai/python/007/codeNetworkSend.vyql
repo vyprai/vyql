@@ -1,0 +1,9 @@
+module bindings.python.migration.m37bdfae0;
+
+binding networkSend7 {
+  requires {
+    dependency("openai")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

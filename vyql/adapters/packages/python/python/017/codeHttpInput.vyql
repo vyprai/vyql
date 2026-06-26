@@ -1,0 +1,9 @@
+module bindings.python.migration.m3d9ccbad;
+
+binding httpInput17 {
+  requires {
+    dependency("fastapi")
+  }
+  query pattern callExpr where callee.path ~= "http_input"
+  emit source code.HttpInput at call.result
+}

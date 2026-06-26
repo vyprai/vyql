@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteDangerousUploadExtensionBlocklist : issue {
+  cwe: [CWE_434]
+  review_assumption: "an attacker can upload a valid image payload with a .phar filename that remains executable on affected PHP/web-server configurations"
+  reviewCategory: upload
+  reviewCondition: "dangerous upload extension blocklist omits an executable extension handled by common PHP deployments"
+  reviewConfidence: high
+  reviewEvidence: "upload processing context {pattern} renames dangerous extensions to .txt but the regex lacks a PHAR extension case"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

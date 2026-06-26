@@ -1,6 +1,0 @@
-import code.{NetworkData}
-adapter elixir {
-  package "input_event" {
-    source path "process_events" -> code.NetworkData
-  }
-}

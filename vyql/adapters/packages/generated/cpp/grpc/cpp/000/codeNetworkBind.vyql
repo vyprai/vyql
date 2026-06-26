@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2ce1e70f;
+
+binding networkBind0 {
+  requires {
+    dependency("grpc")
+  }
+  query pattern callExpr where callee.method == "grpc_server_add_http2_port"
+  emit sink code.NetworkBind at args[0]
+}

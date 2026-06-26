@@ -1,0 +1,9 @@
+module bindings.php.migration.m09e52295;
+
+binding deserialization1 {
+  requires {
+    dependency("drupal/core-serialization")
+  }
+  query pattern callExpr where callee.method == "DrupalComponentSerializationPhpSerialize::decode"
+  emit sink code.Deserialization at args[0]
+}

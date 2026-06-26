@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "moviepy" {
-    sink method "subprocess_call" -> code.CommandExecution
-  }
-}

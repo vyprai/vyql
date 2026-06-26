@@ -1,0 +1,14 @@
+module bindings.go.migration.mf9fca987;
+
+binding inputValidation2 {
+  requires {
+    dependency("github.com/tmc/grpc-websocket-proxy")
+  }
+  query pattern callExpr where callee.method == "WithRequestMutator"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding expiredCachedAuthTokenReuse71 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:accessTokenCache.timeout.isBefore" and node.token contains "call_path:ZonedDateTime.now" and node.token contains "selector:accessTokenCache.resource" and node.token contains "call_path:accessToken.getExpiresAtAsInstant" and node.token contains "call_path:expiresAt.minus" and not (node.token contains "call_path:accessTokenCache.timeout.isAfter")
+  emit issue code.ExpiredCachedAuthTokenReuse at node
+}

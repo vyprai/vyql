@@ -1,0 +1,9 @@
+module bindings.javascript.migration.ma6af8d4c;
+
+binding filePathAccess1 {
+  requires {
+    dependency("path-parse")
+  }
+  query pattern callExpr where callee.method == "posix.parse"
+  emit sink code.FilePathAccess at args[0]
+}

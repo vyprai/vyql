@@ -1,0 +1,9 @@
+module bindings.swift.migration.m8e721eac;
+
+binding codeEval1 {
+  requires {
+    dependency("github.com/ChimeHQ/SwiftTreeSitter")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding certValidationDisabled626 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "this.rejectUnauthorized=opts.rejectUnauthorized===undefined?null:opts.rejectUnauthorized" and node.token contains "rejectUnauthorized:this.rejectUnauthorized" and not (node.token contains "opts.rejectUnauthorized===undefined?true:opts.rejectUnauthorized")
+  emit issue code.CertValidationDisabled at node
+}

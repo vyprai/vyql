@@ -1,0 +1,9 @@
+module bindings.swift.migration.m215449c2;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/garriguv/SQLiteMigrationManager.swift")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.FilePathAccess at args[0]
+}

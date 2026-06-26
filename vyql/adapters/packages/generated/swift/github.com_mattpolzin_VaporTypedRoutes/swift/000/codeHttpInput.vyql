@@ -1,0 +1,9 @@
+module bindings.swift.migration.m50c97e45;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/mattpolzin/VaporTypedRoutes")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit source code.HttpInput at call.result
+}

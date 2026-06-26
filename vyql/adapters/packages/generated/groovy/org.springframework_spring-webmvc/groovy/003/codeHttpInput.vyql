@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m9b5f4120;
+
+binding httpInput3 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "header"
+  emit source code.HttpInput at call.result
+}

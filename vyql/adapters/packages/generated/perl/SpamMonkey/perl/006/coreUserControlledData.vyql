@@ -1,0 +1,9 @@
+module bindings.perl.migration.m5e234a59;
+
+binding userControlledData6 {
+  requires {
+    dependency("SpamMonkey")
+  }
+  query pattern callExpr where callee.method == "get_uris"
+  emit source core.UserControlledData at call.result
+}

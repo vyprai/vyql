@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m5e117159;
+
+binding codeEval1 {
+  requires {
+    dependency("com.google.gwt:gwt-dev")
+  }
+  query pattern callExpr where callee.method == "Compiler.compile"
+  emit sink code.CodeEval at args[0]
+}

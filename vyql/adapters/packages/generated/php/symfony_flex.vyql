@@ -1,6 +1,0 @@
-import code.{CommandExecution}
-adapter php {
-  package "symfony/flex" {
-    sink method "exec" -> code.CommandExecution
-  }
-}

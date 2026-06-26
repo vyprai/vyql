@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m4107ab81;
+
+binding httpInput2 {
+  requires {
+    dependency("aws-sdk-cpp")
+  }
+  query pattern callExpr where callee.method == "GetAdditionalCustomHeaders"
+  emit source code.HttpInput at call.result
+}

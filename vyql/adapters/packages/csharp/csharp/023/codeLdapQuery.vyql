@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m2a0e231a;
+
+binding ldapQuery23 {
+  requires {
+    dependency("System.DirectoryServices")
+  }
+  query pattern callExpr where callee.path ~= "DirectorySearcher"
+  emit sink code.LdapQuery at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding objectLookupByUserInput528 {
+  query pattern callExpr where callee.path ~= "analysis.function.context.sink" and args.any.literal contains "name=generate_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "auth_token.user_id=user_id" and not args.any.literal contains "current_user.id!=user_id"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}

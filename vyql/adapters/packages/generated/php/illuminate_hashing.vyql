@@ -1,9 +1,0 @@
-import code.{SecretValue}
-
-adapter php {
-  package "illuminate/hashing" {
-    source method "make" -> code.SecretValue
-    source method "check" -> code.SecretValue
-    source method "isHashed" -> code.SecretValue
-  }
-}

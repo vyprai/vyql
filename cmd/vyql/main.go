@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
@@ -40,6 +41,13 @@ import (
 )
 
 const version = "0.1.0"
+
+type compiledRuleSet struct {
+	onto     *ontology.Ontology
+	compiled []*engine.CompiledRule
+}
+
+var compiledRulesCache sync.Map // map[rules source]compiledRuleSet
 
 func main() {
 	if len(os.Args) < 2 {
@@ -215,6 +223,10 @@ func profileNames() string {
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
 func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
+	return scanPathsWithProfile(paths, rulesSrc, "")
+}
+
+func scanPathsWithProfile(paths []string, rulesSrc, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
 		return nil, stats, nil, err
@@ -222,22 +234,17 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	if g == nil {
 		return nil, stats, nil, nil // recognized files, but nothing to analyze
 	}
-	onto := ontology.Seed()
-	decls, err := parser.Parse(rulesSrc)
+	rules, err := compiledRulesFor(rulesSrc)
 	if err != nil {
-		return nil, stats, g, fmt.Errorf("rule parse: %w", err)
+		return nil, stats, g, err
 	}
-	compiled, cerrs := engine.CompileRules(decls, onto)
-	if len(cerrs) != 0 {
-		for _, e := range cerrs {
-			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
-		}
-		return nil, stats, g, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
-	}
-	eng := engine.New(onto, g)
+	eng := engine.New(rules.onto, g)
 	var all []*findings.Finding
 	tk := newTimer()
-	for _, cr := range compiled {
+	for _, cr := range rules.compiled {
+		if !ruleActiveForProfile(cr, profileName) {
+			continue
+		}
 		got, err := eng.Evaluate(cr)
 		if err != nil {
 			return nil, stats, g, err
@@ -246,6 +253,70 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	}
 	tk.mark("evaluate")
 	return all, stats, g, nil
+}
+
+func ruleActiveForProfile(cr *engine.CompiledRule, profileName string) bool {
+	if cr == nil || cr.Rule == nil {
+		return false
+	}
+	required := stringListMeta(cr.Rule.Meta["required_profiles"])
+	if len(required) == 0 || profileName == "" {
+		return true
+	}
+	for _, name := range required {
+		if name == profileName {
+			return true
+		}
+	}
+	return false
+}
+
+func stringListMeta(raw any) []string {
+	switch xs := raw.(type) {
+	case []string:
+		return xs
+	case []any:
+		out := make([]string, 0, len(xs))
+		for _, x := range xs {
+			if s, ok := x.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case string:
+		if xs == "" {
+			return nil
+		}
+		return []string{xs}
+	default:
+		return nil
+	}
+}
+
+func compiledRulesFor(rulesSrc string) (compiledRuleSet, error) {
+	cacheKey := compiledRulesCacheKey{src: rulesSrc}
+	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
+		return cached.(compiledRuleSet), nil
+	}
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(rulesSrc), lowerNonCoreV2RuntimeSource)
+	if err != nil {
+		return compiledRuleSet{}, fmt.Errorf("rule parse: %w", err)
+	}
+	onto := ontology.Seed()
+	compiled, cerrs := engine.CompileRules(decls, onto)
+	if len(cerrs) != 0 {
+		for _, e := range cerrs {
+			fmt.Fprintln(os.Stderr, "rule error: "+e.Error())
+		}
+		return compiledRuleSet{}, fmt.Errorf("%d rule(s) failed to compile", len(cerrs))
+	}
+	rules := compiledRuleSet{onto: onto, compiled: compiled}
+	actual, _ := compiledRulesCache.LoadOrStore(cacheKey, rules)
+	return actual.(compiledRuleSet), nil
+}
+
+type compiledRulesCacheKey struct {
+	src string
 }
 
 type scanRunOptions struct {
@@ -293,7 +364,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	tk.mark("fingerprint")
 	if !hit {
-		all, stats, graph, err = scanPaths(paths, src)
+		all, stats, graph, err = scanPathsWithProfile(paths, src, prof.Name)
 		if err != nil {
 			return err
 		}
@@ -354,9 +425,39 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 
 func loadRules(path string) (string, error) {
 	if path == "" {
-		// default: the standalone rule packs under <data root>/packs
-		path = filepath.Join(datadir.Root(), "packs")
+		// Default scans load authored mechanics before the standalone rule packs.
+		return loadDefaultRuleSources()
 	}
+	var sb strings.Builder
+	mechanics, err := loadRuleSourcesUnder(filepath.Join(datadir.Root(), "mechanics"))
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(mechanics)
+	src, err := loadRuleSourcesUnder(path)
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(src)
+	return sb.String(), nil
+}
+
+func loadDefaultRuleSources() (string, error) {
+	var sb strings.Builder
+	for _, dir := range []string{
+		filepath.Join(datadir.Root(), "mechanics"),
+		filepath.Join(datadir.Root(), "packs"),
+	} {
+		src, err := loadRuleSourcesUnder(dir)
+		if err != nil {
+			return "", err
+		}
+		sb.WriteString(src)
+	}
+	return sb.String(), nil
+}
+
+func loadRuleSourcesUnder(path string) (string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", err
@@ -381,6 +482,33 @@ func loadRules(path string) (string, error) {
 		return nil
 	})
 	return sb.String(), err
+}
+
+func v2RuntimeSourcesForRules(rulesSrc string) []parser.V2RuntimeSource {
+	var out []parser.V2RuntimeSource
+	if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+		for _, file := range files {
+			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+		for _, file := range files {
+			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		}
+	}
+	if !strings.Contains(rulesSrc, "module mechanics.") {
+		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	out = append(out, parser.V2RuntimeSourcesFromText("rules", rulesSrc)...)
+	return out
+}
+
+func lowerNonCoreV2RuntimeSource(src parser.V2RuntimeSource) bool {
+	return !strings.HasPrefix(src.Name, "ontology/") && !strings.HasPrefix(src.Name, "mechanics/")
 }
 
 func printReport(fs []*findings.Finding) {
@@ -476,7 +604,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews   [-kind all -query TEXT -format text|json]")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews; migrate-v2 converts legacy files")
 	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

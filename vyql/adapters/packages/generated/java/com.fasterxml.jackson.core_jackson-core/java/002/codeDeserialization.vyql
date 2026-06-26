@@ -1,0 +1,9 @@
+module bindings.java.migration.m4237a371;
+
+binding deserialization2 {
+  requires {
+    dependency("com.fasterxml.jackson.core:jackson-core")
+  }
+  query pattern callExpr where callee.method == "readValueAsTree"
+  emit sink code.Deserialization at args[0]
+}

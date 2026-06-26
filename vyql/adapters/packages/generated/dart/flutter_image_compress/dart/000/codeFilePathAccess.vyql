@@ -1,0 +1,9 @@
+module bindings.dart.migration.mf505fb5a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("flutter_image_compress")
+  }
+  query pattern callExpr where callee.method == "compressWithFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding httpInput5 {
+  requires {
+    dependency("rack")
+  }
+  query pattern callExpr where callee.path ~= "env"
+  emit source code.HttpInput at call.result
+}

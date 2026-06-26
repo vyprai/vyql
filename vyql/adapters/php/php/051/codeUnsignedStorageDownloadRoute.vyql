@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding unsignedStorageDownloadRoute51 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "call_path:Route.get" and node.token contains "call_path:Route.get.where" and node.token contains "call_arg:Route.get.where:.*" and node.token contains "call_path:Storage.disk.path" and node.token contains "call_path:response.download" and node.token contains "call_path:response.download.deleteFileAfterSend" and containsAny(node.token, ["literal:{path}", "literal:{file}", "literal:{filename}"]) and not (node.token contains "call_path:Route.get.middleware") and not (containsAny(node.token, ["literal:signed", "literal:auth", "literal:can:"]))
+  emit issue code.UnsignedStorageDownloadRoute at node
+}

@@ -1,6 +1,0 @@
-import code.{CommandExecution, FilePathAccess}
-adapter perl {
-  package "Statistics-ROC" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

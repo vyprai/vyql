@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma1498ba9;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/Nef10/TangerineDownloader")
+  }
+  query pattern callExpr where callee.method == "downloadAccountTransactions"
+  emit sink code.NetworkSend at args[0]
+}

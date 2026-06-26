@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8d30e341;
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("google-apis-androidpublisher_v3")
+  }
+  query pattern callExpr where callee.path ~= "AddTargetingResponse"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

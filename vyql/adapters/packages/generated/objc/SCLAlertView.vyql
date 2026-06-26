@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter objc {
-  package "SCLAlertView" {
-    source method "addTextField" -> core.UserControlledData
-    source method "addTextView" -> core.UserControlledData
-  }
-}

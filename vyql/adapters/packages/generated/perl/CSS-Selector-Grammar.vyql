@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "CSS-Selector-Grammar" {
-    sink method "parse_selector" -> code.Deserialization
-  }
-}

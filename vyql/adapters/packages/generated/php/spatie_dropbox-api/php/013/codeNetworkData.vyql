@@ -1,0 +1,9 @@
+module bindings.php.migration.mc0603966;
+
+binding networkData13 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit source code.NetworkData at call.result
+}

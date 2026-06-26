@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc507311d;
+
+binding urlFetch3 {
+  requires {
+    dependency("github.com/amzn/smoke-http")
+  }
+  query pattern callExpr where callee.method == "executeRetriableWithOutput"
+  emit sink code.UrlFetch at args[0]
+}

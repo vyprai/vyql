@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m34e3f5af;
+
+binding htmlEscape2 {
+  requires {
+    dependency("sdoc")
+  }
+  query pattern callExpr where callee.method == "strip_tags"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

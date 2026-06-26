@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter ruby {
-  package "redis-rack" {
-    source method "find_session" -> code.StoredDataRead
-    sink method "write_session" -> code.StoredDataWrite
-    sink method "delete_session" -> code.StoredDataWrite
-  }
-}

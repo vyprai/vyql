@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "ch.qos.logback:logback-core" {
-    sink method "ch.qos.logback.core.net.AutoFlushingObjectWriter.write" -> code.Deserialization
-  }
-}

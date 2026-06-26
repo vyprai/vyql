@@ -1,0 +1,9 @@
+module bindings.python.migration.mbcc9422d;
+
+binding codeEval2 {
+  requires {
+    dependency("jupyter-events")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.CodeEval at args[0]
+}

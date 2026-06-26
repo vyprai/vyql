@@ -1,8 +1,0 @@
-adapter dart {
-  package "multi_image_picker" {
-    sink method "getPath" -> code.FilePathAccess
-    sink method "getPath_API19" -> code.FilePathAccess
-    sink method "getPath_API11to18" -> code.FilePathAccess
-    sink method "getPath_BelowAPI11" -> code.FilePathAccess
-  }
-}

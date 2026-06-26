@@ -1,5 +1,0 @@
-adapter java {
-  package "org.codehaus.plexus:plexus-utils" {
-    control method "StringUtils.escape" -> core.InputValidation
-  }
-}

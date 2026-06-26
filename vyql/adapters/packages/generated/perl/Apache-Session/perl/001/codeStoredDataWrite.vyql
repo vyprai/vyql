@@ -1,0 +1,9 @@
+module bindings.perl.migration.m64b68b08;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("Apache-Session")
+  }
+  query pattern callExpr where callee.method == "STORE"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.csharp.migration.ma63120ee;
+
+binding deserialization0 {
+  requires {
+    dependency("facebook.client")
+  }
+  query pattern callExpr where callee.method == "Facebook.Client.AppAuthenticationHelper.ParseQueryString"
+  emit sink code.Deserialization at args[0]
+}

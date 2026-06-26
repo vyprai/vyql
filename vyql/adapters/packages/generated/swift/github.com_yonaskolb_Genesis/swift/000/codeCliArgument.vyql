@@ -1,0 +1,9 @@
+module bindings.swift.migration.m5b76aac5;
+
+binding cliArgument0 {
+  requires {
+    dependency("github.com/yonaskolb/Genesis")
+  }
+  query pattern callExpr where callee.method == "GenesisCLI.run"
+  emit source code.CliArgument at call.result
+}

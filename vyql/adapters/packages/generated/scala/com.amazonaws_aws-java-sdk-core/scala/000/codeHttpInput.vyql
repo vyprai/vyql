@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8fbe7766;
+
+binding httpInput0 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-core")
+  }
+  query pattern callExpr where callee.method == "setHeaders"
+  emit source code.HttpInput at call.result
+}

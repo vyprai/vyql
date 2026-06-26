@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb1ceacea;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/halcyonmobile/RestBird")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkConnectSink at args[0]
+}

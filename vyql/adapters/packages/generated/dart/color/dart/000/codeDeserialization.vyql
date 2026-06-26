@@ -1,0 +1,9 @@
+module bindings.dart.migration.m2ea837de;
+
+binding deserialization0 {
+  requires {
+    dependency("color")
+  }
+  query pattern callExpr where callee.method == "ColorParser.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mea77056c;
+
+binding templateRender4 {
+  requires {
+    dependency("phoenix_view")
+  }
+  query pattern callExpr where callee.method == "render_many"
+  emit sink code.TemplateRender at args[0]
+}

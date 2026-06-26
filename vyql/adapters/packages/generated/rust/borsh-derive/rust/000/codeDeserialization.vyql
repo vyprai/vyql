@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc590c69e;
+
+binding deserialization0 {
+  requires {
+    dependency("borsh-derive")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

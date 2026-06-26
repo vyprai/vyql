@@ -1,0 +1,9 @@
+module bindings.dart.migration.m789b28ee;
+
+binding deserialization0 {
+  requires {
+    dependency("vm_service")
+  }
+  query pattern callExpr where callee.method == "RPCError.parse"
+  emit sink code.Deserialization at args[0]
+}

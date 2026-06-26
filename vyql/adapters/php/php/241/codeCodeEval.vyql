@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding codeEval241 {
+  query pattern callExpr where callee.path ~= "assert"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "aws-c-compression" {
-    sink method "aws_huffman_decode" -> code.Deserialization
-  }
-}

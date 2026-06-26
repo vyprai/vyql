@@ -1,0 +1,9 @@
+module bindings.scala.migration.m766f70e1;
+
+binding httpInput3 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "getHttpServletRequest"
+  emit source code.HttpInput at call.result
+}

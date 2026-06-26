@@ -1,7 +1,0 @@
-adapter javascript {
-  package "rgb-regex" {
-    flag code.RegexCompile on any {
-      method "module.exports"
-    }
-  }
-}

@@ -1,0 +1,11 @@
+module bindings.go.migration.m48a985c1;
+
+binding safeResponseContentType174 {
+  query pattern callExpr where callee.path ~= "Header.Add" and args.any.literal contains "content-type" and args.any.literal contains "image/"
+  emit check core.SafeResponseContentType at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

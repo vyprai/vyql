@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter ruby {
-  package "dm-migrations" {
-    sink method "execute" -> code.SqlExecution
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding deserialization114 {
+  query pattern callExpr where callee.path ~= "ActiveSupport.JSON.decode"
+  emit sink code.Deserialization at args[0]
+}

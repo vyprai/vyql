@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m4d266a53;
+
+binding filePathAccess0 {
+  requires {
+    dependency("plug_static_index_html")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.FilePathAccess at args[0]
+}

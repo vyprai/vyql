@@ -1,0 +1,9 @@
+module bindings.go.migration.m24f722ab;
+
+binding userControlledData10 {
+  requires {
+    dependency("github.com/eknkc/amber")
+  }
+  query pattern callExpr where callee.method == "VirtualFileParser"
+  emit source core.UserControlledData at call.result
+}

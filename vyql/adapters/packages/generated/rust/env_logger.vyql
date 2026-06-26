@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter rust {
-  package "env_logger" {
-    source method "parse_default_env" -> core.UserControlledData
-  }
-}

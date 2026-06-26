@@ -1,0 +1,9 @@
+module bindings.php.migration.mec5dfadc;
+
+binding networkData0 {
+  requires {
+    dependency("laravel/framework")
+  }
+  query pattern callExpr where callee.method == "getRequest"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.mf9732fa7;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/apparentlymart/go-textseg")
+  }
+  query pattern callExpr where callee.method == "AllTokens"
+  emit sink code.Deserialization at args[0]
+}

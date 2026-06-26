@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m3ef25844;
+
+binding deserialization3 {
+  requires {
+    dependency("qt5-xmlpatterns")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.Deserialization at args[0]
+}

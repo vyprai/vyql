@@ -1,0 +1,9 @@
+module bindings.dart.migration.m30f6cf35;
+
+binding userControlledData0 {
+  requires {
+    dependency("share_plus")
+  }
+  query pattern callExpr where callee.method == "share"
+  emit source core.UserControlledData at call.result
+}

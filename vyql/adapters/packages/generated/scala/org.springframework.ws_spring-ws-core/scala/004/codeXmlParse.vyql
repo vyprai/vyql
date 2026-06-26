@@ -1,0 +1,9 @@
+module bindings.scala.migration.ma6b87da4;
+
+binding xmlParse4 {
+  requires {
+    dependency("org.springframework.ws:spring-ws-core")
+  }
+  query pattern callExpr where callee.method == "getPayloadSource"
+  emit sink code.XmlParse at args[0]
+}

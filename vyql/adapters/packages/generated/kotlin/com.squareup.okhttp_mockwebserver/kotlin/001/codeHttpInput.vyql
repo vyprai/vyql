@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2a6a5b64;
+
+binding httpInput1 {
+  requires {
+    dependency("com.squareup.okhttp:mockwebserver")
+  }
+  query pattern callExpr where callee.method == "RecordedRequest.getPath"
+  emit source code.HttpInput at call.result
+}

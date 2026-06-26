@@ -1,0 +1,9 @@
+module bindings.php.migration.ma80b729a;
+
+binding codeEval0 {
+  requires {
+    dependency("d11wtq/boris")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

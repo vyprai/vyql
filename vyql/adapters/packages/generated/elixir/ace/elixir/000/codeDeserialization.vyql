@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mfd2ebdec;
+
+binding deserialization0 {
+  requires {
+    dependency("ace")
+  }
+  query pattern callExpr where callee.method == "Ace.HTTP2.Frame.parse"
+  emit sink code.Deserialization at args[0]
+}

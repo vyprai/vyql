@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter objc {
-  package "SwiftyGif" {
-    sink method "setGifFromURL" -> code.UrlFetch
-  }
-}

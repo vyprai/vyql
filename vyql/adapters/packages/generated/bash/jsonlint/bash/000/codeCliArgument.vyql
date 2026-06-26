@@ -1,0 +1,9 @@
+module bindings.bash.migration.mbdae7077;
+
+binding cliArgument0 {
+  requires {
+    dependency("jsonlint")
+  }
+  query pattern callExpr where callee.path ~= "jsonlint.argv"
+  emit source code.CliArgument at call.result
+}

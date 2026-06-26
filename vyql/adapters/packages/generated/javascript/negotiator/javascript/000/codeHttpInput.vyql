@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mcb8eafcb;
+
+binding httpInput0 {
+  requires {
+    dependency("negotiator")
+  }
+  query pattern callExpr where callee.method == "Negotiator"
+  emit source code.HttpInput at call.result
+}

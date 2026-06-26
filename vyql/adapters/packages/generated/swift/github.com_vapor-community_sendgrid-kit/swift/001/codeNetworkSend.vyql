@@ -1,0 +1,9 @@
+module bindings.swift.migration.m8d7a68d4;
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/vapor-community/sendgrid-kit")
+  }
+  query pattern callExpr where callee.method == "validateEmail"
+  emit sink code.NetworkSend at args[0]
+}

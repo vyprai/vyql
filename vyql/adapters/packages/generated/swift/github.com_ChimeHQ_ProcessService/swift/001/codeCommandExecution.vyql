@@ -1,0 +1,9 @@
+module bindings.swift.migration.m78c3e4d4;
+
+binding commandExecution1 {
+  requires {
+    dependency("github.com/ChimeHQ/ProcessService")
+  }
+  query pattern callExpr where callee.method == "userShellInvocation"
+  emit sink code.CommandExecution at args[0]
+}

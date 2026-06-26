@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5d33218c;
+
+binding deserialization2 {
+  requires {
+    dependency("wikicloth")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

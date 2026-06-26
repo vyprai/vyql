@@ -1,0 +1,9 @@
+module bindings.scala.migration.m46290a3b;
+
+binding httpInput2 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-transports-http-jetty")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

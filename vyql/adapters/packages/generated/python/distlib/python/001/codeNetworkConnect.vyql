@@ -1,0 +1,9 @@
+module bindings.python.migration.m5d58d3db;
+
+binding networkConnect1 {
+  requires {
+    dependency("distlib")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.ruby.migration.mfc7aeb91;
+
+binding htmlEscape0 {
+  requires {
+    dependency("font-awesome-rails")
+  }
+  query pattern callExpr where callee.method == "fa_icon"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

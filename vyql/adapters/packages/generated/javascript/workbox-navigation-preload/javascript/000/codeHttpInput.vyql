@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mc34b93e6;
+
+binding httpInput0 {
+  requires {
+    dependency("workbox-navigation-preload")
+  }
+  query pattern callExpr where callee.method == "enable"
+  emit source code.HttpInput at call.result
+}

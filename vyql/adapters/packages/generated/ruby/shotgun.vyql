@@ -1,9 +1,0 @@
-import code.{CodeEval, Deserialization, FilePathAccess}
-
-adapter ruby {
-  package "shotgun" {
-    sink method "Loader.call!" -> code.Deserialization
-    sink method "Loader.call!" -> code.FilePathAccess
-    sink method "Loader.call!" -> code.CodeEval
-  }
-}

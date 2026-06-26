@@ -1,0 +1,10 @@
+module bindings.sca.migration.mc40a837e;
+
+binding certValidationDependency4 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.sca.package" and node.token contains "advisory_cwe=CWE_295"
+  emit issue sbom.CertValidationDependency at node
+}

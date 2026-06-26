@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mb703b9d3;
+
+binding deserialization1 {
+  requires {
+    dependency("plug")
+  }
+  query pattern callExpr where callee.method == "Plug.Parsers.Urlencoded.parse"
+  emit sink code.Deserialization at args[0]
+}

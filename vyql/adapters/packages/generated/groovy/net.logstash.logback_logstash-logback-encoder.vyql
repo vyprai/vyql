@@ -1,8 +1,0 @@
-import code.{LogOutput, Deserialization}
-
-adapter groovy {
-  package "net.logstash.logback:logstash-logback-encoder" {
-    sink method "writeTo" -> code.LogOutput
-    sink method "readFully" -> code.Deserialization
-  }
-}

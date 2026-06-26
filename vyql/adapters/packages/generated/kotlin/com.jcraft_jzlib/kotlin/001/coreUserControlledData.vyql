@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me85ad24e;
+
+binding userControlledData1 {
+  requires {
+    dependency("com.jcraft:jzlib")
+  }
+  query pattern callExpr where callee.method == "GZIPInputStream.read"
+  emit source core.UserControlledData at call.result
+}

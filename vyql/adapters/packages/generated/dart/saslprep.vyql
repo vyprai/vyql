@@ -1,5 +1,0 @@
-adapter dart {
-  package "saslprep" {
-    control method "saslprep" -> core.InputValidation
-  }
-}

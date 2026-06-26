@@ -1,8 +1,0 @@
-adapter objc {
-  package "Onfido" {
-    source method "withSdkToken" -> code.SecretValue
-    source method "onTokenRequestedWithCustomerUserHash" -> code.SecretValue
-    source method "onTokenGeneratedWithCustomerUserHash" -> code.SecretValue
-    source method "initWithWorkflowRunId" -> core.UserControlledData
-  }
-}

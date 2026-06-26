@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "xml-apis:xml-apis" {
-    sink method "parse" -> code.Deserialization
-  }
-}

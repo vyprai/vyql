@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "apigen/apigen" {
-    sink method "tokenize" -> code.Deserialization
-  }
-}

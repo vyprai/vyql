@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m944fc6bc;
+
+binding deserialization0 {
+  requires {
+    dependency("opusfile")
+  }
+  query pattern callExpr where callee.method == "opus_head_parse"
+  emit sink code.Deserialization at args[0]
+}

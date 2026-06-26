@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding shiftedClusterSizeAllocationMissingBounds85 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=exfat_mount" and node.token contains "malloc(CLUSTER_SIZE(*ef->sb))" and node.token contains "verify_vbr_checksum(ef->dev,ef->zero_cluster,SECTOR_SIZE(*ef->sb))" and node.token contains "ef->sb->sector_bits" and node.token contains "ef->sb->spc_bits" and not (node.token contains "ef->sb->sector_bits<9")
+  emit issue code.ShiftedClusterSizeAllocationMissingBounds at node
+}

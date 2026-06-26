@@ -1,8 +1,0 @@
-import code.{XmlParse, Deserialization}
-
-adapter groovy {
-  package "rome:rome" {
-    sink method "parse" -> code.XmlParse
-    sink method "build" -> code.Deserialization
-  }
-}

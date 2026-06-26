@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-import core.{HtmlEscape}
-
-adapter php {
-  package "tracy/tracy" {
-    sink method "exec" -> code.CommandExecution
-    control method "escapeHtml" -> core.HtmlEscape
-  }
-}

@@ -1,9 +1,0 @@
-import code.{WeakCipher}
-
-adapter elixir {
-  package "salsa20" {
-    flag code.WeakCipher on any {
-      method "crypt"
-    }
-  }
-}

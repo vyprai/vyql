@@ -1,0 +1,9 @@
+module bindings.python.migration.mb6c97805;
+
+binding filePathAccess5 {
+  requires {
+    dependency("pyreadline")
+  }
+  query pattern callExpr where callee.method == "read_inputrc"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter python {
-  package "promise" {
-    source method "load" -> core.UserControlledData
-    source method "load_many" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.mea7ae01c;
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/CoreOffice/CoreXLSX")
+  }
+  query pattern callExpr where callee.method == "parseComments"
+  emit sink code.Deserialization at args[0]
+}

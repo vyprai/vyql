@@ -1,0 +1,9 @@
+module bindings.python.migration.m87404f83;
+
+binding cliArgument9 {
+  requires {
+    dependency("flask-migrate")
+  }
+  query pattern callExpr where callee.method == "history"
+  emit source code.CliArgument at call.result
+}

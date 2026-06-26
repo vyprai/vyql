@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "generic-array" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

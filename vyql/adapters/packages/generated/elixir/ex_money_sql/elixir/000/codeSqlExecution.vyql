@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m083f0bb4;
+
+binding sqlExecution0 {
+  requires {
+    dependency("ex_money_sql")
+  }
+  query pattern callExpr where callee.method == "execute_each"
+  emit sink code.SqlExecution at args[0]
+}

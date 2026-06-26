@@ -1,6 +1,0 @@
-adapter php {
-  package "symfony/http-kernel" {
-    source method "handle" -> code.HttpInput
-    sink method "handle" -> code.ResponseHeaderWrite
-  }
-}

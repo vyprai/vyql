@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m592adc14;
+
+binding deserialization5 {
+  requires {
+    dependency("com.google.http-client:google-http-client-jackson2")
+  }
+  query pattern callExpr where callee.method == "getByteValue"
+  emit sink code.Deserialization at args[0]
+}

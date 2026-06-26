@@ -1,0 +1,9 @@
+module bindings.dart.migration.m252beaed;
+
+binding databaseRead4 {
+  requires {
+    dependency("flutter_downloader")
+  }
+  query pattern callExpr where callee.method == "loadTasks"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m6fdc023b;
+
+binding userControlledData1 {
+  requires {
+    dependency("y18n")
+  }
+  query pattern callExpr where callee.method == "setLocale"
+  emit source core.UserControlledData at call.result
+}

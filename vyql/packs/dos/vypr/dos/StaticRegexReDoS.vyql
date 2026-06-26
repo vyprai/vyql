@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule StaticRegexReDoS {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_1333, CWE_400]
+    id: "VYQL-DOS-002"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.RegexMatchSink
+}

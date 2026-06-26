@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/robfig/cron/v3" {
-    sink method "NewParser" -> code.Deserialization
-    sink method "ParseStandard" -> code.Deserialization
-  }
-}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter swift {
-  package "github.com/dagronf/SwiftImageReadWrite" {
-    sink method "load" -> code.FilePathAccess
-  }
-}

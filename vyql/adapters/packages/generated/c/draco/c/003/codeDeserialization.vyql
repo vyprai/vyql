@@ -1,0 +1,9 @@
+module bindings.c.migration.mb4f2a5a4;
+
+binding deserialization3 {
+  requires {
+    dependency("draco")
+  }
+  query pattern callExpr where callee.method == "DecodeFromFile"
+  emit sink code.Deserialization at args[0]
+}

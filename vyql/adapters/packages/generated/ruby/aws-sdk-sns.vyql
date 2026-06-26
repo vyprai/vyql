@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-adapter ruby {
-  package "aws-sdk-sns" {
-    sink method "publish" -> code.NetworkSend
-    sink method "publish_batch" -> code.NetworkSend
-  }
-}

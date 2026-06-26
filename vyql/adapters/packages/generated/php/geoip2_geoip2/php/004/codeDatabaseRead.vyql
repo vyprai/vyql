@@ -1,0 +1,9 @@
+module bindings.php.migration.m15019051;
+
+binding databaseRead4 {
+  requires {
+    dependency("geoip2/geoip2")
+  }
+  query pattern callExpr where callee.method == "connectionType"
+  emit sink code.DatabaseReadSink at args[0]
+}

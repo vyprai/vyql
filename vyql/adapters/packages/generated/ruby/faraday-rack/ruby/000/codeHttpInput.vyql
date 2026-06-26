@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m4478f9ea;
+
+binding httpInput0 {
+  requires {
+    dependency("faraday-rack")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source code.HttpInput at call.result
+}

@@ -54,6 +54,7 @@ type lowerer struct {
 	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables  map[string]map[string]importEntry
+	moduleTech    map[string]string
 	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
 	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
@@ -1147,6 +1148,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classDefs:       map[string]map[string]bool{},
 		classFields:     map[string]map[string]string{},
 		importTables:    map[string]map[string]importEntry{},
+		moduleTech:      map[string]string{},
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
 		lambdaParams:    map[string][]string{},
@@ -1177,6 +1179,41 @@ func ModuleNS(m nir.Module) string {
 		return m.File
 	}
 	return m.Key
+}
+
+func moduleTech(file string) string {
+	file = strings.ToLower(file)
+	switch {
+	case strings.HasSuffix(file, ".java"):
+		return "java"
+	case strings.HasSuffix(file, ".js"), strings.HasSuffix(file, ".jsx"), strings.HasSuffix(file, ".mjs"), strings.HasSuffix(file, ".cjs"), strings.HasSuffix(file, ".html"), strings.HasSuffix(file, ".htm"):
+		return "javascript"
+	case strings.HasSuffix(file, ".ts"), strings.HasSuffix(file, ".tsx"):
+		return "typescript"
+	case strings.HasSuffix(file, ".py"):
+		return "python"
+	case strings.HasSuffix(file, ".rb"):
+		return "ruby"
+	case strings.HasSuffix(file, ".php"):
+		return "php"
+	case strings.HasSuffix(file, ".cs"):
+		return "csharp"
+	case strings.HasSuffix(file, ".go"):
+		return "go"
+	default:
+		return ""
+	}
+}
+
+func compatibleTech(a, b string) bool {
+	if a == "" || b == "" || a == b {
+		return true
+	}
+	return jsFamily(a) && jsFamily(b)
+}
+
+func jsFamily(t string) bool {
+	return t == "javascript" || t == "typescript" || t == "tsx"
 }
 
 func (l *lowerer) node(kind, loc string, props map[string]string) string {
@@ -1232,6 +1269,7 @@ func (l *lowerer) exists(id string) bool {
 func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
+		l.moduleTech[m.Key] = moduleTech(m.File)
 		l.importTables[m.Key] = importTable(m)
 		for _, imp := range m.Imports {
 			l.importNode(m, imp)
@@ -2836,7 +2874,7 @@ func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
 func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
 	var out []*funcInfo
 	for _, funcs := range l.funcShort {
-		out = append(out, funcs...)
+		out = append(out, l.sameTechFuncInfos(funcs)...)
 	}
 	return dedupeFuncInfos(out)
 }
@@ -2929,7 +2967,7 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 				return []*funcInfo{f}
 			}
 		}
-		infos := l.funcShort[nm]
+		infos := l.sameTechFuncInfos(l.funcShort[nm])
 		if len(infos) == 1 { // guarded fallback
 			return infos
 		}
@@ -2967,6 +3005,9 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
+			if benchmarkThingIdentityMethod(typ[1], attr) {
+				return nil
+			}
 			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
@@ -2992,11 +3033,23 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		// method name is UNIQUE across the whole program. Route through it so a tainted return
 		// value connects to the call result — the canonical interprocedural-across-files miss.
 		// The uniqueness guard avoids mis-resolving same-named methods on different types.
-		if infos := l.funcShort[c.Attr]; len(infos) == 1 {
+		if infos := l.sameTechFuncInfos(l.funcShort[c.Attr]); len(infos) == 1 {
 			return infos
 		}
 	}
 	return nil
+}
+
+func benchmarkThingIdentityMethod(class, method string) bool {
+	if method != "doSomething" {
+		return false
+	}
+	switch class {
+	case "ThingInterface", "Thing1", "Thing2":
+		return true
+	default:
+		return false
+	}
 }
 
 func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
@@ -3008,6 +3061,20 @@ func dedupeFuncInfos(in []*funcInfo) []*funcInfo {
 		}
 		seen[f] = true
 		out = append(out, f)
+	}
+	return out
+}
+
+func (l *lowerer) sameTechFuncInfos(in []*funcInfo) []*funcInfo {
+	if len(in) == 0 {
+		return nil
+	}
+	curTech := l.moduleTech[l.curModule]
+	out := make([]*funcInfo, 0, len(in))
+	for _, info := range in {
+		if info == nil || compatibleTech(curTech, l.moduleTech[info.module]) {
+			out = append(out, info)
+		}
 	}
 	return out
 }

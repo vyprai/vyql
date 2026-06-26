@@ -1,0 +1,9 @@
+module bindings.php.migration.m5ab2210c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("phenx/php-font-lib")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

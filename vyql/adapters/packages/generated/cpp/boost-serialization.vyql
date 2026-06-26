@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "boost-serialization" {
-    sink method "load" -> code.Deserialization
-  }
-}

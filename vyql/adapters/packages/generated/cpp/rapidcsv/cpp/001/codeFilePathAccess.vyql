@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m7b5f7815;
+
+binding filePathAccess1 {
+  requires {
+    dependency("rapidcsv")
+  }
+  query pattern callExpr where callee.method == "Save"
+  emit sink code.FilePathAccess at args[0]
+}

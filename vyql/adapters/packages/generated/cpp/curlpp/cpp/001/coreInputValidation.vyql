@@ -1,0 +1,14 @@
+module bindings.cpp.migration.maca94c35;
+
+binding inputValidation1 {
+  requires {
+    dependency("curlpp")
+  }
+  query pattern callExpr where callee.method == "unescape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

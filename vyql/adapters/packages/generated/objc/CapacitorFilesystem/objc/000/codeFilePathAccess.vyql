@@ -1,0 +1,9 @@
+module bindings.objc.migration.m2d36e45b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("CapacitorFilesystem")
+  }
+  query pattern callExpr where callee.method == "readFile"
+  emit sink code.FilePathAccess at args[0]
+}

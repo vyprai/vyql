@@ -1,5 +1,0 @@
-adapter python {
-  package "sphinx" {
-    sink method "parse" -> code.Deserialization
-  }
-}

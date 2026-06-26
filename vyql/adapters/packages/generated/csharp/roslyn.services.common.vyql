@@ -1,8 +1,0 @@
-import core.{PathCanonicalization}
-
-adapter csharp {
-  package "roslyn.services.common" {
-    control method "NormalizeAbsolutePath" -> core.PathCanonicalization
-    control method "ResolveRelativePath" -> core.PathCanonicalization
-  }
-}

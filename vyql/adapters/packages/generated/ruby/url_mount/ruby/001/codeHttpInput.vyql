@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5f5fcb35;
+
+binding httpInput1 {
+  requires {
+    dependency("url_mount")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit source code.HttpInput at call.result
+}

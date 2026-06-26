@@ -1,0 +1,9 @@
+module bindings.csharp.migration.me8cd7832;
+
+binding deserialization3 {
+  requires {
+    dependency("aspnet.security.openidconnect.server")
+  }
+  query pattern callExpr where callee.method == "DeserializeRefreshTokenContext"
+  emit sink code.Deserialization at args[0]
+}

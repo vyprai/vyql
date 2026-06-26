@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.codehaus.btm:btm" {
-    sink method "bitronix.tm.jndi.BitronixContext.parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding commandExecution8 {
+  requires {
+    dependency("java.lang")
+  }
+  query pattern callExpr where callee.path ~= "Runtime.exec"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding domInput70 {
+  query pattern callExpr where callee.path ~= "window.location"
+  emit source code.DomInput at call.result
+}

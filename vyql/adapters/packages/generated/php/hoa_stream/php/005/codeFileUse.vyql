@@ -1,0 +1,9 @@
+module bindings.php.migration.m2df6e391;
+
+binding fileUse5 {
+  requires {
+    dependency("hoa/stream")
+  }
+  query pattern callExpr where callee.method == "readFloat"
+  emit sink code.FileUseSink at args[0]
+}

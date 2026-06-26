@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8e471f5b;
+
+binding commandExecution0 {
+  requires {
+    dependency("thor")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

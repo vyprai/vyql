@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-
-adapter elixir {
-  package "cloudi_core" {
-    sink method "shell_output" -> code.CommandExecution
-    sink method "os_spawn_kill_pids" -> code.CommandExecution
-  }
-}

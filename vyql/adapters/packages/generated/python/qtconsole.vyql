@@ -1,8 +1,0 @@
-import code.{CliArgument, HtmlRender}
-
-adapter python {
-  package "qtconsole" {
-    source method "parse_command_line" -> code.CliArgument
-    sink method "export_html" -> code.HtmlRender
-  }
-}

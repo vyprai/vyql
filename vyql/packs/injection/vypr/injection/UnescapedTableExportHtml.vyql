@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedTableExportHtml {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-045"
+    severity: high
+  }
+  issue code.UnescapedTableExportHtml as sink
+}

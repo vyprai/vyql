@@ -1,0 +1,9 @@
+module bindings.dart.migration.medf6299a;
+
+binding filePathAccess8 {
+  requires {
+    dependency("storage_client")
+  }
+  query pattern callExpr where callee.method == "remove"
+  emit sink code.FilePathAccess at args[0]
+}

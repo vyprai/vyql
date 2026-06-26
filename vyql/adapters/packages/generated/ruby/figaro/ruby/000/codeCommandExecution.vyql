@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8ecff16e;
+
+binding commandExecution0 {
+  requires {
+    dependency("figaro")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

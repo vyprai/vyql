@@ -1,5 +1,0 @@
-adapter swift {
-  package "github.com/OperatorFoundation/Datable" {
-    sink method "array" -> code.Deserialization
-  }
-}

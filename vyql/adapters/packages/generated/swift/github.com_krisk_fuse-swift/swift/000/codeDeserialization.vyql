@@ -1,0 +1,9 @@
+module bindings.swift.migration.mbe2d7868;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/krisk/fuse-swift")
+  }
+  query pattern callExpr where callee.method == "parseIndex"
+  emit sink code.Deserialization at args[0]
+}

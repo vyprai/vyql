@@ -1,7 +1,0 @@
-import code.{NetworkData}
-
-adapter perl {
-  package "LWP-UserAgent-Patch-LogRequestContent" {
-    source method "patch_data" -> code.NetworkData
-  }
-}

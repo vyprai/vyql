@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter ruby {
-  package "geokit" {
-    control method "url_escape" -> core.InputValidation
-  }
-}

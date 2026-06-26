@@ -1,0 +1,9 @@
+module bindings.java.migration.mfe97f080;
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "setUpdateSessionQuery"
+  emit sink code.SqlExecution at args[0]
+}

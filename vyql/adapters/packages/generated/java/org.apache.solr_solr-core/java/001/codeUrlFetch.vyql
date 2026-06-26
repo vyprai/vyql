@@ -1,0 +1,9 @@
+module bindings.java.migration.maa1493b1;
+
+binding urlFetch1 {
+  requires {
+    dependency("org.apache.solr:solr-core")
+  }
+  query pattern callExpr where callee.method == "callGet"
+  emit sink code.UrlFetch at args[0]
+}

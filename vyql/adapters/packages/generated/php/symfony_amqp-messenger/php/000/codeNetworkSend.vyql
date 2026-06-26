@@ -1,0 +1,9 @@
+module bindings.php.migration.m44204587;
+
+binding networkSend0 {
+  requires {
+    dependency("symfony/amqp-messenger")
+  }
+  query pattern callExpr where callee.method == "publish"
+  emit sink code.NetworkSend at args[0]
+}

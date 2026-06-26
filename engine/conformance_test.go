@@ -82,3 +82,32 @@ rule WrongTransform {
 		t.Fatalf("row7 field-insensitive known limitation should suppress, got %d", n)
 	}
 }
+
+func TestAdvisoryControlDoesNotSuppressTaint(t *testing.T) {
+	onto := testOntology()
+	decls, err := parser.Parse(flowRule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	store := usg.NewInMemStore()
+	for _, id := range []string{"in", "transform", "q"} {
+		store.AddNode(usg.Node{ID: id, Type: "code.X", Props: map[string]string{"loc": id}})
+	}
+	store.AddLabel("in", usg.Label{Concept: "custom.Input"})
+	store.AddLabel("transform", usg.Label{Concept: "custom.Transform", Detail: map[string]string{"advisory": "true"}})
+	store.AddLabel("q", usg.Label{Concept: "custom.Target"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "transform"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "transform", Dst: "q"})
+
+	fs, err := New(onto, store).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("advisory control suppressed taint, got %d finding(s)", len(fs))
+	}
+}

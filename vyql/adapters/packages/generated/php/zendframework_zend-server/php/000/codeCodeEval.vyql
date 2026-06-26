@@ -1,0 +1,9 @@
+module bindings.php.migration.mad7395fb;
+
+binding codeEval0 {
+  requires {
+    dependency("zendframework/zend-server")
+  }
+  query pattern callExpr where callee.method == "call_user_func_array"
+  emit sink code.CodeEval at args[0]
+}

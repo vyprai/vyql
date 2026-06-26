@@ -1,6 +1,0 @@
-import code.{FileUse}
-adapter rust {
-  package "wepoll-ffi" {
-    sink method "epoll_ctl" -> code.FileUse
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mf2b8b64f;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("illuminate/cache")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}

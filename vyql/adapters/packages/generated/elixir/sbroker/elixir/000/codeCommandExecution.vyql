@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m9cc181fd;
+
+binding commandExecution0 {
+  requires {
+    dependency("sbroker")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

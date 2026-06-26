@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding dynamicCodeLoad146 {
+  query pattern callExpr where callee.path ~= "load"
+  emit sink code.DynamicCodeLoad at args[0]
+}

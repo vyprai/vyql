@@ -1,0 +1,9 @@
+module bindings.php.migration.mc5601031;
+
+binding sqlExecution15 {
+  requires {
+    dependency("laravel/framework")
+  }
+  query pattern callExpr where callee.method == "raw"
+  emit sink code.SqlExecution at args[0]
+}

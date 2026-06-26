@@ -1,0 +1,9 @@
+module bindings.rust.migration.md90ddda8;
+
+binding deserialization0 {
+  requires {
+    dependency("gif")
+  }
+  query pattern callExpr where callee.method == "decode_next"
+  emit sink code.Deserialization at args[0]
+}

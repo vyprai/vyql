@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "io.rest-assured:json-path" {
-    sink method "parse" -> code.Deserialization
-    sink method "JsonPath" -> code.Deserialization
-  }
-}

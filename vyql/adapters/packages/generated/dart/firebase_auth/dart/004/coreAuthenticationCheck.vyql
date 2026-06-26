@@ -1,0 +1,14 @@
+module bindings.dart.migration.ma2325e4f;
+
+binding authenticationCheck4 {
+  requires {
+    dependency("firebase_auth")
+  }
+  query pattern callExpr where callee.method == "sendPasswordResetEmail"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

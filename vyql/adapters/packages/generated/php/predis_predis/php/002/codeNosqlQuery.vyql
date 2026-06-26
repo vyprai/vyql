@@ -1,0 +1,9 @@
+module bindings.php.migration.md47d0bbb;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("predis/predis")
+  }
+  query pattern callExpr where callee.method == "executeCommand"
+  emit sink code.NosqlQuery at args[0]
+}

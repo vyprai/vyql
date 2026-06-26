@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m2b60e3ee;
+
+binding filePathAccess2 {
+  requires {
+    dependency("jest-serializer")
+  }
+  query pattern callExpr where callee.method == "writeFileSync"
+  emit sink code.FilePathAccess at args[0]
+}

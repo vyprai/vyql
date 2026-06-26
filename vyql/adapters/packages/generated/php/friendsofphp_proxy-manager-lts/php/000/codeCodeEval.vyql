@@ -1,0 +1,9 @@
+module bindings.php.migration.me5ae7a51;
+
+binding codeEval0 {
+  requires {
+    dependency("friendsofphp/proxy-manager-lts")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

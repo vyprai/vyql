@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter php {
-  package "willdurand/jsonp-callback-validator" {
-    control method "validate" -> core.InputValidation
-  }
-}

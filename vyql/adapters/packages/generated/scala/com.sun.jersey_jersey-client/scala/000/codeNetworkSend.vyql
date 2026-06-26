@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9e8e9fe2;
+
+binding networkSend0 {
+  requires {
+    dependency("com.sun.jersey:jersey-client")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

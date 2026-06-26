@@ -1,0 +1,8 @@
+module profiles;
+
+profile web {
+  detect: ["dep:flask", "dep:django", "dep:rails", "dep:express", "dep:laravel", "dep:spring-boot-starter-web", "file:config/routes.rb"]
+  entrypoints: [HttpInput, HttpHeader, Cookie, FileUpload, PatternOptionInput, SecretValue, DatabaseRead, DomInput, ComputedSizeValue, ArchiveEntryName]
+  priority: "80"
+  title: "Server-rendered web application"
+}

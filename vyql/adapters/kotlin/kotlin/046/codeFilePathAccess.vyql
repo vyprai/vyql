@@ -1,0 +1,6 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding filePathAccess46 {
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}

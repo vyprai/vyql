@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m42c70bea;
+
+binding htmlRender0 {
+  requires {
+    dependency("url-loader")
+  }
+  query pattern callExpr where callee.method == "loader"
+  emit sink code.HtmlRender at args[0]
+}

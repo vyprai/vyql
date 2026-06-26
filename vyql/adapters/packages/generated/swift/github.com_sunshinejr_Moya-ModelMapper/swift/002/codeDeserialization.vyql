@@ -1,0 +1,9 @@
+module bindings.swift.migration.md90b7637;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/sunshinejr/Moya-ModelMapper")
+  }
+  query pattern callExpr where callee.method == "mapOptional"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,13 @@
+module bindings.elixir.migration.mbf3d8276;
+
+binding weakHash0 {
+  requires {
+    dependency("pbkdf2_elixir")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "Pbkdf2.hash_pwd_salt"
+  emit issue code.WeakHash at node
+}

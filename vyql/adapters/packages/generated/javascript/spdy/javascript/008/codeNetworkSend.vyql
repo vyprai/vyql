@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mf932fff7;
+
+binding networkSend8 {
+  requires {
+    dependency("spdy")
+  }
+  query pattern callExpr where callee.method == "end"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m62abc178;
+
+binding deserialization1 {
+  requires {
+    dependency("device_info_platform_interface")
+  }
+  query pattern callExpr where callee.method == "IosDeviceInfo.fromMap"
+  emit sink code.Deserialization at args[0]
+}

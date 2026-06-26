@@ -1,0 +1,9 @@
+module bindings.perl.migration.m75b3cf19;
+
+binding envVariable1 {
+  requires {
+    dependency("Config-ENV-Multi")
+  }
+  query pattern callExpr where callee.method == "param"
+  emit source code.EnvVariable at call.result
+}

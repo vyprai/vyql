@@ -1,0 +1,9 @@
+module bindings.bash.migration.m6b0d035b;
+
+binding cliArgument0 {
+  requires {
+    dependency("sd")
+  }
+  query pattern callExpr where callee.path ~= "sd.argv"
+  emit source code.CliArgument at call.result
+}

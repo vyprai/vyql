@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding sqlExecution134 {
+  query pattern callExpr where callee.method == "$queryRawUnsafe"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter dart {
-  package "easy_localization" {
-    sink method "AuditCommand.run" -> code.FilePathAccess
-  }
-}

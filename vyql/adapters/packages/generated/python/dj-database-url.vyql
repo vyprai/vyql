@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter python {
-  package "dj-database-url" {
-    source method "parse" -> core.UserControlledData
-  }
-}

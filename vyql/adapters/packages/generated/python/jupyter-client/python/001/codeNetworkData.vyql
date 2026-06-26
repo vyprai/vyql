@@ -1,0 +1,9 @@
+module bindings.python.migration.m4e196017;
+
+binding networkData1 {
+  requires {
+    dependency("jupyter-client")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

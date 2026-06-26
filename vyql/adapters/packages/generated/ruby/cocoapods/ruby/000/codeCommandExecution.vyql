@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m31d18271;
+
+binding commandExecution0 {
+  requires {
+    dependency("cocoapods")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m3b5cdde0;
+
+binding htmlRender5 {
+  requires {
+    dependency("CWStatusBarNotification")
+  }
+  query pattern callExpr where callee.method == "displayNotificationWithView:forDuration:"
+  emit sink code.HtmlRender at args[0]
+}

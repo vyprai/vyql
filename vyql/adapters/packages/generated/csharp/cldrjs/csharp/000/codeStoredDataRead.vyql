@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mf9ec5b39;
+
+binding storedDataRead0 {
+  requires {
+    dependency("cldrjs")
+  }
+  query pattern callExpr where callee.method == "lookup"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.java.migration.m46692003;
+
+binding deserialization0 {
+  requires {
+    dependency("com.thoughtworks.xstream:xstream")
+  }
+  query pattern callExpr where callee.method == "fromXML"
+  emit sink code.Deserialization at args[0]
+}

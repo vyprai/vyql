@@ -1,5 +1,0 @@
-adapter perl {
-  package "Pry" {
-    sink method "pry" -> code.CodeEval
-  }
-}

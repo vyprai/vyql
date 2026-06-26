@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter swift {
-  package "github.com/mercari/QRScanner" {
-    source method "metadataOutput" -> core.UserControlledData
-  }
-}

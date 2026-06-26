@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mc50e0c11;
+
+binding deserialization3 {
+  requires {
+    dependency("nebml")
+  }
+  query pattern callExpr where callee.method == "ReadFloat"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{HttpInput}
-adapter scala {
-  package "io.vertx:vertx-web" {
-    source method "query" -> code.HttpInput
-  }
-}

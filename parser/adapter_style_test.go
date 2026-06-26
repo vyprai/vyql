@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/vyprai/vyql/datadir"
 )
 
 func TestAdaptersAvoidLegacyStructuredTokenHasSyntax(t *testing.T) {
@@ -67,7 +69,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := ParseRuntime(string(data))
 		if err != nil {
 			return err
 		}
@@ -124,7 +126,7 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := ParseRuntime(string(data))
 		if err != nil {
 			return err
 		}
@@ -161,19 +163,17 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 }
 
 func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	path := filepath.Join(root, "vyql", "adapters", "javascript.vyql")
-	data, err := os.ReadFile(path)
+	sources, err := datadir.ReadVYQL("adapters/javascript.vyql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	decls, err := Parse(string(data))
-	if err != nil {
-		t.Fatal(err)
+	var decls []Decl
+	for _, source := range sources {
+		parsed, err := ParseRuntime(string(source.Data))
+		if err != nil {
+			t.Fatalf("parse %s: %v", source.Name, err)
+		}
+		decls = append(decls, parsed...)
 	}
 	structuralConcepts := map[string]bool{
 		"code.StoredHtmlWrite":                          true,
@@ -247,7 +247,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := ParseRuntime(string(data))
 		if err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := Parse(string(data))
+		decls, err := ParseRuntime(string(data))
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.glassfish.jersey.media:jersey-media-json-jackson" {
-    sink method "readFrom" -> code.Deserialization
-  }
-}

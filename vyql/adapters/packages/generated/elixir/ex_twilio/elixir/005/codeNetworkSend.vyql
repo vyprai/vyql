@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mbfdf81eb;
+
+binding networkSend5 {
+  requires {
+    dependency("ex_twilio")
+  }
+  query pattern callExpr where callee.method == "ExTwilio.API.get"
+  emit sink code.NetworkSend at args[0]
+}

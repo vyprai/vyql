@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter cpp {
-  package "buck-yeh-bux" {
-    source method "C_EZArgs.retro_path" -> code.CliArgument
-  }
-}

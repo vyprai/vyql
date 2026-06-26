@@ -1,0 +1,9 @@
+module bindings.dart.migration.me435d651;
+
+binding storedDataRead2 {
+  requires {
+    dependency("shared_preferences_android")
+  }
+  query pattern callExpr where callee.method == "readAllKeys"
+  emit source code.StoredDataRead at call.result
+}

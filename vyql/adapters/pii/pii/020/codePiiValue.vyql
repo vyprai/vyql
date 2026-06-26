@@ -1,0 +1,6 @@
+module bindings.pii.migration.m24e11c07;
+
+binding piiValue20 {
+  query pattern callExpr where callee.method == "getPassportNumber"
+  emit source code.PiiValue at call.result
+}

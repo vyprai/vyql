@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9b64c798;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/argentlabs/web3.swift")
+  }
+  query pattern callExpr where callee.method == "decodeData"
+  emit sink code.Deserialization at args[0]
+}

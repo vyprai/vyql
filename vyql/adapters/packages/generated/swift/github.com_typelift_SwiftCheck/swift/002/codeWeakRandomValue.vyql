@@ -1,0 +1,13 @@
+module bindings.swift.migration.md8419421;
+
+binding weakRandomValue2 {
+  requires {
+    dependency("github.com/typelift/SwiftCheck")
+  }
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.method == "randomInRange"
+  emit issue code.WeakRandomValue at node
+}

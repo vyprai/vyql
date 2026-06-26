@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mf932fff7;
+
+binding networkData3 {
+  requires {
+    dependency("spdy")
+  }
+  query pattern callExpr where callee.method == "Socket"
+  emit source code.NetworkData at call.result
+}

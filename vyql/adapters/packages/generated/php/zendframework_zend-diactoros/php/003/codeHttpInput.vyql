@@ -1,0 +1,9 @@
+module bindings.php.migration.m4685cbb4;
+
+binding httpInput3 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "RequestTrait::getUri"
+  emit source code.HttpInput at call.result
+}

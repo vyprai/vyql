@@ -1,0 +1,11 @@
+module code;
+
+concept PointerUse : issue {
+  cwe: [CWE_416]
+  review_assumption: "the pointer aliases the released allocation and no safe reinitialization occurs"
+  reviewCategory: memory
+  reviewCondition: "a pointer is dereferenced or otherwise used after a prior release"
+  reviewConfidence: low
+  reviewEvidence: "pointer-use primitive {pattern} is observed"
+  vulnerableTo: [memory.UseAfterFree]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m722a53df;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("redis")
+  }
+  query pattern callExpr where callee.method == "execute_command"
+  emit sink code.NosqlQuery at args[0]
+}

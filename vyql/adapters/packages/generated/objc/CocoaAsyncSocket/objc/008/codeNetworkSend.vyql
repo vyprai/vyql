@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4eae030a;
+
+binding networkSend8 {
+  requires {
+    dependency("CocoaAsyncSocket")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.NetworkSend at args[0]
+}

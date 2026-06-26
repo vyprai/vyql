@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter scala {
-  package "javax.mail:mail" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter csharp {
-  package "jquery.validate.unobtrusive.bootstrap" {
-    control method "escapeAttributeValue" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.dart.migration.m1b732e90;
+
+binding logOutput1 {
+  requires {
+    dependency("dartz")
+  }
+  query pattern callExpr where callee.method == "println"
+  emit sink code.LogOutput at args[0]
+}

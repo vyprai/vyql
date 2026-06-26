@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m797a2933;
+
+binding codeEval0 {
+  requires {
+    dependency("org.eclipse.jdt.core.compiler:ecj")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

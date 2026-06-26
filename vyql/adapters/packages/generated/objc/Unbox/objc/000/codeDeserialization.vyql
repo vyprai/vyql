@@ -1,0 +1,9 @@
+module bindings.objc.migration.me1d663be;
+
+binding deserialization0 {
+  requires {
+    dependency("Unbox")
+  }
+  query pattern callExpr where callee.path ~= "unbox.parse"
+  emit sink code.Deserialization at args[0]
+}

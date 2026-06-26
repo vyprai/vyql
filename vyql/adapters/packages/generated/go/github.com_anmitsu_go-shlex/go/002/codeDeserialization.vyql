@@ -1,0 +1,9 @@
+module bindings.go.migration.me8febf58;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/anmitsu/go-shlex")
+  }
+  query pattern callExpr where callee.method == "Split"
+  emit sink code.Deserialization at args[0]
+}

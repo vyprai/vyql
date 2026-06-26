@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "spring" {
-    sink method "Spring::JSON.decode" -> code.Deserialization
-  }
-}

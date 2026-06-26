@@ -1,0 +1,9 @@
+module bindings.scala.migration.m5f67c63a;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.openjdk.jmh:jmh-core")
+  }
+  query pattern callExpr where callee.method == "doFork"
+  emit sink code.CommandExecution at args[0]
+}

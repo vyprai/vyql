@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m23049434;
+
+binding deserialization0 {
+  requires {
+    dependency("robin-map")
+  }
+  query pattern callExpr where callee.method == "deserialize_value"
+  emit sink code.Deserialization at args[0]
+}

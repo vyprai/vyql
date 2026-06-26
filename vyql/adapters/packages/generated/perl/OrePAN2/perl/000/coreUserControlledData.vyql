@@ -1,0 +1,9 @@
+module bindings.perl.migration.me25953b6;
+
+binding userControlledData0 {
+  requires {
+    dependency("OrePAN2")
+  }
+  query pattern callExpr where callee.method == "inject_from_file"
+  emit source core.UserControlledData at call.result
+}

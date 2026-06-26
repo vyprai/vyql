@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding database7 {
+  query pattern callExpr where callee.path ~= "mongo.Connect"
+  emit fact runtime.ReceiverType at call.result {
+    about: mongo.Database
+  }
+}

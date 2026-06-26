@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mbca90048;
+
+binding userControlledData0 {
+  requires {
+    dependency("ipaddr.js")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

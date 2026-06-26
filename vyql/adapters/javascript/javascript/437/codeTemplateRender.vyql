@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding templateRender437 {
+  query pattern callExpr where callee.path ~= "mustache.render"
+  emit sink code.TemplateRender at args[0]
+}

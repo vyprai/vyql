@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding urlFetch286 {
+  query pattern callExpr where callee.path ~= "axios.get"
+  emit sink code.UrlFetch at args[0]
+}

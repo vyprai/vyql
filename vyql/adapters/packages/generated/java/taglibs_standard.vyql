@@ -1,6 +1,0 @@
-import core.{SqlParameterization}
-adapter java {
-  package "taglibs:standard" {
-    control method "addSQLParameter" -> core.SqlParameterization
-  }
-}

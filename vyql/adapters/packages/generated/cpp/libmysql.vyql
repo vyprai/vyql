@@ -1,5 +1,0 @@
-adapter cpp {
-  package "libmysql" {
-    sink method "kill_query" -> code.SqlExecution
-  }
-}

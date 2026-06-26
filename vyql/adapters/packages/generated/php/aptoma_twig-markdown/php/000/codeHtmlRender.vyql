@@ -1,0 +1,9 @@
+module bindings.php.migration.mfab4b72a;
+
+binding htmlRender0 {
+  requires {
+    dependency("aptoma/twig-markdown")
+  }
+  query pattern callExpr where callee.method == "parseMarkdown"
+  emit sink code.HtmlRender at args[0]
+}

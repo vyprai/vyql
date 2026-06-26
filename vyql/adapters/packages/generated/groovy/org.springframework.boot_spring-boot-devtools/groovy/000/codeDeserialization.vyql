@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1300a23d;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.boot:spring-boot-devtools")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

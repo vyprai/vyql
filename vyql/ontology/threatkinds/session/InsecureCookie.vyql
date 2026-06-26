@@ -1,0 +1,6 @@
+module session;
+
+threat InsecureCookie {
+  cwe: [CWE_614]
+  desc: "Sensitive cookie without Secure/HttpOnly flag"
+}

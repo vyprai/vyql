@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding intentInput36 {
+  query pattern callExpr where callee.path ~= ".getStringExtra"
+  emit source code.IntentInput at call.result
+}

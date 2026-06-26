@@ -1,0 +1,9 @@
+module bindings.php.migration.md358f357;
+
+binding deserialization0 {
+  requires {
+    dependency("symfony/web-link")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

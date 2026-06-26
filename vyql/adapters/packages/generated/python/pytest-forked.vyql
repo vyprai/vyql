@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-
-adapter python {
-  package "pytest-forked" {
-    sink method "forked_run_report" -> code.CommandExecution
-  }
-}

@@ -1,5 +1,0 @@
-adapter ruby {
-  package "hpricot" {
-    sink method "ELE" -> code.XmlParse
-  }
-}

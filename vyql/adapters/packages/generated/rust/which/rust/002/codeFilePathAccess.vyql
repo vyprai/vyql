@@ -1,0 +1,9 @@
+module bindings.rust.migration.m3ed6ed01;
+
+binding filePathAccess2 {
+  requires {
+    dependency("which")
+  }
+  query pattern callExpr where callee.method == "first_result"
+  emit sink code.FilePathAccess at args[0]
+}

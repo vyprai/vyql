@@ -1,0 +1,11 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding lockRelease142 {
+  query pattern callExpr where callee.path ~= "Monitor.Exit"
+  emit check core.LockRelease at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

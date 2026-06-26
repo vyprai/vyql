@@ -1,0 +1,14 @@
+module bindings.dart.migration.m3793a3e1;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("geolocator_web")
+  }
+  query pattern callExpr where callee.method == "GeolocatorPlugin.requestPermission"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

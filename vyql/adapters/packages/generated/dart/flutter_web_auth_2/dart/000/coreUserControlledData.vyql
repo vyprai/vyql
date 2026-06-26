@@ -1,0 +1,9 @@
+module bindings.dart.migration.mc71f8ab4;
+
+binding userControlledData0 {
+  requires {
+    dependency("flutter_web_auth_2")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit source core.UserControlledData at call.result
+}

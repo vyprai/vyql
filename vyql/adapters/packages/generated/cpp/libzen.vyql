@@ -1,8 +1,0 @@
-import code.{NetworkData, UrlFetch}
-
-adapter cpp {
-  package "libzen" {
-    sink method "HTTP_Client::Open" -> code.UrlFetch
-    source method "HTTP_Client::Read" -> code.NetworkData
-  }
-}

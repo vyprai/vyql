@@ -1,0 +1,9 @@
+module bindings.csharp.migration.me1d44095;
+
+binding filePathAccess0 {
+  requires {
+    dependency("accord.video.ffmpeg")
+  }
+  query pattern callExpr where callee.method == "VideoFileReader.Open"
+  emit sink code.FilePathAccess at args[0]
+}

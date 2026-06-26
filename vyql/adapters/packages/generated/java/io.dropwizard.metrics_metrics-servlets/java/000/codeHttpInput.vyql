@@ -1,0 +1,9 @@
+module bindings.java.migration.m4cc637c2;
+
+binding httpInput0 {
+  requires {
+    dependency("io.dropwizard.metrics:metrics-servlets")
+  }
+  query pattern callExpr where callee.method == "doGet"
+  emit source code.HttpInput at call.result
+}

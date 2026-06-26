@@ -1,0 +1,9 @@
+module bindings.rust.migration.m54612438;
+
+binding deserialization0 {
+  requires {
+    dependency("os_str_bytes")
+  }
+  query pattern callExpr where callee.method == "assert_from_raw_vec"
+  emit sink code.Deserialization at args[0]
+}

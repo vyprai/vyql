@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding sqlExecution111 {
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}

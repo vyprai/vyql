@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5342780c;
+
+binding storedDataWrite33 {
+  requires {
+    dependency("shared_preferences")
+  }
+  query pattern callExpr where callee.method == "setDouble"
+  emit sink code.StoredDataWrite at args[0]
+}

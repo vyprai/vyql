@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "jni" {
-    sink method "new_direct_byte_buffer" -> code.Deserialization
-  }
-}

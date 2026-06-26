@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m364e10a2;
+
+binding deserialization1 {
+  requires {
+    dependency("javax:javaee-web-api")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

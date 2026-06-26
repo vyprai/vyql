@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mc2b1e9be;
+
+binding deserialization1 {
+  requires {
+    dependency("hpack")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

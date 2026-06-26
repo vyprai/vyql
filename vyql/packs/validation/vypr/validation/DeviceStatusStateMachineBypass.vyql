@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule DeviceStatusStateMachineBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_841, CWE_787]
+    id: "VYQL-VAL-011"
+    severity: high
+  }
+  issue code.DeviceStatusStateMachineBypass as status
+}

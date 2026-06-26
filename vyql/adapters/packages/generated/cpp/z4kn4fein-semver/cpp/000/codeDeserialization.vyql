@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mef24ce8d;
+
+binding deserialization0 {
+  requires {
+    dependency("z4kn4fein-semver")
+  }
+  query pattern callExpr where callee.method == "semver::prerelease_descriptor::parse"
+  emit sink code.Deserialization at args[0]
+}

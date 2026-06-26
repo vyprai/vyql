@@ -1,8 +1,0 @@
-import code.{SecretValue}
-import core.{AuthenticationCheck}
-
-adapter dart {
-  package "sasl_scram" {
-    source method "UsernamePasswordCredential.password" -> code.SecretValue
-  }
-}

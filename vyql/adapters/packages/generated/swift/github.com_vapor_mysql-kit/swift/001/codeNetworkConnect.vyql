@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf637575e;
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/vapor/mysql-kit")
+  }
+  query pattern callExpr where callee.method == "makeConnection"
+  emit sink code.NetworkConnectSink at args[0]
+}

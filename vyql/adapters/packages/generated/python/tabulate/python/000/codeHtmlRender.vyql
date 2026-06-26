@@ -1,0 +1,9 @@
+module bindings.python.migration.mda4ec84c;
+
+binding htmlRender0 {
+  requires {
+    dependency("tabulate")
+  }
+  query pattern callExpr where callee.method == "tabulate"
+  emit sink code.HtmlRender at args[0]
+}

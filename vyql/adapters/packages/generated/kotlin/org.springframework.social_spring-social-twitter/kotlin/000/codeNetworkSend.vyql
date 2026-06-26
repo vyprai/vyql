@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1b890743;
+
+binding networkSend0 {
+  requires {
+    dependency("org.springframework.social:spring-social-twitter")
+  }
+  query pattern callExpr where callee.method == "sendDirectMessage"
+  emit sink code.NetworkSend at args[0]
+}

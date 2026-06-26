@@ -1,0 +1,14 @@
+module bindings.rust.migration.m222602a5;
+
+binding safeDeserialization20 {
+  requires {
+    dependency("serde_yaml")
+  }
+  query pattern callExpr where callee.path ~= "serde_yaml.from_str"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

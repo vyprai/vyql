@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m55efc519;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-geometry")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

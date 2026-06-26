@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc5727723;
+
+binding userControlledData0 {
+  requires {
+    dependency("moos-core")
+  }
+  query pattern callExpr where callee.method == "OnCommandMsg"
+  emit source core.UserControlledData at call.result
+}

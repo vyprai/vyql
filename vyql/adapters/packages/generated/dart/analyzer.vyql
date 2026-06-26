@@ -1,5 +1,0 @@
-adapter dart {
-  package "analyzer" {
-    sink method "parse" -> code.Deserialization
-  }
-}

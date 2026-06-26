@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding xmlParse21 {
+  requires {
+    dependency("XML::LibXML")
+  }
+  query pattern callExpr where callee.method == "parse_string"
+  emit sink code.XmlParse at args[0]
+}

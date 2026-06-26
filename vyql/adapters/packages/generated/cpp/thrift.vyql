@@ -1,9 +1,0 @@
-import code.{Deserialization, NetworkConnect}
-
-adapter cpp {
-  package "thrift" {
-    sink method "read" -> code.Deserialization
-    sink method "open" -> code.NetworkConnect
-    sink method "Connect" -> code.NetworkConnect
-  }
-}

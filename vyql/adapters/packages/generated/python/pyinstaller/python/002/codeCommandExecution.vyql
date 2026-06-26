@@ -1,0 +1,9 @@
+module bindings.python.migration.m6e0698cd;
+
+binding commandExecution2 {
+  requires {
+    dependency("pyinstaller")
+  }
+  query pattern callExpr where callee.method == "exec_command_all"
+  emit sink code.CommandExecution at args[0]
+}

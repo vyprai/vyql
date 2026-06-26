@@ -1,0 +1,9 @@
+module bindings.swift.migration.m936ccb7b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/1024jp/GzipSwift")
+  }
+  query pattern callExpr where callee.method == "gzipped"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m687dcbc5;
+
+binding sqlExecution1 {
+  requires {
+    dependency("pg8000")
+  }
+  query pattern callExpr where callee.method == "execute_simple"
+  emit sink code.SqlExecution at args[0]
+}

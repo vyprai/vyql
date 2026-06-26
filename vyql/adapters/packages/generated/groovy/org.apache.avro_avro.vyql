@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter groovy {
-  package "org.apache.avro:avro" {
-    sink method "parse" -> code.Deserialization
-  }
-}

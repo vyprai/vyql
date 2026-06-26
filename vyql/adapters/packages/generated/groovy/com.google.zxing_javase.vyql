@@ -1,6 +1,0 @@
-import code.{FilePathAccess}
-adapter groovy {
-  package "com.google.zxing:javase" {
-    sink method "writeToPath" -> code.FilePathAccess
-  }
-}

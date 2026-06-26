@@ -1,0 +1,9 @@
+module bindings.rust.migration.m69a1c049;
+
+binding deserialization2 {
+  requires {
+    dependency("toml_edit")
+  }
+  query pattern callExpr where callee.method == "try_parse_path"
+  emit sink code.Deserialization at args[0]
+}

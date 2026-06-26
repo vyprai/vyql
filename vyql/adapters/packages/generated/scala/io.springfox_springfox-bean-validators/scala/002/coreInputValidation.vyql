@@ -1,0 +1,14 @@
+module bindings.scala.migration.m68e66f22;
+
+binding inputValidation2 {
+  requires {
+    dependency("io.springfox:springfox-bean-validators")
+  }
+  query pattern callExpr where callee.method == "annotationFromBean"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

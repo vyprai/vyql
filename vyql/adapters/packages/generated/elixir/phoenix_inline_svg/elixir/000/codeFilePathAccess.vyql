@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2a2efef3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("phoenix_inline_svg")
+  }
+  query pattern callExpr where callee.method == "read_svg_from_path"
+  emit sink code.FilePathAccess at args[0]
+}

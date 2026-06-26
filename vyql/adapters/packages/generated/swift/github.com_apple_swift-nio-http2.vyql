@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter swift {
-  package "github.com/apple/swift-nio-http2" {
-    sink method "decodeHeaders" -> code.Deserialization
-  }
-}

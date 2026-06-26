@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter groovy {
-  package "com.squareup.dagger:dagger" {
-    sink method "dagger.internal.Loader.loadClass" -> code.CodeEval
-  }
-}

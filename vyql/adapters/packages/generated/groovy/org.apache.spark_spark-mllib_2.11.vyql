@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.apache.spark:spark-mllib_2.11" {
-    sink method "load" -> code.Deserialization
-  }
-}

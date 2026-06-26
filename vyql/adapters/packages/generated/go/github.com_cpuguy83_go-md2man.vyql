@@ -1,7 +1,0 @@
-adapter go {
-  package "github.com/cpuguy83/go-md2man" {
-    sink method "Render" -> code.Deserialization
-    sink method "RoffRenderer" -> code.Deserialization
-    control method "escapeSpecialChars" -> core.HtmlEscape
-  }
-}

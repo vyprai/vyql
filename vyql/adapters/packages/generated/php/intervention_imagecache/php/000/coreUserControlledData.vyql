@@ -1,0 +1,9 @@
+module bindings.php.migration.m211433d7;
+
+binding userControlledData0 {
+  requires {
+    dependency("intervention/imagecache")
+  }
+  query pattern callExpr where callee.method == "make"
+  emit source core.UserControlledData at call.result
+}

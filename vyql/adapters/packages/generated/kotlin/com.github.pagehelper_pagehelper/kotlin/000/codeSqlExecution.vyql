@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mc1b80158;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.github.pagehelper:pagehelper")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.SqlExecution at args[0]
+}

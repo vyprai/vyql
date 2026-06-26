@@ -1,0 +1,9 @@
+module bindings.csharp.migration.md1519ec6;
+
+binding networkSend8 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "BeginOpenWrite"
+  emit sink code.NetworkSend at args[0]
+}

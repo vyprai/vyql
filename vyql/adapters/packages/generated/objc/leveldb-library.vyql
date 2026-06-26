@@ -1,9 +1,0 @@
-import code.{StoredDataWrite, StoredDataRead}
-adapter objc {
-  package "leveldb-library" {
-    sink method "Put" -> code.StoredDataWrite
-    sink method "Delete" -> code.StoredDataWrite
-    sink method "Write" -> code.StoredDataWrite
-    source method "Get" -> code.StoredDataRead
-  }
-}

@@ -217,7 +217,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.Parse(string(raw))
+		decls, err := parser.ParseRuntime(string(raw))
 		if err != nil {
 			return err
 		}

@@ -1,5 +1,0 @@
-adapter bash {
-  package "libarchive" {
-    sink path "libarchive" arg all -> code.FilePathAccess
-  }
-}

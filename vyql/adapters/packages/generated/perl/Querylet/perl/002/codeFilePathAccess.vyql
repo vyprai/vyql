@@ -1,0 +1,9 @@
+module bindings.perl.migration.m804d0b62;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Querylet")
+  }
+  query pattern callExpr where callee.method == "set_output_filename"
+  emit sink code.FilePathAccess at args[0]
+}

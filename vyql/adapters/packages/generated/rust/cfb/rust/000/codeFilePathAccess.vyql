@@ -1,0 +1,9 @@
+module bindings.rust.migration.m61567b75;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cfb")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

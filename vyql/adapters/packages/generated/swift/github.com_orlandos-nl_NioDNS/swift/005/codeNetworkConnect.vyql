@@ -1,0 +1,9 @@
+module bindings.swift.migration.m175e4063;
+
+binding networkConnect5 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "srvConnect"
+  emit sink code.NetworkConnectSink at args[0]
+}

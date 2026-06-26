@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter dart {
-  package "numerus" {
-    sink method "toRomanNumeralValue" -> code.Deserialization
-  }
-}

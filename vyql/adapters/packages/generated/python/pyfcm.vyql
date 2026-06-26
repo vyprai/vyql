@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-
-adapter python {
-  package "pyfcm" {
-    sink method "notify" -> code.NetworkSend
-    sink method "async_notify_multiple_devices" -> code.NetworkSend
-  }
-}

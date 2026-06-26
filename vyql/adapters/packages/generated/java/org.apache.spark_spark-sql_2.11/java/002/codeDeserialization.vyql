@@ -1,0 +1,9 @@
+module bindings.java.migration.m34ad357f;
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.spark:spark-sql_2.11")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-
-adapter swift {
-  package "github.com/vapor/mysql-nio" {
-    sink method "simpleQuery" -> code.SqlExecution
-  }
-}

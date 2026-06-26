@@ -1,0 +1,9 @@
+module bindings.ruby.migration.me18a81ce;
+
+binding filePathAccess5 {
+  requires {
+    dependency("rack-rewrite")
+  }
+  query pattern callExpr where callee.method == "x_send_file"
+  emit sink code.FilePathAccess at args[0]
+}

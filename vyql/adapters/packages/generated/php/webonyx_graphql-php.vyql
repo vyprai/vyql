@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter php {
-  package "webonyx/graphql-php" {
-    source method "GraphQL\\Server\\Helper::parseHttpRequest" -> core.UserControlledData
-    source method "GraphQL\\Server\\Helper::parseRequestParams" -> core.UserControlledData
-  }
-}

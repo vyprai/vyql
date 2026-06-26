@@ -1,9 +1,0 @@
-import code.{NetworkData, Deserialization}
-
-adapter dart {
-  package "gql_link" {
-    source method "serializeRequest" -> code.NetworkData
-    sink method "parseResponse" -> code.Deserialization
-    sink method "parseError" -> code.Deserialization
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m54a8d93c;
+
+binding sqlExecution0 {
+  requires {
+    dependency("influxdb")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

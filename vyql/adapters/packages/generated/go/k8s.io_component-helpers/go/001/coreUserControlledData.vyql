@@ -1,0 +1,9 @@
+module bindings.go.migration.mf7acbc18;
+
+binding userControlledData1 {
+  requires {
+    dependency("k8s.io/component-helpers")
+  }
+  query pattern callExpr where callee.method == "ParseNodeIPAnnotation"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mdf2aee91;
+
+binding httpInput2 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-jaxrs")
+  }
+  query pattern callExpr where callee.method == "getHttpHeaders"
+  emit source code.HttpInput at call.result
+}

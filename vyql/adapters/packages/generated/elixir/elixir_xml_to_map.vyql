@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "elixir_xml_to_map" {
-    sink method "naive_map" -> code.Deserialization
-    sink method "nested_map" -> code.Deserialization
-  }
-}

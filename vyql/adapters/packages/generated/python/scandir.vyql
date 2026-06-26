@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "scandir" {
-    sink method "scandir_generic" -> code.FilePathAccess
-    sink method "scandir_python" -> code.FilePathAccess
-    sink method "walk" -> code.FilePathAccess
-  }
-}

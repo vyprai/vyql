@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule ServerSideBrowserActiveHtmlRendering {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_918, CWE_79, CWE_200]
+    id: "VYQL-RF-026"
+    severity: high
+  }
+  issue code.ServerSideBrowserActiveHtmlRendering as render
+}

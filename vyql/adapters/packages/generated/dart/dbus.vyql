@@ -1,7 +1,0 @@
-import code.{XmlParse}
-
-adapter dart {
-  package "dbus" {
-    sink method "parseDBusIntrospectXml" -> code.XmlParse
-  }
-}

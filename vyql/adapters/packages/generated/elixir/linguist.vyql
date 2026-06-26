@@ -1,7 +1,0 @@
-import code.{ExpressionEval}
-adapter elixir {
-  package "linguist" {
-    sink method "t" -> code.ExpressionEval
-    sink method "t!" -> code.ExpressionEval
-  }
-}

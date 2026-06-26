@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter groovy {
-  package "org.apache.activemq:activemq-spring" {
-    sink method "resourceFromString" -> code.FilePathAccess
-  }
-}

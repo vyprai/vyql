@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1ffc0d53;
+
+binding codeEval0 {
+  requires {
+    dependency("org.apache.hadoop:hadoop-yarn-common")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CodeEval at args[0]
+}

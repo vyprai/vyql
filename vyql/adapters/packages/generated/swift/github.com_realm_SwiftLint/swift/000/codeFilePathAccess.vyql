@@ -1,0 +1,9 @@
+module bindings.swift.migration.m3676cd66;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/realm/SwiftLint")
+  }
+  query pattern callExpr where callee.method == "write(toPath:)"
+  emit sink code.FilePathAccess at args[0]
+}

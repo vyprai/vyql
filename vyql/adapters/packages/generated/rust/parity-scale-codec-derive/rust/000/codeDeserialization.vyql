@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc3d07efb;
+
+binding deserialization0 {
+  requires {
+    dependency("parity-scale-codec-derive")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

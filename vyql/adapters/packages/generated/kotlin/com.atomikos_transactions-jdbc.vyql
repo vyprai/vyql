@@ -1,6 +1,0 @@
-adapter kotlin {
-  package "com.atomikos:transactions-jdbc" {
-    sink method "getTestQuery" -> code.SqlExecution
-    control method "prepare" -> core.SqlParameterization
-  }
-}

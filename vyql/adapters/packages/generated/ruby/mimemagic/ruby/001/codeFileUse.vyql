@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mea43a185;
+
+binding fileUse1 {
+  requires {
+    dependency("mimemagic")
+  }
+  query pattern callExpr where callee.method == "magic_match"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization, NetworkConnect, NetworkSend}
-adapter java {
-  package "com.squareup.retrofit:retrofit" {
-    sink method "parse" -> code.Deserialization
-    sink method "execute" -> code.NetworkConnect
-    sink method "enqueue" -> code.NetworkSend
-  }
-}

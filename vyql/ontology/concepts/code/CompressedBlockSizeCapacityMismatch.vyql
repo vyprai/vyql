@@ -1,0 +1,11 @@
+module code;
+
+concept CompressedBlockSizeCapacityMismatch : issue {
+  cwe: [CWE_787]
+  review_assumption: "a malformed compressed block or destination-size edge case can exhaust the output buffer before metadata or block bytes are written"
+  reviewCategory: memory
+  reviewCondition: "compressed block output accounting compares against a caller capacity that may not be the real destination size"
+  reviewConfidence: medium
+  reviewEvidence: "compressed block writer {pattern} writes size metadata and copies block data using mismatched capacity checks"
+  vulnerableTo: [memory.OobWrite]
+}

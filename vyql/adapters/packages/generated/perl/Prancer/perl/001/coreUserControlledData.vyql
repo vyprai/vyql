@@ -1,0 +1,9 @@
+module bindings.perl.migration.m33814bd0;
+
+binding userControlledData1 {
+  requires {
+    dependency("Prancer")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source core.UserControlledData at call.result
+}

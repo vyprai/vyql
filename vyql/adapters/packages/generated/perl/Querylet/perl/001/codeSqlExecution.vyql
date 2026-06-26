@@ -1,0 +1,9 @@
+module bindings.perl.migration.m804d0b62;
+
+binding sqlExecution1 {
+  requires {
+    dependency("Querylet")
+  }
+  query pattern callExpr where callee.method == "set_dbh"
+  emit sink code.SqlExecution at args[0]
+}

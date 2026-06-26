@@ -1,0 +1,9 @@
+module bindings.python.migration.m9de101ea;
+
+binding fileUse0 {
+  requires {
+    dependency("pathlib2")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FileUseSink at args[0]
+}

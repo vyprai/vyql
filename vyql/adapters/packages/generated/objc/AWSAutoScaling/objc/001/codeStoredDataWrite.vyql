@@ -1,0 +1,9 @@
+module bindings.objc.migration.mcab5780f;
+
+binding storedDataWrite1 {
+  requires {
+    dependency("AWSAutoScaling")
+  }
+  query pattern callExpr where callee.method == "setUp"
+  emit sink code.StoredDataWrite at args[0]
+}

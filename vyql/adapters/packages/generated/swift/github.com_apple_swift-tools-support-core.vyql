@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter swift {
-  package "github.com/apple/swift-tools-support-core" {
-    sink method "exec" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

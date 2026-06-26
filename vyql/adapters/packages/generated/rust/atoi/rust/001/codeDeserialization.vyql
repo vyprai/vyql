@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6c3e529d;
+
+binding deserialization1 {
+  requires {
+    dependency("atoi")
+  }
+  query pattern callExpr where callee.method == "from_radix_10_checked"
+  emit sink code.Deserialization at args[0]
+}

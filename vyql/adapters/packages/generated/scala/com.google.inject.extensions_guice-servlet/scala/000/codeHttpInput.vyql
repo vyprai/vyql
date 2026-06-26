@@ -1,0 +1,9 @@
+module bindings.scala.migration.mdd9d5759;
+
+binding httpInput0 {
+  requires {
+    dependency("com.google.inject.extensions:guice-servlet")
+  }
+  query pattern callExpr where callee.method == "getOriginalRequest"
+  emit source code.HttpInput at call.result
+}

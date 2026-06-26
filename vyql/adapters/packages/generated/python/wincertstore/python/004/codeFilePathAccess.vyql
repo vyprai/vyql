@@ -1,0 +1,9 @@
+module bindings.python.migration.m07a705d1;
+
+binding filePathAccess4 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

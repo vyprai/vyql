@@ -1,0 +1,9 @@
+module bindings.php.migration.m6c87298b;
+
+binding deserialization3 {
+  requires {
+    dependency("php-amqplib/php-amqplib")
+  }
+  query pattern callExpr where callee.method == "PhpAmqpLibWireAMQPReader::read_array"
+  emit sink code.Deserialization at args[0]
+}

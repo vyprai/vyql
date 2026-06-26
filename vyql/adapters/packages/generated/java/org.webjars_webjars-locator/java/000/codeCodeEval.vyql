@@ -1,0 +1,9 @@
+module bindings.java.migration.m21feb668;
+
+binding codeEval0 {
+  requires {
+    dependency("org.webjars:webjars-locator")
+  }
+  query pattern callExpr where callee.method == "getSetupJavaScript"
+  emit sink code.CodeEval at args[0]
+}

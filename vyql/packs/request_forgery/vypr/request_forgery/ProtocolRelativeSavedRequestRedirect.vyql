@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule ProtocolRelativeSavedRequestRedirect {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_601]
+    id: "VYQL-RF-042"
+    severity: medium
+  }
+  issue code.ProtocolRelativeSavedRequestRedirect as redirect
+}

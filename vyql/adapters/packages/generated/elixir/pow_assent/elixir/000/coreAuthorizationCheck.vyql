@@ -1,0 +1,14 @@
+module bindings.elixir.migration.md564ea3c;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("pow_assent")
+  }
+  query pattern callExpr where callee.method == "authorize_url"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

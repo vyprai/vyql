@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf201a5b2;
+
+binding networkBind2 {
+  requires {
+    dependency("github.com/apple/swift-nio-transport-services")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

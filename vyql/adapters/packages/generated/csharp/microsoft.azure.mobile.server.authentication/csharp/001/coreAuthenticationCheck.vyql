@@ -1,0 +1,14 @@
+module bindings.csharp.migration.m2c78783d;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("microsoft.azure.mobile.server.authentication")
+  }
+  query pattern callExpr where callee.method == "TryValidateLoginToken"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

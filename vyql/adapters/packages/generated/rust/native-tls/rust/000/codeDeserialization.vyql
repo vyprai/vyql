@@ -1,0 +1,9 @@
+module bindings.rust.migration.me11995c7;
+
+binding deserialization0 {
+  requires {
+    dependency("native-tls")
+  }
+  query pattern callExpr where callee.method == "from_pkcs12"
+  emit sink code.Deserialization at args[0]
+}

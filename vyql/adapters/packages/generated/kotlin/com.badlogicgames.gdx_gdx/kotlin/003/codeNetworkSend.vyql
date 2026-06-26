@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mb36ef84f;
+
+binding networkSend3 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx")
+  }
+  query pattern callExpr where callee.method == "sendHttpRequest"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.mb7bb0a0e;
+
+binding networkConnect6 {
+  requires {
+    dependency("io.vertx:vertx-web-client")
+  }
+  query pattern callExpr where callee.method == "patchAbs"
+  emit sink code.NetworkConnectSink at args[0]
+}

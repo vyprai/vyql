@@ -1587,6 +1587,23 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if target, val, ok := c.jsAssignmentExpr(inner); ok {
 			return append(prefix, nir.Assign{Targets: []string{target}, Value: val})
 		}
+		if v, ok := c.jsSelfDefaultAssignmentValue(left, rhs); ok {
+			right := c.expr(v)
+			if left != nil && left.Kind() == "member_expression" {
+				p := c.dotted(left)
+				right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
+			}
+			if left != nil && left.Kind() == "subscript_expression" {
+				base := field(left, "object")
+				key := field(left, "index")
+				right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
+				return []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
+					nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
+				}
+			}
+		}
 		right := c.expr(rhs)
 		// member-property write (e.g. obj.prop = x): model as a path call so adapter
 		// mappings can reason about the assigned value.
@@ -2630,6 +2647,20 @@ func (c *jsConv) unwrapJsTransparentExpr(n *tree_sitter.Node) *tree_sitter.Node 
 		n = kids[0]
 	}
 	return n
+}
+
+func (c *jsConv) jsSelfDefaultAssignmentValue(left, rhs *tree_sitter.Node) (*tree_sitter.Node, bool) {
+	left = c.unwrapJsTransparentExpr(left)
+	rhs = c.unwrapJsTransparentExpr(rhs)
+	if left == nil || rhs == nil || rhs.Kind() != "binary_expression" || c.text(field(rhs, "operator")) != "||" {
+		return nil, false
+	}
+	lhs := c.unwrapJsTransparentExpr(field(rhs, "left"))
+	def := c.unwrapJsTransparentExpr(field(rhs, "right"))
+	if lhs == nil || def == nil || c.dotted(left) == "?" || c.dotted(left) != c.dotted(lhs) {
+		return nil, false
+	}
+	return def, true
 }
 
 func isBrowserGlobalObject(path string) bool {

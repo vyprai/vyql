@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb0a76b3a;
+
+binding networkSend1 {
+  requires {
+    dependency("socket.io")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}

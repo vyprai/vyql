@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m124bee80;
+
+binding deserialization0 {
+  requires {
+    dependency("kaffe")
+  }
+  query pattern callExpr where callee.method == "decode_pem"
+  emit sink code.Deserialization at args[0]
+}

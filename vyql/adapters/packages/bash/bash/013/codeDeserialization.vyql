@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding deserialization13 {
+  requires {
+    dependency("jq")
+  }
+  query pattern callExpr where callee.path ~= "jq"
+  emit sink code.Deserialization at args.any
+}

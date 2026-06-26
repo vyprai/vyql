@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mab5d43e4;
+
+binding deserialization0 {
+  requires {
+    dependency("postcss-selector-parser")
+  }
+  query pattern callExpr where callee.method == "Node"
+  emit sink code.Deserialization at args[0]
+}

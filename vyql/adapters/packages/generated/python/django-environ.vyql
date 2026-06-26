@@ -1,5 +1,0 @@
-adapter python {
-  package "django-environ" {
-    source method "read_env" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m236f1cc7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/apache/thrift")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

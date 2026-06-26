@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mad42afce;
+
+binding codeEval0 {
+  requires {
+    dependency("org.powermock:powermock-core")
+  }
+  query pattern callExpr where callee.method == "loadClass"
+  emit sink code.CodeEval at args[0]
+}

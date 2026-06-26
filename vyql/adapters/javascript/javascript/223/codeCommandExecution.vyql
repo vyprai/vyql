@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding commandExecution223 {
+  query pattern callExpr where callee.path ~= "cp.spawn"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.migration.m2e91238a;
+
+binding nosqlQuery2 {
+  requires {
+    dependency("Mongoose")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}

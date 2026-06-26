@@ -1,0 +1,9 @@
+module bindings.perl.migration.mbe603286;
+
+binding networkSend11 {
+  requires {
+    dependency("WWW-Formspring")
+  }
+  query pattern callExpr where callee.method == "profile_ask"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.me6b2d92a;
+
+binding deserialization1 {
+  requires {
+    dependency("javascriptcore-rs")
+  }
+  query pattern callExpr where callee.method == "from_json"
+  emit sink code.Deserialization at args[0]
+}

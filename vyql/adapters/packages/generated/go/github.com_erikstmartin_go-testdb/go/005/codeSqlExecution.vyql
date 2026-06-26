@@ -1,0 +1,9 @@
+module bindings.go.migration.mef2883f0;
+
+binding sqlExecution5 {
+  requires {
+    dependency("github.com/erikstmartin/go-testdb")
+  }
+  query pattern callExpr where callee.method == "SetExecWithArgsFunc"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding nilMapMergeWritePanic272 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=go" and node.token contains "selector:options.Helm.Values" and node.token contains "selector:options.Helm.ValuesFrom" and node.token contains "assign:values=options.Helm.Values.Data" and node.token contains "call_path:mergeValues" and not (node.token contains "binary:values==nil") and not (node.token contains "assign:values=map[string]interface{}{}") and not (node.token contains "call_path:make")
+  emit issue code.NilMapMergeWritePanic at node
+}

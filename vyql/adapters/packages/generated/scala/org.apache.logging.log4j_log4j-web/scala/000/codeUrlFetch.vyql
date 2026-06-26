@@ -1,0 +1,9 @@
+module bindings.scala.migration.m45041b45;
+
+binding urlFetch0 {
+  requires {
+    dependency("org.apache.logging.log4j:log4j-web")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.UrlFetch at args[0]
+}

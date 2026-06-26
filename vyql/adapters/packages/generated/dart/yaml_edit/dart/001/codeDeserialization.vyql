@@ -1,0 +1,9 @@
+module bindings.dart.migration.m60a94493;
+
+binding deserialization1 {
+  requires {
+    dependency("yaml_edit")
+  }
+  query pattern callExpr where callee.method == "YamlEditor.update"
+  emit sink code.Deserialization at args[0]
+}

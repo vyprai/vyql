@@ -1,7 +1,0 @@
-import code.{SecretValue}
-adapter ruby {
-  package "aws-sigv4" {
-    source method "signature" -> code.SecretValue
-    source method "event_signature" -> code.SecretValue
-  }
-}

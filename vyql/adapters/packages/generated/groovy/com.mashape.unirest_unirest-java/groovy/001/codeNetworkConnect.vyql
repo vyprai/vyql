@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m26e194b2;
+
+binding networkConnect1 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.mdb99f906;
+
+binding expressionEval0 {
+  requires {
+    dependency("GoogleTagManager")
+  }
+  query pattern callExpr where callee.method == "executeWithParameters:"
+  emit sink code.ExpressionEval at args[0]
+}

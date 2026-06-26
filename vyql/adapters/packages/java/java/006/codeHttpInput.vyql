@@ -1,0 +1,9 @@
+module bindings.java.migration.m9ef49b0f;
+
+binding httpInput6 {
+  requires {
+    dependency("io.vertx")
+  }
+  query pattern callExpr where callee.path ~= ".pathParam"
+  emit source code.HttpInput at call.result
+}

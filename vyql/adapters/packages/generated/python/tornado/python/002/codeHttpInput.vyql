@@ -1,0 +1,9 @@
+module bindings.python.migration.m8d225ccd;
+
+binding httpInput2 {
+  requires {
+    dependency("tornado")
+  }
+  query pattern callExpr where callee.method == "cookies"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m58504865;
+
+binding deserialization1 {
+  requires {
+    dependency("istanbul-lib-source-maps")
+  }
+  query pattern callExpr where callee.method == "registerMap"
+  emit sink code.Deserialization at args[0]
+}

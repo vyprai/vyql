@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding shellEscape201 {
+  query pattern callExpr where callee.path ~= "Shellwords.escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

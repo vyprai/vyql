@@ -1,0 +1,9 @@
+module bindings.python.migration.m2982b66d;
+
+binding userControlledData12 {
+  requires {
+    dependency("falcon")
+  }
+  query pattern callExpr where callee.method == "falcon.uri.parse_port"
+  emit source core.UserControlledData at call.result
+}

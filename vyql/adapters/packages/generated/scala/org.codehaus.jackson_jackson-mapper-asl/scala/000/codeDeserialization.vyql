@@ -1,0 +1,9 @@
+module bindings.scala.migration.m0f7313aa;
+
+binding deserialization0 {
+  requires {
+    dependency("org.codehaus.jackson:jackson-mapper-asl")
+  }
+  query pattern callExpr where callee.method == "readValue"
+  emit sink code.Deserialization at args[0]
+}

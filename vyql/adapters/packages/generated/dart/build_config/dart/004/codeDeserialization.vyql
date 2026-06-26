@@ -1,0 +1,9 @@
+module bindings.dart.migration.md1712474;
+
+binding deserialization4 {
+  requires {
+    dependency("build_config")
+  }
+  query pattern callExpr where callee.path ~= "GlobalBuilderConfig.fromJson"
+  emit sink code.Deserialization at args[0]
+}

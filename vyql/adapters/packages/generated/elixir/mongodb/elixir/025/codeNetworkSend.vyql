@@ -1,0 +1,9 @@
+module bindings.elixir.migration.md3359d57;
+
+binding networkSend25 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

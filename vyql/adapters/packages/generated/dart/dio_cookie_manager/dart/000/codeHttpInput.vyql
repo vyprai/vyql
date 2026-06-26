@@ -1,0 +1,9 @@
+module bindings.dart.migration.m7355f118;
+
+binding httpInput0 {
+  requires {
+    dependency("dio_cookie_manager")
+  }
+  query pattern callExpr where callee.method == "CookieManager"
+  emit source code.HttpInput at call.result
+}

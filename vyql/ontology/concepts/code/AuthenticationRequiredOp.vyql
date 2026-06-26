@@ -1,0 +1,11 @@
+module code;
+
+concept AuthenticationRequiredOp : issue {
+  cwe: [CWE_306]
+  review_assumption: "the enclosing endpoint or entry point can be reached by an unauthenticated actor"
+  reviewCategory: auth
+  reviewCondition: "security-sensitive operation is reachable without an observed authentication guard"
+  reviewConfidence: low
+  reviewEvidence: "sensitive operation {pattern} is present"
+  vulnerableTo: [authentication.MissingAuthentication]
+}

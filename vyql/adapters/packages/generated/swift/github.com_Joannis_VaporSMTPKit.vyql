@@ -1,8 +1,0 @@
-import code.{NetworkSend, SecretValue}
-
-adapter swift {
-  package "github.com/Joannis/VaporSMTPKit" {
-    sink method "sendMail" -> code.NetworkSend
-    sink method "sendMails" -> code.NetworkSend
-  }
-}

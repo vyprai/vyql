@@ -1,0 +1,9 @@
+module bindings.scala.migration.mf414268f;
+
+binding deserialization0 {
+  requires {
+    dependency("com.sun.jersey.contribs:jersey-multipart")
+  }
+  query pattern callExpr where callee.method == "readMultiPart"
+  emit sink code.Deserialization at args[0]
+}

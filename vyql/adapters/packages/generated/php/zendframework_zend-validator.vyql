@@ -1,7 +1,0 @@
-import core.{CsrfProtection}
-
-adapter php {
-  package "zendframework/zend-validator" {
-    control method "getHash" -> core.CsrfProtection
-  }
-}

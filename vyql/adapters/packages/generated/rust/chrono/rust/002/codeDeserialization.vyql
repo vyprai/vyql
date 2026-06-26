@@ -1,0 +1,9 @@
+module bindings.rust.migration.mebb1b43f;
+
+binding deserialization2 {
+  requires {
+    dependency("chrono")
+  }
+  query pattern callExpr where callee.method == "parse_from_str"
+  emit sink code.Deserialization at args[0]
+}

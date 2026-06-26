@@ -1,0 +1,9 @@
+module bindings.c.migration.mce355dd5;
+
+binding commandExecution0 {
+  requires {
+    dependency("libodb")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CommandExecution at args[0]
+}

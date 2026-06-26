@@ -1,8 +1,0 @@
-import code.{NetworkSend}
-adapter dart {
-  package "share_plus_web" {
-    sink method "SharePlusPlugin.share" -> code.NetworkSend
-    sink method "SharePlusPlugin.shareFiles" -> code.NetworkSend
-    sink method "SharePlusPlugin.shareXFiles" -> code.NetworkSend
-  }
-}

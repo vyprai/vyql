@@ -1,0 +1,9 @@
+module bindings.swift.migration.m220cd6e9;
+
+binding httpInput2 {
+  requires {
+    dependency("github.com/swift-server/swift-aws-lambda-events")
+  }
+  query pattern callExpr where callee.method == "headers"
+  emit source code.HttpInput at call.result
+}

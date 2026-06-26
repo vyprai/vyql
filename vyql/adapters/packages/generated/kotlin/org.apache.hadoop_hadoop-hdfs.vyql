@@ -1,8 +1,0 @@
-import core.{PathCanonicalization, InputValidation}
-
-adapter kotlin {
-  package "org.apache.hadoop:hadoop-hdfs" {
-    control method "isReservedPathComponent" -> core.InputValidation
-    control method "getPathComponents" -> core.PathCanonicalization
-  }
-}

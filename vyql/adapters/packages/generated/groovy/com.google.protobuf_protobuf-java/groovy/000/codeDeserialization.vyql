@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m4bd52e04;
+
+binding deserialization0 {
+  requires {
+    dependency("com.google.protobuf:protobuf-java")
+  }
+  query pattern callExpr where callee.method == "parseFrom"
+  emit sink code.Deserialization at args[0]
+}

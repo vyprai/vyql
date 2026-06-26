@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter dart {
-  package "args" {
-    source method "parse" -> code.CliArgument
-  }
-}

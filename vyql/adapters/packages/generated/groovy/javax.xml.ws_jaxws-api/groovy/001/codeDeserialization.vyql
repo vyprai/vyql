@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md539988c;
+
+binding deserialization1 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "LogicalMessage.setPayload"
+  emit sink code.Deserialization at args[0]
+}

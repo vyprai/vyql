@@ -1,0 +1,9 @@
+module bindings.php.migration.mc4d98c95;
+
+binding filePathAccess1 {
+  requires {
+    dependency("jms/cg")
+  }
+  query pattern callExpr where callee.method == "file_put_contents"
+  emit sink code.FilePathAccess at args[0]
+}

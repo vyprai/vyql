@@ -1,0 +1,9 @@
+module bindings.swift.migration.m88c57f3b;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/AudioKit/DunneAudioKit")
+  }
+  query pattern callExpr where callee.method == "loadSFZ"
+  emit sink code.Deserialization at args[0]
+}

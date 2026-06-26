@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-adapter swift {
-  package "github.com/apple/swift-system" {
-    sink method "open" -> code.FilePathAccess
-    sink method "read" -> code.FileUse
-    sink method "write" -> code.FileUse
-  }
-}

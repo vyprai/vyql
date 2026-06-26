@@ -59,15 +59,17 @@ type controlSpec struct {
 	ValMatches []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
 	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Detail     map[string]string
 }
 
 type flagPredicate struct {
-	Subject  string
-	Property string
-	Op       string
-	Values   []string
-	Exact    bool
-	Negative bool
+	Subject     string
+	Property    string
+	Op          string
+	Values      []string
+	valuesLower []string
+	Exact       bool
+	Negative    bool
 }
 
 type flagOperandSpec struct {
@@ -86,6 +88,15 @@ type flagSpec struct {
 // activeSources, when non-nil, restricts which source concepts the input adapters
 // emit for the active analysis profile. nil = every source active.
 var activeSources map[string]bool
+
+var (
+	autoAdaptersCache sync.Map // map[string]cachedAutoAdapters
+)
+
+type cachedAutoAdapters struct {
+	data []adapters.Adapter
+	err  error
+}
 
 // SetActiveSources sets the active-profile filter for source labelling. Pass nil to disable.
 func SetActiveSources(s map[string]bool) { activeSources = s }
@@ -118,6 +129,10 @@ func valContainsLower(lowerTokens, sub string) bool {
 	return strings.Contains(lowerTokens, strings.ToLower(sub))
 }
 
+func valContainsLowerNeedle(lowerTokens, lowerSub string) bool {
+	return strings.Contains(lowerTokens, lowerSub)
+}
+
 // valConds reports whether every `val` substring is present (AND) and every
 // `nval` substring is absent among the value tokens. Empty lists pass.
 func valConds(tokens string, vals, nvals []string) bool {
@@ -138,10 +153,182 @@ func valCondsLower(lowerTokens string, vals, nvals []string) bool {
 	return true
 }
 
+func valCondsLowerNeedles(lowerTokens string, valsLower, nvalsLower []string) bool {
+	for _, v := range valsLower {
+		if !valContainsLowerNeedle(lowerTokens, v) {
+			return false
+		}
+	}
+	for _, nv := range nvalsLower {
+		if valContainsLowerNeedle(lowerTokens, nv) {
+			return false
+		}
+	}
+	return true
+}
+
+func lowerStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, len(values))
+	for i, v := range values {
+		out[i] = strings.ToLower(v)
+	}
+	return out
+}
+
+func newFlagPredicate(subject, property, op string, values []string, exact, negative bool) flagPredicate {
+	return flagPredicate{
+		Subject:     subject,
+		Property:    property,
+		Op:          op,
+		Values:      values,
+		valuesLower: lowerStrings(values),
+		Exact:       exact,
+		Negative:    negative,
+	}
+}
+
+func (pred flagPredicate) lowerValues() []string {
+	if len(pred.valuesLower) == len(pred.Values) {
+		return pred.valuesLower
+	}
+	return lowerStrings(pred.Values)
+}
+
 type flowTokenIndex struct {
 	built bool
 	rev   map[string][]string
 	fwd   map[string][]string
+}
+
+type flagMatchIndex struct {
+	built        bool
+	flow         flowTokenIndex
+	nodes        map[string]usg.Node
+	types        map[string][]usg.Node
+	typesByFile  map[string]map[string][]usg.Node
+	paramsByLine map[string]map[int][]usg.Node
+	scopedHits   map[string]bool
+	scopedReady  map[string]bool
+	callArgText  map[string]string
+}
+
+func (idx *flagMatchIndex) ensure(s usg.Store) {
+	if idx.built {
+		return
+	}
+	idx.built = true
+	idx.nodes = map[string]usg.Node{}
+	idx.types = map[string][]usg.Node{}
+	idx.typesByFile = map[string]map[string][]usg.Node{}
+	idx.paramsByLine = map[string]map[int][]usg.Node{}
+	idx.scopedHits = map[string]bool{}
+	idx.scopedReady = map[string]bool{}
+	idx.callArgText = map[string]string{}
+	rangeNodes(s, func(n usg.Node) bool {
+		idx.nodes[n.ID] = n
+		idx.types[n.Type] = append(idx.types[n.Type], n)
+		if file := locFile(n.Prop("loc")); file != "" {
+			if idx.typesByFile[n.Type] == nil {
+				idx.typesByFile[n.Type] = map[string][]usg.Node{}
+			}
+			idx.typesByFile[n.Type][file] = append(idx.typesByFile[n.Type][file], n)
+			if n.Type == "code.Param" {
+				_, line := splitLocFileLine(n.Prop("loc"))
+				if line != 0 {
+					if idx.paramsByLine[file] == nil {
+						idx.paramsByLine[file] = map[int][]usg.Node{}
+					}
+					idx.paramsByLine[file][line] = append(idx.paramsByLine[file][line], n)
+				}
+			}
+		}
+		return true
+	})
+	idx.flow.ensure(s)
+}
+
+func (idx *flagMatchIndex) nodesOfType(s usg.Store, typ string) []usg.Node {
+	idx.ensure(s)
+	return idx.types[typ]
+}
+
+func (idx *flagMatchIndex) nodesOfTypeInFile(s usg.Store, typ, file string) []usg.Node {
+	idx.ensure(s)
+	if file == "" {
+		return idx.types[typ]
+	}
+	return idx.typesByFile[typ][file]
+}
+
+func (idx *flagMatchIndex) node(s usg.Store, id string) (usg.Node, bool) {
+	idx.ensure(s)
+	n, ok := idx.nodes[id]
+	return n, ok
+}
+
+func (idx *flagMatchIndex) scopedHit(s usg.Store, kind string, pred flagPredicate, values []string, nodeTypes []string, n usg.Node, tech string, crossLang bool, allowUnscoped bool, match func(usg.Node) bool) bool {
+	idx.ensure(s)
+	file := locFile(n.Prop("loc"))
+	scope := scopeWithoutOrder(nodeLexicalScope(n))
+	key := strings.Join([]string{
+		kind,
+		flagPredicateCacheKey(pred),
+		strings.Join(values, "\x1f"),
+		strings.Join(nodeTypes, "\x1f"),
+		file,
+		scope,
+		tech,
+		strconv.FormatBool(crossLang),
+		strconv.FormatBool(allowUnscoped),
+	}, "\x1e")
+	if idx.scopedReady[key] {
+		return idx.scopedHits[key]
+	}
+	hit := false
+	for _, nodeType := range nodeTypes {
+		for _, cand := range idx.nodesOfTypeInFile(s, nodeType, file) {
+			if cand.ID == n.ID {
+				continue
+			}
+			candScope := scopeWithoutOrder(nodeLexicalScope(cand))
+			if scope != "" {
+				if candScope == "" {
+					if !allowUnscoped {
+						continue
+					}
+				} else if !sameOrNestedScope(candScope, scope) {
+					continue
+				}
+			}
+			if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+				continue
+			}
+			if match(cand) {
+				hit = true
+				break
+			}
+		}
+		if hit {
+			break
+		}
+	}
+	idx.scopedReady[key] = true
+	idx.scopedHits[key] = hit
+	return hit
+}
+
+func flagPredicateCacheKey(pred flagPredicate) string {
+	return strings.Join([]string{
+		pred.Subject,
+		pred.Property,
+		pred.Op,
+		strings.Join(pred.Values, "\x1f"),
+		strconv.FormatBool(pred.Exact),
+		strconv.FormatBool(pred.Negative),
+	}, "\x1f")
 }
 
 func (idx *flowTokenIndex) ensure(s usg.Store) {
@@ -378,6 +565,19 @@ func collectionElement(s usg.Store, idx *collectionFlowIndex, argID string, elem
 	return ""
 }
 
+func collectionArgument(s usg.Store, idx *collectionFlowIndex, argID string) bool {
+	idx.ensure(s)
+	return len(idx.reachesSeq[argID]) > 0
+}
+
+func collectionArgKindAllowsFlow(vkind string) bool {
+	switch vkind {
+	case "Name", "Call", "Index":
+		return true
+	}
+	return false
+}
+
 func detailWithPattern(detail map[string]string, pattern string) map[string]string {
 	if len(detail) == 0 {
 		return nil
@@ -397,6 +597,7 @@ var (
 	conceptDetails    map[string]map[string]string
 	conceptRoleOnce   sync.Once
 	conceptRoles      map[string]map[string]bool
+	adapterDeclCache  sync.Map // map[adapterDeclCacheKey]*parser.AdapterDecl
 )
 
 func reviewDetail(concept, pattern string) (map[string]string, string) {
@@ -418,36 +619,30 @@ func reviewDetail(concept, pattern string) (map[string]string, string) {
 func ontologyConceptDetails() map[string]map[string]string {
 	conceptDetailOnce.Do(func() {
 		conceptDetails = map[string]map[string]string{}
-		files, err := filepath.Glob(filepath.Join(datadir.Root(), "ontology", "*.vyql"))
+		files, err := datadir.ReadVYQLDir("ontology")
 		if err != nil {
-			panic("frontend: glob ontology/*.vyql: " + err.Error())
+			panic("frontend: read ontology: " + err.Error())
 		}
-		for _, file := range files {
-			raw, err := os.ReadFile(file)
-			if err != nil {
-				panic("frontend: read " + file + ": " + err.Error())
+		decls, err := parseV2RuntimeAdapterSources(files)
+		if err != nil {
+			panic("frontend: parse ontology detail corpus: " + err.Error())
+		}
+		for _, d := range decls {
+			cd, ok := d.(*parser.ConceptDecl)
+			if !ok {
+				continue
 			}
-			decls, err := parser.Parse(string(raw))
-			if err != nil {
-				panic("frontend: parse " + file + ": " + err.Error())
-			}
-			for _, d := range decls {
-				cd, ok := d.(*parser.ConceptDecl)
-				if !ok {
+			detail := map[string]string{}
+			for k, v := range cd.Fields {
+				if !strings.HasPrefix(k, "review_") {
 					continue
 				}
-				detail := map[string]string{}
-				for k, v := range cd.Fields {
-					if !strings.HasPrefix(k, "review_") {
-						continue
-					}
-					if s, ok := v.(string); ok && s != "" {
-						detail[k] = s
-					}
+				if s, ok := v.(string); ok && s != "" {
+					detail[k] = s
 				}
-				if len(detail) > 0 {
-					conceptDetails[cd.QualifiedName()] = detail
-				}
+			}
+			if len(detail) > 0 {
+				conceptDetails[cd.QualifiedName()] = detail
 			}
 		}
 	})
@@ -472,6 +667,15 @@ func ontologyRoleConcepts(role string) map[string]bool {
 
 func singleOntologyRoleConcept(role string) string {
 	var out string
+	for c := range ontologyRoleConcepts(role) {
+		if strings.HasSuffix(c, "Issue") {
+			continue
+		}
+		out = c
+	}
+	if out != "" {
+		return out
+	}
 	for c := range ontologyRoleConcepts(role) {
 		if out != "" {
 			return ""
@@ -529,6 +733,7 @@ func AdaptersFor(tech string) []adapters.Adapter {
 		out = append(out, jsDomValueInputAdapter())
 		out = append(out, jsPathRegexGuardAdapter())
 		out = append(out, jsSafePathResolverAdapter())
+		out = append(out, jsModuleHelperLdapEscapeAdapter())
 	}
 	if tech == "ruby" {
 		out = append(out, processArgVectorAdapter(tech))
@@ -568,7 +773,10 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 		if err != nil {
 			return nil, err
 		}
-		decls, err := parser.Parse(string(b))
+		decls, err := parseV2RuntimeAdapterSources([]datadir.Source{{
+			Name: filepath.ToSlash(file),
+			Data: b,
+		}})
 		if err != nil {
 			return nil, err
 		}
@@ -632,9 +840,10 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			allowed := make([]bool, len(spec.Assumes))
 			for i := range spec.Assumes {
-				allowed[i] = packageAllowed(spec.Assumes[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Assumes[i].Packages)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -680,9 +889,10 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			allowed := make([]bool, len(spec.Filters))
 			for i := range spec.Filters {
-				allowed[i] = packageAllowed(spec.Filters[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Filters[i].Packages)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -734,13 +944,20 @@ func CtorTypesFor(tech string) map[string]string {
 }
 
 func loadDecl(tech string) *parser.AdapterDecl {
-	src := string(datadir.MustRead("adapters/" + tech + ".vyql"))
-	if extra, err := datadir.Read("adapters/packages/" + tech + ".vyql"); err == nil {
-		src += "\n" + string(extra)
+	key := adapterDeclCacheKey{tech: tech}
+	if cached, ok := adapterDeclCache.Load(key); ok {
+		return cached.(*parser.AdapterDecl)
 	}
-	decls, err := parser.Parse(src)
+	sources, err := datadir.ReadVYQL("adapters/" + tech + ".vyql")
 	if err != nil {
-		panic("frontend: invalid adapters/" + tech + ".vyql: " + err.Error())
+		panic("frontend: read adapters/" + tech + ".vyql: " + err.Error())
+	}
+	if extra, err := datadir.ReadVYQL("adapters/packages/" + tech + ".vyql"); err == nil {
+		sources = append(sources, extra...)
+	}
+	decls, err := parseV2RuntimeAdapterSources(sources)
+	if err != nil {
+		panic("frontend: invalid adapter corpus for " + tech + ": " + err.Error())
 	}
 	var merged *parser.AdapterDecl
 	for _, d := range decls {
@@ -758,9 +975,56 @@ func loadDecl(tech string) *parser.AdapterDecl {
 		merged.Mappings = append(merged.Mappings, a.Mappings...)
 	}
 	if merged != nil {
-		return merged
+		actual, _ := adapterDeclCache.LoadOrStore(key, merged)
+		return actual.(*parser.AdapterDecl)
 	}
 	panic("frontend: no adapter declaration in adapters/" + tech + ".vyql")
+}
+
+type adapterDeclCacheKey struct {
+	tech string
+}
+
+func v2RuntimeSourcesForAdapter(sources []datadir.Source) []parser.V2RuntimeSource {
+	out := make([]parser.V2RuntimeSource, 0, len(sources)+32)
+	hasOntology, hasMechanics := false, false
+	for _, source := range sources {
+		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
+		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+	}
+	if !hasOntology {
+		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	if !hasMechanics {
+		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+			for _, file := range files {
+				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			}
+		}
+	}
+	for _, source := range sources {
+		out = append(out, parser.V2RuntimeSource{Name: source.Name, Source: string(source.Data)})
+	}
+	return out
+}
+
+func parseV2RuntimeAdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
+	selected := make(map[string]bool, len(sources))
+	for _, source := range sources {
+		selected[source.Name] = true
+	}
+	return parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForAdapter(sources), func(src parser.V2RuntimeSource) bool {
+		return selected[src.Name]
+	})
 }
 
 func loadSpec(tech string) adapterSpec {
@@ -829,32 +1093,28 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "flag":
 			if mp.Flag != nil {
 				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages}
 				for _, pred := range mp.Flag.Predicates {
-					fs.Predicates = append(fs.Predicates, flagPredicate{
-						Subject: pred.Subject, Property: pred.Property, Op: pred.Op, Values: pred.Values, Exact: pred.Exact, Negative: pred.Negative,
-					})
+					fs.Predicates = append(fs.Predicates, newFlagPredicate(pred.Subject, pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
 				}
 				for _, operand := range mp.Flag.Operands {
 					var os flagOperandSpec
 					for _, pred := range operand.Predicates {
-						os.Predicates = append(os.Predicates, flagPredicate{
-							Subject: pred.Subject, Property: pred.Property, Op: pred.Op, Values: pred.Values, Exact: pred.Exact, Negative: pred.Negative,
-						})
+						os.Predicates = append(os.Predicates, newFlagPredicate(pred.Subject, pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
 					}
 					fs.Operands = append(fs.Operands, os)
 				}
@@ -876,6 +1136,23 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 	return s
 }
 
+func adapterMappingDetail(mp parser.AdapterMapping) map[string]string {
+	if !mp.Advisory && mp.About == "" && mp.Coverage == "" {
+		return nil
+	}
+	out := map[string]string{}
+	if mp.Advisory {
+		out["advisory"] = "true"
+	}
+	if mp.About != "" {
+		out["about"] = mp.About
+	}
+	if mp.Coverage != "" {
+		out["coverage"] = mp.Coverage
+	}
+	return out
+}
+
 // inputAdapter labels source reads. Prefix matching is `resolved`; `contains`
 // matching (Go's varying receivers) is `syntactic` → lower confidence.
 func (spec adapterSpec) inputAdapter() adapters.Adapter {
@@ -888,6 +1165,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 		Fidelity: fidelity, Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
 				return spec.Inputs[i].Methods, spec.Inputs[i].Paths, spec.Inputs[i].Match == "contains"
 			})
@@ -895,7 +1173,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			// resolve it once per spec instead of re-running the costly evidence match per node.
 			allowed := make([]bool, len(spec.Inputs))
 			for i := range spec.Inputs {
-				allowed[i] = packageAllowed(spec.Inputs[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Inputs[i].Packages)
 			}
 			var out []adapters.Mapping
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
@@ -964,6 +1242,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			binops, _ := s.NodesOfType("code.BinOp")
 			ids = append(ids, binops...)
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			sinkIdx := buildSpecIndex(len(spec.Sinks), func(i int) (methods, paths []string, loose bool) {
 				if spec.Sinks[i].ByMethod {
 					return []string{spec.Sinks[i].Pattern}, nil, false
@@ -972,7 +1251,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Sinks))
 			for i := range spec.Sinks {
-				allowed[i] = packageAllowed(spec.Sinks[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Sinks[i].Packages)
 			}
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
@@ -1012,7 +1291,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					// Keyed by (concept,
 					// ARG INDEX): the same concept can be injectable at MULTIPLE arg
 					// positions of one call, so those must not collapse together.
-					bkey := sk.Concept + "\x00" + strconv.Itoa(sk.ArgIndex)
+					bkey := sinkBestKey(sk)
 					if curIdx, ok := bestByConcept[bkey]; !ok {
 						bestByConcept[bkey] = i
 					} else if cur := spec.Sinks[curIdx]; len(sk.Pattern) > len(cur.Pattern) ||
@@ -1022,7 +1301,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				}
 				for _, i := range cand {
 					sk := spec.Sinks[i]
-					best, ok := bestByConcept[sk.Concept+"\x00"+strconv.Itoa(sk.ArgIndex)]
+					best, ok := bestByConcept[sinkBestKey(sk)]
 					if !ok || best != i {
 						continue
 					}
@@ -1045,6 +1324,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					// receiver-sink: the tainted data is the receiver; the call node
 					// carries that taint, so label the node itself rather than an arg.
 					if sk.Receiver {
+						if sk.Constraint != "" && recvType != "" && !constraintAllows(sk.Constraint, recvType) {
+							continue
+						}
 						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
@@ -1071,12 +1353,23 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 								break
 							}
 							target := arg
+							foundCollectionTarget := false
 							if sk.CollectionFirst {
 								if first := collectionElement(s, &collectionIdx, arg, sk.CollectionIndex); first != "" {
 									target = first
+									foundCollectionTarget = true
 								}
 							}
-							if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
+							if a, ok, _ := s.GetNode(arg); ok {
+								vkind := a.Prop("vkind")
+								if sk.Collection && !foundCollectionTarget && vkind != "Seq" &&
+									(!collectionArgKindAllowsFlow(vkind) || !collectionArgument(s, &collectionIdx, arg)) {
+									continue
+								}
+								if !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
+									continue
+								}
+							} else if sk.Collection {
 								continue
 							}
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
@@ -1089,12 +1382,23 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					target := arg
+					foundCollectionTarget := false
 					if sk.CollectionFirst {
 						if first := collectionElement(s, &collectionIdx, arg, sk.CollectionIndex); first != "" {
 							target = first
+							foundCollectionTarget = true
 						}
 					}
-					if a, ok, _ := s.GetNode(arg); ok && !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
+					if a, ok, _ := s.GetNode(arg); ok {
+						vkind := a.Prop("vkind")
+						if sk.Collection && !foundCollectionTarget && vkind != "Seq" &&
+							(!collectionArgKindAllowsFlow(vkind) || !collectionArgument(s, &collectionIdx, arg)) {
+							continue
+						}
+						if !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
+							continue
+						}
+					} else if sk.Collection {
 						continue
 					}
 					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
@@ -1106,6 +1410,14 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 	}
 }
 
+func sinkBestKey(sk sinkSpec) string {
+	return sk.Concept + "\x00" +
+		strconv.Itoa(sk.ArgIndex) + "\x00" +
+		strconv.FormatBool(sk.Collection) + "\x00" +
+		strconv.FormatBool(sk.CollectionFirst) + "\x00" +
+		strconv.Itoa(sk.CollectionIndex)
+}
+
 // controlAdapter labels control concepts (transforms/validators) on the calls that
 // apply them, so `unless sanitized_by` can suppress a sanitized flow (docs/07).
 func (spec adapterSpec) controlAdapter() adapters.Adapter {
@@ -1115,6 +1427,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			ctrlIdx := buildSpecIndex(len(spec.Controls), func(i int) (methods, paths []string, loose bool) {
 				if spec.Controls[i].ByMethod {
 					return []string{spec.Controls[i].Pattern}, nil, false
@@ -1123,7 +1436,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Controls))
 			for i := range spec.Controls {
-				allowed[i] = packageAllowed(spec.Controls[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Controls[i].Packages)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -1151,7 +1464,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 						if len(c.Packages) > 0 {
 							spec = 3 // package-specific control supersedes native/general
 						}
-						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Specificity: spec})
+						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Specificity: spec, Detail: c.Detail})
 					}
 				}
 			}
@@ -1297,15 +1610,41 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 }
 
 func packageAllowed(want []string, have map[string]bool) bool {
+	return newPackageGate(have).allowed(want)
+}
+
+type packageGate struct {
+	have  map[string]bool
+	cache map[string]bool
+}
+
+func newPackageGate(have map[string]bool) *packageGate {
+	return &packageGate{have: have, cache: map[string]bool{}}
+}
+
+func (g *packageGate) allowed(want []string) bool {
 	if len(want) == 0 {
 		return true
 	}
 	for _, w := range want {
-		if packageInEvidence(w, have) {
+		if g.inEvidence(w) {
 			return true
 		}
 	}
 	return false
+}
+
+func (g *packageGate) inEvidence(want string) bool {
+	want = sca.NormalizePackageName(want)
+	if want == "" {
+		return true
+	}
+	if hit, ok := g.cache[want]; ok {
+		return hit
+	}
+	hit := packageInEvidence(want, g.have)
+	g.cache[want] = hit
+	return hit
 }
 
 func packageInEvidence(want string, have map[string]bool) bool {
@@ -1335,10 +1674,11 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			fileTech := fileContextTechs(s)
 			allowed := make([]bool, len(spec.Flags))
 			for i := range spec.Flags {
-				allowed[i] = packageAllowed(spec.Flags[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Flags[i].Packages)
 			}
 			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
 				if spec.Flags[i].Scope != "" {
@@ -1358,7 +1698,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 				return methods, paths, len(methods) == 0 && len(paths) == 0
 			})
 			var out []adapters.Mapping
-			var flowIdx flowTokenIndex
+			var matchIdx flagMatchIndex
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Name"}
 			if spec.crossLang {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
@@ -1381,7 +1721,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						if !flagNodeKindAllows(fl, n) {
 							continue
 						}
-						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang, fileTech) {
+						if !flagMatchesNode(s, &matchIdx, fl, n, spec.Technology, spec.crossLang, fileTech) {
 							continue
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
@@ -1442,7 +1782,7 @@ func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
 	}
 }
 
-func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+func flagMatchesNode(s usg.Store, idx *flagMatchIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
 	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+strings.ToLower(fl.Scope)+".context" {
 		return false
 	}
@@ -1454,7 +1794,7 @@ func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, 
 	if len(fl.Operands) == 0 {
 		return true
 	}
-	operands := flagOperandCandidates(s, idx, n)
+	operands := flagOperandCandidates(s, &idx.flow, n)
 	used := make([]bool, len(operands))
 	var matchOperand func(int) bool
 	matchOperand = func(i int) bool {
@@ -1543,16 +1883,16 @@ func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
 	return true
 }
 
-func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+func flagPredicateMatches(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
 	if pred.Subject == "flow_to" {
-		hit := flagFlowToNodeHit(s, idx, pred, n, tech, crossLang, fileTech)
+		hit := flagFlowToNodeHit(s, &idx.flow, pred, n, tech, crossLang, fileTech)
 		if pred.Negative {
 			return !hit
 		}
 		return hit
 	}
 	if pred.Subject == "scope_call" {
-		hit := flagScopeNodeHit(s, pred, n, []string{"code.Call"}, tech, crossLang)
+		hit := flagScopeNodeHit(s, idx, pred, n, []string{"code.Call"}, tech, crossLang)
 		if pred.Negative {
 			return !hit
 		}
@@ -1561,7 +1901,7 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 	if n.Prop("callee_path") == "analysis.function.context" ||
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
-		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang); ok {
+		if ok, hit := flagContextPredicateMatchesAST(s, idx, pred, n, tech, crossLang); ok {
 			if !flagPredicateUsesCallArg(pred) {
 				probe := pred
 				probe.Negative = false
@@ -1632,7 +1972,7 @@ func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n u
 	return false
 }
 
-func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {
+func flagContextPredicateMatchesAST(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {
 	if pred.Property != "tokens" || len(pred.Values) == 0 {
 		return false, false
 	}
@@ -1641,18 +1981,18 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 	for _, v := range pred.Values {
 		switch {
 		case strings.HasPrefix(v, "call_arg:"):
-			return true, flagScopeCallArgHit(s, pred, n, tech, crossLang)
+			return true, flagScopeCallArgHit(s, idx, pred, n, tech, crossLang)
 		case strings.HasPrefix(v, "call_path:"):
-			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call_path:"), Exact: pred.Exact}
+			probe = newFlagPredicate("", "path", pred.Op, trimFlagValuePrefix(pred.Values, "call_path:"), pred.Exact, false)
 			nodeTypes = []string{"code.Call"}
 		case strings.HasPrefix(v, "call:"):
-			probe = flagPredicate{Property: "method", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call:"), Exact: pred.Exact}
+			probe = newFlagPredicate("", "method", pred.Op, trimFlagValuePrefix(pred.Values, "call:"), pred.Exact, false)
 			nodeTypes = []string{"code.Call"}
 		case strings.HasPrefix(v, "literal:"):
-			probe = flagPredicate{Property: "tokens", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "literal:"), Exact: pred.Exact}
+			probe = newFlagPredicate("", "tokens", pred.Op, trimFlagValuePrefix(pred.Values, "literal:"), pred.Exact, false)
 			nodeTypes = []string{"code.Const"}
 		case strings.HasPrefix(v, "identifier:"):
-			probe = flagPredicate{Property: "identifier", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "identifier:"), Exact: pred.Exact}
+			probe = newFlagPredicate("", "identifier", pred.Op, trimFlagValuePrefix(pred.Values, "identifier:"), pred.Exact, false)
 			nodeTypes = []string{"code.Name", "code.Param"}
 		case strings.HasPrefix(v, "selector:"), strings.HasPrefix(v, "attr_path:"):
 			prefix := "selector:"
@@ -1663,62 +2003,45 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 			if pred.Op == "contains_any" {
 				prop = "any"
 			}
-			probe = flagPredicate{Property: prop, Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, prefix), Exact: pred.Exact}
+			probe = newFlagPredicate("", prop, pred.Op, trimFlagValuePrefix(pred.Values, prefix), pred.Exact, false)
 			nodeTypes = []string{"code.Attr"}
 		case strings.HasPrefix(v, "index:"), strings.HasPrefix(v, "subscript:"):
 			prefix := "index:"
 			if strings.HasPrefix(v, "subscript:") {
 				prefix = "subscript:"
 			}
-			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
+			return true, flagScopeSubscriptHit(s, idx, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
 		case strings.HasPrefix(v, "binary:"), strings.HasPrefix(v, "expr:"):
 			prefix := "binary:"
 			if strings.HasPrefix(v, "expr:") {
 				prefix = "expr:"
 			}
-			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
+			return true, flagScopeBinopHit(s, idx, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
 		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
 			return false, false
 		default:
 			return false, false
 		}
 	}
-	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
+	return true, flagScopeNodeHit(s, idx, probe, n, nodeTypes, tech, crossLang)
 }
 
-func flagScopeBinopHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.BinOp")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
-		if binopPredicateMatches(s, pred.Op, values, cand) {
+func flagScopeBinopHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
+	return idx.scopedHit(s, "binop", pred, values, []string{"code.BinOp"}, n, tech, crossLang, true, func(cand usg.Node) bool {
+		if binopPredicateMatches(s, idx, pred.Op, values, cand) {
 			return true
 		}
-	}
-	return false
+		return false
+	})
 }
 
-func binopPredicateMatches(s usg.Store, op string, values []string, n usg.Node) bool {
+func binopPredicateMatches(s usg.Store, idx *flagMatchIndex, op string, values []string, n usg.Node) bool {
 	if len(values) == 0 {
 		return false
 	}
 	all := op != "contains_any" && op != "any"
 	for _, value := range values {
-		hit := binopValueMatches(s, value, n)
+		hit := binopValueMatches(s, idx, value, n)
 		if all && !hit {
 			return false
 		}
@@ -1729,7 +2052,7 @@ func binopPredicateMatches(s usg.Store, op string, values []string, n usg.Node) 
 	return all
 }
 
-func binopValueMatches(s usg.Store, value string, n usg.Node) bool {
+func binopValueMatches(s usg.Store, idx *flagMatchIndex, value string, n usg.Node) bool {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return false
@@ -1744,7 +2067,7 @@ func binopValueMatches(s usg.Store, value string, n usg.Node) bool {
 	if n.Prop("op") != op {
 		return false
 	}
-	operands := flagOperandCandidates(s, &flowTokenIndex{}, n)
+	operands := flagOperandCandidates(s, &idx.flow, n)
 	if len(operands) < 2 {
 		return false
 	}
@@ -1811,30 +2134,13 @@ func normalizeFlagExprFragment(s string) string {
 	return repl.Replace(s)
 }
 
-func flagScopeSubscriptHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.Subscript")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
+func flagScopeSubscriptHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
+	return idx.scopedHit(s, "subscript", pred, values, []string{"code.Subscript"}, n, tech, crossLang, true, func(cand usg.Node) bool {
 		if subscriptPredicateMatches(pred.Op, values, cand) {
 			return true
 		}
-	}
-	return false
+		return false
+	})
 }
 
 func subscriptPredicateMatches(op string, values []string, n usg.Node) bool {
@@ -1879,37 +2185,26 @@ func subscriptKeyMatches(n usg.Node, key string) bool {
 	return false
 }
 
-func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.Call")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
-		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokensScoped(s, cand, tech, crossLang)) {
+func flagScopeCallArgHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
+	return idx.scopedHit(s, "call_arg", pred, nil, []string{"code.Call"}, n, tech, crossLang, true, func(cand usg.Node) bool {
+		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokensScoped(s, idx, cand, tech, crossLang)) {
 			return true
 		}
-	}
-	return false
+		return false
+	})
 }
 
-func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang bool) string {
+func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, tech string, crossLang bool) string {
+	idx.ensure(s)
+	cacheKey := strings.Join([]string{n.ID, tech, strconv.FormatBool(crossLang)}, "\x1f")
+	if cached, ok := idx.callArgText[cacheKey]; ok {
+		return cached
+	}
 	tokens := callArgContextTokens(n)
 	path := n.Prop("callee_path")
 	method := n.Prop("method")
 	if path == "" && method == "" {
+		idx.callArgText[cacheKey] = tokens
 		return tokens
 	}
 	var out []string
@@ -1946,25 +2241,32 @@ func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang 
 		add(node.Prop("path"))
 		add(node.ID)
 	}
-	argIDs, _ := s.NodesOfType("code.Arg")
-	for _, argID := range argIDs {
-		arg, ok, err := s.GetNode(argID)
-		if err != nil || !ok || !scopedCallArgCandidate(arg, n, tech, crossLang) || !nodeFlowsTo(s, arg.ID, n.ID) {
+	for _, argID := range idx.flow.rev[n.ID] {
+		arg, ok := idx.node(s, argID)
+		if !ok || arg.Type != "code.Arg" || !scopedCallArgCandidate(arg, n, tech, crossLang) {
 			continue
 		}
 		addNode(arg)
-		for _, nodeType := range []string{"code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq", "code.Call"} {
-			ids, _ := s.NodesOfType(nodeType)
-			for _, srcID := range ids {
-				src, ok, err := s.GetNode(srcID)
-				if err != nil || !ok || !scopedCallArgCandidate(src, n, tech, crossLang) || !nodeFlowsTo(s, src.ID, arg.ID) {
-					continue
-				}
-				addNode(src)
+		for _, srcID := range idx.flow.rev[arg.ID] {
+			src, ok := idx.node(s, srcID)
+			if !ok || !callArgSourceNodeType(src.Type) || !scopedCallArgCandidate(src, n, tech, crossLang) {
+				continue
 			}
+			addNode(src)
 		}
 	}
-	return strings.Join(out, "\x00")
+	result := strings.Join(out, "\x00")
+	idx.callArgText[cacheKey] = result
+	return result
+}
+
+func callArgSourceNodeType(typ string) bool {
+	switch typ {
+	case "code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq", "code.Call":
+		return true
+	default:
+		return false
+	}
 }
 
 func scopedCallArgCandidate(cand, anchor usg.Node, tech string, crossLang bool) bool {
@@ -1980,16 +2282,6 @@ func scopedCallArgCandidate(cand, anchor usg.Node, tech string, crossLang bool) 
 		return false
 	}
 	return true
-}
-
-func nodeFlowsTo(s usg.Store, srcID, dstID string) bool {
-	edges, _ := s.OutEdges(srcID, "FLOWS")
-	for _, e := range edges {
-		if e.Dst == dstID {
-			return true
-		}
-	}
-	return false
 }
 
 func callArgContextTokens(n usg.Node) string {
@@ -2034,37 +2326,27 @@ func normalizeSubscriptFlagValues(values []string) []string {
 	return out
 }
 
-func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool) bool {
+func flagScopeNodeHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool) bool {
 	probe := pred
 	probe.Negative = false
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	for _, nodeType := range nodeTypes {
-		ids, _ := s.NodesOfType(nodeType)
-		for _, id := range ids {
-			cand, ok, err := s.GetNode(id)
-			if err != nil || !ok || cand.ID == n.ID {
-				continue
-			}
-			candScope := nodeLexicalScope(cand)
-			if scope != "" {
-				if candScope != "" {
-					if !sameOrNestedScope(candScope, scope) {
-						continue
-					}
-				} else if !unscopedNodeBelongsToScopedContext(cand, n) {
-					continue
-				}
-			}
-			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-				continue
-			}
-			if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-				continue
-			}
-			if flagPredicateMatchesNodeOnly(probe, cand) {
-				return true
-			}
+	if idx.scopedHit(s, "node", probe, nil, nodeTypes, n, tech, crossLang, false, func(cand usg.Node) bool {
+		return flagPredicateMatchesNodeOnly(probe, cand)
+	}) {
+		return true
+	}
+	if nodeLexicalScope(n) == "" || !containsStr(nodeTypes, "code.Param") {
+		return false
+	}
+	file, line := splitLocFileLine(n.Prop("loc"))
+	for _, cand := range idx.paramsByLine[file][line] {
+		if cand.ID == n.ID || nodeLexicalScope(cand) != "" {
+			continue
+		}
+		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+			continue
+		}
+		if flagPredicateMatchesNodeOnly(probe, cand) {
+			return true
 		}
 	}
 	return false
@@ -2130,43 +2412,51 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 	case "method":
 		return containsStr(pred.Values, n.Prop("method"))
 	case "op":
-		return valuePredicate(pred.Op, pred.Values, n.Prop("op"))
+		return flagValuePredicate(pred, n.Prop("op"))
 	case "tokens":
 		if flagPredicateUsesCallArg(pred) {
-			return contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokens(n))
+			return flagContextTokenValuePredicate(pred, callArgContextTokens(n))
 		}
-		return contextTokenValuePredicate(pred.Op, pred.Values, n.Prop("str_args"))
+		return flagContextTokenValuePredicate(pred, n.Prop("str_args"))
 	case "identifier":
 		if n.Type != "code.Name" && n.Type != "code.Param" {
 			return false
 		}
-		return valuePredicate(pred.Op, pred.Values, n.Prop("callee_path")+"\x00"+n.Prop("method")+"\x00"+n.Prop("name")+"\x00"+n.ID)
+		return flagValuePredicate(pred, n.Prop("callee_path")+"\x00"+n.Prop("method")+"\x00"+n.Prop("name")+"\x00"+n.ID)
 	case "key":
-		return valuePredicate(pred.Op, pred.Values, n.Prop("str_args")+"\x00"+n.Prop("callee_path"))
+		return flagValuePredicate(pred, n.Prop("str_args")+"\x00"+n.Prop("callee_path"))
 	case "call":
 		if n.Type != "code.Call" {
 			return false
 		}
-		return valuePredicate(pred.Op, pred.Values, nodeSearchText(n))
+		return flagValuePredicate(pred, nodeSearchText(n))
 	case "any":
-		return valuePredicate(pred.Op, pred.Values, nodeSearchText(n))
+		return flagValuePredicate(pred, nodeSearchText(n))
 	default:
-		return valuePredicate(pred.Op, pred.Values, n.Prop(pred.Property))
+		return flagValuePredicate(pred, n.Prop(pred.Property))
 	}
 }
 
 func contextTokenValuePredicate(op string, values []string, text string) bool {
+	return contextTokenValuePredicateLowerValues(op, values, lowerStrings(values), text)
+}
+
+func flagContextTokenValuePredicate(pred flagPredicate, text string) bool {
+	return contextTokenValuePredicateLowerValues(pred.Op, pred.Values, pred.lowerValues(), text)
+}
+
+func contextTokenValuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
 	if op == "equals" || op == "equals_any" {
 		if contextTokenEqualsPredicate(op, values, text) {
 			return true
 		}
 	}
 	if op == "contains" || op == "" || op == "contains_any" {
-		if contextTokenContainsPredicate(op, values, text) {
+		if contextTokenContainsPredicateLowerValues(op, values, valuesLower, text) {
 			return true
 		}
 	}
-	return valuePredicate(op, values, text)
+	return valuePredicateLowerValues(op, values, valuesLower, text)
 }
 
 func contextTokenEqualsPredicate(op string, values []string, text string) bool {
@@ -2174,12 +2464,24 @@ func contextTokenEqualsPredicate(op string, values []string, text string) bool {
 		return false
 	}
 	all := op != "equals_any"
+	if len(values) == 1 {
+		prefix, want, ok := splitContextTokenPredicateValue(values[0])
+		if !ok {
+			return false
+		}
+		hit := contextTokenValueMatch(text, prefix, func(got string) bool { return got == want })
+		if all {
+			return hit
+		}
+		return hit
+	}
+	tokens := contextTokensByPrefix(text)
 	for _, v := range values {
 		prefix, want, ok := splitContextTokenPredicateValue(v)
 		hit := false
 		if ok {
-			for _, tok := range strings.Split(text, "\x00") {
-				if strings.HasPrefix(tok, prefix) && strings.TrimPrefix(tok, prefix) == want {
+			for _, got := range tokens[prefix] {
+				if got == want {
 					hit = true
 					break
 				}
@@ -2196,16 +2498,46 @@ func contextTokenEqualsPredicate(op string, values []string, text string) bool {
 }
 
 func contextTokenContainsPredicate(op string, values []string, text string) bool {
+	return contextTokenContainsPredicateLowerValues(op, values, lowerStrings(values), text)
+}
+
+func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []string, text string) bool {
 	if len(values) == 0 {
 		return false
 	}
 	all := op != "contains_any"
-	for _, v := range values {
+	if len(values) == 1 {
+		prefix, want, ok := splitContextTokenPredicateValue(values[0])
+		if !ok {
+			return false
+		}
+		wantLower := strings.ToLower(want)
+		if len(valuesLower) == 1 {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+				wantLower = lowerWant
+			}
+		}
+		hit := contextTokenValueMatch(text, prefix, func(got string) bool {
+			return contextTokenContainsLower(prefix, got, want, wantLower)
+		})
+		if all {
+			return hit
+		}
+		return hit
+	}
+	tokens := contextTokensByPrefix(text)
+	for i, v := range values {
 		prefix, want, ok := splitContextTokenPredicateValue(v)
 		hit := false
 		if ok {
-			for _, tok := range strings.Split(text, "\x00") {
-				if strings.HasPrefix(tok, prefix) && valContains(strings.TrimPrefix(tok, prefix), want) {
+			wantLower := strings.ToLower(want)
+			if i < len(valuesLower) {
+				if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+					wantLower = lowerWant
+				}
+			}
+			for _, got := range tokens[prefix] {
+				if contextTokenContainsLower(prefix, got, want, wantLower) {
 					hit = true
 					break
 				}
@@ -2221,6 +2553,87 @@ func contextTokenContainsPredicate(op string, values []string, text string) bool
 	return all
 }
 
+func contextTokenValueMatch(text, prefix string, match func(string) bool) bool {
+	for start := 0; start <= len(text); {
+		end := strings.IndexByte(text[start:], '\x00')
+		var tok string
+		if end < 0 {
+			tok = text[start:]
+			start = len(text) + 1
+		} else {
+			tok = text[start : start+end]
+			start += end + 1
+		}
+		if strings.HasPrefix(tok, prefix) && match(tok[len(prefix):]) {
+			return true
+		}
+	}
+	return false
+}
+
+func contextTokensByPrefix(text string) map[string][]string {
+	out := map[string][]string{}
+	for start := 0; start <= len(text); {
+		end := strings.IndexByte(text[start:], '\x00')
+		var tok string
+		if end < 0 {
+			tok = text[start:]
+			start = len(text) + 1
+		} else {
+			tok = text[start : start+end]
+			start += end + 1
+		}
+		if tok == "" {
+			continue
+		}
+		prefix, value, ok := splitContextTokenPredicateValue(tok)
+		if !ok {
+			continue
+		}
+		out[prefix] = append(out[prefix], value)
+	}
+	return out
+}
+
+func contextTokenContains(prefix, got, want string) bool {
+	return contextTokenContainsLower(prefix, got, want, strings.ToLower(want))
+}
+
+func contextTokenContainsLower(prefix, got, want, wantLower string) bool {
+	if prefix == "class_base:" {
+		return classBaseTokenMatches(got, want)
+	}
+	return valContainsLowerNeedle(strings.ToLower(got), wantLower)
+}
+
+func classBaseTokenMatches(got, want string) bool {
+	got = strings.TrimSpace(got)
+	want = strings.TrimSpace(want)
+	if got == "" || want == "" {
+		return false
+	}
+	if strings.EqualFold(got, want) {
+		return true
+	}
+	gotSeg := lastTypeSegment(got)
+	wantSeg := lastTypeSegment(want)
+	return gotSeg != "" && wantSeg != "" && strings.EqualFold(gotSeg, wantSeg)
+}
+
+func lastTypeSegment(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if i := strings.LastIndex(s, "::"); i >= 0 {
+		return s[i+2:]
+	}
+	if i := strings.LastIndex(s, "."); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
 func splitContextTokenPredicateValue(v string) (prefix, want string, ok bool) {
 	for _, sep := range []string{":", "="} {
 		if i := strings.Index(v, sep); i > 0 {
@@ -2231,6 +2644,14 @@ func splitContextTokenPredicateValue(v string) (prefix, want string, ok bool) {
 }
 
 func valuePredicate(op string, values []string, text string) bool {
+	return valuePredicateLowerValues(op, values, lowerStrings(values), text)
+}
+
+func flagValuePredicate(pred flagPredicate, text string) bool {
+	return valuePredicateLowerValues(pred.Op, pred.Values, pred.lowerValues(), text)
+}
+
+func valuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
 	switch op {
 	case "equals":
 		for _, v := range values {
@@ -2242,24 +2663,20 @@ func valuePredicate(op string, values []string, text string) bool {
 	case "equals_any":
 		return containsStr(values, text)
 	case "contains_any":
-		for _, v := range values {
-			if valContains(text, v) {
+		lowerText := strings.ToLower(text)
+		for _, v := range valuesLower {
+			if valContainsLowerNeedle(lowerText, v) {
 				return true
 			}
 		}
 		return false
 	default:
-		for _, v := range values {
-			if !valContains(text, v) {
-				return false
-			}
-		}
-		return true
+		return valCondsLowerNeedles(strings.ToLower(text), valuesLower, nil)
 	}
 }
 
 func nodeSearchText(n usg.Node) string {
-	return strings.Join([]string{n.Type, n.Prop("callee_path"), n.Prop("method"), n.Prop("op"), n.Prop("str_args")}, "\x00")
+	return n.Type + "\x00" + n.Prop("callee_path") + "\x00" + n.Prop("method") + "\x00" + n.Prop("op") + "\x00" + n.Prop("str_args")
 }
 
 func locFile(loc string) string {
@@ -2291,6 +2708,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
 			pkgs := packageEvidence(s, spec.Technology, crossLang)
+			pkgGate := newPackageGate(pkgs)
 			markIdx := buildSpecIndex(len(spec.Marks), func(i int) (methods, paths []string, loose bool) {
 				if spec.Marks[i].ByMethod {
 					return []string{spec.Marks[i].Pattern}, nil, false
@@ -2299,7 +2717,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Marks))
 			for i := range spec.Marks {
-				allowed[i] = packageAllowed(spec.Marks[i].Packages, pkgs)
+				allowed[i] = pkgGate.allowed(spec.Marks[i].Packages)
 			}
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"}
 			if crossLang {
@@ -2332,6 +2750,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 							continue
 						}
 						detail, conf := reviewDetail(m.Concept, m.Pattern)
+						detail = mergeMappingDetail(detail, m.Detail)
 						spec := 0
 						if len(m.Packages) > 0 {
 							spec = 3 // package-specific mark supersedes native/general
@@ -2344,6 +2763,20 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			return out
 		},
 	}
+}
+
+func mergeMappingDetail(base, extra map[string]string) map[string]string {
+	if len(extra) == 0 {
+		return base
+	}
+	out := make(map[string]string, len(base)+len(extra))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
 }
 
 // --- adapter spec indexing -------------------------------------------------
@@ -2493,32 +2926,93 @@ func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern"
 // AutoAdapters returns adapter declarations that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
 func AutoAdapters() []adapters.Adapter {
-	files, err := filepath.Glob(filepath.Join(datadir.Root(), "adapters", "*.vyql"))
-	if err != nil {
-		panic("frontend: glob adapters/*.vyql: " + err.Error())
+	const key = "v2"
+	if cached, ok := autoAdaptersCache.Load(key); ok {
+		res := cached.(cachedAutoAdapters)
+		if res.err != nil {
+			panic(res.err.Error())
+		}
+		return res.data
 	}
-	sort.Strings(files)
+	data, err := loadAutoAdapters()
+	res := cachedAutoAdapters{data: data, err: err}
+	actual, _ := autoAdaptersCache.LoadOrStore(key, res)
+	actualRes := actual.(cachedAutoAdapters)
+	if actualRes.err != nil {
+		panic(actualRes.err.Error())
+	}
+	return actualRes.data
+}
+
+func loadAutoAdapters() ([]adapters.Adapter, error) {
+	sources, err := autoAdapterSources()
+	if err != nil {
+		return nil, fmt.Errorf("frontend: read auto adapters: %w", err)
+	}
+	byName := map[string]*parser.AdapterDecl{}
+	var order []string
+	decls, err := parseV2RuntimeAdapterSources(sources)
+	if err != nil {
+		return nil, fmt.Errorf("frontend: parse auto adapter corpus: %w", err)
+	}
+	for _, d := range decls {
+		ad, ok := d.(*parser.AdapterDecl)
+		if !ok {
+			continue
+		}
+		merged := byName[ad.Name]
+		if merged == nil {
+			merged = &parser.AdapterDecl{Name: ad.Name, Meta: map[string]any{}}
+			byName[ad.Name] = merged
+			order = append(order, ad.Name)
+		}
+		for k, v := range ad.Meta {
+			merged.Meta[k] = v
+		}
+		merged.Mappings = append(merged.Mappings, ad.Mappings...)
+	}
 	var out []adapters.Adapter
-	for _, file := range files {
-		raw, err := os.ReadFile(file)
-		if err != nil {
-			panic("frontend: read " + file + ": " + err.Error())
+	for _, name := range order {
+		ad := byName[name]
+		if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
+			out = append(out, adaptersFromSpec(specFromDecl(ad))...)
 		}
-		decls, err := parser.Parse(string(raw))
-		if err != nil {
-			panic("frontend: parse " + file + ": " + err.Error())
-		}
-		for _, d := range decls {
-			ad, ok := d.(*parser.AdapterDecl)
-			if !ok {
+	}
+	return out, nil
+}
+
+func autoAdapterSources() ([]datadir.Source, error) {
+	root := filepath.Join(datadir.Root(), "adapters")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	var out []datadir.Source
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() {
+			if name == "packages" {
 				continue
 			}
-			if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
-				out = append(out, adaptersFromSpec(specFromDecl(ad))...)
+			sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("adapters", name)))
+			if err != nil {
+				return nil, err
 			}
+			out = append(out, sources...)
+			continue
 		}
+		if !strings.HasSuffix(name, ".vyql") {
+			continue
+		}
+		rel := filepath.ToSlash(filepath.Join("adapters", name))
+		raw, err := datadir.Read(rel)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, datadir.Source{Name: rel, Data: raw})
 	}
-	return out
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
 }
 
 // paramSourceAdapter labels function/method parameter nodes with the spec's
@@ -2540,9 +3034,10 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 				return nil // no active source set -> parameters are not sources
 			}
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
+			pkgGate := newPackageGate(pkgs)
 			active := make([]paramSourceSpec, 0, len(sources))
 			for _, src := range sources {
-				if activeSources[src.Concept] && packageAllowed(src.Packages, pkgs) {
+				if activeSources[src.Concept] && pkgGate.allowed(src.Packages) {
 					active = append(active, src)
 				}
 			}
@@ -2707,6 +3202,53 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 						out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 						break
 					}
+				}
+			}
+			return out
+		},
+	}
+}
+
+func jsModuleHelperLdapEscapeAdapter() adapters.Adapter {
+	concept := "core." + "Ldap" + "Escape"
+	return adapters.Adapter{
+		Name: "javascript.module-helper-ldap-escape", Technology: "javascript", Specificity: 2,
+		Fidelity: "semantic", Origin: "deterministic",
+		Apply: func(s usg.Store) []adapters.Mapping {
+			moduleHelperFiles := map[string]bool{}
+			names, _ := s.NodesOfType("code.Name")
+			for _, id := range names {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				if n.Prop("callee_path") == "ldapEscape" && strings.Contains(n.ID, "__module#var#ldapEscape") {
+					if file := locFile(n.Prop("loc")); file != "" {
+						moduleHelperFiles[file] = true
+					}
+				}
+			}
+			if len(moduleHelperFiles) == 0 {
+				return nil
+			}
+			calls, _ := s.NodesOfType("code.Call")
+			var out []adapters.Mapping
+			for _, id := range calls {
+				n, ok, err := s.GetNode(id)
+				if err != nil || !ok {
+					continue
+				}
+				if t := nodeTechFromNode(n); t != "" && t != "javascript" && t != "typescript" && t != "tsx" {
+					continue
+				}
+				if n.Prop("method") != "ldapEscape" && n.Prop("callee_path") != "ldapEscape" {
+					continue
+				}
+				if moduleHelperFiles[locFile(n.Prop("loc"))] {
+					out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 				}
 			}
 			return out

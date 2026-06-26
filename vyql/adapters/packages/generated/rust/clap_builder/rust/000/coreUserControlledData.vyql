@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf01fc0cc;
+
+binding userControlledData0 {
+  requires {
+    dependency("clap_builder")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

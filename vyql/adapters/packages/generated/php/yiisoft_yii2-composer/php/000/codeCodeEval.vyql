@@ -1,0 +1,9 @@
+module bindings.php.migration.m140df4a2;
+
+binding codeEval0 {
+  requires {
+    dependency("yiisoft/yii2-composer")
+  }
+  query pattern callExpr where callee.method == "runCommands"
+  emit sink code.CodeEval at args[0]
+}

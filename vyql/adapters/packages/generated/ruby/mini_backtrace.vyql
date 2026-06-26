@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter ruby {
-  package "mini_backtrace" {
-    source method "MiniBacktrace::Unit.filter_backtrace_with_rails" -> core.UserControlledData
-  }
-}

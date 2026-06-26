@@ -1,0 +1,9 @@
+module bindings.python.migration.mee806b51;
+
+binding urlFetch1 {
+  requires {
+    dependency("pyquery")
+  }
+  query pattern callExpr where callee.method == "url_opener"
+  emit sink code.UrlFetch at args[0]
+}

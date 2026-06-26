@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5da00152;
+
+binding networkData4 {
+  requires {
+    dependency("ws2_32-sys")
+  }
+  query pattern callExpr where callee.method == "WSARecv"
+  emit source code.NetworkData at call.result
+}

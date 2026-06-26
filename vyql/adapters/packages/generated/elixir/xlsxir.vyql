@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter elixir {
-  package "xlsxir" {
-    sink method "extract" -> code.FilePathAccess
-  }
-}

@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-
-adapter go {
-  package "github.com/shurcooL/events" {
-    sink method "jsonDecodeFile" -> code.Deserialization
-    sink method "jsonEncodeFile" -> code.FilePathAccess
-  }
-}

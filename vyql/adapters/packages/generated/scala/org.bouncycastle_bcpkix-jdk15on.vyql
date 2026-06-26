@@ -1,8 +1,0 @@
-import code.{SecretValue}
-
-adapter scala {
-  package "org.bouncycastle:bcpkix-jdk15on" {
-    source method "getPassword" -> code.SecretValue
-    source method "getPasswordConversionScheme" -> code.SecretValue
-  }
-}

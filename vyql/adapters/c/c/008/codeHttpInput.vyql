@@ -1,0 +1,6 @@
+module bindings.c.migration.mce54b166;
+
+binding httpInput8 {
+  query pattern callExpr where callee.path ~= "http_request_get_query_string"
+  emit source code.HttpInput at call.result
+}

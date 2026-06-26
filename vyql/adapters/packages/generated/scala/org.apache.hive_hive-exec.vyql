@@ -1,9 +1,0 @@
-import code.{CommandExecution, Deserialization, SqlExecution}
-adapter scala {
-  package "org.apache.hive:hive-exec" {
-    sink method "run" -> code.CommandExecution
-    sink method "compile" -> code.SqlExecution
-    sink method "parse" -> code.Deserialization
-    sink method "execute" -> code.SqlExecution
-  }
-}

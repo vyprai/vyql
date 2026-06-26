@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding commandExecution91 {
+  query pattern callExpr where callee.path ~= "Open3.capture2"
+  emit sink code.CommandExecution at args[0]
+}

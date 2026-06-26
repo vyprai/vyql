@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m3bf4d6c1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("membrane_file_plugin")
+  }
+  query pattern callExpr where callee.method == "open!"
+  emit sink code.FilePathAccess at args[0]
+}

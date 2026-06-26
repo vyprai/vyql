@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding htmlRender470 {
+  query pattern callExpr where callee.path ~= "Response" and not args.any.literal contains "text/plain" and not args.any.literal contains "application/json"
+  emit sink code.HtmlRender at args[0]
+}

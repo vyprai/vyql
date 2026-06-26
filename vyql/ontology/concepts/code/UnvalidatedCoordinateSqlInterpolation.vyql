@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedCoordinateSqlInterpolation : issue {
+  cwe: [CWE_89, CWE_20]
+  review_assumption: "application callers can pass request-controlled coordinate strings into the geospatial query helper"
+  reviewCategory: sql
+  reviewCondition: "coordinate boundary values are interpolated into SQL range predicates without numeric coercion"
+  reviewConfidence: high
+  reviewEvidence: "SQL geospatial helper context {pattern} formats latitude or longitude boundary values into BETWEEN predicates before coercing them to numeric values"
+  vulnerableTo: [injection.SqlInjection, validation.ImproperInputValidation]
+}

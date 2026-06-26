@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsRemotingCallableSystemPropertiesLeak : issue {
+  cwe: [CWE_200, CWE_862]
+  review_assumption: "an attacker able to control an agent process can send the callable to the controller on affected Jenkins versions"
+  reviewCategory: secret
+  reviewCondition: "Jenkins remoting Callable exposes controller Java system properties without restricting execution to agents"
+  reviewConfidence: high
+  reviewEvidence: "remoting callable context {pattern} returns System.getProperties() while using raw Callable/checkRoles instead of MasterToSlaveCallable"
+  vulnerableTo: [secrets.SecretLeak, access_control.MissingAuthorization]
+}

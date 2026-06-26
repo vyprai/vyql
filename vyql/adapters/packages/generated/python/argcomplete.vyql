@@ -1,6 +1,0 @@
-import code.{CliArgument}
-adapter python {
-  package "argcomplete" {
-    source method "patch" -> code.CliArgument
-  }
-}

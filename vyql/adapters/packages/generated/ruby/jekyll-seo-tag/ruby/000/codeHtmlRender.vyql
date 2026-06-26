@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m796af5e8;
+
+binding htmlRender0 {
+  requires {
+    dependency("jekyll-seo-tag")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

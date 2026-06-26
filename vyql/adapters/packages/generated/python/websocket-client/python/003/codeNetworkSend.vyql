@@ -1,0 +1,9 @@
+module bindings.python.migration.mbc0437ed;
+
+binding networkSend3 {
+  requires {
+    dependency("websocket-client")
+  }
+  query pattern callExpr where callee.method == "send_bytes"
+  emit sink code.NetworkSend at args[0]
+}

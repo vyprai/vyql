@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md7f97319;
+
+binding htmlRender0 {
+  requires {
+    dependency("builder")
+  }
+  query pattern callExpr where callee.method == "tag!"
+  emit sink code.HtmlRender at args[0]
+}

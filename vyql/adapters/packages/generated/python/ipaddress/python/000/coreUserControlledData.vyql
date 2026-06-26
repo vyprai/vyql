@@ -1,0 +1,9 @@
+module bindings.python.migration.m4442f74b;
+
+binding userControlledData0 {
+  requires {
+    dependency("ipaddress")
+  }
+  query pattern callExpr where callee.method == "ip_network"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m3a9bc318;
+
+binding sqlExecution0 {
+  requires {
+    dependency("symfony/doctrine-bridge")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

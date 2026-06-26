@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding logOutput403 {
+  query pattern callExpr where callee.path ~= "logger.warn"
+  emit sink code.LogOutput at args.any
+}

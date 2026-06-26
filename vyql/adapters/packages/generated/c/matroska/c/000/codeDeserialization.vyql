@@ -1,0 +1,9 @@
+module bindings.c.migration.m647b8019;
+
+binding deserialization0 {
+  requires {
+    dependency("matroska")
+  }
+  query pattern callExpr where callee.method == "FileMatroska.ReadFrame"
+  emit sink code.Deserialization at args[0]
+}

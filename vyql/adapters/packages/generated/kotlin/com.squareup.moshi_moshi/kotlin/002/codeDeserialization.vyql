@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m83b89f7b;
+
+binding deserialization2 {
+  requires {
+    dependency("com.squareup.moshi:moshi")
+  }
+  query pattern callExpr where callee.method == "peek"
+  emit sink code.Deserialization at args[0]
+}

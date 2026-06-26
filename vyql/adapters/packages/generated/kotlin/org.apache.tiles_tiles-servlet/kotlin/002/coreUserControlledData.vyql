@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7983ff90;
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.tiles:tiles-servlet")
+  }
+  query pattern callExpr where callee.method == "getDefinitionName"
+  emit source core.UserControlledData at call.result
+}

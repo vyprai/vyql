@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb7e39a7c;
+
+binding networkData0 {
+  requires {
+    dependency("connectivity")
+  }
+  query pattern callExpr where callee.method == "checkConnectivity"
+  emit source code.NetworkData at call.result
+}

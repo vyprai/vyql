@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.assertj:assertj-core" {
-    sink method "parse" -> code.Deserialization
-  }
-}

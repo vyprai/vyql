@@ -1,0 +1,9 @@
+module bindings.python.migration.mf16a0cc3;
+
+binding cliArgument3 {
+  requires {
+    dependency("python-dotenv")
+  }
+  query pattern callExpr where callee.method == "cli"
+  emit source code.CliArgument at call.result
+}

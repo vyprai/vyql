@@ -1,0 +1,9 @@
+module bindings.rust.migration.m6731e3b7;
+
+binding deserialization1 {
+  requires {
+    dependency("version_check")
+  }
+  query pattern callExpr where callee.method == "Channel::parse"
+  emit sink code.Deserialization at args[0]
+}

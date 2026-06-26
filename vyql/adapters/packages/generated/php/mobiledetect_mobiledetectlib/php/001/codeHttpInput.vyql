@@ -1,0 +1,9 @@
+module bindings.php.migration.m4be3a9f8;
+
+binding httpInput1 {
+  requires {
+    dependency("mobiledetect/mobiledetectlib")
+  }
+  query pattern callExpr where callee.method == "setHttpHeaders"
+  emit source code.HttpInput at call.result
+}

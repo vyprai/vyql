@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m59c914f1;
+
+binding shellEscape1 {
+  requires {
+    dependency("escape")
+  }
+  query pattern callExpr where callee.method == "shell_single_word"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

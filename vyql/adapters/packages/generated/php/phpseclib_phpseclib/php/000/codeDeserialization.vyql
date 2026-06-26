@@ -1,0 +1,9 @@
+module bindings.php.migration.mbe247997;
+
+binding deserialization0 {
+  requires {
+    dependency("phpseclib/phpseclib")
+  }
+  query pattern callExpr where callee.method == "loadString"
+  emit sink code.Deserialization at args[0]
+}

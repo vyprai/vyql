@@ -1,9 +1,0 @@
-import code.{UrlFetch}
-import core.{InputValidation}
-
-adapter php {
-  package "anhskohbo/no-captcha" {
-    sink method "sendRequestVerify" -> code.UrlFetch
-    control method "verifyResponse" -> core.InputValidation
-  }
-}

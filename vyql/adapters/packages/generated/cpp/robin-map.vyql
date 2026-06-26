@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "robin-map" {
-    sink method "deserialize_value" -> code.Deserialization
-    sink method "deserialize" -> code.Deserialization
-  }
-}

@@ -1,5 +1,0 @@
-adapter perl {
-  package "Apache-AuthTicket" {
-    sink method "_update_ticket_timestamp" -> code.SqlExecution
-  }
-}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-
-adapter c {
-  package "gperf" {
-    source method "read_input" -> core.UserControlledData
-  }
-}

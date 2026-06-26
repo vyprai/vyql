@@ -1,9 +1,0 @@
-import code.{SecretValue}
-import core.{UserControlledData}
-adapter objc {
-  package "KKWeChatSDK" {
-    source method "handleOpenURL" -> core.UserControlledData
-    source method "sendAuthReq" -> code.SecretValue
-    source method "onAuthFinish" -> code.SecretValue
-  }
-}

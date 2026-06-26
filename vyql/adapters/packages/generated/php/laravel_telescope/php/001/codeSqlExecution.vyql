@@ -1,0 +1,9 @@
+module bindings.php.migration.m7330fa7c;
+
+binding sqlExecution1 {
+  requires {
+    dependency("laravel/telescope")
+  }
+  query pattern callExpr where callee.method == "recordQuery"
+  emit sink code.SqlExecution at args[0]
+}

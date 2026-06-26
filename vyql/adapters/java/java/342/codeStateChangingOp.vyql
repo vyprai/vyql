@@ -1,0 +1,6 @@
+module bindings.java.migration.m420f6b67;
+
+binding stateChangingOp342 {
+  query pattern callExpr where callee.method == "updatePassword"
+  emit sink code.StateChangingOpSink at args[0]
+}

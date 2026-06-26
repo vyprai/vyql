@@ -1,0 +1,9 @@
+module bindings.php.migration.m801e6e81;
+
+binding filePathAccess3 {
+  requires {
+    dependency("goaop/framework")
+  }
+  query pattern callExpr where callee.method == "chmod"
+  emit sink code.FilePathAccess at args[0]
+}

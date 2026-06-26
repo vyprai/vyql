@@ -1,0 +1,9 @@
+module bindings.php.migration.mc8298519;
+
+binding htmlRender0 {
+  requires {
+    dependency("sonata-project/block-bundle")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

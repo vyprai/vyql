@@ -1,7 +1,0 @@
-import code.{NetworkConnect}
-
-adapter dart {
-  package "vm_service_client" {
-    sink method "VMServiceClient.connect" -> code.NetworkConnect
-  }
-}

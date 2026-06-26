@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m6d39e99c;
+
+binding userControlledData2 {
+  requires {
+    dependency("mint_web_socket")
+  }
+  query pattern callExpr where callee.method == "stream_request_body"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbc64cf90;
+
+binding networkData1 {
+  requires {
+    dependency("net-http-persistent")
+  }
+  query pattern callExpr where callee.path ~= "Net::HTTP::Persistent#request"
+  emit source code.NetworkData at call.result
+}

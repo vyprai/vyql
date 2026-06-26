@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter java {
-  package "org.codehaus.groovy:groovy-jsr223" {
-    sink method "eval" -> code.CodeEval
-    sink method "compile" -> code.CodeEval
-  }
-}

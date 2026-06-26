@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m35de3585;
+
+binding userControlledData0 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit source core.UserControlledData at call.result
+}

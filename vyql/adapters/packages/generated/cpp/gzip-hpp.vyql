@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "gzip-hpp" {
-    sink method "decompress" -> code.Deserialization
-  }
-}

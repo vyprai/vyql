@@ -1,0 +1,9 @@
+module bindings.scala.migration.m93aa4491;
+
+binding deserialization2 {
+  requires {
+    dependency("cglib:cglib")
+  }
+  query pattern callExpr where callee.method == "parseConstructor"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,14 @@
+module bindings.groovy.migration.md15b4d9e;
+
+binding authenticationCheck7 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "ApiBinding.isAuthorized"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

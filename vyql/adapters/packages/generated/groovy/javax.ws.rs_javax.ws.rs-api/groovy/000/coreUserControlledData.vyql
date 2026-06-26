@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m5175e394;
+
+binding userControlledData0 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getPathSegments"
+  emit source core.UserControlledData at call.result
+}

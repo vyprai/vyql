@@ -1,0 +1,7 @@
+module code;
+
+review code.NullableDeref {
+  category: memory
+  kind: attention
+  text: "review dereference and nearby null checks"
+}

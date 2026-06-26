@@ -1,7 +1,0 @@
-import code.{NetworkConnect, NetworkSend}
-adapter swift {
-  package "github.com/nerdishbynature/RequestKit" {
-    sink method "dataTask" -> code.NetworkConnect
-    sink method "uploadTask" -> code.NetworkSend
-  }
-}

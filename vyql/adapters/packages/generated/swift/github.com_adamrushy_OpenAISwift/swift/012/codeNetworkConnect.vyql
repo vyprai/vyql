@@ -1,0 +1,9 @@
+module bindings.swift.migration.mcc8da8a2;
+
+binding networkConnect12 {
+  requires {
+    dependency("github.com/adamrushy/OpenAISwift")
+  }
+  query pattern callExpr where callee.method == "sendImages"
+  emit sink code.NetworkConnectSink at args[0]
+}

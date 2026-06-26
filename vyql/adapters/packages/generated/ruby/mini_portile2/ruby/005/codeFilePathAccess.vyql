@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma66d92b3;
+
+binding filePathAccess5 {
+  requires {
+    dependency("mini_portile2")
+  }
+  query pattern callExpr where callee.method == "verify_file"
+  emit sink code.FilePathAccess at args[0]
+}

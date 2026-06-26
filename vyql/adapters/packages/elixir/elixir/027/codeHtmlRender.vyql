@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf98b3aca;
+
+binding htmlRender27 {
+  requires {
+    dependency("phoenix_html")
+  }
+  query pattern callExpr where callee.path ~= "Phoenix.HTML.raw"
+  emit sink code.HtmlRender at args[0]
+}

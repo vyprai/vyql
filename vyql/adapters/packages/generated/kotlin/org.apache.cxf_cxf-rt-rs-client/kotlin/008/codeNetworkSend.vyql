@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m18881a63;
+
+binding networkSend8 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkSend at args[0]
+}

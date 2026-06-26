@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "mapail" {
-    sink method "map_to_struct" -> code.Deserialization
-    sink method "map_to_struct!" -> code.Deserialization
-  }
-}

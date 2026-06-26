@@ -1,0 +1,9 @@
+module bindings.dart.migration.macfed050;
+
+binding deserialization5 {
+  requires {
+    dependency("_fe_analyzer_shared")
+  }
+  query pattern callExpr where callee.method == "handleSpreadExpression"
+  emit sink code.Deserialization at args[0]
+}

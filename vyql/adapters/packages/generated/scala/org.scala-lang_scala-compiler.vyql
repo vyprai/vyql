@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter scala {
-  package "org.scala-lang:scala-compiler" {
-    control method "parse" -> core.InputValidation
-  }
-}

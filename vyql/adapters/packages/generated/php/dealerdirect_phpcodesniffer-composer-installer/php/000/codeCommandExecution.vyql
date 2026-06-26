@@ -1,0 +1,9 @@
+module bindings.php.migration.ma95fcd6b;
+
+binding commandExecution0 {
+  requires {
+    dependency("dealerdirect/phpcodesniffer-composer-installer")
+  }
+  query pattern callExpr where callee.method == "PHPCSStandardsComposerPluginInstallersPHPCodeSnifferPlugin::getPhpcsCommand"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,5 +1,0 @@
-adapter go {
-  package "github.com/tinylib/msgp" {
-    sink method "ReadFile" -> code.FilePathAccess
-  }
-}

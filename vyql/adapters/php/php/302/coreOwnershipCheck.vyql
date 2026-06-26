@@ -1,0 +1,11 @@
+module bindings.php.migration.mfbe84119;
+
+binding ownershipCheck302 {
+  query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "customer_id" and args.any.literal contains "auth()->guard" and args.any.literal contains "user()->id"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m2992b839;
+
+binding deserialization1 {
+  requires {
+    dependency("mustangostang/spyc")
+  }
+  query pattern callExpr where callee.method == "YAMLLoadString"
+  emit sink code.Deserialization at args[0]
+}

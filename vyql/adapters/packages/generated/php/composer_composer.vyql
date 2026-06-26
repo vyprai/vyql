@@ -1,8 +1,0 @@
-import code.{FilePathAccess, FileUse}
-
-adapter php {
-  package "composer/composer" {
-    sink method "Composer\Cache.read" -> code.FilePathAccess
-    sink method "Composer\Cache.write" -> code.FileUse
-  }
-}

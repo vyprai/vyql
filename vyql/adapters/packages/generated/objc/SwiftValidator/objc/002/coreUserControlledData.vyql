@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7db30fcf;
+
+binding userControlledData2 {
+  requires {
+    dependency("SwiftValidator")
+  }
+  query pattern callExpr where callee.method == "Validator.validateField"
+  emit source core.UserControlledData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{LogOutput}
-adapter elixir {
-  package "bunt" {
-    sink method "puts" -> code.LogOutput
-    sink method "warn" -> code.LogOutput
-    sink method "write" -> code.LogOutput
-  }
-}

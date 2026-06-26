@@ -1,0 +1,10 @@
+module bindings.java.migration.m420f6b67;
+
+binding verboseHttpClientAuthorizationLog65 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:RestAdapter.Builder" and node.token contains "call:setLogLevel" and node.token contains "call:setLog" and node.token contains "selector:RestAdapter.LogLevel.FULL" and not (node.token contains "selector:RestAdapter.LogLevel.BASIC") and not (node.token contains "selector:RestAdapter.LogLevel.NONE")
+  emit issue code.VerboseHttpClientAuthorizationLog at node
+}

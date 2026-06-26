@@ -1,0 +1,9 @@
+module bindings.python.migration.m5ad7d84f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("psycopg2-binary")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.SqlExecution at args[0]
+}

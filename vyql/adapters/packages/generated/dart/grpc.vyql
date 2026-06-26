@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "grpc" {
-    sink method "ASN1Parser.parse" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-import code.{SqlExecution, Deserialization}
-adapter kotlin {
-  package "org.apache.solr:solr-solrj" {
-    sink method "query" -> code.SqlExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding domInput84 {
+  query pattern callExpr where callee.path ~= "res.json"
+  emit source code.DomInput at call.result
+}

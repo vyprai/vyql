@@ -1,0 +1,9 @@
+module bindings.javascript.migration.md3833ac0;
+
+binding deserialization0 {
+  requires {
+    dependency("shell-quote")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-adapter objc {
-  package "YYImage" {
-    source method "YYImageDetectType" -> core.UserControlledData
-    sink method "YYCGImageCreateWithWebPData" -> code.Deserialization
-  }
-}

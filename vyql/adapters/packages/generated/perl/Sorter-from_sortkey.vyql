@@ -1,7 +1,0 @@
-import code.{CodeEval}
-
-adapter perl {
-  package "Sorter-from_sortkey" {
-    sink method "gen_sorter" -> code.CodeEval
-  }
-}

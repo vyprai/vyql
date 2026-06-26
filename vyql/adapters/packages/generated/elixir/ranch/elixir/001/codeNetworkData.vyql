@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2a361423;
+
+binding networkData1 {
+  requires {
+    dependency("ranch")
+  }
+  query pattern callExpr where callee.method == "wait_for_connections_loop"
+  emit source code.NetworkData at call.result
+}

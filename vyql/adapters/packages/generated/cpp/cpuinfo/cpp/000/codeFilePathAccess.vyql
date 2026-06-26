@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m2aac48b3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cpuinfo")
+  }
+  query pattern callExpr where callee.method == "cpuinfo_linux_parse_cpulist"
+  emit sink code.FilePathAccess at args[0]
+}

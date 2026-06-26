@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding codeEval275 {
+  query pattern callExpr where callee.path ~= "otherReflectApply"
+  emit sink code.CodeEval at args[2]
+}

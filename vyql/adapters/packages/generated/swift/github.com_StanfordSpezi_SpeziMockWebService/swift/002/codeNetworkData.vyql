@@ -1,0 +1,9 @@
+module bindings.swift.migration.mda392dd5;
+
+binding networkData2 {
+  requires {
+    dependency("github.com/StanfordSpezi/SpeziMockWebService")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.NetworkData at call.result
+}

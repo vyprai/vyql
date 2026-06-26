@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/docker/go-units" {
-    sink method "FromHumanSize" -> code.Deserialization
-    sink method "RAMInBytes" -> code.Deserialization
-    sink method "ParseUlimit" -> code.Deserialization
-  }
-}

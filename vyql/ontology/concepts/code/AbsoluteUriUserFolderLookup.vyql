@@ -1,0 +1,11 @@
+module code;
+
+concept AbsoluteUriUserFolderLookup : issue {
+  cwe: [CWE_639, CWE_863]
+  review_assumption: "the absolute URI can originate from a client-controlled path or DAV request and should not authorize access to another principal's folder"
+  reviewCategory: access_control
+  reviewCondition: "an absolute file URI user component selects the user folder used for a file lookup"
+  reviewConfidence: high
+  reviewEvidence: "absolute URI resolver {pattern} parses the URI and calls getUserFolder without deriving the user id from the active session"
+  vulnerableTo: [access_control.Idor, access_control.IncorrectAuthorization]
+}

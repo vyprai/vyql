@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding authorizationCheck177 {
+  query pattern callExpr where callee.path ~= "ability.can"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

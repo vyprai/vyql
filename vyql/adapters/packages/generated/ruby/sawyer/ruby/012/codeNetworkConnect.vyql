@@ -1,0 +1,9 @@
+module bindings.ruby.migration.md6355825;
+
+binding networkConnect12 {
+  requires {
+    dependency("sawyer")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

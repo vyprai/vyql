@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m247f06f3;
+
+binding networkSend3 {
+  requires {
+    dependency("qt5-serialport")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.NetworkSend at args[0]
+}

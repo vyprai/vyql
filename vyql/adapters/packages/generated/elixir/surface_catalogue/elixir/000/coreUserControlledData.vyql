@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m33b4c36e;
+
+binding userControlledData0 {
+  requires {
+    dependency("surface_catalogue")
+  }
+  query pattern callExpr where callee.method == "mount"
+  emit source core.UserControlledData at call.result
+}

@@ -1,8 +1,0 @@
-import code.{CodeEval}
-
-adapter scala {
-  package "com.github.bumptech.glide:glide" {
-    sink method "parse" -> code.CodeEval
-    sink method "parseModule" -> code.CodeEval
-  }
-}

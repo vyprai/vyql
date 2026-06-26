@@ -1,0 +1,9 @@
+module bindings.scala.migration.m8fbe7766;
+
+binding urlFetch1 {
+  requires {
+    dependency("com.amazonaws:aws-java-sdk-core")
+  }
+  query pattern callExpr where callee.method == "setResourcePath"
+  emit sink code.UrlFetch at args[0]
+}

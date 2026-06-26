@@ -1,0 +1,11 @@
+module code;
+
+concept StoredHtmlWrite : issue {
+  cwe: [CWE_79]
+  review_assumption: "the stored value is later rendered as HTML in the application UI"
+  reviewCategory: xss
+  reviewCondition: "stored HTML is written without a proven sanitizer before later rendering"
+  reviewConfidence: medium
+  reviewEvidence: "stored HTML write context {pattern} persists attacker-controlled markup"
+  vulnerableTo: [injection.Xss]
+}

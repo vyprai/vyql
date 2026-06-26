@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbbb9062e;
+
+binding commandExecution1 {
+  requires {
+    dependency("capistrano")
+  }
+  query pattern callExpr where callee.method == "run_shell_command"
+  emit sink code.CommandExecution at args[0]
+}

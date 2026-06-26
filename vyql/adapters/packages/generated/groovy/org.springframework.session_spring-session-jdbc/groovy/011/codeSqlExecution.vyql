@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m59519c26;
+
+binding sqlExecution11 {
+  requires {
+    dependency("org.springframework.session:spring-session-jdbc")
+  }
+  query pattern callExpr where callee.method == "findByIndexNameAndIndexValue"
+  emit sink code.SqlExecution at args[0]
+}

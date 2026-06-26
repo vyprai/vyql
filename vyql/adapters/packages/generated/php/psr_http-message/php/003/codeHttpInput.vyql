@@ -1,0 +1,9 @@
+module bindings.php.migration.med01f18a;
+
+binding httpInput3 {
+  requires {
+    dependency("psr/http-message")
+  }
+  query pattern callExpr where callee.method == "getUploadedFiles"
+  emit source code.HttpInput at call.result
+}

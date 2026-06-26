@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m1fbb9f86;
+
+binding codeEval0 {
+  requires {
+    dependency("system.web.optimization.react")
+  }
+  query pattern callExpr where callee.method == "BabelTransform.Process"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.perl.migration.mfca40a44;
+
+binding htmlRender33 {
+  query pattern callExpr where callee.path ~= "print"
+  emit sink code.HtmlRender at args.any
+}

@@ -1,0 +1,9 @@
+module bindings.scala.migration.m5626b611;
+
+binding deserialization3 {
+  requires {
+    dependency("org.apache.solr:solr-core")
+  }
+  query pattern callExpr where callee.method == "getParsedSchema"
+  emit sink code.Deserialization at args[0]
+}

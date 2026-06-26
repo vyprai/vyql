@@ -1,0 +1,9 @@
+module bindings.scala.migration.m4212472c;
+
+binding xmlParse5 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getBoolean"
+  emit sink code.XmlParse at args[0]
+}

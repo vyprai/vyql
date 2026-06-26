@@ -1,0 +1,14 @@
+module bindings.php.migration.m4bbd7017;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("laravel/fortify")
+  }
+  query pattern callExpr where callee.method == "authenticateThrough"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m6bb35419;
+
+binding httpInput0 {
+  requires {
+    dependency("ralouphie/getallheaders")
+  }
+  query pattern callExpr where callee.method == "getallheaders"
+  emit source code.HttpInput at call.result
+}

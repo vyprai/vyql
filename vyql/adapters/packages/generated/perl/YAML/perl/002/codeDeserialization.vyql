@@ -1,0 +1,9 @@
+module bindings.perl.migration.m8122b530;
+
+binding deserialization2 {
+  requires {
+    dependency("YAML")
+  }
+  query pattern callExpr where callee.method == "yaml_load"
+  emit sink code.Deserialization at args[0]
+}

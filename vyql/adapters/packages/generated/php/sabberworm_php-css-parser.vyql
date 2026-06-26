@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "sabberworm/php-css-parser" {
-    sink method "parse" -> code.Deserialization
-  }
-}

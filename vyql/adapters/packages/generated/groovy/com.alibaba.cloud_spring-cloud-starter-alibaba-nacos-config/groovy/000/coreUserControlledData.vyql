@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mac6909eb;
+
+binding userControlledData0 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config")
+  }
+  query pattern callExpr where callee.method == "loadNacosPropertySource"
+  emit source core.UserControlledData at call.result
+}

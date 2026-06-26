@@ -1,0 +1,9 @@
+module bindings.dart.migration.md348b2cc;
+
+binding deserialization1 {
+  requires {
+    dependency("intl_translation")
+  }
+  query pattern callExpr where callee.method == "parseContent"
+  emit sink code.Deserialization at args[0]
+}

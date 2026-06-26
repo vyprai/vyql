@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mdab3cbca;
+
+binding deserialization0 {
+  requires {
+    dependency("dom-converter")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit sink code.Deserialization at args[0]
+}

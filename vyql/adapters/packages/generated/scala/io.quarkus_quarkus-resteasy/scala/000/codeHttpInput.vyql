@@ -1,0 +1,9 @@
+module bindings.scala.migration.ma00db17c;
+
+binding httpInput0 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractUriInfo"
+  emit source code.HttpInput at call.result
+}

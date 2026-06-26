@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9e718907;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "openWriter"
+  emit sink code.FilePathAccess at args[0]
+}

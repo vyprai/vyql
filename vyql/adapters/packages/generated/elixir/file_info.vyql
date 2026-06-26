@@ -1,7 +1,0 @@
-import code.{CommandExecution, Deserialization}
-adapter elixir {
-  package "file_info" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse!" -> code.Deserialization
-  }
-}

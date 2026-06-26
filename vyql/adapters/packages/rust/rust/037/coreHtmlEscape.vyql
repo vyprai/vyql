@@ -1,0 +1,14 @@
+module bindings.rust.migration.m222602a5;
+
+binding htmlEscape37 {
+  requires {
+    dependency("ammonia")
+  }
+  query pattern callExpr where callee.path ~= "ammonia.clean"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

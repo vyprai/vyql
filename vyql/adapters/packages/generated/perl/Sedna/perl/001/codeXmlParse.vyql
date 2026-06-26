@@ -1,0 +1,9 @@
+module bindings.perl.migration.m340e4174;
+
+binding xmlParse1 {
+  requires {
+    dependency("Sedna")
+  }
+  query pattern callExpr where callee.method == "parse_version"
+  emit sink code.XmlParse at args[0]
+}

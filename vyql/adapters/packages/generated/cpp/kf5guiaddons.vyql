@@ -1,8 +1,0 @@
-import code.{UrlFetch}
-
-adapter cpp {
-  package "kf5guiaddons" {
-    sink method "concatDocsUrl" -> code.UrlFetch
-    sink method "openHelp" -> code.UrlFetch
-  }
-}

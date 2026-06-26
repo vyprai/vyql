@@ -1,0 +1,12 @@
+module vypr.injection;
+
+rule StoredCommand {
+  meta {
+    cwe: [CWE_78]
+    id: "VYQL-INJ-032"
+    severity: high
+  }
+  taint code.DatabaseRead -> code.CommandExecution
+  unless path coveredBy core.ShellEscape
+  unless endpoint coveredBy core.CommandArgumentValidation
+}

@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-
-adapter php {
-  package "spatie/laravel-ray" {
-    sink method "sendRequest" -> code.NetworkSend
-  }
-}

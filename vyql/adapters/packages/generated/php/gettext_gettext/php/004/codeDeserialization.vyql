@@ -1,0 +1,9 @@
+module bindings.php.migration.mdee1b9f3;
+
+binding deserialization4 {
+  requires {
+    dependency("gettext/gettext")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

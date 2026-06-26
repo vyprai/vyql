@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9269cf78;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework.data:spring-data-jpa")
+  }
+  query pattern callExpr where callee.method == "rewrite"
+  emit sink code.SqlExecution at args[0]
+}

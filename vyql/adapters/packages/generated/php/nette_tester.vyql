@@ -1,5 +1,0 @@
-adapter php {
-  package "nette/tester" {
-    source method "parse" -> code.CliArgument
-  }
-}

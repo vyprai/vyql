@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding filePathAccess104 {
+  query pattern callExpr where callee.path ~= "ioutil.WriteFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.me335d7a5;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/postgres-nio")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

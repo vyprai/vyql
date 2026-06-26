@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2cc4ccef;
+
+binding deserialization1 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.method == "do_parse"
+  emit sink code.Deserialization at args[0]
+}

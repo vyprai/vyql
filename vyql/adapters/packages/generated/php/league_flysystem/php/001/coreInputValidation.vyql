@@ -1,0 +1,14 @@
+module bindings.php.migration.m618233b0;
+
+binding inputValidation1 {
+  requires {
+    dependency("league/flysystem")
+  }
+  query pattern callExpr where callee.method == "guardAgainstInvalidMount"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

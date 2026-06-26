@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1f1f0430;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.apache.hbase:hbase-server")
+  }
+  query pattern callExpr where callee.method == "readMyEphemeralNodeOnDisk"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me919f35e;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.security.oauth:spring-security-oauth2")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.ma9d2693c;
+
+binding cliArgument1 {
+  requires {
+    dependency("github.com/apple/swift-argument-parser")
+  }
+  query pattern callExpr where callee.method == "parseOrExit"
+  emit source code.CliArgument at call.result
+}

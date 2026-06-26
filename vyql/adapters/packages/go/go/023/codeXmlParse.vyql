@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding xmlParse23 {
+  requires {
+    dependency("encoding/xml")
+  }
+  query pattern callExpr where callee.path ~= "xml.Unmarshal"
+  emit sink code.XmlParse at args[0]
+}

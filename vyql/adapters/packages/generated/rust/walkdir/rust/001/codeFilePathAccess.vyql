@@ -1,0 +1,9 @@
+module bindings.rust.migration.madfdf54e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("walkdir")
+  }
+  query pattern callExpr where callee.method == "into_path"
+  emit sink code.FilePathAccess at args[0]
+}

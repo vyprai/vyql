@@ -1,0 +1,9 @@
+module bindings.rust.migration.m085231ca;
+
+binding userControlledData2 {
+  requires {
+    dependency("termion")
+  }
+  query pattern callExpr where callee.method == "async_stdin"
+  emit source core.UserControlledData at call.result
+}

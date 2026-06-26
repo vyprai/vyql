@@ -1,0 +1,9 @@
+module bindings.dart.migration.me3dca079;
+
+binding userControlledData1 {
+  requires {
+    dependency("country_pickers")
+  }
+  query pattern callExpr where callee.method == "getCountryByIsoCode"
+  emit source core.UserControlledData at call.result
+}

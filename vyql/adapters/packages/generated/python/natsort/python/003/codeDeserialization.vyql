@@ -1,0 +1,9 @@
+module bindings.python.migration.mdbe7978b;
+
+binding deserialization3 {
+  requires {
+    dependency("natsort")
+  }
+  query pattern callExpr where callee.method == "parse_number_or_none_factory"
+  emit sink code.Deserialization at args[0]
+}

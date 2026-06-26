@@ -1,0 +1,9 @@
+module bindings.swift.migration.m9592d749;
+
+binding envVariable4 {
+  requires {
+    dependency("github.com/Kitura/Configuration")
+  }
+  query pattern callExpr where callee.method == "environmentVariablePathSeparator"
+  emit source code.EnvVariable at call.result
+}

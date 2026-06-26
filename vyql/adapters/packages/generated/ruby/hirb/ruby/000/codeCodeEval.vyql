@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1b178a21;
+
+binding codeEval0 {
+  requires {
+    dependency("hirb")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.CodeEval at args[0]
+}

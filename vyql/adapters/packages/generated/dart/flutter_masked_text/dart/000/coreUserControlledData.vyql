@@ -1,0 +1,9 @@
+module bindings.dart.migration.m09cd344f;
+
+binding userControlledData0 {
+  requires {
+    dependency("flutter_masked_text")
+  }
+  query pattern callExpr where callee.method == "MaskedTextController"
+  emit source core.UserControlledData at call.result
+}

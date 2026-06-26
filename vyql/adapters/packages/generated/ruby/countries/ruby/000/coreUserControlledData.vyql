@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3cbd322e;
+
+binding userControlledData0 {
+  requires {
+    dependency("countries")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}

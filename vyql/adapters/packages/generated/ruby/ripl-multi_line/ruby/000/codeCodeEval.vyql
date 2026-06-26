@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mf6660590;
+
+binding codeEval0 {
+  requires {
+    dependency("ripl-multi_line")
+  }
+  query pattern callExpr where callee.method == "eval_input"
+  emit sink code.CodeEval at args[0]
+}

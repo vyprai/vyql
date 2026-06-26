@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mc096a7db;
+
+binding expressionEval2 {
+  requires {
+    dependency("c89stringutils")
+  }
+  query pattern callExpr where callee.method == "vasprintf"
+  emit sink code.ExpressionEval at args[0]
+}

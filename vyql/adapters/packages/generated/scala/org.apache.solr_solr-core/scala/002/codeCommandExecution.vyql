@@ -1,0 +1,9 @@
+module bindings.scala.migration.m5626b611;
+
+binding commandExecution2 {
+  requires {
+    dependency("org.apache.solr:solr-core")
+  }
+  query pattern callExpr where callee.method == "runImpl"
+  emit sink code.CommandExecution at args[0]
+}

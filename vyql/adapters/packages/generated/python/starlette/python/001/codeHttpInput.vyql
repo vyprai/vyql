@@ -1,0 +1,9 @@
+module bindings.python.migration.m46906d4c;
+
+binding httpInput1 {
+  requires {
+    dependency("starlette")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.HttpInput at call.result
+}

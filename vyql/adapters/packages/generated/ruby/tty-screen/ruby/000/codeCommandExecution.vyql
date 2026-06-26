@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m1a19c932;
+
+binding commandExecution0 {
+  requires {
+    dependency("tty-screen")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}

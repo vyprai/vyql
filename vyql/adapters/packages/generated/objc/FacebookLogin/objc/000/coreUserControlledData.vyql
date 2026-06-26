@@ -1,0 +1,9 @@
+module bindings.objc.migration.m05df197d;
+
+binding userControlledData0 {
+  requires {
+    dependency("FacebookLogin")
+  }
+  query pattern callExpr where callee.method == "logIn"
+  emit source core.UserControlledData at call.result
+}

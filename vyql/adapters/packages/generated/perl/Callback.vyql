@@ -1,5 +1,0 @@
-adapter perl {
-  package "Callback" {
-    sink method "call" -> code.CodeEval
-  }
-}

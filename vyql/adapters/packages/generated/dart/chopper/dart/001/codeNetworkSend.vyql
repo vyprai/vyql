@@ -1,0 +1,9 @@
+module bindings.dart.migration.md5715606;
+
+binding networkSend1 {
+  requires {
+    dependency("chopper")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}

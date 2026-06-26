@@ -1,0 +1,9 @@
+module bindings.dart.migration.mcf621b38;
+
+binding deserialization0 {
+  requires {
+    dependency("yet_another_json_isolate")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

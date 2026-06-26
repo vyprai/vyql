@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.me396344b;
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.xerial:sqlite-jdbc")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

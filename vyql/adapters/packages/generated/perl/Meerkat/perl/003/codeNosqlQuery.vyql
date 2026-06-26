@@ -1,0 +1,9 @@
+module bindings.perl.migration.m77118eb6;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("Meerkat")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}

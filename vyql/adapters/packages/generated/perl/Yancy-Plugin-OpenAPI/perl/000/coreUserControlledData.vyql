@@ -1,0 +1,9 @@
+module bindings.perl.migration.m64d616ae;
+
+binding userControlledData0 {
+  requires {
+    dependency("Yancy-Plugin-OpenAPI")
+  }
+  query pattern callExpr where callee.method == "_openapi_spec_from_schema"
+  emit source core.UserControlledData at call.result
+}

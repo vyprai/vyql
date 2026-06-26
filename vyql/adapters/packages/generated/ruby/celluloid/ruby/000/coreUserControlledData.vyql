@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mbe3c9b3d;
+
+binding userControlledData0 {
+  requires {
+    dependency("celluloid")
+  }
+  query pattern callExpr where callee.method == "async"
+  emit source core.UserControlledData at call.result
+}

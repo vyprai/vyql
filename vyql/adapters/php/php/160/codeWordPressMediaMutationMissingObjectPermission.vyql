@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding wordPressMediaMutationMissingObjectPermission160 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "$_REQUEST['attachment_id']" and node.token contains "get_post($attachment_id)" and node.token contains "ReplaceController($attachment_id)" and node.token contains "$this->loadView('prepare-remove-background')" and not (node.token contains "checkImagePermission") and not (node.token contains "current_user_can('edit_post'") and not (node.token contains "current_user_can(\"edit_post\"")
+  emit issue code.WordPressMediaMutationMissingObjectPermission at node
+}

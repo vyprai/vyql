@@ -1,0 +1,9 @@
+module bindings.python.migration.m8bff7fd6;
+
+binding filePathAccess1 {
+  requires {
+    dependency("cfgv")
+  }
+  query pattern callExpr where callee.method == "load_from_filename"
+  emit sink code.FilePathAccess at args[0]
+}

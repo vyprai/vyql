@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter bash {
-  package "yq" {
-    source path "yq.argv" -> code.CliArgument
-  }
-}

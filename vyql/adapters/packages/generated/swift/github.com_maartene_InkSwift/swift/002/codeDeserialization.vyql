@@ -1,0 +1,9 @@
+module bindings.swift.migration.md90858ad;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/maartene/InkSwift")
+  }
+  query pattern callExpr where callee.method == "InkStory.loadState(_:)"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding filePathAccess96 {
+  query pattern callExpr where callee.path ~= "os.Open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept DecodedRequestStaticPathTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "the request path can contain encoded parent-directory separators that decode before filesystem lookup"
+  reviewCategory: path
+  reviewCondition: "decoded request paths are appended to a static-file root and served without canonical containment"
+  reviewConfidence: high
+  reviewEvidence: "static-file context {pattern} decodes a request path, checks the resulting static path with existsSync, and serves it without an observed root containment check"
+  vulnerableTo: [path.PathTraversal]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept ArchiveSymlinkFilterBypass : issue {
+  cwe: [CWE_22, CWE_59]
+  review_assumption: "archive entries may contain symlinks that redirect later writes outside the intended extraction directory"
+  reviewCategory: path
+  reviewCondition: "archive extraction can miss or misapply symlink and hard-link target validation"
+  reviewConfidence: medium
+  reviewEvidence: "archive extraction context {pattern} extracts archive entries without proving link targets remain inside the destination root"
+  vulnerableTo: [path.PathTraversal, path.LinkFollowing]
+}

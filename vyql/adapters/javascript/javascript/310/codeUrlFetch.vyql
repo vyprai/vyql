@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding urlFetch310 {
+  query pattern callExpr where callee.path ~= "needle.get"
+  emit sink code.UrlFetch at args[0]
+}

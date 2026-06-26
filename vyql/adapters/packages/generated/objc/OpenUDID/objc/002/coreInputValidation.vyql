@@ -1,0 +1,14 @@
+module bindings.objc.migration.m2a69cfe6;
+
+binding inputValidation2 {
+  requires {
+    dependency("OpenUDID")
+  }
+  query pattern callExpr where callee.method == "setOptOut"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CodiadFilemanagerSearchCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-087"
+    severity: critical
+  }
+  issue code.CodiadFilemanagerSearchCommandInjection as sink
+}

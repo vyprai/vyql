@@ -1,0 +1,9 @@
+module bindings.perl.migration.m902b303e;
+
+binding httpInput1 {
+  requires {
+    dependency("Labyrinth")
+  }
+  query pattern callExpr where callee.method == "ParseParams"
+  emit source code.HttpInput at call.result
+}

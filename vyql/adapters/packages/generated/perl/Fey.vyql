@@ -1,6 +1,0 @@
-adapter perl {
-  package "Fey" {
-    sink method "sql" -> code.SqlExecution
-    control method "bind_params" -> core.SqlParameterization
-  }
-}

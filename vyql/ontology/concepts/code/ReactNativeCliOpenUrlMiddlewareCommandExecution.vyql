@@ -1,0 +1,11 @@
+module code;
+
+concept ReactNativeCliOpenUrlMiddlewareCommandExecution : issue {
+  cwe: [CWE_78]
+  review_assumption: "an attacker can reach the development server endpoint and choose a URL scheme that the OS open handler interprets as command execution"
+  reviewCategory: command
+  reviewCondition: "React Native CLI opens a request-supplied URL in the system browser without an http/https protocol allowlist"
+  reviewConfidence: high
+  reviewEvidence: "openURLMiddleware context {pattern} extracts url from req.body and passes it to open(url) before validating the URL protocol"
+  vulnerableTo: [injection.CommandInjection]
+}

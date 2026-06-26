@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter go {
-  package "contrib.go.opencensus.io/exporter/stackdriver" {
-    control method "sanitize" -> core.InputValidation
-  }
-}

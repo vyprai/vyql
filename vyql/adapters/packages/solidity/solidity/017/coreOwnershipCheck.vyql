@@ -1,0 +1,14 @@
+module bindings.solidity.migration.m72929a80;
+
+binding ownershipCheck17 {
+  requires {
+    dependency("@openzeppelin/contracts")
+  }
+  query pattern callExpr where callee.path ~= "Ownable._checkOwner"
+  emit check core.OwnershipCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

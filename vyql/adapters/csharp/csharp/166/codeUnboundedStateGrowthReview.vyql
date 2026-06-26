@@ -1,0 +1,10 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding unboundedStateGrowthReview166 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=GetOrAddNode" and node.token contains "GetOrAddNode(subKey)" and not (node.token contains "MaxStateDepth")
+  emit issue code.UnboundedStateGrowthReview at node
+}

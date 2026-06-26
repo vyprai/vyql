@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding securityKeyTrustOperation247 {
+  query pattern callExpr where callee.path ~= "module.run_command" and args.any.literal contains "apt-key" and args.any.literal contains "--recv"
+  emit sink code.SecurityKeyTrustOperation at args[0]
+}

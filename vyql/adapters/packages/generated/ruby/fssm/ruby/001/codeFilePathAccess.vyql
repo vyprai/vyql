@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mafb9df01;
+
+binding filePathAccess1 {
+  requires {
+    dependency("fssm")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.FilePathAccess at args[0]
+}

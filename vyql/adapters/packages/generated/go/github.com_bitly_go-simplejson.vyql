@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter go {
-  package "github.com/bitly/go-simplejson" {
-    sink method "NewJson" -> code.Deserialization
-    sink method "NewFromReader" -> code.Deserialization
-  }
-}

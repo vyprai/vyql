@@ -1,0 +1,9 @@
+module bindings.go.migration.me312f8bb;
+
+binding htmlRender3 {
+  requires {
+    dependency("github.com/PuerkitoBio/goquery")
+  }
+  query pattern callExpr where callee.method == "Render"
+  emit sink code.HtmlRender at args[0]
+}

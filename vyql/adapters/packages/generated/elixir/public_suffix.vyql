@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter elixir {
-  package "public_suffix" {
-    sink method "PublicSuffix.RemoteFileFetcher.fetch_remote_file" -> code.UrlFetch
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.php.migration.ma037d6a9;
+
+binding commandExecution0 {
+  requires {
+    dependency("laravel/breeze")
+  }
+  query pattern callExpr where callee.method == "runCommands"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m2c177580;
+
+binding htmlRender0 {
+  requires {
+    dependency("github.com/Cocoanetics/DTCoreText")
+  }
+  query pattern callExpr where callee.method == "parseStyleBlock"
+  emit sink code.HtmlRender at args[0]
+}

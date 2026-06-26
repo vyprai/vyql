@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma2f94430;
+
+binding networkSend1 {
+  requires {
+    dependency("azure-umqtt-c")
+  }
+  query pattern callExpr where callee.method == "sendPacketItem"
+  emit sink code.NetworkSend at args[0]
+}

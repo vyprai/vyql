@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m15c6ee8c;
+
+binding userControlledData0 {
+  requires {
+    dependency("workbox-window")
+  }
+  query pattern callExpr where callee.method == "Workbox.messageSW"
+  emit source core.UserControlledData at call.result
+}

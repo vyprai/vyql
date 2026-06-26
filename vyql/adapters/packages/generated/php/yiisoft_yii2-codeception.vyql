@@ -1,8 +1,0 @@
-import code.{RedirectTarget}
-adapter php {
-  package "yiisoft/yii2-codeception" {
-    flag code.RedirectTarget on any {
-      method "getUrl"
-    }
-  }
-}

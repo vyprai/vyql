@@ -1,0 +1,9 @@
+module bindings.python.migration.md01d46f3;
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("wheel")
+  }
+  query pattern callExpr where callee.method == "unpack"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

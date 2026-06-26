@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m8c752442;
+
+binding userControlledData1 {
+  requires {
+    dependency("diff")
+  }
+  query pattern callExpr where callee.method == "applyPatch"
+  emit source core.UserControlledData at call.result
+}

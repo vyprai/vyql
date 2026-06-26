@@ -1,0 +1,9 @@
+module bindings.scala.migration.m9e718907;
+
+binding fileUse1 {
+  requires {
+    dependency("org.apache.tomcat.embed:tomcat-embed-logging-juli")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FileUseSink at args[0]
+}

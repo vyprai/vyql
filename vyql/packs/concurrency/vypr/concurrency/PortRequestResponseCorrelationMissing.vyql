@@ -1,0 +1,11 @@
+module vypr.concurrency;
+
+rule PortRequestResponseCorrelationMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_362, CWE_200]
+    id: "VYQL-RACE-006"
+    severity: high
+  }
+  issue code.PortRequestResponseCorrelationMissing as m
+}

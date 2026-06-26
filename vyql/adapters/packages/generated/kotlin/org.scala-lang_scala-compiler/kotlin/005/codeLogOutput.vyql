@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4b05a11d;
+
+binding logOutput5 {
+  requires {
+    dependency("org.scala-lang:scala-compiler")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.LogOutput at args[0]
+}

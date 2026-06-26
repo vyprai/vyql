@@ -1,0 +1,10 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding rubyLineAnchorValidationBypass208 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=legal?" and node.token contains "string.to_s" and node.token contains "/^[0-9a-f]{24}$/i"
+  emit issue code.RubyLineAnchorValidationBypass at node
+}

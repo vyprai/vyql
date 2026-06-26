@@ -1,0 +1,14 @@
+module bindings.php.migration.me4174701;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("symfony/security-csrf")
+  }
+  query pattern callExpr where callee.method == "isTokenValid"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

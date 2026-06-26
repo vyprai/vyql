@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m739b11aa;
+
+binding networkData1 {
+  requires {
+    dependency("spandex_phoenix")
+  }
+  query pattern callExpr where callee.method == "default_metadata"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.m21476910;
+
+binding networkData3 {
+  requires {
+    dependency("tokio")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

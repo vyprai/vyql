@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcd9ab0bc;
+
+binding deserialization3 {
+  requires {
+    dependency("org.springframework.security:spring-security-jwt")
+  }
+  query pattern callExpr where callee.method == "decodeAndVerify"
+  emit sink code.Deserialization at args[0]
+}

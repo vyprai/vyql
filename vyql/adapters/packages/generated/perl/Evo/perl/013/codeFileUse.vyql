@@ -1,0 +1,9 @@
+module bindings.perl.migration.m21559073;
+
+binding fileUse13 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "write_many"
+  emit sink code.FileUseSink at args[0]
+}

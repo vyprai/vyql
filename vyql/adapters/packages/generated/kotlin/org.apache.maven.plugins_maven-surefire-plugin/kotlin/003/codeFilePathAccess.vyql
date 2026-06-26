@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m04569a9c;
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-surefire-plugin")
+  }
+  query pattern callExpr where callee.method == "setSystemPropertiesFile"
+  emit sink code.FilePathAccess at args[0]
+}

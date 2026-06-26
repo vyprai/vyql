@@ -1,7 +1,0 @@
-import code.{FilePathAccess, NetworkSend}
-adapter ruby {
-  package "backports" {
-    sink method "write" -> code.FilePathAccess
-    sink method "send" -> code.NetworkSend
-  }
-}

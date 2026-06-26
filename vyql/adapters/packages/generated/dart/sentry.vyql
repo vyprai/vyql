@@ -1,8 +1,0 @@
-import core.{InputValidation}
-
-adapter dart {
-  package "sentry" {
-    control method "HttpSanitizer.sanitizeUrl" -> core.InputValidation
-    control method "HttpSanitizer.sanitizedHeaders" -> core.InputValidation
-  }
-}

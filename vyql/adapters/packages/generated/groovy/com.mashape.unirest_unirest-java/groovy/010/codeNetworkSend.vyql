@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m26e194b2;
+
+binding networkSend10 {
+  requires {
+    dependency("com.mashape.unirest:unirest-java")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkSend at args[0]
+}

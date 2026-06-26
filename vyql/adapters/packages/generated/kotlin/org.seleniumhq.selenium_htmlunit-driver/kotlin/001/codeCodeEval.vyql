@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4e338abf;
+
+binding codeEval1 {
+  requires {
+    dependency("org.seleniumhq.selenium:htmlunit-driver")
+  }
+  query pattern callExpr where callee.method == "executeScript"
+  emit sink code.CodeEval at args[0]
+}

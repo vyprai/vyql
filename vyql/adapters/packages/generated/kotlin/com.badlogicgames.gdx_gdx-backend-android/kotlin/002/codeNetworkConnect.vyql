@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m2a73d5f6;
+
+binding networkConnect2 {
+  requires {
+    dependency("com.badlogicgames.gdx:gdx-backend-android")
+  }
+  query pattern callExpr where callee.method == "newClientSocket"
+  emit sink code.NetworkConnectSink at args[0]
+}

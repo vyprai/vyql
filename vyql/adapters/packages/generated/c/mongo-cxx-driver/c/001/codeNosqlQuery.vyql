@@ -1,0 +1,9 @@
+module bindings.c.migration.me696b3a4;
+
+binding nosqlQuery1 {
+  requires {
+    dependency("mongo-cxx-driver")
+  }
+  query pattern callExpr where callee.method == "bypass_query_analysis"
+  emit sink code.NosqlQuery at args[0]
+}

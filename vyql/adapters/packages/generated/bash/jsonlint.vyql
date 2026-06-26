@@ -1,5 +1,0 @@
-adapter bash {
-  package "jsonlint" {
-    source path "jsonlint.argv" -> code.CliArgument
-  }
-}

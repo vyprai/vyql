@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma5d53358;
+
+binding commandExecution7 {
+  requires {
+    dependency("com.google.api-client:google-api-client")
+  }
+  query pattern callExpr where callee.method == "runCertificateProviderCommand"
+  emit sink code.CommandExecution at args[0]
+}

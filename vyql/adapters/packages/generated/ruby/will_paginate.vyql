@@ -1,5 +1,0 @@
-adapter ruby {
-  package "will_paginate" {
-    sink method "paginate_by_sql" -> code.SqlExecution
-  }
-}

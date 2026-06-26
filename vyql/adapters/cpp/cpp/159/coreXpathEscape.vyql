@@ -1,0 +1,11 @@
+module bindings.cpp.migration.m4e783366;
+
+binding xpathEscape159 {
+  query pattern callExpr where callee.path ~= "escape_xpath"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

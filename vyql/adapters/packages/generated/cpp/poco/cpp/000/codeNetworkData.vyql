@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m64dff1c6;
+
+binding networkData0 {
+  requires {
+    dependency("poco")
+  }
+  query pattern callExpr where callee.method == "stream"
+  emit source code.NetworkData at call.result
+}

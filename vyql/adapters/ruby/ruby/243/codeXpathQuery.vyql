@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding xpathQuery243 {
+  query pattern callExpr where callee.method == "at_xpath"
+  emit sink code.XpathQuery at args[0]
+}

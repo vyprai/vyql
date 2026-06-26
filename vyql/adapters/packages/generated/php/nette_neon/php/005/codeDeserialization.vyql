@@ -1,0 +1,9 @@
+module bindings.php.migration.mbbfcbacd;
+
+binding deserialization5 {
+  requires {
+    dependency("nette/neon")
+  }
+  query pattern callExpr where callee.method == "NetteNeonLexer::tokenize"
+  emit sink code.Deserialization at args[0]
+}

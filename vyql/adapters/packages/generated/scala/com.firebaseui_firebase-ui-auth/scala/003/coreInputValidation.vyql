@@ -1,0 +1,14 @@
+module bindings.scala.migration.m2c70c628;
+
+binding inputValidation3 {
+  requires {
+    dependency("com.firebaseui:firebase-ui-auth")
+  }
+  query pattern callExpr where callee.method == "validateDefaultCountryIso"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

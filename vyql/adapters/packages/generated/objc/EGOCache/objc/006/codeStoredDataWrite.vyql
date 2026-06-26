@@ -1,0 +1,9 @@
+module bindings.objc.migration.m048c22d9;
+
+binding storedDataWrite6 {
+  requires {
+    dependency("EGOCache")
+  }
+  query pattern callExpr where callee.method == "setString:forKey:withTimeoutInterval"
+  emit sink code.StoredDataWrite at args[0]
+}

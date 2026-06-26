@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding requestBackedFooterScriptXss277 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and containsAny(node.token, ["subscript:$_REQUEST[\"footerScripts\"]", "subscript:$_REQUEST['footerScripts']"]) and containsAny(node.token, ["call_path:print", "call_path:echo"]) and not (containsAny(node.token, ["subscript:$GLOBALS[\"footerScripts\"]", "subscript:$GLOBALS['footerScripts']"]))
+  emit issue code.RequestBackedFooterScriptXss at node
+}

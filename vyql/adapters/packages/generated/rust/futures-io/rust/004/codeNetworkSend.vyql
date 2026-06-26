@@ -1,0 +1,9 @@
+module bindings.rust.migration.m7c060ca7;
+
+binding networkSend4 {
+  requires {
+    dependency("futures-io")
+  }
+  query pattern callExpr where callee.method == "poll_write_vectored"
+  emit sink code.NetworkSend at args[0]
+}

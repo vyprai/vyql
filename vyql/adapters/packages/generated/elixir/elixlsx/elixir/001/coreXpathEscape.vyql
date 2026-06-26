@@ -1,0 +1,14 @@
+module bindings.elixir.migration.mdec79204;
+
+binding xpathEscape1 {
+  requires {
+    dependency("elixlsx")
+  }
+  query pattern callExpr where callee.method == "xml_escape"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

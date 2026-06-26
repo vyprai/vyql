@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding htmlEscape32 {
+  requires {
+    dependency("cgi")
+  }
+  query pattern callExpr where callee.path ~= "CGI.escapeHTML"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

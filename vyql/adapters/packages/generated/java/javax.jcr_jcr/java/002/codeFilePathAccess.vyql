@@ -1,0 +1,9 @@
+module bindings.java.migration.mbbc78ebf;
+
+binding filePathAccess2 {
+  requires {
+    dependency("javax.jcr:jcr")
+  }
+  query pattern callExpr where callee.method == "getProperty"
+  emit sink code.FilePathAccess at args[0]
+}

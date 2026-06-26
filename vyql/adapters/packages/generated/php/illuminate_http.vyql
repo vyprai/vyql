@@ -1,5 +1,0 @@
-adapter php {
-  package "illuminate/http" {
-    source method "cookie" -> code.HttpInput
-  }
-}

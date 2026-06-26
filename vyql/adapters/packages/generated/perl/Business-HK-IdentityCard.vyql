@@ -1,7 +1,0 @@
-import core.{InputValidation}
-
-adapter perl {
-  package "Business-HK-IdentityCard" {
-    control method "is_valid" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding externalApiResponse7 {
+  requires {
+    dependency("faraday")
+  }
+  query pattern callExpr where callee.method == "body"
+  emit source code.ExternalApiResponse at call.result
+}

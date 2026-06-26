@@ -1,9 +1,0 @@
-import code.{SecretValue}
-import core.{AuthenticationCheck}
-
-adapter elixir {
-  package "oauther" {
-    source method "credentials" -> code.SecretValue
-    control method "sign" -> core.AuthenticationCheck
-  }
-}

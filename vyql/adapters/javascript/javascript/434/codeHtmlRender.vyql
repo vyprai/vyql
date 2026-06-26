@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding htmlRender434 {
+  query pattern callExpr where callee.method == "bypassSecurityTrustStyle"
+  emit sink code.HtmlRender at args[0]
+}

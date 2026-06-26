@@ -1,0 +1,9 @@
+module bindings.java.migration.m6be46fbf;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.apache.cassandra:cassandra-all")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.SqlExecution at args[0]
+}

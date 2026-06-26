@@ -1,5 +1,0 @@
-adapter javascript {
-  package "react-router-dom" {
-    source path "HydratedRouter" -> code.DomInput
-  }
-}

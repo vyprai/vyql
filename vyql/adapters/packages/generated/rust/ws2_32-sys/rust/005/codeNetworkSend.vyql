@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5da00152;
+
+binding networkSend5 {
+  requires {
+    dependency("ws2_32-sys")
+  }
+  query pattern callExpr where callee.method == "WSASend"
+  emit sink code.NetworkSend at args[0]
+}

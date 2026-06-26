@@ -1,0 +1,9 @@
+module bindings.python.migration.md4288bce;
+
+binding deserialization1 {
+  requires {
+    dependency("biopython")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

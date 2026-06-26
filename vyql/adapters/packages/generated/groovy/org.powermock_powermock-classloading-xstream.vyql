@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter groovy {
-  package "org.powermock:powermock-classloading-xstream" {
-    sink method "clone" -> code.Deserialization
-  }
-}

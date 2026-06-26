@@ -1,5 +1,0 @@
-adapter python {
-  package "python-social-auth" {
-    source method "path_tokens" -> code.SecretValue
-  }
-}

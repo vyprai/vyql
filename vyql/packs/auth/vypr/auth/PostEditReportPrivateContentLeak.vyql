@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule PostEditReportPrivateContentLeak {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_200, CWE_863]
+    id: "VYQL-AUTH-040"
+    severity: high
+  }
+  issue code.PostEditReportPrivateContentLeak as report
+}

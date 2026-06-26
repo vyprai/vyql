@@ -1,0 +1,9 @@
+module bindings.scala.migration.m27896d22;
+
+binding deserialization2 {
+  requires {
+    dependency("net.minidev:json-smart")
+  }
+  query pattern callExpr where callee.method == "parseWithException"
+  emit sink code.Deserialization at args[0]
+}

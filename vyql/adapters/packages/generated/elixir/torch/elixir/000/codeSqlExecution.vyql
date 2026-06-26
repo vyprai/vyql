@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2c3a823f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("torch")
+  }
+  query pattern callExpr where callee.method == "paginate"
+  emit sink code.SqlExecution at args[0]
+}

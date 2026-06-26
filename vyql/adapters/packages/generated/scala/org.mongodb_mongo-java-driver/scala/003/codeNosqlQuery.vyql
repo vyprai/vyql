@@ -1,0 +1,9 @@
+module bindings.scala.migration.m91b5a0a7;
+
+binding nosqlQuery3 {
+  requires {
+    dependency("org.mongodb:mongo-java-driver")
+  }
+  query pattern callExpr where callee.method == "executeCommand"
+  emit sink code.NosqlQuery at args[0]
+}

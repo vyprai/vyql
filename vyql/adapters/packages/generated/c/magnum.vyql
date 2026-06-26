@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter c {
-  package "magnum" {
-    sink method "AbstractResourceLoader::load" -> code.FilePathAccess
-  }
-}

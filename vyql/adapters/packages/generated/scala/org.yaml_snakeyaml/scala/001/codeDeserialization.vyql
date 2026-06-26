@@ -1,0 +1,9 @@
+module bindings.scala.migration.m04c5a245;
+
+binding deserialization1 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "loadAs"
+  emit sink code.Deserialization at args[0]
+}

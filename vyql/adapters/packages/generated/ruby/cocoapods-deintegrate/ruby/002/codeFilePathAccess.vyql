@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m312b2054;
+
+binding filePathAccess2 {
+  requires {
+    dependency("cocoapods-deintegrate")
+  }
+  query pattern callExpr where callee.method == "deintegrate_target"
+  emit sink code.FilePathAccess at args[0]
+}

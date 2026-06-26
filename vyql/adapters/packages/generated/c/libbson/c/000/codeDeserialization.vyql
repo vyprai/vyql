@@ -1,0 +1,9 @@
+module bindings.c.migration.mbc6f74ce;
+
+binding deserialization0 {
+  requires {
+    dependency("libbson")
+  }
+  query pattern callExpr where callee.method == "code"
+  emit sink code.Deserialization at args[0]
+}

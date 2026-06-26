@@ -1,0 +1,9 @@
+module bindings.c.migration.m56be988b;
+
+binding networkConnect0 {
+  requires {
+    dependency("aws-c-io")
+  }
+  query pattern callExpr where callee.method == "aws_socket_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

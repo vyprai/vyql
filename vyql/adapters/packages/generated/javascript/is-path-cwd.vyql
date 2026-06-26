@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-
-adapter javascript {
-  package "is-path-cwd" {
-    sink method "isPathCwd" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m006c2da4;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/apple/swift-protobuf")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

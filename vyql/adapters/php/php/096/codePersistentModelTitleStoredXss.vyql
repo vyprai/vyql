@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding persistentModelTitleStoredXss96 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "call" and node.path == "$this.request.request.get" and node.flowTo.path == "$column.__setitem__" and not (containsAny(node.scopeCall.any, [noHtml, htmlspecialchars, htmlentities, strip_tags]))
+  emit issue code.PersistentModelTitleStoredXss at node
+}

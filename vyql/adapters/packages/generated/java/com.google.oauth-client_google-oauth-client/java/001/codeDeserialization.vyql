@@ -1,0 +1,9 @@
+module bindings.java.migration.m39800053;
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.oauth-client:google-oauth-client")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

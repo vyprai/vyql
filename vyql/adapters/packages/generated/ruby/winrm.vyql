@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter ruby {
-  package "winrm" {
-    sink method "run_wql" -> code.SqlExecution
-  }
-}

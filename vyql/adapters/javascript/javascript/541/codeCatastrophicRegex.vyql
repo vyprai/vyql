@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding catastrophicRegex541 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "RegExp" and node.token contains "d]*(?:;"
+  emit issue code.CatastrophicRegex at node
+  emit sink code.CatastrophicRegexSink at node
+}

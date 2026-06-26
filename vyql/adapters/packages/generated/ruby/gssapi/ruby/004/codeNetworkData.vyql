@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m3b1624df;
+
+binding networkData4 {
+  requires {
+    dependency("gssapi")
+  }
+  query pattern callExpr where callee.method == "wrap_message"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding httpInput17 {
+  query pattern callExpr where callee.path ~= ".QueryString"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.m87dd58c2;
+
+binding cookie1 {
+  requires {
+    dependency("codeception/module-yii2")
+  }
+  query pattern callExpr where callee.method == "setCookie"
+  emit source code.Cookie at call.result
+}

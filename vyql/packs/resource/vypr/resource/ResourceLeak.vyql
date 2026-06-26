@@ -1,0 +1,11 @@
+module vypr.resource;
+
+rule ResourceLeak {
+  meta {
+    cwe: [CWE_772]
+    id: "VYQL-RES-001"
+    severity: medium
+  }
+  issue code.ResourceHandle as h
+  unless h.dominates coveredBy core.ResourceRelease
+}

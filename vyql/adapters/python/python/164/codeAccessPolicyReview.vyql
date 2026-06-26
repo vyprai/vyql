@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding accessPolicyReview164 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=create_shelf" and node.token contains "ub.Shelf()" and node.token contains "create_edit_shelf" and node.token contains "page=\"shelfcreate\"" and not (node.token contains "role_edit_shelfs")
+  emit issue code.AccessPolicyReview at node
+}

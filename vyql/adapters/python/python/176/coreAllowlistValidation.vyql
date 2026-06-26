@@ -1,0 +1,11 @@
+module bindings.python.migration.m21017d75;
+
+binding allowlistValidation176 {
+  query pattern callExpr where callee.path ~= "is_allowed_host"
+  emit check core.AllowlistValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

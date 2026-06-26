@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me83d46b5;
+
+binding networkConnect3 {
+  requires {
+    dependency("req")
+  }
+  query pattern callExpr where callee.method == "post!"
+  emit sink code.NetworkConnectSink at args[0]
+}

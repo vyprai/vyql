@@ -1,0 +1,9 @@
+module bindings.swift.migration.me0ca856f;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("github.com/juliand665/UserDefault")
+  }
+  query pattern callExpr where callee.method == "saveValue"
+  emit sink code.StoredDataWrite at args[0]
+}

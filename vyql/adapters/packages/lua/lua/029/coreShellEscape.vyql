@@ -1,0 +1,14 @@
+module bindings.lua.migration.m49b0a04f;
+
+binding shellEscape29 {
+  requires {
+    dependency("lua-shell-games")
+  }
+  query pattern callExpr where callee.path ~= "shellescape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

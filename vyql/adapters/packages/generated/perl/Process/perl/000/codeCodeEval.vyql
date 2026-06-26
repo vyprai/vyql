@@ -1,0 +1,9 @@
+module bindings.perl.migration.m4de90834;
+
+binding codeEval0 {
+  requires {
+    dependency("Process")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding absoluteUriUserFolderLookup169 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=AbsoluteUri", "name=AbsoluteURI", "name=AbsolutePath"]) and node.token contains "call_path:explode" and node.token contains "call_path:$this.rootFolder.getUserFolder" and not (node.token contains "call_path:$this.userSession.getUser") and not (node.token contains "call_path:$user.getUID")
+  emit issue code.AbsoluteUriUserFolderLookup at node
+}

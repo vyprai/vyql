@@ -1,8 +1,0 @@
-import code.{CommandExecution}
-import core.{UserControlledData}
-
-adapter php {
-  package "seld/cli-prompt" {
-    source method "Seld\CliPrompt\CliPrompt::prompt" -> core.UserControlledData
-  }
-}

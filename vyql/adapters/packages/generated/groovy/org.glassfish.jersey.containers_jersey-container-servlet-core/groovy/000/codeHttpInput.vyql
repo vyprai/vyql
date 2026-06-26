@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1df5cfef;
+
+binding httpInput0 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-servlet-core")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}

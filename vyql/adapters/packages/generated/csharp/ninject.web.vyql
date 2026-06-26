@@ -1,7 +1,0 @@
-import code.{HttpInput}
-adapter csharp {
-  package "ninject.web" {
-    source method "ProcessRequest" -> code.HttpInput
-    source method "DoProcessRequest" -> code.HttpInput
-  }
-}

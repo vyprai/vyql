@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter objc {
-  package "SwiftKVC" {
-    source method "subscript" -> core.UserControlledData
-    source method "get" -> core.UserControlledData
-  }
-}

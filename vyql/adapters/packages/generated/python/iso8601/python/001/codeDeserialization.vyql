@@ -1,0 +1,9 @@
+module bindings.python.migration.m83b585b6;
+
+binding deserialization1 {
+  requires {
+    dependency("iso8601")
+  }
+  query pattern callExpr where callee.method == "parse_timezone"
+  emit sink code.Deserialization at args[0]
+}

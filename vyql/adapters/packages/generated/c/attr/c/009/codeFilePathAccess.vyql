@@ -1,0 +1,9 @@
+module bindings.c.migration.ma3178d8e;
+
+binding filePathAccess9 {
+  requires {
+    dependency("attr")
+  }
+  query pattern callExpr where callee.method == "walk_tree"
+  emit sink code.FilePathAccess at args[0]
+}

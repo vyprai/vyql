@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4b3b1680;
+
+binding networkBind4 {
+  requires {
+    dependency("gRPC-ProtoRPC")
+  }
+  query pattern callExpr where callee.method == "grpc_server_start"
+  emit sink code.NetworkBind at args[0]
+}

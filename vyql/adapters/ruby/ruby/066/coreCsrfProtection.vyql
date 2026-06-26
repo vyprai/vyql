@@ -1,0 +1,11 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding csrfProtection66 {
+  query pattern callExpr where callee.path ~= "verify_authenticity_token"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

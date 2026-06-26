@@ -1,7 +1,0 @@
-import code.{UrlFetch}
-
-adapter kotlin {
-  package "com.squareup.picasso:picasso" {
-    sink method "load" -> code.UrlFetch
-  }
-}

@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter scala {
-  package "com.beust:jcommander" {
-    source method "parse" -> core.UserControlledData
-  }
-}

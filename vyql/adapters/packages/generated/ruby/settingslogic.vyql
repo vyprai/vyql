@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "settingslogic" {
-    sink method "method_missing" -> code.Deserialization
-  }
-}

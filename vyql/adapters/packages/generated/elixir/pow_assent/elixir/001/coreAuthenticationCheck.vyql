@@ -1,0 +1,14 @@
+module bindings.elixir.migration.md564ea3c;
+
+binding authenticationCheck1 {
+  requires {
+    dependency("pow_assent")
+  }
+  query pattern callExpr where callee.method == "callback_upsert"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

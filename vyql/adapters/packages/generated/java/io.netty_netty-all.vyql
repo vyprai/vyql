@@ -1,9 +1,0 @@
-import code.{NetworkData, NetworkSend, NetworkConnect, NetworkBind}
-adapter java {
-  package "io.netty:netty-all" {
-    source method "readBytes" -> code.NetworkData
-    sink method "writeBytes" -> code.NetworkSend
-    sink method "connect" -> code.NetworkConnect
-    sink method "bind" -> code.NetworkBind
-  }
-}

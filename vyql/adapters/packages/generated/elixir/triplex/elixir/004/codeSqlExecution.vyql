@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me859b561;
+
+binding sqlExecution4 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.m447b4385;
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Slices"
+  emit source core.UserControlledData at call.result
+}

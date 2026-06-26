@@ -1,0 +1,6 @@
+module bindings.go.migration.m48a985c1;
+
+binding cliArgument19 {
+  query pattern callExpr where callee.path ~= "flag.Arg"
+  emit source code.CliArgument at call.result
+}

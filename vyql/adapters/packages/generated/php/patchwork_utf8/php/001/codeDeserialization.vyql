@@ -1,0 +1,9 @@
+module bindings.php.migration.m73b140ff;
+
+binding deserialization1 {
+  requires {
+    dependency("patchwork/utf8")
+  }
+  query pattern callExpr where callee.method == "unserialize"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{FileUse}
-
-adapter java {
-  package "org.mybatis.generator:mybatis-generator-core" {
-    sink method "generate" -> code.FileUse
-    sink method "write" -> code.FileUse
-  }
-}

@@ -1,8 +1,0 @@
-import code.{FilePathAccess}
-
-adapter rust {
-  package "predicates" {
-    sink method "read_file" -> code.FilePathAccess
-    sink method "from_file_path" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.powershell.migration.m92132a18;
+
+binding commandExecution14 {
+  requires {
+    dependency("Microsoft.PowerShell.Management")
+  }
+  query pattern callExpr where callee.path ~= "Start-Process"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,7 +1,0 @@
-adapter rust {
-  package "jsonrpc-core" {
-    sink method "handle_request_sync" -> code.Deserialization
-    sink method "handle_request" -> code.Deserialization
-    sink method "read_request" -> code.Deserialization
-  }
-}

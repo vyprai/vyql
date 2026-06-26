@@ -1,0 +1,9 @@
+module bindings.ruby.migration.ma17b2b86;
+
+binding logOutput1 {
+  requires {
+    dependency("yell")
+  }
+  query pattern callExpr where callee.method == "write!"
+  emit sink code.LogOutput at args[0]
+}

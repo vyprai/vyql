@@ -1,9 +1,0 @@
-import code.{FilePathAccess, NetworkData, Deserialization}
-adapter kotlin {
-  package "rome:rome" {
-    sink method "XmlReader" -> code.FilePathAccess
-    source method "XmlReader" -> code.NetworkData
-    sink method "read" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-  }
-}

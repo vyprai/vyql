@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m7ec5cd6a;
+
+binding filePathAccess2 {
+  requires {
+    dependency("com.aventstack:extentreports")
+  }
+  query pattern callExpr where callee.method == "createScreenCaptureFromPath"
+  emit sink code.FilePathAccess at args[0]
+}

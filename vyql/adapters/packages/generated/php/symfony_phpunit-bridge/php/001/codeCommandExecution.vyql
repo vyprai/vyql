@@ -1,0 +1,9 @@
+module bindings.php.migration.md77bab6c;
+
+binding commandExecution1 {
+  requires {
+    dependency("symfony/phpunit-bridge")
+  }
+  query pattern callExpr where callee.path ~= "bin/simple-phpunit.php::passthru"
+  emit sink code.CommandExecution at args[0]
+}

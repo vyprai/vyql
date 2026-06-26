@@ -1,0 +1,9 @@
+module bindings.cpp.migration.me84b83db;
+
+binding filePathAccess3 {
+  requires {
+    dependency("aws-c-io")
+  }
+  query pattern callExpr where callee.method == "aws_pem_objects_init_from_file_path"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter javascript {
-  package "readdirp" {
-    sink method "readdirp" -> code.FilePathAccess
-    sink method "readdirpPromise" -> code.FilePathAccess
-  }
-}

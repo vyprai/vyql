@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule PathBasedSandboxExposeBindRace {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_59, CWE_367, CWE_22]
+    id: "VYQL-PATH-047"
+    severity: critical
+  }
+  issue code.PathBasedSandboxExposeBindRace as sink
+}

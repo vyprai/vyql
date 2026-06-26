@@ -1,0 +1,7 @@
+module code;
+
+concept ExternalCall : sink {
+  cwe: [CWE_829]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [smartcontract.ExternalCallInjection]
+}

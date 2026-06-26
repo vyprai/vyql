@@ -1,7 +1,0 @@
-import code.{HttpInput}
-
-adapter ruby {
-  package "browser" {
-    source method "Browser::AcceptLanguage.parse" -> code.HttpInput
-  }
-}

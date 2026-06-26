@@ -1,0 +1,9 @@
+module bindings.go.migration.m61f6f98f;
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/mattn/go-zglob")
+  }
+  query pattern callExpr where callee.method == "Match"
+  emit sink code.FilePathAccess at args[0]
+}

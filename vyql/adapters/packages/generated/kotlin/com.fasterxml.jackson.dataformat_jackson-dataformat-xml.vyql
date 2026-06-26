@@ -1,8 +1,0 @@
-import code.{Deserialization, FilePathAccess, NetworkData}
-
-adapter kotlin {
-  package "com.fasterxml.jackson.dataformat:jackson-dataformat-xml" {
-    sink method "readValue" -> code.Deserialization
-    sink method "createParser" -> code.Deserialization
-  }
-}

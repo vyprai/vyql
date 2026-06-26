@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2cc4ccef;
+
+binding xmlParse2 {
+  requires {
+    dependency("sweet_xml")
+  }
+  query pattern callExpr where callee.method == "handle_dtd"
+  emit sink code.XmlParse at args[0]
+}

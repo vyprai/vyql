@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mff1f856c;
+
+binding commandExecution4 {
+  requires {
+    dependency("kitchen-vagrant")
+  }
+  query pattern callExpr where callee.method == "execute_command"
+  emit sink code.CommandExecution at args[0]
+}

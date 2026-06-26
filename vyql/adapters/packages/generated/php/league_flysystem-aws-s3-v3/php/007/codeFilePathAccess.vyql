@@ -1,0 +1,9 @@
+module bindings.php.migration.m053b035d;
+
+binding filePathAccess7 {
+  requires {
+    dependency("league/flysystem-aws-s3-v3")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m4e45b835;
+
+binding expressionEval2 {
+  requires {
+    dependency("github.com/nerzh/swift-regular-expression")
+  }
+  query pattern callExpr where callee.method == "replaceFirst"
+  emit sink code.ExpressionEval at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m8b310bd3;
+
+binding codeEval0 {
+  requires {
+    dependency("kf5declarative")
+  }
+  query pattern callExpr where callee.method == "setSource"
+  emit sink code.CodeEval at args[0]
+}

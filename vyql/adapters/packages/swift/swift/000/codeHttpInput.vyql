@@ -1,0 +1,9 @@
+module bindings.swift.migration.mc6005d88;
+
+binding httpInput0 {
+  requires {
+    dependency("vapor")
+  }
+  query pattern callExpr where callee.method == "query" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}

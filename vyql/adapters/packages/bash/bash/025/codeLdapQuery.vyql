@@ -1,0 +1,9 @@
+module bindings.bash.migration.mb6f991a5;
+
+binding ldapQuery25 {
+  requires {
+    dependency("openldap")
+  }
+  query pattern callExpr where callee.path ~= "ldapsearch"
+  emit sink code.LdapQuery at args.any
+}

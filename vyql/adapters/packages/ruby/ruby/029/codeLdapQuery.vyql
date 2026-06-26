@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5895bccf;
+
+binding ldapQuery29 {
+  requires {
+    dependency("net-ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}

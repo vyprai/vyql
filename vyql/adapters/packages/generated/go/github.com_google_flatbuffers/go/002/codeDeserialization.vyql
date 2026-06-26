@@ -1,0 +1,9 @@
+module bindings.go.migration.mc2425dbf;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/google/flatbuffers")
+  }
+  query pattern callExpr where callee.method == "GetBufferIdentifier"
+  emit sink code.Deserialization at args[0]
+}

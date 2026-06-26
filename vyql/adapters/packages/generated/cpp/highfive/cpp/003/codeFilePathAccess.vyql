@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m81595c17;
+
+binding filePathAccess3 {
+  requires {
+    dependency("highfive")
+  }
+  query pattern callExpr where callee.method == "getPath"
+  emit sink code.FilePathAccess at args[0]
+}

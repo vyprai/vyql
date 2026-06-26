@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1a2efc41;
+
+binding deserialization2 {
+  requires {
+    dependency("Plagger")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

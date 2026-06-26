@@ -1,0 +1,9 @@
+module bindings.python.migration.m1bab5e56;
+
+binding commandExecution1 {
+  requires {
+    dependency("uvicorn")
+  }
+  query pattern callExpr where callee.method == "subprocess_started"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter rust {
-  package "wasm-bindgen-macro-support" {
-    sink method "ClassMarker::parse" -> code.Deserialization
-  }
-}

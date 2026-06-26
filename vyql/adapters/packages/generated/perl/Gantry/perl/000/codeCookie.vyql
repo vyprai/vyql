@@ -1,0 +1,9 @@
+module bindings.perl.migration.m01685e94;
+
+binding cookie0 {
+  requires {
+    dependency("Gantry")
+  }
+  query pattern callExpr where callee.method == "get_cookies"
+  emit source code.Cookie at call.result
+}

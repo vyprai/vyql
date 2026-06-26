@@ -1,0 +1,9 @@
+module bindings.rust.migration.m5906ebe1;
+
+binding deserialization1 {
+  requires {
+    dependency("num-rational")
+  }
+  query pattern callExpr where callee.method == "from_str"
+  emit sink code.Deserialization at args[0]
+}

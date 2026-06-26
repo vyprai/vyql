@@ -1,0 +1,6 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding webViewLoad23 {
+  query pattern callExpr where callee.method == "evaluateJavascript"
+  emit sink code.WebViewLoad at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m26665031;
+
+binding deserialization0 {
+  requires {
+    dependency("moto")
+  }
+  query pattern callExpr where callee.method == "deserialize_body"
+  emit sink code.Deserialization at args[0]
+}

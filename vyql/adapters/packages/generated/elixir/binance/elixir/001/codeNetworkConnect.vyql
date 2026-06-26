@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m49825113;
+
+binding networkConnect1 {
+  requires {
+    dependency("binance")
+  }
+  query pattern callExpr where callee.method == "unsigned_request_binance"
+  emit sink code.NetworkConnectSink at args[0]
+}

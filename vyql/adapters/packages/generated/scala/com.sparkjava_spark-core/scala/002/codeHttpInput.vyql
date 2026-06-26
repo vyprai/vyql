@@ -1,0 +1,9 @@
+module bindings.scala.migration.m852e8598;
+
+binding httpInput2 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit source code.HttpInput at call.result
+}

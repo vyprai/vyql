@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mbfd454d1;
+
+binding codeEval6 {
+  requires {
+    dependency("groovy")
+  }
+  query pattern callExpr where callee.path ~= "Eval.me"
+  emit sink code.CodeEval at args[0]
+}

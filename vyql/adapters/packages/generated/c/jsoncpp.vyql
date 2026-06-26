@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter c {
-  package "jsoncpp" {
-    sink method "Reader.parse" -> code.Deserialization
-  }
-}

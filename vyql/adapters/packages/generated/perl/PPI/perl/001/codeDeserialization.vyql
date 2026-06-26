@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma50a59da;
+
+binding deserialization1 {
+  requires {
+    dependency("PPI")
+  }
+  query pattern callExpr where callee.method == "lex_file"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,10 @@
+module bindings.go.migration.m48a985c1;
+
+binding unsafeBuildClientCommandAssembly283 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:BuildClient" and node.token contains "literal:GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build" and node.token contains "selector:input.Filename" and node.token contains "call:handleFilename" and node.token contains "call_path:fmt.Sprintf" and node.token contains "call_path:exec.Command" and not (node.token contains "call_path:utils.NormalizeString") and not (node.token contains "call_path:utils.StringIsNumber") and not (node.token contains "call_path:utils.IsValidIPAddress")
+  emit issue code.UnsafeBuildClientCommandAssembly at node
+}

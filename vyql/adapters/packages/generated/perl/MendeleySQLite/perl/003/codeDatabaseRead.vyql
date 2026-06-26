@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1f45aed0;
+
+binding databaseRead3 {
+  requires {
+    dependency("MendeleySQLite")
+  }
+  query pattern callExpr where callee.method == "get_all_tags_for_document"
+  emit sink code.DatabaseReadSink at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mae4bb781;
+
+binding deserialization1 {
+  requires {
+    dependency("symfony/polyfill-intl-icu")
+  }
+  query pattern callExpr where callee.method == "parseCurrency"
+  emit sink code.Deserialization at args[0]
+}

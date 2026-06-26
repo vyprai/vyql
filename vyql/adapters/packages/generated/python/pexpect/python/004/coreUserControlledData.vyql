@@ -1,0 +1,9 @@
+module bindings.python.migration.m90ea37e9;
+
+binding userControlledData4 {
+  requires {
+    dependency("pexpect")
+  }
+  query pattern callExpr where callee.method == "split_command_line"
+  emit source core.UserControlledData at call.result
+}

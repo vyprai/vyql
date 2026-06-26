@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter kotlin {
-  package "org.jboss.arquillian.junit:arquillian-junit-container" {
-    sink method "execute" -> code.CodeEval
-  }
-}

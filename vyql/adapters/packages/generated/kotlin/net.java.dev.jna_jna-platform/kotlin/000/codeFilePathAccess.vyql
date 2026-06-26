@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m52aac050;
+
+binding filePathAccess0 {
+  requires {
+    dependency("net.java.dev.jna:jna-platform")
+  }
+  query pattern callExpr where callee.method == "moveToTrash"
+  emit sink code.FilePathAccess at args[0]
+}

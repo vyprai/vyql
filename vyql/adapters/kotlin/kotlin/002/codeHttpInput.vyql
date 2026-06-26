@@ -1,0 +1,6 @@
+module bindings.kotlin.migration.m304d1620;
+
+binding httpInput2 {
+  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "annotation:PutMapping"
+  emit source code.HttpInput at call.result
+}

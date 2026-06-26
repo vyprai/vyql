@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m86810149;
+
+binding deserialization1 {
+  requires {
+    dependency("javax.mail:mail")
+  }
+  query pattern callExpr where callee.method == "InternetAddress.parse"
+  emit sink code.Deserialization at args[0]
+}

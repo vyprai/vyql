@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mca980e10;
+
+binding filePathAccess2 {
+  requires {
+    dependency("net-scp")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.FilePathAccess at args[0]
+}

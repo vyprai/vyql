@@ -1,0 +1,9 @@
+module bindings.perl.migration.mf00bb792;
+
+binding deserialization9 {
+  requires {
+    dependency("Kwalify")
+  }
+  query pattern callExpr where callee.method == "validate_time"
+  emit sink code.Deserialization at args[0]
+}

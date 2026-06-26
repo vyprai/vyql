@@ -1,0 +1,9 @@
+module bindings.cpp.migration.mdba66264;
+
+binding userControlledData0 {
+  requires {
+    dependency("kf5sonnet")
+  }
+  query pattern callExpr where callee.method == "setBuffer"
+  emit source core.UserControlledData at call.result
+}

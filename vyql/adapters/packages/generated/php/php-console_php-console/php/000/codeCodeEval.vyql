@@ -1,0 +1,9 @@
+module bindings.php.migration.md6e99547;
+
+binding codeEval0 {
+  requires {
+    dependency("php-console/php-console")
+  }
+  query pattern callExpr where callee.method == "dispatchCode"
+  emit sink code.CodeEval at args[0]
+}

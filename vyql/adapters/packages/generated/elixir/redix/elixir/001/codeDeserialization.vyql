@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m624a3b43;
+
+binding deserialization1 {
+  requires {
+    dependency("redix")
+  }
+  query pattern callExpr where callee.method == "Redix.Protocol.parse_multi"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.mefc26b2f;
+
+binding deserialization0 {
+  requires {
+    dependency("defusedxml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

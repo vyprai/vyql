@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m307a18ba;
+
+binding deserialization1 {
+  requires {
+    dependency("lodepng")
+  }
+  query pattern callExpr where callee.method == "lodepng_decode_file"
+  emit sink code.Deserialization at args[0]
+}

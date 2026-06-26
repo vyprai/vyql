@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "membrane_rtp_format" {
-    sink method "register_payload_type_mapping" -> code.Deserialization
-    sink method "register" -> code.Deserialization
-  }
-}

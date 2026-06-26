@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m19ec740d;
+
+binding networkSend7 {
+  requires {
+    dependency("io.netty:netty-buffer")
+  }
+  query pattern callExpr where callee.method == "setBytes"
+  emit sink code.NetworkSend at args[0]
+}

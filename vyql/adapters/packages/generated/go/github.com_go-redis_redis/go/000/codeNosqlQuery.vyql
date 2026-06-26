@@ -1,0 +1,9 @@
+module bindings.go.migration.m68ebe15d;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("github.com/go-redis/redis")
+  }
+  query pattern callExpr where callee.method == "Get"
+  emit sink code.NosqlQuery at args[0]
+}

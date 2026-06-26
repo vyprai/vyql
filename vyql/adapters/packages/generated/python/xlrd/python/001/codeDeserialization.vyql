@@ -1,0 +1,9 @@
+module bindings.python.migration.mfd2e419c;
+
+binding deserialization1 {
+  requires {
+    dependency("xlrd")
+  }
+  query pattern callExpr where callee.method == "open_workbook_xls"
+  emit sink code.Deserialization at args[0]
+}

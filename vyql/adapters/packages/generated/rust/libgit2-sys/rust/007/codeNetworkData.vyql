@@ -1,0 +1,9 @@
+module bindings.rust.migration.m540f56d1;
+
+binding networkData7 {
+  requires {
+    dependency("libgit2-sys")
+  }
+  query pattern callExpr where callee.method == "git_remote_download"
+  emit source code.NetworkData at call.result
+}

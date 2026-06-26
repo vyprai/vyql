@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m36422801;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.shiro:shiro-web")
+  }
+  query pattern callExpr where callee.method == "getPathWithinApplication"
+  emit source code.HttpInput at call.result
+}

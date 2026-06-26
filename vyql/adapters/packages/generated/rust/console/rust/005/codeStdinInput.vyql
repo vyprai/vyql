@@ -1,0 +1,9 @@
+module bindings.rust.migration.mc226c3b1;
+
+binding stdinInput5 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_secure_line"
+  emit source code.StdinInput at call.result
+}

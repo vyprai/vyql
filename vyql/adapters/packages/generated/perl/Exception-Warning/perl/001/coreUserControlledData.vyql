@@ -1,0 +1,9 @@
+module bindings.perl.migration.m3e148717;
+
+binding userControlledData1 {
+  requires {
+    dependency("Exception-Warning")
+  }
+  query pattern callExpr where callee.method == "__DIE__"
+  emit source core.UserControlledData at call.result
+}

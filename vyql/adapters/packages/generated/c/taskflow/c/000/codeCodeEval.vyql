@@ -1,0 +1,9 @@
+module bindings.c.migration.m20618f6c;
+
+binding codeEval0 {
+  requires {
+    dependency("taskflow")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding commandArgumentValidation513 {
+  query pattern callExpr where callee.path ~= "isValidHost"
+  emit check core.CommandArgumentValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

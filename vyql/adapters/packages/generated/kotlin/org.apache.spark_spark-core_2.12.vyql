@@ -1,5 +1,0 @@
-adapter kotlin {
-  package "org.apache.spark:spark-core_2.12" {
-    sink method "run" -> code.CommandExecution
-  }
-}

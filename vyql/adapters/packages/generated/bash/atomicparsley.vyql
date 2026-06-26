@@ -1,6 +1,0 @@
-import code.{CliArgument, CommandExecution}
-adapter bash {
-  package "atomicparsley" {
-    source method "AtomicParsley" -> code.CliArgument
-  }
-}

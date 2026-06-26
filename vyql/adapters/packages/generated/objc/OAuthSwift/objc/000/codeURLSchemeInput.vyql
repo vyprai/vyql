@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc6062c70;
+
+binding uRLSchemeInput0 {
+  requires {
+    dependency("OAuthSwift")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.URLSchemeInput at call.result
+}

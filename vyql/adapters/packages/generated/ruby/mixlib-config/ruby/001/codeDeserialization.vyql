@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m850ba68e;
+
+binding deserialization1 {
+  requires {
+    dependency("mixlib-config")
+  }
+  query pattern callExpr where callee.method == "from_yaml"
+  emit sink code.Deserialization at args[0]
+}

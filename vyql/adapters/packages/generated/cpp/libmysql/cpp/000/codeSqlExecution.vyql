@@ -1,0 +1,9 @@
+module bindings.cpp.migration.ma8e6e7f2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("libmysql")
+  }
+  query pattern callExpr where callee.method == "kill_query"
+  emit sink code.SqlExecution at args[0]
+}

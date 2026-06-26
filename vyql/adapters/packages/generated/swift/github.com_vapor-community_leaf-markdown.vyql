@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter swift {
-  package "github.com/vapor-community/leaf-markdown" {
-    sink method "render" -> code.HtmlRender
-  }
-}

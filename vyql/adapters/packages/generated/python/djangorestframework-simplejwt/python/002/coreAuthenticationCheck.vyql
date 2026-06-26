@@ -1,0 +1,14 @@
+module bindings.python.migration.mac4e01b5;
+
+binding authenticationCheck2 {
+  requires {
+    dependency("djangorestframework-simplejwt")
+  }
+  query pattern callExpr where callee.method == "check_blacklist"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

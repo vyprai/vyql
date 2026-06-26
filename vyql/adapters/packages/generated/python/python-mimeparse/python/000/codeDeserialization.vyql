@@ -1,0 +1,9 @@
+module bindings.python.migration.md6a6dd4a;
+
+binding deserialization0 {
+  requires {
+    dependency("python-mimeparse")
+  }
+  query pattern callExpr where callee.method == "parse_mime_type"
+  emit sink code.Deserialization at args[0]
+}

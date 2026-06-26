@@ -1,0 +1,9 @@
+module bindings.objc.migration.m7b0b866c;
+
+binding networkData1 {
+  requires {
+    dependency("CNIOWindows")
+  }
+  query pattern callExpr where callee.method == "CNIOWindows_recvmmsg"
+  emit source code.NetworkData at call.result
+}

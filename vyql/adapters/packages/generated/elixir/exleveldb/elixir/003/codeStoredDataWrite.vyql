@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m23562f2c;
+
+binding storedDataWrite3 {
+  requires {
+    dependency("exleveldb")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.StoredDataWrite at args[0]
+}

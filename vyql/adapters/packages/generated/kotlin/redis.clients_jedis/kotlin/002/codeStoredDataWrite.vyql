@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m3f4f1628;
+
+binding storedDataWrite2 {
+  requires {
+    dependency("redis.clients:jedis")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit sink code.StoredDataWrite at args[0]
+}

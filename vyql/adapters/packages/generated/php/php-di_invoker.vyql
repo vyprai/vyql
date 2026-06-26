@@ -1,6 +1,0 @@
-import code.{CodeEval}
-adapter php {
-  package "php-di/invoker" {
-    sink method "call" -> code.CodeEval
-  }
-}

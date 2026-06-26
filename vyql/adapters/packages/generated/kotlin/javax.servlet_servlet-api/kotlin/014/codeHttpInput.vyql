@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma8d8feef;
+
+binding httpInput14 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "getServletPath"
+  emit source code.HttpInput at call.result
+}

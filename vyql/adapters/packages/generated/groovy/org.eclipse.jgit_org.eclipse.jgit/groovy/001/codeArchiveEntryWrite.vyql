@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m51a6149b;
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("org.eclipse.jgit:org.eclipse.jgit")
+  }
+  query pattern callExpr where callee.method == "cloneRepository"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

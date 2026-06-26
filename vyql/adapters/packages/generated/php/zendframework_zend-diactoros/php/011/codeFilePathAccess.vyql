@@ -1,0 +1,9 @@
+module bindings.php.migration.m4685cbb4;
+
+binding filePathAccess11 {
+  requires {
+    dependency("zendframework/zend-diactoros")
+  }
+  query pattern callExpr where callee.method == "CallbackStream::write"
+  emit sink code.FilePathAccess at args[0]
+}

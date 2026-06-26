@@ -1,0 +1,9 @@
+module bindings.python.migration.mbd84b515;
+
+binding urlFetch0 {
+  requires {
+    dependency("gdown")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.UrlFetch at args[0]
+}

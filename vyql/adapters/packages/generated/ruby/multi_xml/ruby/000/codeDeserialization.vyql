@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m5bce96a1;
+
+binding deserialization0 {
+  requires {
+    dependency("multi_xml")
+  }
+  query pattern callExpr where callee.method == "MultiXml.parse"
+  emit sink code.Deserialization at args[0]
+}

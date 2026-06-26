@@ -1,0 +1,9 @@
+module bindings.perl.migration.m21559073;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "mkdir"
+  emit sink code.FilePathAccess at args[0]
+}

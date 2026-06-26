@@ -1,0 +1,6 @@
+module bindings.csharp.migration.m1caa8bf2;
+
+binding deserialization52 {
+  query pattern callExpr where callee.method == "Deserialize"
+  emit sink code.Deserialization at args[0]
+}

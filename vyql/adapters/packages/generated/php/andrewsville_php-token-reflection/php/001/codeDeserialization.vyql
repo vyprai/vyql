@@ -1,0 +1,9 @@
+module bindings.php.migration.mc8484175;
+
+binding deserialization1 {
+  requires {
+    dependency("andrewsville/php-token-reflection")
+  }
+  query pattern callExpr where callee.method == "processFile"
+  emit sink code.Deserialization at args[0]
+}

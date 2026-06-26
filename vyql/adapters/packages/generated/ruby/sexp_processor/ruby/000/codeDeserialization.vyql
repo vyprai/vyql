@@ -1,0 +1,9 @@
+module bindings.ruby.migration.maacfdcfd;
+
+binding deserialization0 {
+  requires {
+    dependency("sexp_processor")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

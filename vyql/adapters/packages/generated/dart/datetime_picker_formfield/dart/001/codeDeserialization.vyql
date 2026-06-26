@@ -1,0 +1,9 @@
+module bindings.dart.migration.m70c9abb4;
+
+binding deserialization1 {
+  requires {
+    dependency("datetime_picker_formfield")
+  }
+  query pattern callExpr where callee.method == "tryParse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.go.migration.mae6b10af;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/shurcooL/notifications")
+  }
+  query pattern callExpr where callee.method == "createEmptyFile"
+  emit sink code.FilePathAccess at args[0]
+}

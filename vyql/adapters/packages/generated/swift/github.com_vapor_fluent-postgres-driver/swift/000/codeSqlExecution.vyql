@@ -1,0 +1,9 @@
+module bindings.swift.migration.mf7e00e14;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/vapor/fluent-postgres-driver")
+  }
+  query pattern callExpr where callee.method == "postgres"
+  emit sink code.SqlExecution at args[0]
+}

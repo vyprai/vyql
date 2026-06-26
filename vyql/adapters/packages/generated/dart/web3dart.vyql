@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-adapter dart {
-  package "web3dart" {
-    sink method "call" -> code.NetworkSend
-    sink method "sendRawTransaction" -> code.NetworkSend
-  }
-}

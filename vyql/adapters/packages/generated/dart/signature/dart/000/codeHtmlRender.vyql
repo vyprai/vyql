@@ -1,0 +1,9 @@
+module bindings.dart.migration.m2b80cc2d;
+
+binding htmlRender0 {
+  requires {
+    dependency("signature")
+  }
+  query pattern callExpr where callee.method == "toRawSVG"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,6 @@
+module code;
+
+concept CommandOptionInjection : issue {
+  cwe: [CWE_74, CWE_88]
+  vulnerableTo: [injection.ArgumentInjection]
+}

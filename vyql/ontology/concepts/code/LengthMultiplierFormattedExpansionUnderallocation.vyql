@@ -1,0 +1,11 @@
+module code;
+
+concept LengthMultiplierFormattedExpansionUnderallocation : issue {
+  cwe: [CWE_787, CWE_190]
+  review_assumption: "the generated formatted tokens can grow beyond the per-input multiplier as numeric indexes gain digits"
+  reviewCategory: memory
+  reviewCondition: "a buffer is allocated from input length with a fixed small multiplier before formatted numeric expansion writes into it"
+  reviewConfidence: high
+  reviewEvidence: "allocation/format context {pattern} sizes output from strlen(input) * N and later writes generated %d text into the same expansion buffer"
+  vulnerableTo: [memory.OobWrite, memory.IntegerOverflow]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m5d49181c;
+
+binding filePathAccess2 {
+  requires {
+    dependency("Moya")
+  }
+  query pattern callExpr where callee.method == "let"
+  emit sink code.FilePathAccess at args[0]
+}

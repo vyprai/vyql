@@ -1,0 +1,9 @@
+module bindings.perl.migration.m1a62625e;
+
+binding userControlledData1 {
+  requires {
+    dependency("Caroline")
+  }
+  query pattern callExpr where callee.method == "readkey"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding commandLineAssemblyReview22 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "g_app_info_create_from_commandline(cmdline" and node.token contains "g_string_append_printf(cmd,\"--find=%s\",search_string)" and not (node.token contains "g_shell_quote")
+  emit issue code.CommandLineAssemblyReview at node
+}

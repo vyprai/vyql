@@ -1,0 +1,14 @@
+module bindings.ruby.migration.m7d71eef6;
+
+binding inputValidation1 {
+  requires {
+    dependency("protected_attributes")
+  }
+  query pattern callExpr where callee.method == "attr_accessible"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

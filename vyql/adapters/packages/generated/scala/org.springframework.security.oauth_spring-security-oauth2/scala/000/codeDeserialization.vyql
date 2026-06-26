@@ -1,0 +1,9 @@
+module bindings.scala.migration.m86db18c5;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.security.oauth:spring-security-oauth2")
+  }
+  query pattern callExpr where callee.method == "parseMap"
+  emit sink code.Deserialization at args[0]
+}

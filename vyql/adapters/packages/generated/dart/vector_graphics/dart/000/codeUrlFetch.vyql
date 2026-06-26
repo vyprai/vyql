@@ -1,0 +1,9 @@
+module bindings.dart.migration.m618da0bc;
+
+binding urlFetch0 {
+  requires {
+    dependency("vector_graphics")
+  }
+  query pattern callExpr where callee.method == "NetworkBytesLoader"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "geo" {
-    sink method "decode" -> code.Deserialization
-    sink method "decode!" -> code.Deserialization
-    sink method "repair_str" -> code.Deserialization
-  }
-}

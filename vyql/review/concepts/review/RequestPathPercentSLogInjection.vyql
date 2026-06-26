@@ -1,0 +1,8 @@
+module code;
+
+review code.RequestPathPercentSLogInjection {
+  category: injection
+  expected: [core.OutputEncoding]
+  kind: attention
+  text: "review request-path diagnostic logging for repr-style escaping or explicit control-character neutralization"
+}

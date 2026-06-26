@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m925b957f;
+
+binding userControlledData2 {
+  requires {
+    dependency("html-proofer")
+  }
+  query pattern callExpr where callee.method == "add_internal"
+  emit source core.UserControlledData at call.result
+}

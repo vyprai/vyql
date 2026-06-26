@@ -1,0 +1,9 @@
+module bindings.python.migration.mc7a68612;
+
+binding networkConnect0 {
+  requires {
+    dependency("pytest-remotedata")
+  }
+  query pattern callExpr where callee.method == "turn_off_internet"
+  emit sink code.NetworkConnectSink at args[0]
+}

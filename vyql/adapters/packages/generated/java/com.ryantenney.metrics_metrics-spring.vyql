@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter java {
-  package "com.ryantenney.metrics:metrics-spring" {
-    sink method "parse" -> code.Deserialization
-  }
-}

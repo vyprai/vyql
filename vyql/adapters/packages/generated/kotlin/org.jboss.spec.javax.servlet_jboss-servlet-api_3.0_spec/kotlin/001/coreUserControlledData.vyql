@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m4879cb79;
+
+binding userControlledData1 {
+  requires {
+    dependency("org.jboss.spec.javax.servlet:jboss-servlet-api_3.0_spec")
+  }
+  query pattern callExpr where callee.method == "parseQueryString"
+  emit source core.UserControlledData at call.result
+}

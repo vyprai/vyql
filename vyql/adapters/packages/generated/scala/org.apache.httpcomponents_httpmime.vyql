@@ -1,5 +1,0 @@
-adapter scala {
-  package "org.apache.httpcomponents:httpmime" {
-    sink method "FileBody" -> code.FilePathAccess
-  }
-}

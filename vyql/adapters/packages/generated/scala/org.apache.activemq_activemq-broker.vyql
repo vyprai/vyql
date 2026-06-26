@@ -1,9 +1,0 @@
-import code.{NetworkSend, NetworkData}
-
-adapter scala {
-  package "org.apache.activemq:activemq-broker" {
-    sink method "send" -> code.NetworkSend
-    sink method "dispatchSync" -> code.NetworkSend
-    sink method "dispatchAsync" -> code.NetworkSend
-  }
-}

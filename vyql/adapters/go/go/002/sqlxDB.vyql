@@ -1,0 +1,8 @@
+module bindings.go.migration.m48a985c1;
+
+binding dB2 {
+  query pattern callExpr where callee.path ~= "sqlx.Open"
+  emit fact runtime.ReceiverType at call.result {
+    about: sqlx.DB
+  }
+}

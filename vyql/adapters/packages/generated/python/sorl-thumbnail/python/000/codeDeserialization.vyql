@@ -1,0 +1,9 @@
+module bindings.python.migration.mc84623f1;
+
+binding deserialization0 {
+  requires {
+    dependency("sorl-thumbnail")
+  }
+  query pattern callExpr where callee.method == "deserialize_image_file"
+  emit sink code.Deserialization at args[0]
+}

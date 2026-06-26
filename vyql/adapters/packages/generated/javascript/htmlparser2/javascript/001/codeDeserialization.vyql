@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m4f267c0d;
+
+binding deserialization1 {
+  requires {
+    dependency("htmlparser2")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.Deserialization at args[0]
+}

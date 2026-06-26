@@ -1,0 +1,14 @@
+module bindings.go.migration.m39efcd29;
+
+binding csrfProtection37 {
+  requires {
+    dependency("github.com/gorilla/csrf")
+  }
+  query pattern callExpr where callee.path ~= "csrf.Protect"
+  emit check core.CsrfProtection at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

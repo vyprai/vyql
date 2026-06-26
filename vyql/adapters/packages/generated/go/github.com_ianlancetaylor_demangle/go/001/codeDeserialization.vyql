@@ -1,0 +1,9 @@
+module bindings.go.migration.m62d9a5df;
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/ianlancetaylor/demangle")
+  }
+  query pattern callExpr where callee.method == "ToString"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.ma47aeaca;
+
+binding deserialization1 {
+  requires {
+    dependency("flow/jsonpath")
+  }
+  query pattern callExpr where callee.method == "FlowJSONPathJSONPath::parseTokens"
+  emit sink code.Deserialization at args[0]
+}

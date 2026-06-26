@@ -1,0 +1,9 @@
+module bindings.scala.migration.maa09a5f1;
+
+binding deserialization0 {
+  requires {
+    dependency("net.bytebuddy:byte-buddy")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

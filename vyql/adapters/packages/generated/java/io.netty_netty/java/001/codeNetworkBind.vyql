@@ -1,0 +1,9 @@
+module bindings.java.migration.md40ee1af;
+
+binding networkBind1 {
+  requires {
+    dependency("io.netty:netty")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}

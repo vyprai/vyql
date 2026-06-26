@@ -1,0 +1,9 @@
+module bindings.perl.migration.me8aeb0a7;
+
+binding httpInput0 {
+  requires {
+    dependency("CGI-Application-Plugin-DetectAjax")
+  }
+  query pattern callExpr where callee.method == "is_ajax"
+  emit source code.HttpInput at call.result
+}

@@ -1,8 +1,6 @@
 package frontend
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -52,39 +50,33 @@ func CallEffectsFor(tech, path, method string) []nir.CallEffect {
 
 func loadCallFlowProfiles() {
 	callFlowProfiles = map[string][]callFlowSpec{}
-	files, err := filepath.Glob(filepath.Join(datadir.Root(), "adapters", "*.vyql"))
+	files, err := datadir.ReadVYQLDirExcept("adapters", "packages")
 	if err != nil {
-		panic("frontend: glob adapters/*.vyql: " + err.Error())
+		panic("frontend: read adapters: " + err.Error())
 	}
-	for _, file := range files {
-		raw, err := os.ReadFile(file)
-		if err != nil {
-			panic("frontend: read " + file + ": " + err.Error())
+	decls, err := parseV2RuntimeAdapterSources(files)
+	if err != nil {
+		panic("frontend: parse adapter call-flow corpus: " + err.Error())
+	}
+	for _, d := range decls {
+		ad, ok := d.(*parser.AdapterDecl)
+		if !ok {
+			continue
 		}
-		decls, err := parser.Parse(string(raw))
-		if err != nil {
-			panic("frontend: parse " + file + ": " + err.Error())
-		}
-		for _, d := range decls {
-			ad, ok := d.(*parser.AdapterDecl)
-			if !ok {
+		for _, mp := range ad.Mappings {
+			if mp.Kind != "flow_path" && mp.Kind != "flow_method" && mp.Kind != "flow_prefix" {
 				continue
 			}
-			for _, mp := range ad.Mappings {
-				if mp.Kind != "flow_path" && mp.Kind != "flow_method" && mp.Kind != "flow_prefix" {
-					continue
-				}
-				callFlowProfiles[ad.Name] = append(callFlowProfiles[ad.Name], callFlowSpec{
-					Pattern: mp.Pattern,
-					Method:  mp.Kind == "flow_method",
-					Prefix:  mp.Kind == "flow_prefix",
-					Effect: nir.CallEffect{
-						DestArg:      mp.FlowDestArg,
-						SourceArg:    mp.FlowSourceArg,
-						SourceResult: mp.FlowSourceResult,
-					},
-				})
-			}
+			callFlowProfiles[ad.Name] = append(callFlowProfiles[ad.Name], callFlowSpec{
+				Pattern: mp.Pattern,
+				Method:  mp.Kind == "flow_method",
+				Prefix:  mp.Kind == "flow_prefix",
+				Effect: nir.CallEffect{
+					DestArg:      mp.FlowDestArg,
+					SourceArg:    mp.FlowSourceArg,
+					SourceResult: mp.FlowSourceResult,
+				},
+			})
 		}
 	}
 }

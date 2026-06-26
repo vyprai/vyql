@@ -1,0 +1,9 @@
+module bindings.swift.migration.m015b46cb;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/kylef/PathKit")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}

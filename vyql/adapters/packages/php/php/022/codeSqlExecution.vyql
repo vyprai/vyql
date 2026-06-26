@@ -1,0 +1,9 @@
+module bindings.php.migration.mc5601031;
+
+binding sqlExecution22 {
+  requires {
+    dependency("mysqli")
+  }
+  query pattern callExpr where callee.path ~= "mysqli_query"
+  emit sink code.SqlExecution at args[1]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.migration.ma810090d;
+
+binding deserialization1 {
+  requires {
+    dependency("fdeflate")
+  }
+  query pattern callExpr where callee.method == "decompress_to_vec_bounded"
+  emit sink code.Deserialization at args[0]
+}

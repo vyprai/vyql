@@ -1,5 +1,0 @@
-adapter rust {
-  package "borsh-derive" {
-    sink method "parse" -> code.Deserialization
-  }
-}

@@ -1,7 +1,0 @@
-adapter javascript {
-  package "deep-extend" {
-    flag code.RegexCompile on any {
-      method "RegExp"
-    }
-  }
-}

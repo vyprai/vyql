@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter dart {
-  package "built_value" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

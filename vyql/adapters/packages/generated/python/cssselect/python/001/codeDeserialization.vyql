@@ -1,0 +1,9 @@
+module bindings.python.migration.m5cd0bf4b;
+
+binding deserialization1 {
+  requires {
+    dependency("cssselect")
+  }
+  query pattern callExpr where callee.method == "css_to_xpath"
+  emit sink code.Deserialization at args[0]
+}

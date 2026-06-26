@@ -1,5 +1,0 @@
-adapter java {
-  package "org.apache.httpcomponents:httpclient-cache" {
-    sink method "parseDate" -> code.Deserialization
-  }
-}

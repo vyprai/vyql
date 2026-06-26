@@ -1,7 +1,0 @@
-import code.{FilePathAccess}
-adapter swift {
-  package "github.com/Clipy/LoginServiceKit" {
-    sink method "addLoginItems" -> code.FilePathAccess
-    sink method "removeLoginItems" -> code.FilePathAccess
-  }
-}

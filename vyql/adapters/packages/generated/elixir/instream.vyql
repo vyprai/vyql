@@ -1,7 +1,0 @@
-import code.{DatabaseRead, NosqlQuery}
-adapter elixir {
-  package "instream" {
-    sink method "read" -> code.DatabaseRead
-    sink method "write" -> code.NosqlQuery
-  }
-}

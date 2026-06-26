@@ -1,7 +1,0 @@
-import code.{Deserialization, ExpressionEval}
-adapter php {
-  package "jms/serializer" {
-    sink method "deserialize" -> code.Deserialization
-    sink method "parse" -> code.ExpressionEval
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.mfe250756;
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("python-debian")
+  }
+  query pattern callExpr where callee.method == "extractfile"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

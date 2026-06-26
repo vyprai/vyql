@@ -1,7 +1,0 @@
-adapter c {
-  package "boost-regex" {
-    flag code.RegexCompile on any {
-      method "parse"
-    }
-  }
-}

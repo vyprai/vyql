@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mc82756da;
+
+binding filePathAccess6 {
+  requires {
+    dependency("linecache19")
+  }
+  query pattern callExpr where callee.method == "sha1"
+  emit sink code.FilePathAccess at args[0]
+}

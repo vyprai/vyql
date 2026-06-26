@@ -1,0 +1,14 @@
+module bindings.swift.migration.m6811125b;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("github.com/jevonmao/PermissionsSwiftUI")
+  }
+  query pattern callExpr where callee.method == "requestPermission"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

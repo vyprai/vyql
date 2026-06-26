@@ -1,7 +1,0 @@
-import code.{Deserialization, FilePathAccess}
-adapter php {
-  package "zendframework/zend-stdlib" {
-    sink method "Zend\Stdlib\Parameters::parse_str" -> code.Deserialization
-    sink method "Zend\Stdlib\Glob::glob" -> code.FilePathAccess
-  }
-}

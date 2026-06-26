@@ -1,0 +1,6 @@
+module bindings.bash.migration.m59952d5d;
+
+binding httpInput0 {
+  query pattern callExpr where callee.path ~= "shell_input"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,14 @@
+module bindings.javascript.migration.m5c270092;
+
+binding htmlEscape49 {
+  requires {
+    dependency("escape-html")
+  }
+  query pattern callExpr where callee.path ~= "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

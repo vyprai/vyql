@@ -1,7 +1,0 @@
-import core.{HtmlEscape}
-
-adapter ruby {
-  package "html-pipeline" {
-    control method "SanitizationFilter.call" -> core.HtmlEscape
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mfb23522e;
+
+binding filePathAccess1 {
+  requires {
+    dependency("jline:jline")
+  }
+  query pattern callExpr where callee.method == "Nano.open"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb5c8f190;
+
+binding codeEval0 {
+  requires {
+    dependency("better_errors")
+  }
+  query pattern callExpr where callee.method == "do_eval"
+  emit sink code.CodeEval at args[0]
+}

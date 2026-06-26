@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m57a73f60;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.jboss.shrinkwrap.resolver:shrinkwrap-resolver-impl-maven")
+  }
+  query pattern callExpr where callee.method == "fileFromClassLoaderResource"
+  emit sink code.FilePathAccess at args[0]
+}

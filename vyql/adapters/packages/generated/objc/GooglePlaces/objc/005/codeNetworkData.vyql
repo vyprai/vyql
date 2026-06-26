@@ -1,0 +1,9 @@
+module bindings.objc.migration.mff36b5b7;
+
+binding networkData5 {
+  requires {
+    dependency("GooglePlaces")
+  }
+  query pattern callExpr where callee.method == "searchNearbyWithRequest"
+  emit source code.NetworkData at call.result
+}

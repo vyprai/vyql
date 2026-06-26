@@ -79,20 +79,32 @@ func (c Concept) QualifiedName() string {
 // Ontology holds concepts + an alias index.
 type Ontology struct {
 	concepts map[string]*Concept
-	alias    map[string]string // alias -> canonical
+	alias    map[string]string   // alias -> canonical
+	children map[string][]string // parent concept -> direct refinements
 }
 
 func New() *Ontology {
-	return &Ontology{concepts: map[string]*Concept{}, alias: map[string]string{}}
+	return &Ontology{concepts: map[string]*Concept{}, alias: map[string]string{}, children: map[string][]string{}}
 }
 
 func (o *Ontology) Add(c Concept) *Concept {
-	if c.Kind == "control" && c.Applies == "" {
+	if o.children == nil {
+		o.children = o.buildChildrenIndex()
+	}
+	if (c.Kind == "control" || c.Kind == "check" && len(c.Neutralizes) > 0) && c.Applies == "" {
 		c.Applies = "path"
 	}
 	cp := c
 	q := cp.QualifiedName()
+	if old, exists := o.concepts[q]; exists && old.Refines != "" {
+		parent := o.Canonical(old.Refines)
+		o.children[parent] = removeChild(o.children[parent], q)
+	}
 	o.concepts[q] = &cp
+	if cp.Refines != "" {
+		parent := o.Canonical(cp.Refines)
+		o.children[parent] = append(o.children[parent], q)
+	}
 	for _, a := range c.Aliases {
 		o.alias[a] = q
 	}
@@ -203,17 +215,44 @@ func (o *Ontology) DeprecationWarning(name string) string {
 func (o *Ontology) Descendants(name string) map[string]bool {
 	name = o.Canonical(name)
 	out := map[string]bool{name: true}
-	for changed := true; changed; {
-		changed = false
-		for _, c := range o.concepts {
-			q := c.QualifiedName()
-			if c.Refines != "" && out[c.Refines] && !out[q] {
-				out[q] = true
-				changed = true
+	if o.children == nil {
+		o.children = o.buildChildrenIndex()
+	}
+	queue := []string{name}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, child := range o.children[cur] {
+			if out[child] {
+				continue
 			}
+			out[child] = true
+			queue = append(queue, child)
 		}
 	}
 	return out
+}
+
+func (o *Ontology) buildChildrenIndex() map[string][]string {
+	children := map[string][]string{}
+	for _, c := range o.concepts {
+		if c.Refines == "" {
+			continue
+		}
+		parent := o.Canonical(c.Refines)
+		children[parent] = append(children[parent], c.QualifiedName())
+	}
+	return children
+}
+
+func removeChild(children []string, child string) []string {
+	for i, c := range children {
+		if c == child {
+			copy(children[i:], children[i+1:])
+			return children[:len(children)-1]
+		}
+	}
+	return children
 }
 
 // --- typing predicates ---------------------------------------------------

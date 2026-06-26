@@ -1,8 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "serde_cbor" {
-    sink method "from_reader" -> code.Deserialization
-    sink method "from_slice" -> code.Deserialization
-    sink method "from_mut_slice" -> code.Deserialization
-  }
-}

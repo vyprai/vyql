@@ -1,0 +1,9 @@
+module bindings.swift.migration.m29216675;
+
+binding networkSend0 {
+  requires {
+    dependency("github.com/insidegui/MultipeerKit")
+  }
+  query pattern callExpr where callee.method == "MultipeerTransceiver.send"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept UnencodedUrlQueryParameter : issue {
+  cwe: [CWE_116, CWE_20]
+  review_assumption: "the parameter value can contain delimiters or encoded URL syntax that changes downstream CAS or service URL parsing"
+  reviewCategory: request
+  reviewCondition: "a caller-controlled value is appended as a URL query parameter without URL encoding"
+  reviewConfidence: high
+  reviewEvidence: "URL builder context {pattern} adds a ticket or artifact parameter value to QueryItems without HttpUtility.UrlEncode or equivalent URL encoding"
+  vulnerableTo: [injection.ProtocolStateConfusion, request_forgery.OpenRedirect]
+}

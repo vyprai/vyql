@@ -1,0 +1,9 @@
+module bindings.csharp.migration.mbb14a39b;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("microsoft.aspnetcore.dataprotection.redis")
+  }
+  query pattern callExpr where callee.method == "StoreElement"
+  emit sink code.StoredDataWrite at args[0]
+}

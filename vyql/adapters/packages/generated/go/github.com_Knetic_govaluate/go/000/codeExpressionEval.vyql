@@ -1,0 +1,9 @@
+module bindings.go.migration.m46b092d4;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/Knetic/govaluate")
+  }
+  query pattern callExpr where callee.method == "NewEvaluableExpression"
+  emit sink code.ExpressionEval at args[0]
+}

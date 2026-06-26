@@ -1,0 +1,6 @@
+module bindings.cpp.migration.m4e783366;
+
+binding formatString127 {
+  query pattern callExpr where callee.path ~= "printf"
+  emit sink code.FormatString at args[0]
+}

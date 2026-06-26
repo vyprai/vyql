@@ -1,7 +1,0 @@
-import code.{SqlExecution}
-adapter elixir {
-  package "commanded_ecto_projections" {
-    sink method "update_projection" -> code.SqlExecution
-    sink method "transaction" -> code.SqlExecution
-  }
-}

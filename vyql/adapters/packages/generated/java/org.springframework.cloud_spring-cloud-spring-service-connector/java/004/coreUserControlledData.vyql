@@ -1,0 +1,9 @@
+module bindings.java.migration.mc5d72032;
+
+binding userControlledData4 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-spring-service-connector")
+  }
+  query pattern callExpr where callee.method == "MongoDbFactoryFactory"
+  emit source core.UserControlledData at call.result
+}

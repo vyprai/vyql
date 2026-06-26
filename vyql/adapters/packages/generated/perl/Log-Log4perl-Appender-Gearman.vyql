@@ -1,6 +1,0 @@
-import code.{NetworkSend}
-adapter perl {
-  package "Log-Log4perl-Appender-Gearman" {
-    sink method "log" -> code.NetworkSend
-  }
-}

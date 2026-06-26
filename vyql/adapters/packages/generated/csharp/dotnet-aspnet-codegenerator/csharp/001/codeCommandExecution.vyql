@@ -1,0 +1,9 @@
+module bindings.csharp.migration.m5333e552;
+
+binding commandExecution1 {
+  requires {
+    dependency("dotnet-aspnet-codegenerator")
+  }
+  query pattern callExpr where callee.method == "CreateDispatchCommand"
+  emit sink code.CommandExecution at args[0]
+}

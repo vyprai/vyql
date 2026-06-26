@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5103d1c9;
+
+binding responseHeaderWrite14 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "res.set"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

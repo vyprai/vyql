@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.mfe2e1864;
+
+binding xmlParse0 {
+  requires {
+    dependency("net.sf.dozer:dozer")
+  }
+  query pattern callExpr where callee.method == "addMapping"
+  emit sink code.XmlParse at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me94a1594;
+
+binding commandExecution0 {
+  requires {
+    dependency("bless")
+  }
+  query pattern callExpr where callee.method == "Mix.Tasks.Bless.run"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0d1769df;
+
+binding networkConnect13 {
+  requires {
+    dependency("webrat")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}

@@ -1,0 +1,10 @@
+module vypr.deserialization;
+
+rule UnsafeReflection {
+  meta {
+    cwe: [CWE_470]
+    id: "VYQL-DESER-003"
+    severity: high
+  }
+  taint core.UserControlledData -> code.ReflectionInvoke
+}

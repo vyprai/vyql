@@ -1,0 +1,9 @@
+module bindings.go.migration.m57f628f3;
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/xdg/scram")
+  }
+  query pattern callExpr where callee.method == "parseServerFinal"
+  emit sink code.Deserialization at args[0]
+}

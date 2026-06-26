@@ -1,5 +1,0 @@
-adapter scala {
-  package "net.sf.ehcache:ehcache" {
-    sink method "readExternal" -> code.Deserialization
-  }
-}

@@ -1,0 +1,6 @@
+module code;
+
+concept WorkflowPolicyReview : issue {
+  cwe: [CWE_841, CWE_862, CWE_863]
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

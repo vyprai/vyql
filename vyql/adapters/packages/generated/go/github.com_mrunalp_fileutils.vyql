@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter go {
-  package "github.com/mrunalp/fileutils" {
-    sink method "CopyFile" -> code.FilePathAccess
-    sink method "CopyDirectory" -> code.FilePathAccess
-    sink method "MkdirAllNewAs" -> code.FilePathAccess
-  }
-}

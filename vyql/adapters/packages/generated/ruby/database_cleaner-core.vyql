@@ -1,6 +1,0 @@
-adapter ruby {
-  package "database_cleaner-core" {
-    sink method "cleaning" -> code.SqlExecution
-    sink method "clean_with" -> code.SqlExecution
-  }
-}

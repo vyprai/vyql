@@ -1,0 +1,9 @@
+module bindings.objc.migration.m4c6c99b9;
+
+binding urlFetch0 {
+  requires {
+    dependency("FBSDKCoreKit")
+  }
+  query pattern callExpr where callee.method == "startGraphRequestWithGraphPath:parameters:tokenString:HTTPMethod:completion:"
+  emit sink code.UrlFetch at args[0]
+}

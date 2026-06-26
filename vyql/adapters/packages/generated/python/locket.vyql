@@ -1,9 +1,0 @@
-import code.{FilePathAccess}
-
-adapter python {
-  package "locket" {
-    sink method "lock_file" -> code.FilePathAccess
-    sink method "acquire" -> code.FilePathAccess
-    sink method "release" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding commandStringWrapperExecution127 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=convert" and node.token contains "$cmd_string=\"$this->executable-headers$headers-i$source$args$cmd_params-f$format$temp_file_path\"" and node.token contains "$this->generateDerivativeResponse($cmd_string,$source,$temp_file_path,$content_type)" and not (node.token contains "$cmd=array_merge") and not (node.token contains "HeaderBag")
+  emit issue code.CommandStringWrapperExecution at node
+}

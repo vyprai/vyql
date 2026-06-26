@@ -1,7 +1,0 @@
-import core.{AuthenticationCheck}
-
-adapter kotlin {
-  package "org.eclipse.jetty:jetty-plus" {
-    control method "DataSourceLoginService" -> core.AuthenticationCheck
-  }
-}

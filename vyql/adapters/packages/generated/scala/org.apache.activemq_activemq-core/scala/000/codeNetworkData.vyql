@@ -1,0 +1,9 @@
+module bindings.scala.migration.m7f88aff1;
+
+binding networkData0 {
+  requires {
+    dependency("org.apache.activemq:activemq-core")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

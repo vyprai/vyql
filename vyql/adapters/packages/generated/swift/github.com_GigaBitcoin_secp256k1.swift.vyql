@@ -1,7 +1,0 @@
-import code.{SecretValue}
-
-adapter swift {
-  package "github.com/GigaBitcoin/secp256k1.swift" {
-    source method "sharedSecretFromKeyAgreement" -> code.SecretValue
-  }
-}

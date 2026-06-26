@@ -1,0 +1,9 @@
+module bindings.javascript.migration.ma4a51d5a;
+
+binding deserialization2 {
+  requires {
+    dependency("data-urls")
+  }
+  query pattern callExpr where callee.method == "isomorphicDecode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "com.google.gwt:gwt-servlet" {
-    sink method "deserialize" -> code.Deserialization
-  }
-}

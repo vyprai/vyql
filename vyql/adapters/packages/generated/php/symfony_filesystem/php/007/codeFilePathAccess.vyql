@@ -1,0 +1,9 @@
+module bindings.php.migration.mc24cc569;
+
+binding filePathAccess7 {
+  requires {
+    dependency("symfony/filesystem")
+  }
+  query pattern callExpr where callee.method == "chmod"
+  emit sink code.FilePathAccess at args[0]
+}

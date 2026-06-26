@@ -1,0 +1,9 @@
+module bindings.php.migration.mf0404b66;
+
+binding cliArgument3 {
+  requires {
+    dependency("laravel/scout")
+  }
+  query pattern callExpr where callee.method == "whereIn"
+  emit source code.CliArgument at call.result
+}

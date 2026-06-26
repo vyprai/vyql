@@ -1,6 +1,0 @@
-adapter java {
-  package "com.sun.jersey:jersey-bundle" {
-    sink method "get" -> code.UrlFetch
-    source path "com.sun.jersey.jersey.bundle.cookie" -> code.HttpInput
-  }
-}

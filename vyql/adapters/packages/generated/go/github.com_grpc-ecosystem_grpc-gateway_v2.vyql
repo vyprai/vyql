@@ -1,9 +1,0 @@
-import code.{HttpInput, Deserialization}
-adapter go {
-  package "github.com/grpc-ecosystem/grpc-gateway/v2" {
-    source method "PopulateQueryParameters" -> code.HttpInput
-    source method "PopulateFieldFromPath" -> code.HttpInput
-    sink method "parseField" -> code.Deserialization
-    sink method "parseMessage" -> code.Deserialization
-  }
-}

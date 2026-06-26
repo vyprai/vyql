@@ -1,0 +1,11 @@
+module code;
+
+concept CWebRequestFilePathTraversal : issue {
+  cwe: [CWE_22]
+  review_assumption: "the request helper returns client-controlled path text and the file helper resolves it relative to the process working directory"
+  reviewCategory: path
+  reviewCondition: "C web request page parameters reach filesystem helpers without rejecting traversal-capable path components"
+  reviewConfidence: high
+  reviewEvidence: "C web handler context {pattern} obtains request page data and calls file access helpers without an observed page-name/path guard"
+  vulnerableTo: [path.PathTraversal]
+}

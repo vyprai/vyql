@@ -1,0 +1,9 @@
+module bindings.php.migration.mea539daf;
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("silex/silex")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

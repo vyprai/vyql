@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CodeIgniterActiveRecordOffsetSqlInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_89]
+    id: "VYQL-INJ-085"
+    severity: high
+  }
+  issue code.CodeIgniterActiveRecordOffsetSqlInjection as sink
+}

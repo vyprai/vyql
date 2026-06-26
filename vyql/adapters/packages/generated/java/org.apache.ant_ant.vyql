@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter java {
-  package "org.apache.ant:ant" {
-    sink method "parse" -> code.Deserialization
-  }
-}

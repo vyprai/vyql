@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1f1ce152;
+
+binding commandExecution1 {
+  requires {
+    dependency("javax.activation:javax.activation-api")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

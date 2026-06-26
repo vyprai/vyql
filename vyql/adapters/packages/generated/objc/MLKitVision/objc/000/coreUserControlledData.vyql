@@ -1,0 +1,9 @@
+module bindings.objc.migration.m57b4c527;
+
+binding userControlledData0 {
+  requires {
+    dependency("MLKitVision")
+  }
+  query pattern callExpr where callee.method == "initWithBuffer"
+  emit source core.UserControlledData at call.result
+}

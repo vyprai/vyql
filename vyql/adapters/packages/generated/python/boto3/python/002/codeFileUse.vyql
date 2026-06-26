@@ -1,0 +1,9 @@
+module bindings.python.migration.m45dd8f7b;
+
+binding fileUse2 {
+  requires {
+    dependency("boto3")
+  }
+  query pattern callExpr where callee.method == "download_file"
+  emit sink code.FileUseSink at args[0]
+}

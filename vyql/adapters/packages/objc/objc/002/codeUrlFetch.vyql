@@ -1,0 +1,9 @@
+module bindings.objc.migration.m942721f9;
+
+binding urlFetch2 {
+  requires {
+    dependency("AFNetworking")
+  }
+  query pattern callExpr where callee.method == "GET"
+  emit sink code.UrlFetch at args[0]
+}

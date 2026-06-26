@@ -1,0 +1,14 @@
+module bindings.python.migration.mfd6da6b3;
+
+binding htmlEscape0 {
+  requires {
+    dependency("ftfy")
+  }
+  query pattern callExpr where callee.method == "unescape_html"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,9 @@
+module bindings.powershell.migration.m92132a18;
+
+binding xmlParse10 {
+  requires {
+    dependency("Microsoft.PowerShell.Utility")
+  }
+  query pattern callExpr where callee.path ~= "Select-Xml"
+  emit sink code.XmlParse at args[0]
+}

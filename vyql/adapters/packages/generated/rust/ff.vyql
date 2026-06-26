@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter rust {
-  package "ff" {
-    sink method "from_str_vartime" -> code.Deserialization
-    sink method "from_uniform_bytes" -> code.Deserialization
-  }
-}

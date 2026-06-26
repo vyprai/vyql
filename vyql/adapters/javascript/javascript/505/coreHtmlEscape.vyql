@@ -1,0 +1,11 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding htmlEscape505 {
+  query pattern callExpr where callee.path ~= "DOMPurify.sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

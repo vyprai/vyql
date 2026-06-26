@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.maf65a911;
+
+binding filePathAccess3 {
+  requires {
+    dependency("javax.mail:javax.mail-api")
+  }
+  query pattern callExpr where callee.method == "writeTo"
+  emit sink code.FilePathAccess at args[0]
+}

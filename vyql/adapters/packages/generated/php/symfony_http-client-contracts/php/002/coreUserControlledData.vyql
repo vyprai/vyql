@@ -1,0 +1,9 @@
+module bindings.php.migration.m70032eae;
+
+binding userControlledData2 {
+  requires {
+    dependency("symfony/http-client-contracts")
+  }
+  query pattern callExpr where callee.method == "HttpClientInterface::request.options"
+  emit source core.UserControlledData at call.result
+}

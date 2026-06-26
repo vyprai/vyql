@@ -1,6 +1,0 @@
-adapter perl {
-  package "Pegex" {
-    sink method "exec" -> code.CommandExecution
-    sink method "parse" -> code.Deserialization
-  }
-}

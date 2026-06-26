@@ -1,0 +1,9 @@
+module bindings.perl.migration.m923fa815;
+
+binding deserialization1 {
+  requires {
+    dependency("Cache-RedisDB")
+  }
+  query pattern callExpr where callee.method == "mget"
+  emit sink code.Deserialization at args[0]
+}

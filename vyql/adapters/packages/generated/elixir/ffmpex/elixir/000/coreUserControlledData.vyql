@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m2d581aab;
+
+binding userControlledData0 {
+  requires {
+    dependency("ffmpex")
+  }
+  query pattern callExpr where callee.method == "add_input_file"
+  emit source core.UserControlledData at call.result
+}

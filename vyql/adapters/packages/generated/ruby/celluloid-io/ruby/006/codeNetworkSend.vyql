@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m8593331a;
+
+binding networkSend6 {
+  requires {
+    dependency("celluloid-io")
+  }
+  query pattern callExpr where callee.method == "syswrite"
+  emit sink code.NetworkSend at args[0]
+}

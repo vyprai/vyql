@@ -1,0 +1,9 @@
+module bindings.perl.migration.m04365cea;
+
+binding filePathAccess0 {
+  requires {
+    dependency("StatusBoard-Graph")
+  }
+  query pattern callExpr where callee.method == "write_json"
+  emit sink code.FilePathAccess at args[0]
+}

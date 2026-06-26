@@ -1,0 +1,9 @@
+module bindings.dart.migration.mab46ff19;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("mongo_dart")
+  }
+  query pattern callExpr where callee.method == "createFindAndModifyCommand"
+  emit sink code.NosqlQuery at args[0]
+}

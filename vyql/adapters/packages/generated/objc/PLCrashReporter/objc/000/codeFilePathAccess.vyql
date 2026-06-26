@@ -1,0 +1,9 @@
+module bindings.objc.migration.mc96da700;
+
+binding filePathAccess0 {
+  requires {
+    dependency("PLCrashReporter")
+  }
+  query pattern callExpr where callee.method == "crashReportPath"
+  emit sink code.FilePathAccess at args[0]
+}

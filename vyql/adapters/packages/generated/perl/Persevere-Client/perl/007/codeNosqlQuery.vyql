@@ -1,0 +1,9 @@
+module bindings.perl.migration.md518033e;
+
+binding nosqlQuery7 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NosqlQuery at args[0]
+}

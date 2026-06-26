@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m14698913;
+
+binding userControlledData0 {
+  requires {
+    dependency("fakeweb")
+  }
+  query pattern callExpr where callee.method == "register_uri"
+  emit source core.UserControlledData at call.result
+}

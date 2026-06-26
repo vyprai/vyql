@@ -1,0 +1,9 @@
+module bindings.go.migration.ma206a1a4;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/hashicorp/consul/api")
+  }
+  query pattern callExpr where callee.method == "NewHttpClient"
+  emit sink code.NetworkConnectSink at args[0]
+}

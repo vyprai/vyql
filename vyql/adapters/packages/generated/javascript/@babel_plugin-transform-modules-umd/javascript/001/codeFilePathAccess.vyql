@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m6ba4091d;
+
+binding filePathAccess1 {
+  requires {
+    dependency("@babel/plugin-transform-modules-umd")
+  }
+  query pattern callExpr where callee.method == "buildBrowserInit"
+  emit sink code.FilePathAccess at args[0]
+}

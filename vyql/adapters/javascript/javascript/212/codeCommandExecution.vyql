@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding commandExecution212 {
+  query pattern callExpr where callee.path ~= "child_process.exec"
+  emit sink code.CommandExecution at args[0]
+}

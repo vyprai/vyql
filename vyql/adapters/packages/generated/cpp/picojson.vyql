@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter cpp {
-  package "picojson" {
-    sink method "parse" -> code.Deserialization
-  }
-}

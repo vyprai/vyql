@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedExceptionMessageMarkup {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-033"
+    severity: high
+  }
+  issue code.UnescapedExceptionMessageMarkup as sink
+}

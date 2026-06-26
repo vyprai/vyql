@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m9a902388;
+
+binding deserialization3 {
+  requires {
+    dependency("kf5codecs")
+  }
+  query pattern callExpr where callee.method == "base45Decode"
+  emit sink code.Deserialization at args[0]
+}

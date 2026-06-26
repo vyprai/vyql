@@ -1,8 +1,0 @@
-import code.{StoredDataRead, StoredDataWrite}
-adapter php {
-  package "symfony/polyfill-apcu" {
-    sink method "apcu_add" -> code.StoredDataWrite
-    sink method "apcu_store" -> code.StoredDataWrite
-    source method "apcu_fetch" -> code.StoredDataRead
-  }
-}

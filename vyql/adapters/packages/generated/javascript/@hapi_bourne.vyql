@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter javascript {
-  package "@hapi/bourne" {
-    sink method "parse" -> code.Deserialization
-    sink method "safeParse" -> code.Deserialization
-  }
-}

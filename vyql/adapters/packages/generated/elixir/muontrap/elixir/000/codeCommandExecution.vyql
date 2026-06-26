@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mcebf19c3;
+
+binding commandExecution0 {
+  requires {
+    dependency("muontrap")
+  }
+  query pattern callExpr where callee.method == "cmd"
+  emit sink code.CommandExecution at args[0]
+}

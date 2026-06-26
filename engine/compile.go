@@ -24,6 +24,10 @@ func (e CompileError) Error() string { return e.Rule + ": " + e.Msg }
 type CompiledRule struct {
 	Rule               *parser.Rule
 	Severity           string
+	SourceConcepts     map[string]bool
+	SinkConcepts       map[string]bool
+	TaintKinds         map[string]bool
+	ExcludedChars      string
 	KillControls       map[string]bool // sanitizer concepts (+descendants) that kill taint
 	NeutralizedThreats map[string]bool
 }
@@ -33,6 +37,7 @@ var endpointKinds = map[string][2]map[string]bool{
 	"taint":  {{"source": true}, {"sink": true}},
 	"flow":   {{"source": true}, {"sink": true}},
 	"reach":  {{"exposure": true, "asset": true}, {"asset": true, "exposure": true}},
+	"grant":  {{"principal": true}, {"privilege": true, "principal": true}},
 	"assume": {{"principal": true}, {"privilege": true, "principal": true}},
 }
 
@@ -85,6 +90,10 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 			return nil, err
 		}
 		if body.Verb == "taint" || body.Verb == "flow" {
+			cr.SourceConcepts = onto.Descendants(body.Src.Concept)
+			cr.SinkConcepts = onto.Descendants(body.Dst.Concept)
+			cr.TaintKinds = taintKindsFor(onto, cr.SourceConcepts)
+			cr.ExcludedChars = excludedCharsFor(onto, cr.SinkConcepts)
 			for _, cl := range r.Clauses {
 				if cl.Kind != "unless" {
 					continue
@@ -105,6 +114,34 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 				case parser.GuardedBy:
 					// guarded_by on a typed sink is threat-typed too (docs/06)
 					if err := requireConcept(onto, ex.Concept, "guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.DominatesCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "dominating guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.SameReceiverCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "same-receiver guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.SameScopeCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "same-scope guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
+				case parser.GlobalCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "global guard of "+r.QualifiedName()); err != nil {
 						return nil, err
 					}
 					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
@@ -132,6 +169,22 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
+			case parser.DominatesCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "dominating control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.SameReceiverCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "same-receiver control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.SameScopeCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "same-scope control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			case parser.GlobalCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "global control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
 			case parser.ClosedBy:
 				if err := requireConcept(onto, ex.Concept, "release of "+r.QualifiedName()); err != nil {
 					return nil, err
@@ -147,6 +200,34 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 		}
 	}
 	return cr, nil
+}
+
+func taintKindsFor(onto *ontology.Ontology, concepts map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	for c := range concepts {
+		if cc, err := onto.Get(c); err == nil {
+			for _, t := range cc.Taint {
+				out[t] = true
+			}
+		}
+	}
+	return out
+}
+
+func excludedCharsFor(onto *ontology.Ontology, concepts map[string]bool) string {
+	seen := map[rune]bool{}
+	out := ""
+	for c := range concepts {
+		if cc, err := onto.Get(c); err == nil {
+			for _, r := range cc.ExcludedChars {
+				if !seen[r] {
+					seen[r] = true
+					out += string(r)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string) error {

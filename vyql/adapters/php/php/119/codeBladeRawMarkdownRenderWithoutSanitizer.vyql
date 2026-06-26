@@ -1,0 +1,10 @@
+module bindings.php.migration.mfbe84119;
+
+binding bladeRawMarkdownRenderWithoutSanitizer119 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.module.context" and node.token contains "lang=php" and node.token contains "{!!" and node.token contains "->markdown(" and node.token contains "data[\"content\"]" and not (node.token contains "strip_tags") and not (node.token contains "htmlspecialchars") and not (node.token contains "htmlentities") and not (node.token contains " e(") and not (node.token contains "sanitize") and not (node.token contains "purify") and not (node.token contains "HtmlString")
+  emit issue code.BladeRawMarkdownRenderWithoutSanitizer at node
+}

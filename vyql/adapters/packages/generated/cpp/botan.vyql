@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter cpp {
-  package "botan" {
-    source method "run" -> code.CliArgument
-  }
-}

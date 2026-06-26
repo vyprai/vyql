@@ -1,6 +1,0 @@
-import core.{UserControlledData}
-adapter javascript {
-  package "workbox-google-analytics" {
-    source method "initialize" -> core.UserControlledData
-  }
-}

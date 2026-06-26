@@ -1,0 +1,9 @@
+module bindings.javascript.migration.md2186923;
+
+binding filePathAccess0 {
+  requires {
+    dependency("dir-glob")
+  }
+  query pattern callExpr where callee.method == "async"
+  emit sink code.FilePathAccess at args[0]
+}

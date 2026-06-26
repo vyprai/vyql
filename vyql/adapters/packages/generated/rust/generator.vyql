@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter rust {
-  package "generator" {
-    source method "send" -> core.UserControlledData
-    source method "raw_send" -> core.UserControlledData
-  }
-}

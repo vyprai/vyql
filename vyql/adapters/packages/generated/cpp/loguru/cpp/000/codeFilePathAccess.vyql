@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m7b988fc7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("loguru")
+  }
+  query pattern callExpr where callee.method == "add_file"
+  emit sink code.FilePathAccess at args[0]
+}

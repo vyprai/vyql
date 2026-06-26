@@ -1,0 +1,9 @@
+module bindings.java.migration.mfd0fdab3;
+
+binding networkConnect1 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

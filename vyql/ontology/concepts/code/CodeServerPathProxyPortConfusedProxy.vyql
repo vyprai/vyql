@@ -1,0 +1,11 @@
+module code;
+
+concept CodeServerPathProxyPortConfusedProxy : issue {
+  cwe: [CWE_441, CWE_918]
+  review_assumption: "a user can be lured to a crafted /proxy/:port URL on a code-server instance with the built-in proxy enabled"
+  reviewCategory: request_forgery
+  reviewCondition: "code-server path proxy builds a proxy target from the path port parameter before numeric validation"
+  reviewConfidence: high
+  reviewEvidence: "path proxy target context {pattern} interpolates req.params.port into the upstream target URL before the fixed parseInt port normalization"
+  vulnerableTo: [request_forgery.Ssrf]
+}

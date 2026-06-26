@@ -1,0 +1,9 @@
+module bindings.go.migration.m383fc231;
+
+binding userControlledData0 {
+  requires {
+    dependency("golang.org/x/xerrors")
+  }
+  query pattern callExpr where callee.method == "Errorf"
+  emit source core.UserControlledData at call.result
+}

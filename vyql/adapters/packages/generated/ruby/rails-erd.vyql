@@ -1,5 +1,0 @@
-adapter ruby {
-  package "rails-erd" {
-    source path "erd.argv" -> code.CliArgument
-  }
-}

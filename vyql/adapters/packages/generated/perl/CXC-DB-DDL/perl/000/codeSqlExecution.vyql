@@ -1,0 +1,9 @@
+module bindings.perl.migration.m068486b5;
+
+binding sqlExecution0 {
+  requires {
+    dependency("CXC-DB-DDL")
+  }
+  query pattern callExpr where callee.method == "sql"
+  emit sink code.SqlExecution at args[0]
+}

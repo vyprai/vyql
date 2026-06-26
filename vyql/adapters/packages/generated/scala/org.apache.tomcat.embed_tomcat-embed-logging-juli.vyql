@@ -1,8 +1,0 @@
-adapter scala {
-  package "org.apache.tomcat.embed:tomcat-embed-logging-juli" {
-    sink method "open" -> code.FilePathAccess
-    sink method "open" -> code.FileUse
-    sink method "openWriter" -> code.FilePathAccess
-    sink method "openWriter" -> code.FileUse
-  }
-}

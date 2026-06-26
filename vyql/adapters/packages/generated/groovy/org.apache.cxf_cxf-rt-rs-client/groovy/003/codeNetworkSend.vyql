@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md30241c6;
+
+binding networkSend3 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "writeBody"
+  emit sink code.NetworkSend at args[0]
+}

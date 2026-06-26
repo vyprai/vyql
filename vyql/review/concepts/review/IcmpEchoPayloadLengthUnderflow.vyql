@@ -1,0 +1,8 @@
+module code;
+
+review code.IcmpEchoPayloadLengthUnderflow {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review ICMP echo payload length handling for minimum-size checks before subtracting the echo header"
+}

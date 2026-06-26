@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnsafeBuildClientCommandAssembly {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-060"
+    severity: critical
+  }
+  issue code.UnsafeBuildClientCommandAssembly as sink
+}

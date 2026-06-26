@@ -1,6 +1,0 @@
-adapter java {
-  package "org.scala-lang:scala-compiler" {
-    source method "parse" -> core.UserControlledData
-    source method "parseFilter" -> core.UserControlledData
-  }
-}

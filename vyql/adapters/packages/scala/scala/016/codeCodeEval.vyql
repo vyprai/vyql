@@ -1,0 +1,9 @@
+module bindings.scala.migration.m3608f193;
+
+binding codeEval16 {
+  requires {
+    dependency("scala-compiler")
+  }
+  query pattern callExpr where callee.path ~= "ToolBox.eval"
+  emit sink code.CodeEval at args[0]
+}

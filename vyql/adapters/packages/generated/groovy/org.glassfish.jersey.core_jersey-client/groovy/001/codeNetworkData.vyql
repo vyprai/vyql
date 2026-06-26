@@ -1,0 +1,9 @@
+module bindings.groovy.migration.m1c9a52c8;
+
+binding networkData1 {
+  requires {
+    dependency("org.glassfish.jersey.core:jersey-client")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

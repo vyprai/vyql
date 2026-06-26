@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter python {
-  package "numpydoc" {
-    control method "validate" -> core.InputValidation
-  }
-}

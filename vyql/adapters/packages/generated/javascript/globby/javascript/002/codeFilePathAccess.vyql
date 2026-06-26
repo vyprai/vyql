@@ -1,0 +1,9 @@
+module bindings.javascript.migration.mb053e00e;
+
+binding filePathAccess2 {
+  requires {
+    dependency("globby")
+  }
+  query pattern callExpr where callee.method == "globbyStream"
+  emit sink code.FilePathAccess at args[0]
+}

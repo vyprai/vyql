@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m84d9beb4;
+
+binding networkConnect2 {
+  requires {
+    dependency("memcachex")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

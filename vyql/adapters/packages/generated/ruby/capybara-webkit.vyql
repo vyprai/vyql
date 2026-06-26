@@ -1,5 +1,0 @@
-adapter ruby {
-  package "capybara-webkit" {
-    sink method "open" -> code.FilePathAccess
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m4523f05a;
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/apple/swift-collections-benchmark")
+  }
+  query pattern callExpr where callee.method == "save(to:)"
+  emit sink code.FilePathAccess at args[0]
+}

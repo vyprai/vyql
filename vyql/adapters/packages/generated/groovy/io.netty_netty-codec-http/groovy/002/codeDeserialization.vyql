@@ -1,0 +1,9 @@
+module bindings.groovy.migration.md2683009;
+
+binding deserialization2 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

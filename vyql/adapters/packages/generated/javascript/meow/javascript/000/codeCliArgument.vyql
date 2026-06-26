@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m94a41eab;
+
+binding cliArgument0 {
+  requires {
+    dependency("meow")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

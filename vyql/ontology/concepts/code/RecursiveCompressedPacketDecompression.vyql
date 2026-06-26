@@ -1,0 +1,11 @@
+module code;
+
+concept RecursiveCompressedPacketDecompression : issue {
+  cwe: [CWE_400, CWE_674]
+  review_assumption: "a peer can send nested compressed or jumbo packets that repeatedly trigger decompression and recursive parsing"
+  reviewCategory: resource
+  reviewCondition: "compressed packet handling recursively re-enters packet parsing after decompression without rejecting nested compressed packet headers"
+  reviewConfidence: high
+  reviewEvidence: "packet decompression context {pattern} inflates a compressed packet into the input buffer and calls the packet reader again"
+  vulnerableTo: [dos.UncontrolledResourceConsumption, dos.StackExhaustion]
+}

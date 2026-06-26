@@ -1,0 +1,6 @@
+module bindings.ruby.migration.m5a48bf47;
+
+binding redirectTarget172 {
+  query pattern callExpr where callee.path ~= "redirect_to"
+  emit sink code.RedirectTargetSink at args[0]
+}

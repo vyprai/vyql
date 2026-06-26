@@ -1,0 +1,9 @@
+module bindings.python.migration.m40d3cdd1;
+
+binding filePathAccess4 {
+  requires {
+    dependency("imageio")
+  }
+  query pattern callExpr where callee.method == "volread"
+  emit sink code.FilePathAccess at args[0]
+}

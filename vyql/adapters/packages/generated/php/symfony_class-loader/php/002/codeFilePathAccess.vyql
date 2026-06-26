@@ -1,0 +1,9 @@
+module bindings.php.migration.m027bda08;
+
+binding filePathAccess2 {
+  requires {
+    dependency("symfony/class-loader")
+  }
+  query pattern callExpr where callee.method == "inline"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m899e57cd;
+
+binding userControlledData8 {
+  requires {
+    dependency("tinycss2")
+  }
+  query pattern callExpr where callee.method == "decode_stylesheet_bytes"
+  emit source core.UserControlledData at call.result
+}

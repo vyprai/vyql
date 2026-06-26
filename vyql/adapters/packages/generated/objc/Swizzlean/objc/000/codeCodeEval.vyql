@@ -1,0 +1,9 @@
+module bindings.objc.migration.mac3b7ffd;
+
+binding codeEval0 {
+  requires {
+    dependency("Swizzlean")
+  }
+  query pattern callExpr where callee.method == "swizzleInstanceMethod"
+  emit sink code.CodeEval at args[0]
+}

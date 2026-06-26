@@ -1,0 +1,9 @@
+module bindings.go.migration.m39efcd29;
+
+binding ldapQuery26 {
+  requires {
+    dependency("github.com/go-ldap/ldap")
+  }
+  query pattern callExpr where callee.method == "Search"
+  emit sink code.LdapQuery at args[1]
+}

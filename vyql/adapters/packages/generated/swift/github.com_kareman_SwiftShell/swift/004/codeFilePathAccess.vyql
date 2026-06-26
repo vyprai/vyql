@@ -1,0 +1,9 @@
+module bindings.swift.migration.mdb97838d;
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/kareman/SwiftShell")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

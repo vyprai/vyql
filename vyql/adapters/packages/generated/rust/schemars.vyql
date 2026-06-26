@@ -1,6 +1,0 @@
-import core.{InputValidation}
-adapter rust {
-  package "schemars" {
-    control method "escape" -> core.InputValidation
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.swift.migration.m70f3f2bf;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/ishkawa/APIKit")
+  }
+  query pattern callExpr where callee.method == "object"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{StdinInput}
-
-adapter go {
-  package "golang.org/x/term" {
-    source method "ReadPassword" -> code.StdinInput
-  }
-}

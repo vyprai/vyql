@@ -1,0 +1,6 @@
+module bindings.python.migration.m21017d75;
+
+binding templateRender486 {
+  query pattern callExpr where callee.path ~= "Environment.from_string"
+  emit sink code.TemplateRender at args[0]
+}

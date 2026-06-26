@@ -1,0 +1,9 @@
+module bindings.scala.migration.m041affca;
+
+binding sqlExecution0 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andIsNull"
+  emit sink code.SqlExecution at args[0]
+}

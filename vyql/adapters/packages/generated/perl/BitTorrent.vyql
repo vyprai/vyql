@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter perl {
-  package "BitTorrent" {
-    sink method "bdecode" -> code.Deserialization
-  }
-}

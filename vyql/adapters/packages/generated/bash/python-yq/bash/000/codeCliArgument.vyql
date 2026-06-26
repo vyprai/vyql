@@ -1,0 +1,9 @@
+module bindings.bash.migration.ma6c04443;
+
+binding cliArgument0 {
+  requires {
+    dependency("python-yq")
+  }
+  query pattern callExpr where callee.path ~= "python-yq.argv"
+  emit source code.CliArgument at call.result
+}

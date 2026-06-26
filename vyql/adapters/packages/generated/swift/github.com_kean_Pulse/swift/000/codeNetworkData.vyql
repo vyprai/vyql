@@ -1,0 +1,9 @@
+module bindings.swift.migration.mda5bfed3;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/kean/Pulse")
+  }
+  query pattern callExpr where callee.method == "dataTask"
+  emit source code.NetworkData at call.result
+}

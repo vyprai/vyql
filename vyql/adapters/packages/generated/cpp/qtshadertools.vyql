@@ -1,7 +1,0 @@
-import code.{CommandExecution}
-import core.{UserControlledData}
-adapter cpp {
-  package "qtshadertools" {
-    source method "QShaderBaker::setSourceFileName" -> core.UserControlledData
-  }
-}

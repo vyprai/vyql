@@ -1,0 +1,9 @@
+module bindings.php.migration.m26dcc6cc;
+
+binding userControlledData6 {
+  requires {
+    dependency("behat/mink-browserkit-driver")
+  }
+  query pattern callExpr where callee.method == "submitForm"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m81d1f3b6;
+
+binding networkConnect4 {
+  requires {
+    dependency("google-auth-httplib2")
+  }
+  query pattern callExpr where callee.method == "AuthorizedHttp.request"
+  emit sink code.NetworkConnectSink at args[0]
+}

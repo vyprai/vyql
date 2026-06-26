@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb30a6c67;
+
+binding networkSend0 {
+  requires {
+    dependency("faraday-patron")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkSend at args[0]
+}

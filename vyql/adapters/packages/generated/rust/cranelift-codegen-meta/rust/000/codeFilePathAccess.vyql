@@ -1,0 +1,9 @@
+module bindings.rust.migration.meac000a4;
+
+binding filePathAccess0 {
+  requires {
+    dependency("cranelift-codegen-meta")
+  }
+  query pattern callExpr where callee.method == "generate_rust"
+  emit sink code.FilePathAccess at args[0]
+}

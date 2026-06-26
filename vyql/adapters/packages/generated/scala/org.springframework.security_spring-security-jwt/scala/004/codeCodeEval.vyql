@@ -1,0 +1,9 @@
+module bindings.scala.migration.mcd9ab0bc;
+
+binding codeEval4 {
+  requires {
+    dependency("org.springframework.security:spring-security-jwt")
+  }
+  query pattern callExpr where callee.method == "encode"
+  emit sink code.CodeEval at args[0]
+}

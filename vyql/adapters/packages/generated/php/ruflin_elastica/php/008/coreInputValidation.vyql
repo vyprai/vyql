@@ -1,0 +1,14 @@
+module bindings.php.migration.m628c72ff;
+
+binding inputValidation8 {
+  requires {
+    dependency("ruflin/elastica")
+  }
+  query pattern callExpr where callee.method == "ElasticaUtil::replaceBooleanWordsAndEscapeTerm"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

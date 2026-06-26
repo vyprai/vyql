@@ -1,8 +1,0 @@
-import code.{XmlParse}
-adapter php {
-  package "nb/oxymel" {
-    sink method "raw" -> code.XmlParse
-    sink method "tag" -> code.XmlParse
-    sink method "cdata" -> code.XmlParse
-  }
-}

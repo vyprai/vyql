@@ -1,0 +1,9 @@
+module bindings.dart.migration.m5342780c;
+
+binding ldapQuery24 {
+  requires {
+    dependency("ldap")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1]
+}

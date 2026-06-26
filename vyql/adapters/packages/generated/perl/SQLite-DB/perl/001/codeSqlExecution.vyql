@@ -1,0 +1,9 @@
+module bindings.perl.migration.m82df2154;
+
+binding sqlExecution1 {
+  requires {
+    dependency("SQLite-DB")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

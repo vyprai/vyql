@@ -1,0 +1,9 @@
+module bindings.java.migration.m575bcf05;
+
+binding commandExecution0 {
+  requires {
+    dependency("org.apache.maven.plugins:maven-compiler-plugin")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

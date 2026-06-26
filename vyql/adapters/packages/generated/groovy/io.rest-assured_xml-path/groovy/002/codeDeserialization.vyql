@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc32ad952;
+
+binding deserialization2 {
+  requires {
+    dependency("io.rest-assured:xml-path")
+  }
+  query pattern callExpr where callee.method == "getList"
+  emit sink code.Deserialization at args[0]
+}

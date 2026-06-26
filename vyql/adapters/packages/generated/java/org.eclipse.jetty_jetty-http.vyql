@@ -1,6 +1,0 @@
-import code.{UrlFetch}
-adapter java {
-  package "org.eclipse.jetty:jetty-http" {
-    sink method "parse" -> code.UrlFetch
-  }
-}

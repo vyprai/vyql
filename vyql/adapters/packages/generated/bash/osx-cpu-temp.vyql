@@ -1,9 +1,0 @@
-import code.{PrivilegedOp}
-
-adapter bash {
-  package "osx-cpu-temp" {
-    flag code.PrivilegedOp on any {
-      path "osx-cpu-temp"
-    }
-  }
-}

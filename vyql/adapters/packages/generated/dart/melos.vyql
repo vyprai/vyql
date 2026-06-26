@@ -1,9 +1,0 @@
-import code.{CommandExecution}
-
-adapter dart {
-  package "melos" {
-    sink method "ExecCommand.run" -> code.CommandExecution
-    sink method "RunCommand.run" -> code.CommandExecution
-    sink method "PersistentShell.sendCommand" -> code.CommandExecution
-  }
-}

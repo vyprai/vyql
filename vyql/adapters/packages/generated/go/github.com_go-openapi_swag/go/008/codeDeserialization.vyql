@@ -1,0 +1,9 @@
+module bindings.go.migration.m9d786d35;
+
+binding deserialization8 {
+  requires {
+    dependency("github.com/go-openapi/swag")
+  }
+  query pattern callExpr where callee.method == "FromDynamicJSON"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,6 +1,0 @@
-import code.{Deserialization}
-adapter elixir {
-  package "rfc3339" {
-    sink method "parse" -> code.Deserialization
-  }
-}

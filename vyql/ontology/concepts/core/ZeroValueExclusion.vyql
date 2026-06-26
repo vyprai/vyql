@@ -1,0 +1,8 @@
+module core;
+
+concept ZeroValueExclusion : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_415]
+  neutralizes: [memory.DoubleFree]
+}

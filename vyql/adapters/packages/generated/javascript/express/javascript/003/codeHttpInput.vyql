@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m5103d1c9;
+
+binding httpInput3 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "req.headers"
+  emit source code.HttpInput at call.result
+}

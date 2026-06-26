@@ -1,0 +1,9 @@
+module bindings.rust.migration.mf594c6be;
+
+binding codeEval0 {
+  requires {
+    dependency("javascriptcore-rs-sys")
+  }
+  query pattern callExpr where callee.method == "jsc_context_evaluate"
+  emit sink code.CodeEval at args[0]
+}

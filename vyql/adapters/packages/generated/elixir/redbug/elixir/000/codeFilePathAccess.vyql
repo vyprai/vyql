@@ -1,0 +1,9 @@
+module bindings.elixir.migration.me8404f5a;
+
+binding filePathAccess0 {
+  requires {
+    dependency("redbug")
+  }
+  query pattern callExpr where callee.method == "start"
+  emit sink code.FilePathAccess at args[0]
+}

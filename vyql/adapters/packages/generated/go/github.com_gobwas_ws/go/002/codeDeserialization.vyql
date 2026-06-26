@@ -1,0 +1,9 @@
+module bindings.go.migration.ma2dd4563;
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/gobwas/ws")
+  }
+  query pattern callExpr where callee.method == "httpParseHeaderLine"
+  emit sink code.Deserialization at args[0]
+}

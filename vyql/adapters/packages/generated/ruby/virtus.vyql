@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter ruby {
-  package "virtus" {
-    sink method "coerce" -> code.Deserialization
-  }
-}

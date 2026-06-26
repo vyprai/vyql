@@ -1,0 +1,14 @@
+module bindings.cpp.migration.mab577c9f;
+
+binding sqlParameterization1 {
+  requires {
+    dependency("seacas")
+  }
+  query pattern callExpr where callee.method == "Zoltan_Bind_Param"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

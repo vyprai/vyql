@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma152eb54;
+
+binding httpInput10 {
+  requires {
+    dependency("httpotion")
+  }
+  query pattern callExpr where callee.method == "process_request_headers"
+  emit source code.HttpInput at call.result
+}

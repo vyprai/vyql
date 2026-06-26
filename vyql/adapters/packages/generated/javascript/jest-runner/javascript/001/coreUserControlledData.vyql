@@ -1,0 +1,9 @@
+module bindings.javascript.migration.m57806108;
+
+binding userControlledData1 {
+  requires {
+    dependency("jest-runner")
+  }
+  query pattern callExpr where callee.method == "sendMessageToJest"
+  emit source core.UserControlledData at call.result
+}

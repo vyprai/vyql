@@ -1,7 +1,0 @@
-import code.{CliArgument}
-
-adapter elixir {
-  package "artificery" {
-    source method "parse_args" -> code.CliArgument
-  }
-}

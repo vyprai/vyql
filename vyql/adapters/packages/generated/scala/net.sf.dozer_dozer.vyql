@@ -1,6 +1,0 @@
-adapter scala {
-  package "net.sf.dozer:dozer" {
-    sink method "addMapping" -> code.Deserialization
-    sink method "read" -> code.Deserialization
-  }
-}

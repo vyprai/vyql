@@ -1,7 +1,0 @@
-import code.{CommandExecution, FilePathAccess, SecretValue}
-
-adapter go {
-  package "k8s.io/client-go" {
-    sink method "dataFromSliceOrFile" -> code.FilePathAccess
-  }
-}

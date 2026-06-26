@@ -1,0 +1,9 @@
+module bindings.php.migration.m64539567;
+
+binding sqlExecution2 {
+  requires {
+    dependency("cakephp/debug_kit")
+  }
+  query pattern callExpr where callee.method == "DebugKitDebugSql::interpolate"
+  emit sink code.SqlExecution at args[0]
+}

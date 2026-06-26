@@ -1,0 +1,9 @@
+module bindings.swift.migration.me3c0d926;
+
+binding codeEval1 {
+  requires {
+    dependency("github.com/mhdhejazi/Dynamic")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit sink code.CodeEval at args[0]
+}

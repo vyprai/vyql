@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m844a02b5;
+
+binding deserialization6 {
+  requires {
+    dependency("wil")
+  }
+  query pattern callExpr where callee.method == "com_query"
+  emit sink code.Deserialization at args[0]
+}

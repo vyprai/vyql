@@ -1,0 +1,9 @@
+module bindings.python.migration.mf63958f9;
+
+binding networkConnect0 {
+  requires {
+    dependency("stripe")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}

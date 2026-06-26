@@ -1,6 +1,0 @@
-import code.{CommandExecution, CodeEval}
-adapter elixir {
-  package "rexbug" {
-    sink method "Rexbug.Translator.translate" -> code.CodeEval
-  }
-}

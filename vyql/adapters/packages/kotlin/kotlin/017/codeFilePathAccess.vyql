@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m1457a768;
+
+binding filePathAccess17 {
+  requires {
+    dependency("java.io")
+  }
+  query pattern callExpr where callee.path ~= "File"
+  emit sink code.FilePathAccess at args[0]
+}

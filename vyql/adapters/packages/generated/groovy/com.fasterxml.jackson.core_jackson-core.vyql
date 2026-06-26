@@ -1,8 +1,0 @@
-import code.{Deserialization}
-
-adapter groovy {
-  package "com.fasterxml.jackson.core:jackson-core" {
-    sink method "readValueAs" -> code.Deserialization
-    sink method "readTree" -> code.Deserialization
-  }
-}

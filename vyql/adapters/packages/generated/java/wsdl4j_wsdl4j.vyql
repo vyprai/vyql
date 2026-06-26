@@ -1,9 +1,0 @@
-import code.{Deserialization, FilePathAccess, UrlFetch}
-
-adapter java {
-  package "wsdl4j:wsdl4j" {
-    sink method "readWSDL" -> code.Deserialization
-    sink method "readWSDL" -> code.UrlFetch
-    sink method "readWSDL" -> code.FilePathAccess
-  }
-}

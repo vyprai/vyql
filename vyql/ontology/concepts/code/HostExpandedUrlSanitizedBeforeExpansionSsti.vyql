@@ -1,0 +1,11 @@
+module code;
+
+concept HostExpandedUrlSanitizedBeforeExpansionSsti : issue {
+  cwe: [CWE_94, CWE_1336]
+  review_assumption: "the resulting absolute URL is rendered through a server-side template or metadata renderer that evaluates template syntax"
+  reviewCategory: code_execution
+  reviewCondition: "a request-derived URL is sanitized before host/protocol expansion, allowing attacker-controlled Host metadata to be reintroduced into a template-rendered URL"
+  reviewConfidence: high
+  reviewEvidence: "canonical URL context {pattern} sanitizes the path before building an absolute URL from request host metadata"
+  vulnerableTo: [injection.CodeInjection, injection.TemplateInjection]
+}

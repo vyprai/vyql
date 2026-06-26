@@ -1,8 +1,0 @@
-import code.{Deserialization, HtmlRender}
-adapter ruby {
-  package "webrobots" {
-    sink method "parse!" -> code.Deserialization
-    sink method "parse" -> code.Deserialization
-    sink method "parse_meta_robots" -> code.HtmlRender
-  }
-}

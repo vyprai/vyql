@@ -1,0 +1,9 @@
+module bindings.objc.migration.m81ba313d;
+
+binding networkSend0 {
+  requires {
+    dependency("CNIOLinux")
+  }
+  query pattern callExpr where callee.method == "CNIOLinux_sendmmsg"
+  emit sink code.NetworkSend at args[0]
+}

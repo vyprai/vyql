@@ -1,0 +1,14 @@
+module bindings.swift.migration.m9b64c798;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("github.com/argentlabs/web3.swift")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

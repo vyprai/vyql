@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.m02cd2de8;
+
+binding deserialization0 {
+  requires {
+    dependency("io.jsonwebtoken:jjwt-jackson")
+  }
+  query pattern callExpr where callee.method == "doDeserialize"
+  emit sink code.Deserialization at args[0]
+}

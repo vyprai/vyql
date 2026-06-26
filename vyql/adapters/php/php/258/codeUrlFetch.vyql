@@ -1,0 +1,6 @@
+module bindings.php.migration.mfbe84119;
+
+binding urlFetch258 {
+  query pattern callExpr where callee.path ~= "wp_remote_request"
+  emit sink code.UrlFetch at args[0]
+}

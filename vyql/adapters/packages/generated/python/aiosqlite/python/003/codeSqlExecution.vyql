@@ -1,0 +1,9 @@
+module bindings.python.migration.m4dd2b22b;
+
+binding sqlExecution3 {
+  requires {
+    dependency("aiosqlite")
+  }
+  query pattern callExpr where callee.method == "execute_fetchall"
+  emit sink code.SqlExecution at args[0]
+}

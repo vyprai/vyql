@@ -1,0 +1,9 @@
+module bindings.powershell.migration.m92132a18;
+
+binding ldapQuery19 {
+  requires {
+    dependency("System.DirectoryServices")
+  }
+  query pattern callExpr where callee.path ~= "DirectorySearcher"
+  emit sink code.LdapQuery at args[0]
+}

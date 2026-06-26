@@ -1,8 +1,0 @@
-import code.{TemplateRender}
-
-adapter rust {
-  package "handlebars" {
-    sink method "parse" -> code.TemplateRender
-    sink method "compile" -> code.TemplateRender
-  }
-}

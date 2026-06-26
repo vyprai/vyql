@@ -1,9 +1,0 @@
-import code.{CommandExecution, NetworkBind, NetworkData}
-
-adapter elixir {
-  package "ranch" {
-    sink method "spawn" -> code.CommandExecution
-    source method "wait_for_connections_loop" -> code.NetworkData
-    sink method "do_listen" -> code.NetworkBind
-  }
-}

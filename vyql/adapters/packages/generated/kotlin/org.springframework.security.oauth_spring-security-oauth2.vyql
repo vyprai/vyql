@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter kotlin {
-  package "org.springframework.security.oauth:spring-security-oauth2" {
-    sink method "read" -> code.Deserialization
-    sink method "parseMap" -> code.Deserialization
-  }
-}

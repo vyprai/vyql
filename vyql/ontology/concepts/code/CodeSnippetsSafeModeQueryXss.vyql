@@ -1,0 +1,11 @@
+module code;
+
+concept CodeSnippetsSafeModeQueryXss : issue {
+  cwe: [CWE_79]
+  review_assumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
+  reviewCategory: xss
+  reviewCondition: "Code Snippets safe-mode URL helper reuses a request parameter in generated admin URLs without narrowing or escaping"
+  reviewConfidence: high
+  reviewEvidence: "add_safe_mode_query_var context {pattern} passes $_REQUEST['snippets-safe-mode'] directly to add_query_arg before the patched boolean cast"
+  vulnerableTo: [injection.Xss]
+}

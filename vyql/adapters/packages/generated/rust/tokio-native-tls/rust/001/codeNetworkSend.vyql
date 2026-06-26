@@ -1,0 +1,9 @@
+module bindings.rust.migration.m00b63c50;
+
+binding networkSend1 {
+  requires {
+    dependency("tokio-native-tls")
+  }
+  query pattern callExpr where callee.method == "poll_write"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,6 +1,0 @@
-adapter scala {
-  package "org.apache.shiro:shiro-core" {
-    source method "sessionId" -> code.HttpInput
-    sink method "deserialize" -> code.Deserialization
-  }
-}

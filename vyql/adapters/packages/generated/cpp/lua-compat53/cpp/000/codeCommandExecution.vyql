@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m033c775a;
+
+binding commandExecution0 {
+  requires {
+    dependency("lua-compat53")
+  }
+  query pattern callExpr where callee.method == "io_popen"
+  emit sink code.CommandExecution at args[0]
+}

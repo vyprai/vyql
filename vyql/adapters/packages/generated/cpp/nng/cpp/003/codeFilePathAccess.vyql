@@ -1,0 +1,9 @@
+module bindings.cpp.migration.m5ac66786;
+
+binding filePathAccess3 {
+  requires {
+    dependency("nng")
+  }
+  query pattern callExpr where callee.method == "nni_file_walk"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,7 +1,0 @@
-import code.{HtmlRender}
-
-adapter php {
-  package "easycorp/easyadmin-bundle" {
-    sink method "addHtmlContentToBody" -> code.HtmlRender
-  }
-}

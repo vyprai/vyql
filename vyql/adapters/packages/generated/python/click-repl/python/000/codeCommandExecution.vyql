@@ -1,0 +1,9 @@
+module bindings.python.migration.macd8d8ac;
+
+binding commandExecution0 {
+  requires {
+    dependency("click-repl")
+  }
+  query pattern callExpr where callee.method == "dispatch_repl_commands"
+  emit sink code.CommandExecution at args[0]
+}

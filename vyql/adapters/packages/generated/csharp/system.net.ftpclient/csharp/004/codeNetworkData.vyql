@@ -1,0 +1,9 @@
+module bindings.csharp.migration.md1519ec6;
+
+binding networkData4 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "OpenRead"
+  emit source code.NetworkData at call.result
+}

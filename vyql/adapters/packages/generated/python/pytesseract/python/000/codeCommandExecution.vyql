@@ -1,0 +1,9 @@
+module bindings.python.migration.me5b8ea4b;
+
+binding commandExecution0 {
+  requires {
+    dependency("pytesseract")
+  }
+  query pattern callExpr where callee.method == "run_tesseract"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,5 +1,0 @@
-adapter python {
-  package "pathspec" {
-    source method "PathSpec.from_lines" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.java.migration.md924ce75;
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-util")
+  }
+  query pattern callExpr where callee.method == "copyFile"
+  emit sink code.FilePathAccess at args[0]
+}

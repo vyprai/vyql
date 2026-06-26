@@ -1,0 +1,9 @@
+module bindings.elixir.migration.m7c1cd297;
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("vintage_net_wizard")
+  }
+  query pattern callExpr where callee.method == "VintageNetWizard.Web.API.send_json"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

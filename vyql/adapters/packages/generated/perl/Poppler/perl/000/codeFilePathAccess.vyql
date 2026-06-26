@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma5b09d8f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Poppler")
+  }
+  query pattern callExpr where callee.method == "Poppler::Document::new_from_file"
+  emit sink code.FilePathAccess at args[0]
+}

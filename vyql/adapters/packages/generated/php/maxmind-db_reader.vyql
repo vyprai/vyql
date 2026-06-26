@@ -1,7 +1,0 @@
-import code.{Deserialization}
-
-adapter php {
-  package "maxmind-db/reader" {
-    sink method "MaxMind\Db\Reader\Decoder::decode" -> code.Deserialization
-  }
-}

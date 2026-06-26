@@ -1,0 +1,9 @@
+module bindings.php.migration.mc718eb3b;
+
+binding httpInput0 {
+  requires {
+    dependency("symfony/browser-kit")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}

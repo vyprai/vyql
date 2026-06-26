@@ -1,0 +1,11 @@
+module code;
+
+concept ReachableAssertionReview : issue {
+  cwe: [CWE_617]
+  review_assumption: "the validated fields can be supplied across a process or trust boundary"
+  reviewCategory: resource
+  reviewCondition: "externally reachable input can violate an internal assertion or invariant and terminate the process"
+  reviewConfidence: possibility
+  reviewEvidence: "input validation context {pattern} reaches assertion-backed invariant logic without an observed rejection branch"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

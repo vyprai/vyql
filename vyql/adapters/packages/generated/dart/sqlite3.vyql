@@ -1,6 +1,0 @@
-import code.{SqlExecution}
-adapter dart {
-  package "sqlite3" {
-    sink method "execute" -> code.SqlExecution
-  }
-}

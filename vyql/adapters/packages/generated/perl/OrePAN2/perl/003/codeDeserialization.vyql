@@ -1,0 +1,9 @@
+module bindings.perl.migration.me25953b6;
+
+binding deserialization3 {
+  requires {
+    dependency("OrePAN2")
+  }
+  query pattern callExpr where callee.method == "_modules_from_parser"
+  emit sink code.Deserialization at args[0]
+}

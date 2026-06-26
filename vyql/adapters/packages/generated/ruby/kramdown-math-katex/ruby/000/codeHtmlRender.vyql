@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mde936520;
+
+binding htmlRender0 {
+  requires {
+    dependency("kramdown-math-katex")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.HtmlRender at args[0]
+}

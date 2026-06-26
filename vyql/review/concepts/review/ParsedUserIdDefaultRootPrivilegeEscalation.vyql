@@ -1,0 +1,7 @@
+module code;
+
+review code.ParsedUserIdDefaultRootPrivilegeEscalation {
+  category: auth
+  kind: attention
+  text: "review UID/GID parsers that can return a zero-initialized privileged user before assigning the parsed UID"
+}

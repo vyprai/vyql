@@ -1,0 +1,9 @@
+module bindings.go.migration.m404ff103;
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/golang/protobuf")
+  }
+  query pattern callExpr where callee.method == "UnmarshalString"
+  emit sink code.Deserialization at args[0]
+}

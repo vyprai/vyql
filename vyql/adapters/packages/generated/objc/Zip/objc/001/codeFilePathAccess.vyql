@@ -1,0 +1,9 @@
+module bindings.objc.migration.m86c0763f;
+
+binding filePathAccess1 {
+  requires {
+    dependency("Zip")
+  }
+  query pattern callExpr where callee.method == "unzipFile"
+  emit sink code.FilePathAccess at args[0]
+}

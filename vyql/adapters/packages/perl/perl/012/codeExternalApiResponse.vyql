@@ -1,0 +1,9 @@
+module bindings.perl.migration.ma164dcec;
+
+binding externalApiResponse12 {
+  requires {
+    dependency("LWP::UserAgent")
+  }
+  query pattern callExpr where callee.method == "decoded_content"
+  emit source code.ExternalApiResponse at call.result
+}

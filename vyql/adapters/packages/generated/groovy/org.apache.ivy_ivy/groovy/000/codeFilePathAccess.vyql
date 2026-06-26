@@ -1,0 +1,9 @@
+module bindings.groovy.migration.mc6e73337;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.ivy:ivy")
+  }
+  query pattern callExpr where callee.method == "configure"
+  emit sink code.FilePathAccess at args[0]
+}

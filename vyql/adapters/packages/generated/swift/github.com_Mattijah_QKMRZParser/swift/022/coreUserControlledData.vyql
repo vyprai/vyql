@@ -1,0 +1,9 @@
+module bindings.swift.migration.mb63ccca5;
+
+binding userControlledData22 {
+  requires {
+    dependency("github.com/Mattijah/QKMRZParser")
+  }
+  query pattern callExpr where callee.method == "firstName"
+  emit source core.UserControlledData at call.result
+}

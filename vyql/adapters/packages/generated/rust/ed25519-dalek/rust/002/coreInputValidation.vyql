@@ -1,0 +1,14 @@
+module bindings.rust.migration.mf2568995;
+
+binding inputValidation2 {
+  requires {
+    dependency("ed25519-dalek")
+  }
+  query pattern callExpr where callee.method == "verify"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

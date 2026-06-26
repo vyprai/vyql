@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m0994f068;
+
+binding networkData5 {
+  requires {
+    dependency("bunny")
+  }
+  query pattern callExpr where callee.method == "basic_consume"
+  emit source code.NetworkData at call.result
+}

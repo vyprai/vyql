@@ -1,6 +1,0 @@
-import code.{HtmlRender}
-adapter elixir {
-  package "phoenix_markdown" {
-    sink method "compile" -> code.HtmlRender
-  }
-}

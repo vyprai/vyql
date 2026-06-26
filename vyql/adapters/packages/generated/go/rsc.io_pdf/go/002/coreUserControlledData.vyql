@@ -1,0 +1,9 @@
+module bindings.go.migration.m7c85617b;
+
+binding userControlledData2 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "NewReaderEncrypted"
+  emit source core.UserControlledData at call.result
+}

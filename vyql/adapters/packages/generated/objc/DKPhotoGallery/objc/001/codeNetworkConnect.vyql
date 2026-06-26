@@ -1,0 +1,9 @@
+module bindings.objc.migration.meb529b3f;
+
+binding networkConnect1 {
+  requires {
+    dependency("DKPhotoGallery")
+  }
+  query pattern callExpr where callee.method == "SDWebImageDownloader.downloadImage"
+  emit sink code.NetworkConnectSink at args[0]
+}

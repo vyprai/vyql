@@ -1,0 +1,10 @@
+module bindings.python.migration.m21017d75;
+
+binding frappeLinkExpansionMissingReadPermission526 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=python" and node.token contains "name=get_values_for_link_and_dynamic_link_fields" and node.token contains "call_path:meta.get_link_fields" and node.token contains "call_path:meta.get_dynamic_link_fields" and node.token contains "call_path:frappe.get_doc" and node.token contains "call_path:doc_dict.update" and not (node.token contains "call_path:link_doc.apply_fieldlevel_read_permissions")
+  emit issue code.FrappeLinkExpansionMissingReadPermission at node
+}

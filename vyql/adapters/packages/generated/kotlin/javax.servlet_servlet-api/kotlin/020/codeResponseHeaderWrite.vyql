@@ -1,0 +1,9 @@
+module bindings.kotlin.migration.ma8d8feef;
+
+binding responseHeaderWrite20 {
+  requires {
+    dependency("javax.servlet:servlet-api")
+  }
+  query pattern callExpr where callee.method == "addHeader"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

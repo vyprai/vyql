@@ -1,0 +1,9 @@
+module bindings.scala.migration.m1d6f42b7;
+
+binding httpInput0 {
+  requires {
+    dependency("org.apache.shiro:shiro-core")
+  }
+  query pattern callExpr where callee.method == "sessionId"
+  emit source code.HttpInput at call.result
+}

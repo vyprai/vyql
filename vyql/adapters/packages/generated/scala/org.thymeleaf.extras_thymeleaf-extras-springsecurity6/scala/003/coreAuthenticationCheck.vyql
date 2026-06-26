@@ -1,0 +1,14 @@
+module bindings.scala.migration.m120ceb6a;
+
+binding authenticationCheck3 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
+  }
+  query pattern callExpr where callee.method == "isFullyAuthenticated"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

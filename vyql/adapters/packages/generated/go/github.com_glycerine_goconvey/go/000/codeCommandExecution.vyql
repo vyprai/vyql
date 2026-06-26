@@ -1,0 +1,9 @@
+module bindings.go.migration.mb29d3962;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/glycerine/goconvey")
+  }
+  query pattern callExpr where callee.method == "NewCommand"
+  emit sink code.CommandExecution at args[0]
+}

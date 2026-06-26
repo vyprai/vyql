@@ -1,0 +1,9 @@
+module bindings.python.migration.m2bd4cffd;
+
+binding deserialization0 {
+  requires {
+    dependency("python-dateutil")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

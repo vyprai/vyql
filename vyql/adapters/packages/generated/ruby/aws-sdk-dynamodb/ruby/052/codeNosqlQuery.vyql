@@ -1,0 +1,9 @@
+module bindings.ruby.migration.m47da9b45;
+
+binding nosqlQuery52 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_table"
+  emit sink code.NosqlQuery at args[0]
+}

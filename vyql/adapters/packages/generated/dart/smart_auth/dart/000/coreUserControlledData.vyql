@@ -1,0 +1,9 @@
+module bindings.dart.migration.m883133c9;
+
+binding userControlledData0 {
+  requires {
+    dependency("smart_auth")
+  }
+  query pattern callExpr where callee.method == "getAppSignature"
+  emit source core.UserControlledData at call.result
+}

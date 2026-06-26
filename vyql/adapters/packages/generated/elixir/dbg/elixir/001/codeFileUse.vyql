@@ -1,0 +1,9 @@
+module bindings.elixir.migration.ma7786ba4;
+
+binding fileUse1 {
+  requires {
+    dependency("dbg")
+  }
+  query pattern callExpr where callee.method == "Dbg.Handler.write"
+  emit sink code.FileUseSink at args[0]
+}

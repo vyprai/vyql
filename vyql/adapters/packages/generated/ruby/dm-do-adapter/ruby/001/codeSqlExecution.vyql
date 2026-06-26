@@ -1,0 +1,9 @@
+module bindings.ruby.migration.made672ab;
+
+binding sqlExecution1 {
+  requires {
+    dependency("dm-do-adapter")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.m05416fb9;
+
+binding deserialization1 {
+  requires {
+    dependency("Siren")
+  }
+  query pattern callExpr where callee.method == "processVersionCheckResults"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,9 +1,0 @@
-import code.{SqlExecution, FilePathAccess, Deserialization}
-
-adapter java {
-  package "org.xerial:sqlite-jdbc" {
-    sink method "exec" -> code.SqlExecution
-    sink method "open" -> code.FilePathAccess
-    sink method "parse" -> code.Deserialization
-  }
-}

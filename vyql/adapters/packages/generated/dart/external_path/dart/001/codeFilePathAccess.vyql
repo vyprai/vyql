@@ -1,0 +1,9 @@
+module bindings.dart.migration.mb3ff6cfe;
+
+binding filePathAccess1 {
+  requires {
+    dependency("external_path")
+  }
+  query pattern callExpr where callee.method == "getExternalStoragePublicDirectory"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept UnescapedContentDispositionFilename : issue {
+  cwe: [CWE_113, CWE_116]
+  review_assumption: "the framework helper is called with filenames derived from HTTP requests, storage object names, or other attacker-influenced paths"
+  reviewCategory: injection
+  reviewCondition: "a caller-controlled attachment filename is inserted into a Content-Disposition response header without URL or header escaping"
+  reviewConfidence: high
+  reviewEvidence: "Content-Disposition context {pattern} builds an attachment filename header after basename canonicalization but before url.QueryEscape/url.PathEscape or equivalent header-value encoding"
+  vulnerableTo: [injection.HttpResponseSplitting]
+}

@@ -1,0 +1,9 @@
+module bindings.php.migration.mca3f8814;
+
+binding networkSend3 {
+  requires {
+    dependency("facade/flare-client-php")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkSend at args[0]
+}

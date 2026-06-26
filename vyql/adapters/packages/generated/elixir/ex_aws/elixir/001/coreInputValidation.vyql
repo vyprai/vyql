@@ -1,0 +1,14 @@
+module bindings.elixir.migration.mae3425a2;
+
+binding inputValidation1 {
+  requires {
+    dependency("ex_aws")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

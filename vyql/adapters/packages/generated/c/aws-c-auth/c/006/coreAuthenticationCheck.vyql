@@ -1,0 +1,14 @@
+module bindings.c.migration.m3fb53739;
+
+binding authenticationCheck6 {
+  requires {
+    dependency("aws-c-auth")
+  }
+  query pattern callExpr where callee.method == "aws_sign_request_aws"
+  emit check core.AuthenticationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

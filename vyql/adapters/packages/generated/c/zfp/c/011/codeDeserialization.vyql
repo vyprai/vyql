@@ -1,0 +1,9 @@
+module bindings.c.migration.m8b5e3ed1;
+
+binding deserialization11 {
+  requires {
+    dependency("zfp")
+  }
+  query pattern callExpr where callee.method == "zfp_decode_block_double_2"
+  emit sink code.Deserialization at args[0]
+}

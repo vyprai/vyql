@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnfilteredSearchWhereColumns {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_89, CWE_287]
+    id: "VYQL-INJ-050"
+    severity: high
+  }
+  issue code.UnfilteredSearchWhereColumns as sink
+}

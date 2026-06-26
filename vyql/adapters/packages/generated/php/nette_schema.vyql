@@ -1,7 +1,0 @@
-import code.{Deserialization}
-adapter php {
-  package "nette/schema" {
-    sink method "process" -> code.Deserialization
-    sink method "processMultiple" -> code.Deserialization
-  }
-}

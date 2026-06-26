@@ -1,0 +1,9 @@
+module bindings.go.migration.m51296237;
+
+binding deserialization2 {
+  requires {
+    dependency("modernc.org/cc")
+  }
+  query pattern callExpr where callee.method == "ppParse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.migration.me12f8b0d;
+
+binding filePathAccess1 {
+  requires {
+    dependency("iOSDFULibrary")
+  }
+  query pattern callExpr where callee.method == "createTemporaryFile"
+  emit sink code.FilePathAccess at args[0]
+}

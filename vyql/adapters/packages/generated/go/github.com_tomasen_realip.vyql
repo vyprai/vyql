@@ -1,6 +1,0 @@
-adapter go {
-  package "github.com/tomasen/realip" {
-    source method "FromRequest" -> code.HttpInput
-    source method "RealIP" -> code.HttpInput
-  }
-}

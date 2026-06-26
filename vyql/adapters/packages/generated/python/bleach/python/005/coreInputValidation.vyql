@@ -1,0 +1,14 @@
+module bindings.python.migration.m19b4666f;
+
+binding inputValidation5 {
+  requires {
+    dependency("bleach")
+  }
+  query pattern callExpr where callee.method == "sanitize_css"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

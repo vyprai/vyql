@@ -1,0 +1,9 @@
+module bindings.ruby.migration.mb5a256fc;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("net-http-digest_auth")
+  }
+  query pattern callExpr where callee.method == "Net::HTTP::DigestAuth.auth_header"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

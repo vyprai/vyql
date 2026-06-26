@@ -1,0 +1,14 @@
+module bindings.dart.migration.me0c7bf86;
+
+binding authorizationCheck4 {
+  requires {
+    dependency("flutter_modular")
+  }
+  query pattern callExpr where callee.method == "canActivate"
+  emit check core.AuthorizationCheck at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

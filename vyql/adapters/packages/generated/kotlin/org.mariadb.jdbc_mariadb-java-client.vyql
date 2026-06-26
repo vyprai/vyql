@@ -1,9 +1,0 @@
-import code.{SqlExecution}
-import core.{SqlParameterization}
-
-adapter kotlin {
-  package "org.mariadb.jdbc:mariadb-java-client" {
-    control method "prepareStatement" -> core.SqlParameterization
-    control method "prepareCall" -> core.SqlParameterization
-  }
-}

@@ -1,8 +1,0 @@
-import core.{UserControlledData}
-
-adapter python {
-  package "jieba" {
-    source method "cut" -> core.UserControlledData
-    source method "tokenize" -> core.UserControlledData
-  }
-}

@@ -1,0 +1,9 @@
+module bindings.python.migration.m9de70683;
+
+binding networkBind0 {
+  requires {
+    dependency("flower")
+  }
+  query pattern callExpr where callee.method == "Flower.start"
+  emit sink code.NetworkBind at args[0]
+}

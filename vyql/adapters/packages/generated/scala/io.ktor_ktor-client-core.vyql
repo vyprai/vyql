@@ -1,7 +1,0 @@
-import code.{NetworkSend}
-adapter scala {
-  package "io.ktor:ktor-client-core" {
-    sink method "execute" -> code.NetworkSend
-    sink method "request" -> code.NetworkSend
-  }
-}

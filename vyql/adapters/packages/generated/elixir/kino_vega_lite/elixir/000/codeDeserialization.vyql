@@ -1,0 +1,9 @@
+module bindings.elixir.migration.mf3c769d5;
+
+binding deserialization0 {
+  requires {
+    dependency("kino_vega_lite")
+  }
+  query pattern callExpr where callee.method == "parse_value"
+  emit sink code.Deserialization at args[0]
+}

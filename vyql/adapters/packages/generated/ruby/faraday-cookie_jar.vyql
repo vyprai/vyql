@@ -1,7 +1,0 @@
-import code.{Cookie}
-adapter ruby {
-  package "faraday-cookie_jar" {
-    source method "call" -> code.Cookie
-    source method "call" -> code.Cookie
-  }
-}

@@ -1,7 +1,0 @@
-import core.{UserControlledData}
-adapter groovy {
-  package "org.springframework:spring-messaging" {
-    source method "getPayload" -> core.UserControlledData
-    source method "getHeaders" -> core.UserControlledData
-  }
-}

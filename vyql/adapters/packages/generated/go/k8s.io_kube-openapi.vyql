@@ -1,5 +1,0 @@
-adapter go {
-  package "k8s.io/kube-openapi" {
-    control method "EscapeJsonPointer" -> core.InputValidation
-  }
-}

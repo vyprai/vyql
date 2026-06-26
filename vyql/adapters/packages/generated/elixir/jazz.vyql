@@ -1,9 +1,0 @@
-import code.{Deserialization}
-
-adapter elixir {
-  package "jazz" {
-    sink method "parse" -> code.Deserialization
-    sink method "parse!" -> code.Deserialization
-    sink method "decode" -> code.Deserialization
-  }
-}

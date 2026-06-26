@@ -1,0 +1,9 @@
+module bindings.perl.migration.me8da165b;
+
+binding httpInput0 {
+  requires {
+    dependency("Sledge-SessionManager-MobileID")
+  }
+  query pattern callExpr where callee.method == "get_session_id"
+  emit source code.HttpInput at call.result
+}

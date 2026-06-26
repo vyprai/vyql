@@ -1,0 +1,10 @@
+module bindings.c.migration.mce54b166;
+
+binding reachableAssertionReview129 {
+  unstable: {
+    owner: "migration"
+    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
+  }
+  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "AVAHI_FLAGS_VALID" and node.token contains "AVAHI_PUBLISH_USE_WIDE_AREA" and node.token contains "AVAHI_PUBLISH_USE_MULTICAST" and node.token contains "transport_flags_from_domain" and not (node.token contains "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)")
+  emit issue code.ReachableAssertionReview at node
+}

@@ -1,0 +1,6 @@
+module bindings.javascript.migration.mfb63017a;
+
+binding deserialization281 {
+  query pattern callExpr where callee.path ~= "funcster.deepDeserialize"
+  emit sink code.Deserialization at args[0]
+}

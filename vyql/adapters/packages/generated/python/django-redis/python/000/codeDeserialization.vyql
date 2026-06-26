@@ -1,0 +1,9 @@
+module bindings.python.migration.mcdaf2c19;
+
+binding deserialization0 {
+  requires {
+    dependency("django-redis")
+  }
+  query pattern callExpr where callee.method == "django_redis.serializers.pickle.PickleSerializer.loads"
+  emit sink code.Deserialization at args[0]
+}

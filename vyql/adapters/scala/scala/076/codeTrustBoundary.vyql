@@ -1,0 +1,6 @@
+module bindings.scala.migration.m06d0685b;
+
+binding trustBoundary76 {
+  query pattern callExpr where callee.method == "setAttribute"
+  emit sink code.TrustBoundary at args.any
+}

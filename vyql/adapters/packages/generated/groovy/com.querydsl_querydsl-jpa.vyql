@@ -1,5 +1,0 @@
-adapter groovy {
-  package "com.querydsl:querydsl-jpa" {
-    sink method "query" -> code.SqlExecution
-  }
-}
