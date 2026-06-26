@@ -279,7 +279,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.block(field(n, "body"))
 		body = append(body, c.pyFunctionContext(n, c.decorators)...)
 		var entries []nir.ParamEntry
-		if strings.HasPrefix(name, "resolve_") {
+		if strings.HasPrefix(name, "resolve_") || name == "mutate" {
 			entries = append(entries, c.pyParamEntries(name, params, nil)...)
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).

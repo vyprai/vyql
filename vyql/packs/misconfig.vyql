@@ -47,6 +47,11 @@ rule JwtUnverified {
   match code.JwtUnverified as c
 }
 
+rule WeakJwtSecret {
+  meta { id: "VYQL-CFG-022", severity: high, cwe: [CWE_321, CWE_347, CWE_798], confidence_floor: high }
+  match code.WeakJwtSecret as c
+}
+
 // Cleartext channel — an http:// URL to an HTTP client (CWE-319), value-matched presence.
 rule CleartextChannel {
   meta { id: "VYQL-CFG-006", severity: low, cwe: [CWE_319] }

@@ -1151,7 +1151,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					}
 					params = c.exportedFuncParams(val, c.exported[fnName], params)
 					body := c.funcBody(val)
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(fnName, val), Exported: c.exported[fnName]})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(fnName, val), ParamEntries: c.jsParamEntries(fnName, params, nil), Exported: c.exported[fnName]})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -1366,7 +1366,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 			name := c.text(field(pr, "name"))
 			params := c.exportedFuncParams(pr, exported, c.funcParams(pr))
 			out = append(out, nir.FuncDef{Name: name, Params: params,
-				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, pr), Exported: exported})
+				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, pr), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported})
 			out = append(out, c.returnedObjectMethodFuncDefs(pr, exported)...)
 		case "pair":
 			v := field(pr, "value")
@@ -1379,7 +1379,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 				}
 				params = c.exportedFuncParams(v, exported, params)
 				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes,
-					Body: c.funcBody(v), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, v), Exported: exported})
+					Body: c.funcBody(v), Loc: c.loc(pr), ContextTokens: c.jsFunctionContext(name, v), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported})
 				out = append(out, c.returnedObjectMethodFuncDefs(v, exported)...)
 			}
 			out = append(out, c.objectMethodFuncDefs(v, exported)...)
@@ -1543,7 +1543,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				params = c.paramsFromFunctionText(inner)
 			}
 			params = c.exportedFuncParams(rhs, true, params)
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: true}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
@@ -1553,7 +1553,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					params = c.paramsFromFunctionText(inner)
 				}
 				params = c.exportedFuncParams(rhs, true, params)
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: true}}
 			}
 			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
 			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
@@ -1570,7 +1570,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					}
 					exported := !strings.HasPrefix(name, "_")
 					params = c.exportedFuncParams(rhs, exported, params)
-					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), Exported: exported}}
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported}}
 				}
 			}
 		}
@@ -2153,7 +2153,11 @@ func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
 
 func (c *jsConv) jsParamEntries(name string, params []string, base []string) []nir.ParamEntry {
 	if len(base) == 0 {
-		return nil
+		if strings.EqualFold(name, "resolve") || strings.Contains(strings.ToLower(name), "resolver") {
+			base = []string{"entry_kind:function_param"}
+		} else {
+			return nil
+		}
 	}
 	var out []nir.ParamEntry
 	for i, p := range params {

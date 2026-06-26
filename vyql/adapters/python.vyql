@@ -15,6 +15,7 @@ adapter python {
   source path "analysis.parameter.entry" val "decorator_method:api_route" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
   source path "analysis.parameter.entry" val "decorator_method:filter" nval "param_name:self" nval "param_name:cls" -> code.HttpInput
   source path "analysis.parameter.entry" val "function_name:resolve_" nval "param_name:self" nval "param_name:cls" nval "param_name:info" nval "param_name:root" nval "param_name:parent" nval "param_name:_" -> code.HttpInput
+  source path "analysis.parameter.entry" val "mutate" nval "param_name:self" nval "param_name:cls" nval "param_name:info" nval "param_name:root" nval "param_name:parent" nval "param_name:_" -> code.HttpInput
 
   source "request.form" -> code.HttpInput
   source "request.query_string" -> code.HttpInput
@@ -924,8 +925,11 @@ adapter python {
   sink path "httpx.post" -> code.UrlFetch
   sink path "httpx.request" -> code.UrlFetch
   sink path "httpx.Client" -> code.UrlFetch
+  sink path "httpx.AsyncClient" -> code.UrlFetch
   sink path "httpx.stream" -> code.UrlFetch
   sink path "aiohttp.request" -> code.UrlFetch
+  sink path "aiohttp.ClientSession.get" -> code.UrlFetch
+  sink path "aiohttp.ClientSession.post" -> code.UrlFetch
   sink path "aiohttp.ClientSession" -> code.UrlFetch
   sink path "session.request" -> code.UrlFetch
   sink path "pycurl.Curl" -> code.UrlFetch
@@ -976,6 +980,10 @@ adapter python {
   sink path "shutil.rmtree" -> code.FilePathAccess
   sink path "send_file" -> code.FilePathAccess
   sink path "send_from_directory" -> code.FilePathAccess
+  sink path "FileResponse" -> code.FilePathAccess
+  sink path "StaticFileResponse" -> code.FilePathAccess
+  sink path "django.views.static.serve" -> code.FilePathAccess
+  sink path "aiofiles.open" -> code.FilePathAccess
   sink path "flask.send_file" -> code.FilePathAccess
   sink path "zipfile.ZipFile.extractall" -> code.FilePathAccess
   sink path "tarfile.open" -> code.FilePathAccess
@@ -1199,6 +1207,7 @@ adapter python {
   sink path "mako.template.Template" -> code.TemplateRender
   sink path "Environment.from_string" -> code.TemplateRender
   sink path "render_template_string" -> code.TemplateRender
+  sink path "flask.render_template_string" -> code.TemplateRender
   flag code.IncompleteTemplateValidation in function {
     has "Formatter().parse"
     has "."
@@ -1709,6 +1718,14 @@ adapter python {
   flag code.JwtUnverified on any {
     path "jwt.encode"
     fact algorithm "none"
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.encode"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.decode"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
   }
   flag code.HeaderControlledJwkReview in function {
     name "_prepare_algorithm_key"

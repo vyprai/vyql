@@ -26,6 +26,8 @@ adapter javascript {
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:once" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:on" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:once" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:function_param" val "function_name:resolve" val "param_name:args" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:function_param" val "function_name:resolve" val "param_name:variables" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput
   source "req.params" -> code.HttpInput
@@ -128,7 +130,8 @@ adapter javascript {
   source method "parseFromString" -> core.UserControlledData
   flag code.StoredHtmlWrite in function {
     lang "javascript"
-    call path "copyIn"
+    call path contains_any ["copyIn", "Promise.promisify"]
+    call path "path.extname"
     selector "file.path"
     selector "info.extension"
     not call path "sanitizeSvg"
@@ -931,6 +934,9 @@ adapter javascript {
   }
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
+  sink path "request-promise" -> code.UrlFetch
+  sink path "requestPromise" -> code.UrlFetch
+  sink path "rp" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch
   sink path "needle.post" -> code.UrlFetch
   sink path "superagent.get" -> code.UrlFetch
@@ -938,6 +944,8 @@ adapter javascript {
   sink path "got" -> code.UrlFetch
   sink path "got.get" -> code.UrlFetch
   sink path "got.post" -> code.UrlFetch
+  sink path "got.stream" -> code.UrlFetch
+  sink path "undici.fetch" -> code.UrlFetch
   sink path "undici.request" -> code.UrlFetch
   sink path "fetch.default" -> code.UrlFetch
   sink path "fs.writeFile" -> code.UnsafeUpload
@@ -978,8 +986,11 @@ adapter javascript {
   sink path "fsPromises.readFile" -> code.FilePathAccess
   sink path "fsp.readFile" -> code.FilePathAccess
   sink path "fse.readFile" -> code.FilePathAccess
+  sink path "fs.promises.readFile" -> code.FilePathAccess
+  sink path "fs.promises.writeFile" -> code.FilePathAccess
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
+  sink path "res.attachment" -> code.FilePathAccess
   sink path "zip.file" -> code.FilePathAccess
   sink path "extractEntryTo" -> code.ArchiveEntryWrite
   sink path "zip.extractEntryTo" -> code.ArchiveEntryWrite
@@ -1101,10 +1112,15 @@ adapter javascript {
   sink method "bypassSecurityTrustStyle" -> code.HtmlRender
   sink path "handlebars.compile" -> code.TemplateRender
   sink path "Handlebars.compile" -> code.TemplateRender
+  sink path "mustache.render" arg 0 -> code.TemplateRender
+  sink path "Mustache.render" arg 0 -> code.TemplateRender
   sink path "ejs.render" -> code.TemplateRender
   sink path "ejs.compile" -> code.TemplateRender
   sink path "pug.compile" -> code.TemplateRender
   sink path "pug.render" -> code.TemplateRender
+  sink path "res.render" arg 0 -> code.TemplateRender
+  sink path "reply.view" arg 0 -> code.TemplateRender
+  sink path "ctx.render" arg 0 -> code.TemplateRender
   sink path "lodash.template" -> code.TemplateRender
   sink path "_.template" -> code.TemplateRender
   sink path "nunjucks.renderString" -> code.TemplateRender
@@ -1863,6 +1879,14 @@ adapter javascript {
   flag code.JwtUnverified on any {
     path "jwt.sign"
     fact algorithm "none"
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.sign"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.verify"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
   }
   // explicit CSRF middleware disablement.
   flag code.CsrfDisabled on any {
