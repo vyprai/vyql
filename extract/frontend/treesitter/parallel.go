@@ -58,7 +58,7 @@ func parseModulesPreprocess(
 	if workers < 1 {
 		workers = 1
 	}
-	cache := parsecache.Shared() // nil unless $VYQL_CACHE is set; all methods are nil-safe
+	cache := parsecache.Shared() // nil unless an explicit cache owner is wired in; all methods are nil-safe
 	if preprocess != nil {
 		cache = nil
 	}

@@ -64,6 +64,8 @@ const (
 	AnalysisRoleNeutralizerAssumption = "neutralizer_assumption"
 	AnalysisRolePathAccessCheck       = "path_access_check"
 	AnalysisRoleProcessArgVector      = "process_arg_vector"
+	AnalysisRoleSameReceiverGuard     = "same_receiver_guard"
+	AnalysisRoleSameReceiverTarget    = "same_receiver_guard_target"
 )
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.

@@ -51,89 +51,6 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
 }
 
-// PossibilityFindings emits opt-in, low-confidence review findings for labelled target
-// sites that confirmed rules did not already report. Concept-specific review text lives in
-// ontology data; the fallback here is deliberately generic.
-func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
-	covered := map[string]bool{}
-	for _, f := range confirmed {
-		for _, b := range f.Bindings {
-			covered[b.NodeID] = true
-		}
-	}
-	var out []*findings.Finding
-	seen := map[string]bool{}
-	for _, c := range e.Onto.AllConcepts() {
-		if c.Kind != "sink" || len(c.VulnerableTo) == 0 {
-			continue
-		}
-		qn := c.QualifiedName()
-		if c.Possibility == "exclude" {
-			continue
-		}
-		nodes, _ := e.Store.NodesWithConcept(qn)
-		for _, id := range nodes {
-			key := e.possibilityKey(qn, id)
-			if covered[id] || seen[key] {
-				continue
-			}
-			seen[key] = true
-			rc := possibilityReview(c)
-			out = append(out, &findings.Finding{
-				RuleID:      "VYQL-POSS-" + c.Name,
-				Severity:    "info",
-				Confidence:  "possibility",
-				WitnessKind: "possibility",
-				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
-				ReviewConditions: []findings.ReviewCondition{{
-					Category:   rc.Category,
-					Condition:  rc.Condition,
-					Evidence:   rc.Evidence,
-					Assumption: rc.Assumption,
-					Confidence: rc.Confidence,
-				}},
-			})
-		}
-	}
-	return out
-}
-
-func (e *Engine) possibilityKey(concept, nodeID string) string {
-	n, ok, _ := e.Store.GetNode(nodeID)
-	if !ok {
-		return concept + "\x00" + nodeID
-	}
-	loc := n.Prop("loc")
-	if loc == "" {
-		loc = nodeID
-	}
-	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
-}
-
-func possibilityReview(c ontology.Concept) findings.ReviewCondition {
-	qn := c.QualifiedName()
-	category := firstNonEmpty(c.ReviewCategory, firstString(c.VulnerableTo), qn)
-	condition := c.ReviewCondition
-	if condition == "" {
-		condition = "review " + qn + " because this labelled site was not covered by a confirmed rule finding"
-	}
-	evidence := c.ReviewEvidence
-	if evidence == "" {
-		evidence = "concept label " + qn + " is present"
-	}
-	assumption := c.ReviewAssumption
-	if assumption == "" {
-		assumption = "the data and control conditions represented by this concept hold for the reviewed site"
-	}
-	return findings.ReviewCondition{
-		Category:   category,
-		Condition:  condition,
-		Evidence:   evidence,
-		Assumption: assumption,
-		Confidence: firstNonEmpty(c.ReviewConfidence, "possibility"),
-	}
-}
-
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	switch body := cr.Rule.Body.(type) {
 	case *parser.FlowStmt:
@@ -868,13 +785,6 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-func firstString(vals []string) string {
-	if len(vals) == 0 {
-		return ""
-	}
-	return vals[0]
-}
-
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match
 // (substring / bare method name, no receiver type) can be no better than medium;
 // resolved/semantic matches may be high.
@@ -1002,7 +912,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 			}
 		}
 	}
-	if control == "core.XmlHardening" && e.sameReceiverXmlFactoryGuarded(sinkID, control) {
+	if e.sameReceiverGuarded(sinkID, control) {
 		return true
 	}
 	return false
@@ -1037,17 +947,25 @@ func functionScopeKey(n usg.Node) string {
 	return ""
 }
 
-func (e *Engine) sameReceiverXmlFactoryGuarded(sinkID, control string) bool {
+func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
 	sink, ok, _ := e.Store.GetNode(sinkID)
-	if !ok || !nodeHasConcept(e.labels(sinkID), "code.XmlParserCreate") {
+	if !ok {
+		return false
+	}
+	targets := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverTarget)
+	if len(targets) == 0 || !nodeHasAnyConcept(e.labels(sinkID), targets) {
+		return false
+	}
+	guards := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverGuard)
+	if len(guards) == 0 || !guards[control] {
 		return false
 	}
 	sinkRecv := receiverPrefix(sink.Prop("callee_path"))
 	if sinkRecv == "" {
 		return false
 	}
-	guards, _ := e.Store.NodesWithConcept(control)
-	for _, gid := range guards {
+	guardNodes, _ := e.Store.NodesWithConcept(control)
+	for _, gid := range guardNodes {
 		if gid == sinkID {
 			continue
 		}
@@ -1056,6 +974,15 @@ func (e *Engine) sameReceiverXmlFactoryGuarded(sinkID, control string) bool {
 			continue
 		}
 		if receiverPrefix(guard.Prop("callee_path")) == sinkRecv {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeHasAnyConcept(labels []usg.Label, concepts map[string]bool) bool {
+	for _, l := range labels {
+		if concepts[l.Concept] {
 			return true
 		}
 	}

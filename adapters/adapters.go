@@ -13,10 +13,7 @@
 package adapters
 
 import (
-	"fmt"
-	"os"
 	"sort"
-	"time"
 
 	"github.com/vyprai/vyql/usg"
 )
@@ -110,16 +107,8 @@ type key struct{ node, concept string }
 // poc/vyql/adapters.py apply_adapters.
 func Apply(store usg.Store, ads []Adapter, tenantOverrides []Mapping) ([]ConflictRecord, []Mapping, error) {
 	var proposals []proposal
-	debug := os.Getenv("VYQL_DEBUG_ADAPTERS") != ""
 	for _, ad := range ads {
-		start := time.Now()
-		if debug {
-			fmt.Fprintf(os.Stderr, "[adapter] start %s\n", ad.Name)
-		}
 		mappings := ad.Apply(store)
-		if debug {
-			fmt.Fprintf(os.Stderr, "[adapter] done %s time=%s mappings=%d\n", ad.Name, time.Since(start).Round(time.Millisecond), len(mappings))
-		}
 		for _, m := range mappings {
 			proposals = append(proposals, proposal{ad, m})
 		}

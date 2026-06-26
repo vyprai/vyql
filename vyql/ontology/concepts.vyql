@@ -5805,6 +5805,7 @@ concept PhpSimplexmlUnscopedEntityLoaderXxe : sink {
 concept XmlParserCreate : sink {
   vulnerable_to: [deserialization.XxeUnhardened]
   cwe: [CWE_611]
+  analysis_role: same_receiver_guard_target
 }
 concept CheckstyleExternalParameterEntitiesXxe : sink {
   vulnerable_to: [deserialization.Xxe]
@@ -6030,6 +6031,7 @@ concept XmlHardening : control {
   neutralizes: [deserialization.Xxe]
   cwe: [CWE_611]
   applies: path
+  analysis_role: same_receiver_guard
 }
 
 module identity;

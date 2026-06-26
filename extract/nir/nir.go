@@ -253,7 +253,7 @@ type Block struct{ Stmts []Stmt }
 
 // Structured control-flow nodes (B1 / WS0). Frontends emit these instead of a flat
 // Block when they preserve branch structure; the lowering builds a real CFG (CONTROL
-// edges) from them under VYQL_CFG. With the flag off — or for a frontend that hasn't
+// edges) from them. For a frontend that has not
 // been converted — they are lowered like a Block (flatten), so they are fully additive
 // and behaviour-preserving. Cond is retained for taint and (later) path feasibility.
 type If struct {

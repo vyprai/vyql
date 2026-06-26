@@ -3,7 +3,7 @@
 // Marks cryptographic operations (cipher/sign/verify/hash/KDF/key-gen) as
 // code.CryptoOperation. No CONFIRMED rule consumes this concept, so these labels are
 // inert in normal scans (zero effect on default output / benchmarks). The possibility
-// tier (VYQL_POSSIBILITY=1) surfaces each as a "review this crypto logic" finding for the
+// flag surface exposes each as a "review this crypto logic" item for the
 // AI/triage pass — the bug class behind many crypto CVEs (bypassed verification, weak
 // key/IV handling) that static taint cannot prove. cross_language: crypto APIs recur by
 // name across ecosystems.

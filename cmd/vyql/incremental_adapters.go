@@ -244,8 +244,10 @@ func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
 // deps). If this is unchanged, a module's adapter labels are reproducible from its content.
 func adapterFingerprint(deps map[string]bool) string {
 	h := sha256.New()
-	if salt := parsecache.Shared().Salt(); salt != nil {
-		h.Write(salt)
+	if cache := parsecache.Shared(); cache != nil {
+		if salt := cache.Salt(); salt != nil {
+			h.Write(salt)
+		}
 	}
 	io.WriteString(h, "\x00sources\x00")
 	io.WriteString(h, frontend.ActiveSourcesKey())

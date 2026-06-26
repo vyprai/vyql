@@ -1,4 +1,4 @@
-// Cross-language audit-review labeling for the POSSIBILITY tier (VYQL_POSSIBILITY=1).
+// Cross-language audit-review labeling for scan flags.
 //
 // Marks privileged/state-changing operations (code.SensitiveOperation) and resource
 // acquisitions (code.ResourceReview). No CONFIRMED rule consumes these concepts, so they

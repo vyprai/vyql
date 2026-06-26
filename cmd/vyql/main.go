@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,9 +50,6 @@ func main() {
 	// deep in loading — recover into a clean message rather than a stack trace.
 	defer func() {
 		if r := recover(); r != nil {
-			if os.Getenv("VYQL_PANIC") != "" {
-				panic(r)
-			}
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
 			os.Exit(1)
 		}
@@ -84,8 +80,6 @@ func main() {
 		err = cmdValidateAdapter(args)
 	case "diff":
 		err = cmdDiff(args)
-	case "cache":
-		err = cmdCache(args)
 	default:
 		usage()
 		os.Exit(2)
@@ -109,7 +103,7 @@ func cmdScan(args []string) error {
 	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
-	adapterOverlay := fs.String("adapter-overlay", os.Getenv("VYQL_ADAPTER_OVERLAY"), "optional repo-local adapter overlay directory")
+	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -118,8 +112,9 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
-	restore := setOptionalEnv("VYQL_ADAPTER_OVERLAY", *adapterOverlay)
-	defer restore()
+	oldOverlay := scanAdapterOverlay
+	scanAdapterOverlay = strings.TrimSpace(*adapterOverlay)
+	defer func() { scanAdapterOverlay = oldOverlay }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:    *stats,
 		IncludeFlags: *allResults,
@@ -130,16 +125,13 @@ func cmdScan(args []string) error {
 	})
 }
 
-// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
+// applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
 // through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
 // to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
 // a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
 // value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
-	if v == "" {
-		v = os.Getenv("VYQL_MAX_RAM")
-	}
 	if v == "" {
 		return noop
 	}
@@ -219,22 +211,6 @@ func profileNames() string {
 	return strings.Join(names, " | ")
 }
 
-func setOptionalEnv(key, value string) func() {
-	value = strings.TrimSpace(value)
-	old, had := os.LookupEnv(key)
-	if value == "" {
-		return func() {}
-	}
-	_ = os.Setenv(key, value)
-	return func() {
-		if had {
-			_ = os.Setenv(key, old)
-		} else {
-			_ = os.Unsetenv(key)
-		}
-	}
-}
-
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
@@ -268,12 +244,6 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		}
 		all = append(all, got...)
 	}
-	// Possibility mode (opt-in, for triage): surface ontology sink
-	// sites the confirmed rules did not flag, as low-confidence "possibility"
-	// findings. OFF by default so the protected benchmarks are unaffected.
-	if os.Getenv("VYQL_POSSIBILITY") != "" {
-		all = append(all, eng.PossibilityFindings(all)...)
-	}
 	tk.mark("evaluate")
 	return all, stats, g, nil
 }
@@ -292,18 +262,12 @@ func (o scanRunOptions) wantsFlags() bool {
 }
 
 func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
-	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
-		f, _ := os.Create(cp)
-		_ = pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-	peakHeapPath = os.Getenv("VYQL_MEMPROFILE") // captured at peak (graph built) in buildGraphWith
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
 		return err
 	}
-	// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
+	// whole-scan result cache: if an explicit process cache exists and nothing the output depends on
 	// changed — no source file edit and no vyql/ data change — replay the cached findings and
 	// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
 	// reparse only the files that actually changed.

@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -17,9 +16,13 @@ import (
 )
 
 var (
-	timingOn = os.Getenv("VYQL_TIMING") != ""
-	stderr   = os.Stderr
+	timingOn = false
+	stderr   = discardWriter{}
 )
+
+type discardWriter struct{}
+
+func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func nowNano() int64 { return time.Now().UnixNano() }
 
@@ -179,18 +182,8 @@ var (
 
 // newGraphStore creates the analysis graph store. BadgerDB is the DEFAULT source of truth:
 // on-disk when a RAM ceiling is configured (DiskStorePath, cache=DiskCacheBytes), else in-memory
-// badger. VYQL_STORE=int|inmem are escape hatches to the map-based stores (faster on small repos,
-// no badger overhead). hint>0 presizes the in-RAM stores.
+// badger. hint>0 presizes the in-RAM fallback stores.
 func newGraphStore(hint int) usg.Store {
-	switch os.Getenv("VYQL_STORE") {
-	case "int":
-		return usg.NewIntStore(hint)
-	case "inmem":
-		if hint > 0 {
-			return usg.NewInMemStoreSized(hint)
-		}
-		return usg.NewInMemStore()
-	}
 	if UseIntStore {
 		return usg.NewIntStore(hint)
 	}
