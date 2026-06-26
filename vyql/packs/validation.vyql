@@ -87,3 +87,8 @@ rule UnvalidatedDependencyMapKeyDeserialization {
   meta { id: "VYQL-VAL-017", severity: high, cwe: [CWE_20], confidence_floor: high }
   match code.UnvalidatedDependencyMapKeyDeserialization as field
 }
+
+rule UntrustedSupportUrlNotification {
+  meta { id: "VYQL-VAL-018", severity: medium, cwe: [CWE_20], confidence_floor: high }
+  match code.UntrustedSupportUrlNotification as notification
+}

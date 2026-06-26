@@ -2565,6 +2565,12 @@ review code.UnvalidatedDependencyMapKeyDeserialization {
   expected: [core.InputValidation]
   text: "validate dependency or package map keys during deserialization before they are accepted as manifest identifiers"
 }
+review code.UntrustedSupportUrlNotification {
+  category: "validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "derive support notification site identity from trusted request host data or defang user-supplied URLs before forwarding them to administrators"
+}
 review code.JenkinsJellySecretTextboxExposure {
   category: "secret"
   kind: "target"

@@ -483,6 +483,16 @@ adapter python {
     selector contains_any ["loc.accesskey", "loc.secretkey"]
     token identifier contains_any ["accesskey", "access_key", "secretkey", "secret_key"]
   }
+  flag code.UntrustedSupportUrlNotification in function {
+    lang "python"
+    name "post"
+    call path contains_any ["validate_request", "self.validate_request"]
+    call path contains_any ["schedule_support_email", "send_support_email", "notify_admin", "send_mail", "send_email"]
+    literal contains_any ["Site:", "URL:", "Url:", "Website:"]
+    token subscript contains_any ["request['url']", "request['uri']", "request['site']", "payload['url']", "data['url']"]
+    not selector contains_any ["request.hostname", "request.host", "request.host_url", "self.request.hostname", "self.request.host"]
+    not call path contains_any ["defang", "url_has_allowed_host_and_scheme", "is_safe_url", "same_origin", "allowed_host"]
+  }
   sink path "os.system" -> code.CommandExecution
   sink path "os.popen" -> code.CommandExecution
   sink path "os.popen2" -> code.CommandExecution

@@ -161,6 +161,15 @@ concept UnvalidatedDependencyMapKeyDeserialization : sink {
   review_assumption: "the deserialized manifest or configuration keys select dependency, package, plugin, or module names that must obey an identifier policy before later resolution"
   review_confidence: high
 }
+concept UntrustedSupportUrlNotification : sink {
+  vulnerable_to: [validation.ImproperInputValidation]
+  cwe: [CWE_20]
+  review_category: "validation"
+  review_condition: "a support or contact endpoint forwards a user-supplied site URL into an administrator notification as trusted context"
+  review_evidence: "support notification context {pattern} validates request data, formats a Site field from request URL input, and schedules or sends the administrator notification without trusted-host derivation or URL defanging"
+  review_assumption: "mail clients or administrator workflows may auto-link the supplied URL, causing the notification to imply trust in an attacker-selected site"
+  review_confidence: high
+}
 concept UnboundedJupyterKernelDependency : sink {
   vulnerable_to: [dos.UncontrolledResourceConsumption]
   cwe: [CWE_1104]
