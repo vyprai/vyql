@@ -2619,6 +2619,12 @@ review code.UnescapedContentDispositionFilename {
   expected: [core.InputValidation]
   text: "verify attachment filenames are URL/header-escaped before being embedded in Content-Disposition response headers"
 }
+review code.UnencodedUrlQueryParameter {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "URL-encode caller-controlled or stored values before appending them into generated query-string links"
+}
 review code.CoderAgentManifestInfoLog {
   category: "secret"
   kind: "attention"

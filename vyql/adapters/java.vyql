@@ -743,6 +743,14 @@ adapter java {
     token identifier contains_any ["filename", "fileName"]
     not call path contains_any ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]
   }
+  flag code.UnencodedUrlQueryParameter in function {
+    function contains_any ["generateURL", "getRenderer"]
+    call path "StringBuilder"
+    call path "append"
+    literal contains_any ["?jobFilter=", "&nodeFilter=", "&launcherFilter="]
+    call path contains_any ["getJobFilter", "getNodeFilter", "getLauncherFilter"]
+    not call path contains_any ["URLEncoder.encode", "Util.rawEncode", "encodeURIComponent"]
+  }
   flag code.EmbeddedDotSegmentFilenameWrite in function {
     call path contains_any ["getFilename", "getOriginalFilename"]
     call path contains_any ["Files.copy", "Files.write", "FileUtils.copyInputStreamToFile", "MultipartFile.transferTo"]

@@ -195,6 +195,65 @@ class RawResultName {
 	}
 }
 
+func TestJavaFunctionContextIncludesChartUrlBuilderTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "AbstractBuildStatChartDimension.java")
+	src := []byte(`class AbstractBuildStatChartDimension {
+  private BuildStatConfiguration config;
+
+  public Object getRenderer() {
+    return new StackedAreaRenderer2() {
+      @Override
+      public String generateURL(CategoryDataset dataset, int row, int column) {
+        DateRange range = (DateRange) dataset.getColumnKey(column);
+        StringBuilder sb = new StringBuilder()
+          .append("buildHistory?jobFilter=").append(config.getBuildFilters().getJobFilter())
+          .append("&start=").append(range.getStart().getTimeInMillis());
+        if (config.getBuildFilters().getNodeFilter() != null) {
+          sb.append("&nodeFilter=").append(config.getBuildFilters().getNodeFilter());
+        }
+        return sb.toString();
+      }
+    };
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "function_name:getRenderer") && strings.Contains(args, "identifier:generateURL") {
+			for _, want := range []string{
+				"call_path:StringBuilder",
+				"call_path:config.getBuildFilters.getJobFilter",
+				"literal:buildHistory?jobFilter=",
+				"literal:&nodeFilter=",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("generateURL context missing %q; context=%q", want, args)
+				}
+			}
+			return
+		}
+	}
+	t.Fatalf("generateURL context not found; nodes=%#v", nodes)
+}
+
 func TestJavaThreadLocalLifecycleContextTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "RequestScopedCache.java")
