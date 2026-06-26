@@ -1234,6 +1234,12 @@ review code.UnparameterizedSqlExportStringBuilder {
   expected: [core.SqlParameterization, core.InputValidation]
   text: "review database export query builders for parameterized values and quoted identifiers"
 }
+review code.ReportDateFilterSqlFragmentInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review report date filters for strict date/comparison validation or parameterized query construction before SQL execution"
+}
 review code.EnvFileVariableInjection {
   category: "injection"
   kind: "attention"

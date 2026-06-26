@@ -24,6 +24,11 @@ rule UnparameterizedSqlExportStringBuilder {
   match code.UnparameterizedSqlExportStringBuilder as sink
 }
 
+rule ReportDateFilterSqlFragmentInjection {
+  meta { id: "VYQL-INJ-196", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.ReportDateFilterSqlFragmentInjection as sink
+}
+
 rule PgEscapeStringSqlFilterInjection {
   meta { id: "VYQL-INJ-154", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.PgEscapeStringSqlFilterInjection as sink

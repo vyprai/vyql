@@ -5470,6 +5470,15 @@ concept UnparameterizedSqlExportStringBuilder : sink {
   review_assumption: "exported metric names, keys, process names, or values can contain attacker-controlled SQL metacharacters"
   review_confidence: high
 }
+concept ReportDateFilterSqlFragmentInjection : sink {
+  vulnerable_to: [injection.SqlInjection, validation.ImproperInputValidation]
+  cwe: [CWE_89, CWE_20]
+  review_category: "sql"
+  review_condition: "a report date filter builds a SQL predicate fragment from request-controlled date and comparison values"
+  review_evidence: "report query context {pattern} derives a date predicate fragment from request subscripts and concatenates it into SQL before executing the query"
+  review_assumption: "authenticated report users can submit date or comparison parameters containing SQL metacharacters"
+  review_confidence: high
+}
 concept PgEscapeStringSqlFilterInjection : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]

@@ -1380,6 +1380,32 @@ adapter php {
     lacks "array_map('absint',$exclude)"
     lacks "wp_parse_id_list($exclude)"
   }
+  flag code.ReportDateFilterSqlFragmentInjection in module {
+    lang "php"
+    token subscript contains_any [
+      "$_POST['dropdown_calendar']",
+      "$_POST[\"dropdown_calendar\"]",
+      "$_GET['dropdown_calendar']",
+      "$_GET[\"dropdown_calendar\"]"
+    ]
+    token subscript contains_any [
+      "$_POST['dropdown_sup_inf']",
+      "$_POST[\"dropdown_sup_inf\"]",
+      "$_GET['dropdown_sup_inf']",
+      "$_GET[\"dropdown_sup_inf\"]"
+    ]
+    literal contains_any [" LIKE '", "date_mod", " ORDER BY "]
+    call path "$DB.doQuery"
+    not call path contains_any [
+      "DateTime.createFromFormat",
+      "createFromFormat",
+      "filter_var",
+      "QueryParam",
+      "$DB.request",
+      "$DB.prepare",
+      "prepare"
+    ]
+  }
   flag code.UnfilteredSearchWhereColumns in function {
     lang "php"
     name "scopeSearch"
