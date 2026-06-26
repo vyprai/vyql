@@ -370,6 +370,13 @@ adapter ruby {
     literal contains_any ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]
     not literal contains_any ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]
   }
+  flag code.CatastrophicRegex in class {
+    lang "ruby"
+    literal contains_any ["\\A/([^/]+)/?([^/]+)?\\z", "^/([^/]+)/?([^/]+)?$"]
+    call path contains_any ["path.match", "path.match.to_a"]
+    not call path "path.split"
+    not call path contains_any ["model_id.include", "model_id.include?"]
+  }
   flag code.RubyLineAnchorValidationBypass in function {
     lang "ruby"
     name "legal?"
