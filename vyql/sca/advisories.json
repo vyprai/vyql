@@ -29,6 +29,17 @@
         "cwe": ["CWE-20", "CWE-703"],
         "min_safe": "v1.3.10"
       }
+    ],
+    "github.com/tidwall/match": [
+      {
+        "version": "*",
+        "id": "CVE-2020-36066",
+        "cwe": [
+          "CWE-1333",
+          "CWE-400"
+        ],
+        "min_safe": "v1.0.3"
+      }
     ]
   }
 }
