@@ -1,0 +1,79 @@
+# Rank 981 / CVE-2026-42642: GiveWP campaign comments were exposed through a
+# public WordPress REST endpoint without campaign status or page privacy checks.
+
+test "rank981: public campaign comments route lacks status authorization"
+  lang php
+  file src/API/REST/V3/Routes/Campaigns/CampaignCommentsController.php
+  expect VYQL-AUTH-075
+  expect_review code.PublicRestDataEndpointMissingAuthorization
+  code
+  ```
+  <?php
+  class CampaignCommentsController extends WP_REST_Controller {
+      public function register_routes() {
+          register_rest_route($this->namespace, '/' . CampaignRoute::CAMPAIGN . '/comments', [
+              [
+                  'methods' => WP_REST_Server::READABLE,
+                  'callback' => [$this, 'get_items'],
+                  'permission_callback' => '__return_true',
+              ],
+          ]);
+      }
+
+      public function get_items($request): WP_REST_Response {
+          $campaign = Campaign::find($request->get_param('id'));
+          if (!$campaign) {
+              return rest_ensure_response(new WP_Error('campaign_not_found', 'Campaign not found', ['status' => 404]));
+          }
+
+          $query = (new CampaignDonationQuery($campaign))
+              ->joinDonationMeta(DonationMetaKeys::DONOR_ID, 'donorIdMeta')
+              ->joinDonationMeta(DonationMetaKeys::COMMENT, 'commentMeta');
+
+          return rest_ensure_response(new WP_REST_Response($query->getAll()));
+      }
+  }
+  ```
+
+test "rank981: public campaign comments route checks status and privacy"
+  lang php
+  file src/API/REST/V3/Routes/Campaigns/CampaignCommentsController.php
+  reject VYQL-AUTH-075
+  reject_review code.PublicRestDataEndpointMissingAuthorization
+  code
+  ```
+  <?php
+  class CampaignCommentsController extends WP_REST_Controller {
+      public function register_routes() {
+          register_rest_route($this->namespace, '/' . CampaignRoute::CAMPAIGN . '/comments', [
+              [
+                  'methods' => WP_REST_Server::READABLE,
+                  'callback' => [$this, 'get_items'],
+                  'permission_callback' => '__return_true',
+              ],
+          ]);
+      }
+
+      public function get_items($request): WP_REST_Response {
+          $campaign = Campaign::find($request->get_param('id'));
+          if (!$campaign) {
+              return rest_ensure_response(new WP_Error('campaign_not_found', 'Campaign not found', ['status' => 404]));
+          }
+
+          $canViewPrivate = UserPermissions::campaigns()->canViewPrivate();
+          if (!$campaign->status->isActive() && !$canViewPrivate) {
+              return rest_ensure_response(new WP_Error('rest_forbidden', 'Forbidden', ['status' => CampaignPermissions::authorizationStatusCode()]));
+          }
+
+          if ($campaign->pageId && get_post_status($campaign->pageId) === 'private' && !$canViewPrivate) {
+              return rest_ensure_response(new WP_Error('rest_forbidden', 'Forbidden', ['status' => CampaignPermissions::authorizationStatusCode()]));
+          }
+
+          $query = (new CampaignDonationQuery($campaign))
+              ->joinDonationMeta(DonationMetaKeys::DONOR_ID, 'donorIdMeta')
+              ->joinDonationMeta(DonationMetaKeys::COMMENT, 'commentMeta');
+
+          return rest_ensure_response(new WP_REST_Response($query->getAll()));
+      }
+  }
+  ```

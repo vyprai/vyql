@@ -2227,6 +2227,15 @@ concept FullSizeMediaFileMissingViewFullAuthorization : sink {
   review_assumption: "full/original media files are more sensitive than thumbnails or resized derivatives and require a distinct permission"
   review_confidence: high
 }
+concept PublicRestDataEndpointMissingAuthorization : sink {
+  vulnerable_to: [access_control.MissingAuthorization, access_control.IncorrectAuthorization, secrets.SecretLeak]
+  cwe: [CWE_862, CWE_863, CWE_200]
+  review_category: "access_control"
+  review_condition: "a public REST route returns resource data without checking the resource status, page privacy, ownership, or equivalent view permission inside the handler"
+  review_evidence: "REST controller context {pattern} registers a public readable route, loads resource data, and queries related comments, donations, or records without an observed private-resource authorization branch"
+  review_assumption: "draft, archived, private, inactive, or otherwise restricted resources can expose related data that should be visible only to privileged users"
+  review_confidence: high
+}
 concept ClusterDeployFunctionMissingPermission : sink {
   vulnerable_to: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
   cwe: [CWE_862, CWE_863, CWE_269]

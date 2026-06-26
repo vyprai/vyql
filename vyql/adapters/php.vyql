@@ -1036,6 +1036,17 @@ adapter php {
     lacks "current_user_can('edit_post'"
     lacks "current_user_can(\"edit_post\""
   }
+  flag code.PublicRestDataEndpointMissingAuthorization in class {
+    lang "php"
+    call path "register_rest_route"
+    call arg contains "__return_true"
+    call arg contains "get_items"
+    call path "Campaign.find"
+    call path "CampaignDonationQuery"
+    call path contains "joinDonationMeta"
+    not call path contains_any ["canViewPrivate", "isActive", "get_post_status", "authorizationStatusCode"]
+    not call arg "WP_Error:rest_forbidden"
+  }
   flag code.DisabledRelationshipMetadataExposure in function {
     lang "php"
     name "getRelatableResourceTypes"

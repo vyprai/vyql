@@ -286,6 +286,12 @@ review code.FullSizeMediaFileMissingViewFullAuthorization {
   expected: [core.AuthorizationCheck]
   text: "verify full-size media/data file endpoints require the stronger full-view permission before streaming original files"
 }
+review code.PublicRestDataEndpointMissingAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify public REST data endpoints enforce resource status, page privacy, ownership, or equivalent view permission inside the handler"
+}
 review code.ClusterDeployFunctionMissingPermission {
   category: "access_control"
   kind: "target"
