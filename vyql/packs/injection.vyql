@@ -19,6 +19,11 @@ rule UnvalidatedSqlIdentifierInterpolation {
   match code.UnvalidatedSqlIdentifierInterpolation as sink
 }
 
+rule UnparameterizedSqlExportStringBuilder {
+  meta { id: "VYQL-INJ-194", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnparameterizedSqlExportStringBuilder as sink
+}
+
 rule PgEscapeStringSqlFilterInjection {
   meta { id: "VYQL-INJ-154", severity: high, cwe: [CWE_89], confidence_floor: high }
   match code.PgEscapeStringSqlFilterInjection as sink

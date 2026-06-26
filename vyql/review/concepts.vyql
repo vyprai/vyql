@@ -1222,6 +1222,12 @@ review code.UnvalidatedSqlIdentifierInterpolation {
   expected: [core.InputValidation]
   text: "review SQL builders that interpolate caller-selected table or column identifiers before an allowlist check"
 }
+review code.UnparameterizedSqlExportStringBuilder {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review database export query builders for parameterized values and quoted identifiers"
+}
 review code.EnvFileVariableInjection {
   category: "injection"
   kind: "attention"

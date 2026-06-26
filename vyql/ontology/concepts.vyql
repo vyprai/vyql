@@ -5407,6 +5407,15 @@ concept UnvalidatedSqlIdentifierInterpolation : sink {
   review_assumption: "attackers can control the identifier value passed into the update or query helper"
   review_confidence: high
 }
+concept UnparameterizedSqlExportStringBuilder : sink {
+  vulnerable_to: [injection.SqlInjection]
+  cwe: [CWE_89]
+  review_category: "sql"
+  review_condition: "database export code assembles CREATE or INSERT statements from runtime table, column, or value lists and executes them without parameterization"
+  review_evidence: "SQL export context {pattern} builds query strings from collected values before executing them without sql.Identifier/sql.Placeholder or executemany-style binding"
+  review_assumption: "exported metric names, keys, process names, or values can contain attacker-controlled SQL metacharacters"
+  review_confidence: high
+}
 concept PgEscapeStringSqlFilterInjection : sink {
   vulnerable_to: [injection.SqlInjection]
   cwe: [CWE_89]

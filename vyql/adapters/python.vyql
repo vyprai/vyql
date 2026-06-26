@@ -1234,6 +1234,14 @@ adapter python {
     call path "nonquery"
     not expr "field[0]in[\"firstname\",\"lastname\"]"
   }
+  flag code.UnparameterizedSqlExportStringBuilder in function {
+    lang "python"
+    call path "cur.execute"
+    token identifier contains_any ["creation_list", "values_list", "insert_list", "insert_query"]
+    token identifier contains_any ["plugin", "table", "col_names", "columns"]
+    not call path contains_any ["sql.Identifier", "sql.Literal", "sql.Placeholder"]
+    not call path contains_any ["cur.executemany", "execute_values", "execute_batch"]
+  }
   flag code.AmbiguousQueryParameterSeparator in function {
     name "_parse_qsl"
     has "qs.replace(';','&').split('&')"
