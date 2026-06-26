@@ -2787,6 +2787,15 @@ concept CommentUpdateMissingOwnershipConstraint : sink {
   review_assumption: "the comment id can reference another user's comment through the edit/update path"
   review_confidence: high
 }
+concept OwnedResourceDeleteMissingOwnershipCheck : sink {
+  vulnerable_to: [access_control.Idor, access_control.IncorrectAuthorization]
+  cwe: [CWE_639, CWE_862, CWE_863]
+  review_category: "auth"
+  review_condition: "a delete handler loads resource metadata and deletes backend state without constraining the action to an admin or the resource owner"
+  review_evidence: "resource delete context {pattern} fetches object metadata and reaches backend or registry deletion before an observed owner/admin authorization check"
+  review_assumption: "the request parameter identifies a resource owned by another principal and the delete operation is externally reachable"
+  review_confidence: high
+}
 // Review-only: externally supplied polymorphic type/class names are written into
 // association state without being constrained to a configured allowlist.
 concept PolymorphicTypeSelectionReview : sink {

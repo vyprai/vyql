@@ -844,6 +844,12 @@ review code.CommentUpdateMissingOwnershipConstraint {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "review comment update queries for current-author or current-user ownership constraints"
 }
+review code.OwnedResourceDeleteMissingOwnershipCheck {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review resource delete handlers for admin or current-owner authorization before backend deletion"
+}
 review code.IncompleteIpDenylist {
   category: "request"
   kind: "attention"

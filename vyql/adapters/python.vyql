@@ -1290,6 +1290,17 @@ adapter python {
     call path "doc_dict.update"
     not call path "link_doc.apply_fieldlevel_read_permissions"
   }
+  flag code.OwnedResourceDeleteMissingOwnershipCheck in function {
+    lang "python"
+    name "delete"
+    call path contains_any ["get_image_meta_or_404", "get_resource", "get_object", "get_by_id", "find_by_id"]
+    call path contains_any ["schedule_delete_from_backend", "delete_image_metadata", "delete_resource", "delete_object"]
+    selector contains_any ["req.context.read_only", "request.context.read_only"]
+    token subscript contains_any ["image['protected']", "resource['protected']", "object['protected']"]
+    not selector contains_any ["req.context.is_admin", "request.context.is_admin", "req.context.owner", "request.context.owner", "current_user.id"]
+    not token subscript contains_any ["image['owner']", "resource['owner']", "object['owner']"]
+    not call path contains_any ["check_ownership", "require_owner", "is_owner", "checkPermission", "check_permission"]
+  }
   sink path "analysis.function.context.sink" val "name=generate_auth_token" val "RemoteAuthToken.user_id==user_id" val "auth_token.user_id=user_id" nval "current_user.id!=user_id" -> code.ObjectLookupByUserInput
   sink path "analysis.function.context.sink" val "name=delete_auth_token" val "RemoteAuthToken.user_id==user_id" val "delete()" nval "current_user.id!=user_id" -> code.ObjectLookupByUserInput
 
