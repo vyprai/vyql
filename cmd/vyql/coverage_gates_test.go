@@ -571,6 +571,143 @@ func TestAllAdaptersLoadGate(t *testing.T) {
 	}
 }
 
+func TestEverySourceLanguageHasV2TaintMechanicCoverage(t *testing.T) {
+	decls := parseDataDecls(t, "mechanics", ".vyql")
+	if !hasTaintRuleVerbMechanic(decls) {
+		t.Fatalf("mechanics corpus must define mechanic ruleVerb taint with dataflow.taint source->sink endpoint kinds")
+	}
+
+	for _, lang := range sourceLanguagesForCoverage() {
+		t.Run(lang, func(t *testing.T) {
+			if _, err := os.Stat(filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")); err != nil {
+				t.Fatalf("missing exhaustive language coverage spec: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(datadir.Root(), "adapters", "packages", lang)); err != nil {
+				t.Fatalf("missing package catalog for %q: %v", lang, err)
+			}
+			sourceCount, sinkCount := countV2TaintEndpointMappings(t, filepath.Join("adapters", lang), filepath.Join("adapters", "packages", lang))
+			if sourceCount == 0 {
+				t.Fatalf("%q has no v2 source endpoint definitions", lang)
+			}
+			if sinkCount == 0 {
+				t.Fatalf("%q has no v2 sink endpoint definitions", lang)
+			}
+			if n := len(frontend.AdaptersFor(lang)); n == 0 {
+				t.Fatalf("%q frontend produced no runtime adapters", lang)
+			}
+		})
+	}
+}
+
+func sourceLanguagesForCoverage() []string {
+	out := make([]string, 0, len(languages))
+	for _, lg := range languages {
+		switch lg.name {
+		case "config", "textpattern":
+			continue
+		default:
+			out = append(out, lg.name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
+	t.Helper()
+	sourceCount, sinkCount := 0, 0
+	for _, sub := range subs {
+		for path, src := range readDataFiles(t, sub, ".vyql") {
+			decls, err := parser.ParseRuntime(src)
+			if err != nil {
+				t.Fatalf("parse %s: %v", path, err)
+			}
+			for _, decl := range decls {
+				adapter, ok := decl.(*parser.AdapterDecl)
+				if !ok {
+					continue
+				}
+				for _, mapping := range adapter.Mappings {
+					switch {
+					case strings.HasPrefix(mapping.Kind, "source"):
+						sourceCount++
+					case strings.HasPrefix(mapping.Kind, "sink"):
+						sinkCount++
+					}
+				}
+			}
+		}
+	}
+	return sourceCount, sinkCount
+}
+
+func hasTaintRuleVerbMechanic(files map[string][]parser.Decl) bool {
+	for _, decls := range files {
+		for _, decl := range decls {
+			m, ok := decl.(*parser.V2MechanicDecl)
+			if !ok || m.Kind != "ruleVerb" || m.Name != "taint" {
+				continue
+			}
+			if v2BlockStringValue(m.Items, "solver") != "dataflow.taint" {
+				continue
+			}
+			from := v2BlockStringSet(m.Items, "fromKinds")
+			to := v2BlockStringSet(m.Items, "toKinds")
+			if from["source"] && to["sink"] {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func v2BlockStringValue(items []parser.V2BlockItem, key string) string {
+	for _, item := range items {
+		if len(item.Key) != 1 || item.Key[0] != key {
+			continue
+		}
+		switch value := item.Value.(type) {
+		case string:
+			return value
+		case parser.V2RefExpr:
+			return value.Name
+		case parser.V2LiteralExpr:
+			if s, ok := value.Value.(string); ok {
+				return s
+			}
+		}
+		return ""
+	}
+	return ""
+}
+
+func v2BlockStringSet(items []parser.V2BlockItem, key string) map[string]bool {
+	out := map[string]bool{}
+	for _, item := range items {
+		if len(item.Key) != 1 || item.Key[0] != key {
+			continue
+		}
+		values, ok := item.Value.([]any)
+		if !ok {
+			return out
+		}
+		for _, value := range values {
+			switch x := value.(type) {
+			case string:
+				out[x] = true
+			case parser.V2RefExpr:
+				out[x.Name] = true
+			case parser.V2LiteralExpr:
+				if s, ok := x.Value.(string); ok {
+					out[s] = true
+				}
+			}
+		}
+		return out
+	}
+	return out
+}
+
 func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	repo := testRepoRoot(t)
 	poolPath := filepath.Join(repo, "cve-1000", "pool.tsv")

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
@@ -71,4 +72,120 @@ rule HighConfidenceReview {
 	if len(got) != 1 || got[0].Bindings[0].NodeID != "high" {
 		t.Fatalf("high-confidence finding did not pass v2 floor: %+v", got)
 	}
+}
+
+func TestCompileUsesAuthoredRuleVerbEndpointKinds(t *testing.T) {
+	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+		{Name: "mechanics.vyql", Source: `
+module mechanics.test;
+mechanic ruleVerb taint {
+  solver: dataflow.taint
+  fromKinds: [source]
+  toKinds: [asset]
+  allowedClauses: [where, coveredBy, confidence]
+}
+`},
+		{Name: "concepts.vyql", Source: `
+module custom;
+concept Input : source {}
+concept Asset : asset {}
+`},
+		{Name: "rules.vyql", Source: `
+module rules.test;
+rule SourceToAsset {
+  taint custom.Input -> custom.Asset
+}
+`},
+	})
+	onto := ontology.New()
+	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
+	onto.Add(ontology.Concept{Name: "Asset", Package: "custom", Kind: "asset"})
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("CompileRules errors: %+v", errs)
+	}
+	if len(compiled) != 1 {
+		t.Fatalf("compiled = %d, want 1", len(compiled))
+	}
+}
+
+func TestCompileRejectsEndpointKindsFromAuthoredRuleVerbMechanic(t *testing.T) {
+	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+		{Name: "mechanics.vyql", Source: `
+module mechanics.test;
+mechanic ruleVerb taint {
+  solver: dataflow.taint
+  fromKinds: [asset]
+  toKinds: [sink]
+  allowedClauses: [where, coveredBy, confidence]
+}
+`},
+		{Name: "concepts.vyql", Source: `
+module custom;
+concept Input : source {}
+concept Sink : sink {}
+`},
+		{Name: "rules.vyql", Source: `
+module rules.test;
+rule SourceToSink {
+  taint custom.Input -> custom.Sink
+}
+`},
+	})
+	onto := ontology.New()
+	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
+	onto.Add(ontology.Concept{Name: "Sink", Package: "custom", Kind: "sink"})
+	_, errs := CompileRules(decls, onto)
+	if len(errs) != 1 || !strings.Contains(errs[0].Msg, "expected one of") || !strings.Contains(errs[0].Msg, "asset") {
+		t.Fatalf("CompileRules errors = %+v, want authored endpoint kind rejection", errs)
+	}
+}
+
+func TestCompileRequiresLoadedRuleVerbWhenMechanicsAreAuthoritative(t *testing.T) {
+	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+		{Name: "mechanics.vyql", Source: `
+module mechanics.test;
+mechanic ruleVerb flow {
+  solver: dataflow.flow
+  fromKinds: [source]
+  toKinds: [sink]
+  allowedClauses: [where, coveredBy, confidence]
+}
+`},
+		{Name: "concepts.vyql", Source: `
+module custom;
+concept Input : source {}
+concept Sink : sink {}
+`},
+		{Name: "rules.vyql", Source: `
+module rules.test;
+rule SourceToSink {
+  taint custom.Input -> custom.Sink
+}
+`},
+	})
+	onto := ontology.New()
+	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
+	onto.Add(ontology.Concept{Name: "Sink", Package: "custom", Kind: "sink"})
+	_, errs := CompileRules(decls, onto)
+	if len(errs) != 1 || !strings.Contains(errs[0].Msg, `no loaded mechanic ruleVerb`) {
+		t.Fatalf("CompileRules errors = %+v, want missing ruleVerb mechanic", errs)
+	}
+}
+
+func parseV2RuntimeSourcesForCompileTest(t *testing.T, raw []parser.V2RuntimeSource) []parser.Decl {
+	t.Helper()
+	sources := make([]parser.V2Source, 0, len(raw))
+	for _, src := range raw {
+		prog, err := parser.ParseV2(src.Source)
+		if err != nil {
+			t.Fatalf("ParseV2 %s: %v", src.Name, err)
+		}
+		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
+	}
+	decls, err := parser.LowerV2SourcesToRuntime(sources)
+	if err != nil {
+		t.Fatalf("LowerV2SourcesToRuntime: %v", err)
+	}
+	return decls
 }

@@ -45,12 +45,13 @@ var endpointKinds = map[string][2]map[string]bool{
 func CompileRules(decls []parser.Decl, onto *ontology.Ontology) ([]*CompiledRule, []CompileError) {
 	var compiled []*CompiledRule
 	var errs []CompileError
+	ruleVerbs := ruleVerbMechanicsFromDecls(decls)
 	for _, d := range decls {
 		r, ok := d.(*parser.Rule)
 		if !ok {
 			continue
 		}
-		cr, err := compileOne(r, onto)
+		cr, err := compileOne(r, onto, ruleVerbs)
 		if err != nil {
 			errs = append(errs, CompileError{Rule: r.QualifiedName(), Msg: err.Error()})
 			continue
@@ -70,7 +71,60 @@ func requireConcept(onto *ontology.Ontology, name, where string) error {
 	return nil
 }
 
-func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) {
+type ruleVerbMechanicPolicy struct {
+	present bool
+	verbs   map[string]ruleVerbMechanic
+}
+
+type ruleVerbMechanic struct {
+	FromKinds map[string]bool
+	ToKinds   map[string]bool
+}
+
+func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
+	out := ruleVerbMechanicPolicy{verbs: map[string]ruleVerbMechanic{}}
+	for _, d := range decls {
+		m, ok := d.(*parser.V2MechanicDecl)
+		if !ok || m.Kind != "ruleVerb" {
+			continue
+		}
+		out.present = true
+		out.verbs[m.Name] = ruleVerbMechanic{
+			FromKinds: v2MechanicStringSet(m.Items, "fromKinds"),
+			ToKinds:   v2MechanicStringSet(m.Items, "toKinds"),
+		}
+	}
+	return out
+}
+
+func v2MechanicStringSet(items []parser.V2BlockItem, key string) map[string]bool {
+	out := map[string]bool{}
+	for _, item := range items {
+		if len(item.Key) != 1 || item.Key[0] != key {
+			continue
+		}
+		values, ok := item.Value.([]any)
+		if !ok {
+			return out
+		}
+		for _, value := range values {
+			switch x := value.(type) {
+			case string:
+				out[x] = true
+			case parser.V2RefExpr:
+				out[x.Name] = true
+			case parser.V2LiteralExpr:
+				if s, ok := x.Value.(string); ok {
+					out[s] = true
+				}
+			}
+		}
+		break
+	}
+	return out
+}
+
+func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMechanicPolicy) (*CompiledRule, error) {
 	sev := "medium"
 	if s, ok := r.Meta["severity"].(string); ok {
 		sev = s
@@ -86,7 +140,7 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology) (*CompiledRule, error) 
 		if err := requireConcept(onto, body.Dst.Concept, "sink/target of "+r.QualifiedName()); err != nil {
 			return nil, err
 		}
-		if err := checkEndpointKinds(onto, body, r.QualifiedName()); err != nil {
+		if err := checkEndpointKinds(onto, body, r.QualifiedName(), ruleVerbs); err != nil {
 			return nil, err
 		}
 		if body.Verb == "taint" || body.Verb == "flow" {
@@ -230,22 +284,37 @@ func excludedCharsFor(onto *ontology.Ontology, concepts map[string]bool) string 
 	return out
 }
 
-func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string) error {
-	allowed, ok := endpointKinds[body.Verb]
+func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string, ruleVerbs ruleVerbMechanicPolicy) error {
+	allowed, ok := endpointKindPolicy(body.Verb, ruleVerbs)
 	if !ok {
+		if ruleVerbs.present {
+			return fmt.Errorf("rule verb %q has no loaded mechanic ruleVerb declaration", body.Verb)
+		}
 		return nil
 	}
 	src, _ := onto.Get(body.Src.Concept)
 	dst, _ := onto.Get(body.Dst.Concept)
-	if !allowed[0][src.Kind] {
+	if !allowed[0]["concept"] && !allowed[0][src.Kind] {
 		return fmt.Errorf("%s source '%s' is kind '%s', expected one of %v in %s (endpoints used in the wrong role)",
 			body.Verb, body.Src.Concept, src.Kind, keys(allowed[0]), rule)
 	}
-	if !allowed[1][dst.Kind] {
+	if !allowed[1]["concept"] && !allowed[1][dst.Kind] {
 		return fmt.Errorf("%s target '%s' is kind '%s', expected one of %v in %s (endpoints used in the wrong role)",
 			body.Verb, body.Dst.Concept, dst.Kind, keys(allowed[1]), rule)
 	}
 	return nil
+}
+
+func endpointKindPolicy(verb string, ruleVerbs ruleVerbMechanicPolicy) ([2]map[string]bool, bool) {
+	if ruleVerbs.present {
+		m, ok := ruleVerbs.verbs[verb]
+		if !ok {
+			return [2]map[string]bool{}, false
+		}
+		return [2]map[string]bool{m.FromKinds, m.ToKinds}, true
+	}
+	allowed, ok := endpointKinds[verb]
+	return allowed, ok
 }
 
 func keys(m map[string]bool) []string {

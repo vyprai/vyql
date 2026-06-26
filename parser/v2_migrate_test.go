@@ -950,6 +950,237 @@ adapter textpattern {
 	}
 }
 
+func TestConvertV1ToV2LegacyCapabilityMatrix(t *testing.T) {
+	cases := []struct {
+		name       string
+		src        string
+		resolved   []string
+		unresolved []string
+		want       []string
+	}{
+		{
+			name: "model presentation and profile declarations",
+			src: `
+module code;
+concept HttpInput : source { summary: "input" }
+threat injection.SqlInjection { cwe: [CWE89] }
+review code.HttpInput { category: "input" text: "review input" }
+profile web { title: "Web" packs: [injection] }
+`,
+			want: []string{
+				"concept HttpInput : source",
+				"threat SqlInjection",
+				"review code.HttpInput",
+				"profile web",
+			},
+		},
+		{
+			name: "adapter mappings and package gates",
+			src: `
+adapter java {
+  meta { cross_language: true }
+  source param -> code.ExternalEntryInput
+  source receiver "getParameter" on "HttpServletRequest" -> code.HttpInput
+  sink path "Statement.execute" arg 1 -> code.SqlExecution
+  sink method "println" arg all -> code.HtmlRender
+  sink receiver "openConnection" -> code.UrlFetch
+  sink exact "Random" -> code.WeakRandomValue
+  sink path "subprocess.call" collection first -> code.CommandExecution
+  type "sql.Open" -> sql.DB
+  package "express" {
+    source "req.query" -> code.HttpInput
+  }
+}
+`,
+			resolved: []string{"adapter meta", "source_param", "type"},
+			want: []string{
+				"pattern adapterMetadata",
+				"query param as param",
+				"callee.method == \"getParameter\" and callee.receiver.type == \"HttpServletRequest\"",
+				"emit sink code.SqlExecution at args[1]",
+				"emit sink code.HtmlRender at args.any",
+				"emit sink code.UrlFetch at callee.receiver",
+				"emit sink code.CommandExecution at args[0].collection[0]",
+				"emit fact runtime.ReceiverType at call.result",
+				`dependency("express")`,
+			},
+		},
+		{
+			name: "checks propagation filters and advisory assumptions",
+			src: `
+adapter python {
+  control "escape" -> core.HtmlEscape
+  control receiver method "relative_to" -> core.PathCanonicalization
+  mark method "newDocumentBuilder" -> code.XmlParserCreate
+  filter method "gsub" global
+  filter path "replace"
+  flow method "decode" arg 1 from args 0
+  flow path "parse" arg 0 from result
+  assume guard method "startswith" -> code.FilePathAccess
+  assume sanitizer path "normpath" -> code.FilePathAccess
+}
+`,
+			resolved: []string{"control", "control_receiver_method", "mark", "filter", "flow_method", "flow_path", "assume"},
+			want: []string{
+				"covers path",
+				"covers sameReceiver",
+				"emit issue code.XmlParserCreate at call",
+				"call.filter.global == true",
+				"propagate value from args[0] to args[1].pointee",
+				"propagate value from call.result to args[0].pointee",
+				"advisory: true",
+				"covers dominates",
+			},
+		},
+		{
+			name: "presence flags and structured predicates",
+			src: `
+adapter javascript {
+  flag code.CleartextChannel on any { path "http.get" }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand { identifier contains_any ["token", "secret"] }
+    lacks call contains_any ["scmp", "timingSafeEqual"]
+  }
+}
+`,
+			resolved: []string{"flag"},
+			want: []string{
+				"emit issue code.CleartextChannel",
+				"query unstable.legacyFlag as node",
+				"operand(node",
+				"not (containsAny(node.scopeCall.any",
+			},
+		},
+		{
+			name: "rule verbs coverage clauses and semantic where",
+			src: `
+module core;
+concept Input : source {}
+concept SqlParameterization : control {}
+concept AuthGuard : control {}
+concept CloseHandle : control {}
+module code;
+concept SqlExecution : sink {}
+module identity;
+concept User : principal {}
+concept AdminPrivilege : privilege {}
+
+adapter javascript {
+  package "express" {
+    sink method "execute" -> code.SqlExecution
+  }
+}
+
+module rules.injection;
+rule SqlInjection {
+  taint core.Input as input -> code.SqlExecution as sqlSink
+  unless sanitized_by core.SqlParameterization
+  unless guarded_by core.AuthGuard
+  unless closed_by core.CloseHandle
+  where sqlSink has sbom.ReachableSymbol
+}
+
+rule AdminAssumption {
+  assume identity.User -> identity.AdminPrivilege
+}
+`,
+			resolved: []string{"sanitized_by", "guarded_by", "closed_by", "where", "rule assume"},
+			want: []string{
+				`dependency("express")`,
+				"unless sqlSink.path coveredBy core.SqlParameterization",
+				"unless sqlSink.endpoint coveredBy core.AuthGuard",
+				"unless sqlSink.dominates coveredBy core.CloseHandle",
+				"where has(sqlSink, sbom.ReachableSymbol)",
+				"grant identity.User -> identity.AdminPrivilege",
+			},
+		},
+		{
+			name: "semantic queries and blocking legacy constructs",
+			src: `
+module vypr.business;
+rule InvalidRefundTransition {
+  match transition * -> Refunded on Order as t
+}
+
+module vypr.concurrency;
+rule FileToctou {
+  order code.FileCheck before code.FileUse
+}
+
+state_machine AuthFlow {
+  states [Start, Done]
+  initial Start
+  transition Start -> Done
+}
+
+rule NeedsAlong {
+  match code.SecretComparisonReview as cmp
+  along [cmp]
+}
+`,
+			resolved:   []string{"match transition", "order"},
+			unresolved: []string{"state_machine", "along"},
+			want: []string{
+				"query state as t",
+				"query concept as first",
+				"TODO_v2Migrate",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := ConvertV1ToV2(tc.src, "legacy.vyql")
+			if err != nil {
+				t.Fatalf("ConvertV1ToV2: %v", err)
+			}
+			combined := convertedV2Sources(t, res, len(tc.unresolved) > 0)
+			for _, construct := range tc.resolved {
+				if !migrationLedgerHas(res.Ledger, construct, true) {
+					t.Fatalf("ledger missing resolved %q: %+v", construct, res.Ledger)
+				}
+			}
+			for _, construct := range tc.unresolved {
+				if !migrationLedgerHas(res.Ledger, construct, false) {
+					t.Fatalf("ledger missing unresolved %q: %+v", construct, res.Ledger)
+				}
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(combined, want) {
+					t.Fatalf("converted sources missing %q:\n%s", want, combined)
+				}
+			}
+		})
+	}
+}
+
+func convertedV2Sources(t *testing.T, res V2MigrationResult, allowBlocking bool) string {
+	t.Helper()
+	var combined strings.Builder
+	blocking := 0
+	for _, f := range res.Files {
+		combined.WriteString(f.Source)
+		if strings.Contains(f.Source, "TODO_v2Migrate") {
+			blocking++
+			if _, err := ParseV2(f.Source); err == nil {
+				t.Fatalf("blocking stub %s parsed successfully:\n%s", f.PathHint, f.Source)
+			}
+			continue
+		}
+		if _, err := ParseV2(f.Source); err != nil {
+			t.Fatalf("converted file %s did not parse as v2: %v\n%s", f.PathHint, err, f.Source)
+		}
+	}
+	if blocking > 0 && !allowBlocking {
+		t.Fatalf("unexpected blocking stubs = %d:\n%s", blocking, combined.String())
+	}
+	if blocking == 0 && allowBlocking {
+		t.Fatalf("expected at least one blocking stub:\n%s", combined.String())
+	}
+	return combined.String()
+}
+
 func migrationLedgerHas(records []V2MigrationRecord, construct string, resolved bool) bool {
 	return migrationLedgerRecord(records, construct, resolved).Construct != ""
 }

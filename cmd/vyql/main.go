@@ -508,7 +508,7 @@ func v2RuntimeSourcesForRules(rulesSrc string) []parser.V2RuntimeSource {
 }
 
 func lowerNonCoreV2RuntimeSource(src parser.V2RuntimeSource) bool {
-	return !strings.HasPrefix(src.Name, "ontology/") && !strings.HasPrefix(src.Name, "mechanics/")
+	return !strings.HasPrefix(src.Name, "ontology/")
 }
 
 func printReport(fs []*findings.Finding) {

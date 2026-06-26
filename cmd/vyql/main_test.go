@@ -70,6 +70,25 @@ rule BadCoverageMode {
 	}
 }
 
+func TestCompiledRulesForKeepsLoadedMechanicsAuthoritative(t *testing.T) {
+	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(`
+module rules.test;
+rule SqlInjection {
+  taint code.HttpInput -> code.SqlExecution
+}
+`), lowerNonCoreV2RuntimeSource)
+	if err != nil {
+		t.Fatalf("ParseV2RuntimeSourcesSelected: %v", err)
+	}
+	for _, decl := range decls {
+		m, ok := decl.(*parser.V2MechanicDecl)
+		if ok && m.Kind == "ruleVerb" && m.Name == "taint" {
+			return
+		}
+	}
+	t.Fatalf("loaded runtime declarations did not retain mechanic ruleVerb taint")
+}
+
 func TestRuleActiveForProfileHonorsV2RequiredProfiles(t *testing.T) {
 	rules := `
 module rules.profiled;
