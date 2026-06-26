@@ -599,6 +599,48 @@ func TestEverySourceLanguageHasV2TaintMechanicCoverage(t *testing.T) {
 	}
 }
 
+func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
+	root := testRepoRoot(t)
+	allowed := map[string]bool{
+		"go/parser/parser.go":        true,
+		"go/parser/v2_lower.go":      true,
+		"go/parser/v2_migrate.go":    true,
+		"go/cmd/vyql/definitions.go": true,
+	}
+	var hits []string
+	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		src := string(data)
+		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
+		usesLegacy := importsVyqlParser && strings.Contains(src, "parser.Parse(") || strings.Contains(src, "ParseRuntimeCompat(")
+		if strings.HasPrefix(rel, "go/parser/") && strings.Contains(src, "Parse(src)") {
+			usesLegacy = true
+		}
+		if usesLegacy && !allowed[rel] {
+			hits = append(hits, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan go sources: %v", err)
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("production code must not call the legacy v1 parser outside migration/compat paths:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func sourceLanguagesForCoverage() []string {
 	out := make([]string, 0, len(languages))
 	for _, lg := range languages {
