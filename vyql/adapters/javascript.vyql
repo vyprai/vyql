@@ -802,6 +802,14 @@ adapter javascript {
     has "props(expr,'node.')"
     lacks "Object.freeze(node)"
   }
+  flag code.ResponseParserFunctionEval in function {
+    lang "javascript"
+    call path "Function"
+    call path "parsedResponse.push"
+    literal contains_any ["return ", "\"use strict\"; return "]
+    token identifier "data"
+    not call path "JSON.parse"
+  }
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval

@@ -1182,6 +1182,12 @@ review code.IncompleteMassAssignmentIdUnset {
   expected: [core.InputValidation]
   text: "review generic add handlers that unset identifier fields before request normalization rather than from the normalized input"
 }
+review code.ResponseParserFunctionEval {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.CodeExecutionValidation, core.InputValidation]
+  text: "review response parsers that compile response data with Function; prefer JSON.parse or a strict data parser"
+}
 review code.UnsafeJXPathContextEvaluation {
   category: "code_execution"
   kind: "target"

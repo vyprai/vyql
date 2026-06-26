@@ -75,6 +75,15 @@ concept DynamicFunctionMutableObjectEval : sink {
   review_assumption: "attacker-controlled expression text or object properties can influence generated code or mutate the evaluated object"
   review_confidence: high
 }
+concept ResponseParserFunctionEval : sink {
+  vulnerable_to: [injection.CodeInjection]
+  cwe: [CWE_94, CWE_95]
+  review_category: "code_execution"
+  review_condition: "a response parser compiles response chunks with the Function constructor instead of parsing data"
+  review_evidence: "response parser context {pattern} builds a return expression from parsed response data, compiles it with Function, and pushes the evaluated result"
+  review_assumption: "the parsed response body or any upstream message source can contain attacker-influenced JavaScript syntax"
+  review_confidence: high
+}
 concept UnsafeJXPathContextEvaluation : sink {
   vulnerable_to: [injection.CodeInjection, injection.ExpressionLanguageInjection]
   cwe: [CWE_94, CWE_95]
