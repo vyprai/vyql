@@ -1,0 +1,46 @@
+test "rank991 java: createTempFile delete mkdir directory race"
+  lang java
+  expect VYQL-PATH-055
+  expect_review code.TempFileDirectoryCreationRace
+  code
+  ```
+  import java.io.File;
+  import java.io.IOException;
+
+  class FileResourceManagerProvider {
+      private String createTmpDir() {
+          try {
+              File tmp = File.createTempFile("fileresourcemanager", null);
+              tmp.delete();
+              tmp.mkdir();
+              String workDir = tmp.getAbsolutePath();
+              return workDir;
+          } catch (IOException e) {
+              throw new RuntimeException(e);
+          }
+      }
+  }
+  ```
+
+test "rank991 java: createTempDirectory is clean"
+  lang java
+  reject VYQL-PATH-055
+  reject_review code.TempFileDirectoryCreationRace
+  code
+  ```
+  import java.io.File;
+  import java.io.IOException;
+  import java.nio.file.Files;
+
+  class FileResourceManagerProvider {
+      private String createTmpDir() {
+          try {
+              File tmp = Files.createTempDirectory("fileresourcemanager").toFile();
+              String workDir = tmp.getAbsolutePath();
+              return workDir;
+          } catch (IOException e) {
+              throw new RuntimeException(e);
+          }
+      }
+  }
+  ```

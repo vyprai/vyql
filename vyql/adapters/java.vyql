@@ -1096,6 +1096,12 @@ adapter java {
     call path contains_any ["Secret.toString", "getPrivateKeys"]
     not call path contains_any ["Files.createTempFile", "setReadable", "setWritable", "Files.setPosixFilePermissions", "PosixFilePermissions.asFileAttribute"]
   }
+  flag code.TempFileDirectoryCreationRace in function {
+    call path "File.createTempFile"
+    call path "delete"
+    call path contains_any ["mkdir", "mkdirs"]
+    not call path "Files.createTempDirectory"
+  }
   flag code.InsecureTempFile on any {
     path "Files.createFile"
     has "/tmp/"

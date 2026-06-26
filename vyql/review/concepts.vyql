@@ -2319,6 +2319,12 @@ review code.SensitiveTempFileDefaultPermission {
   expected: [core.SecretRedaction, core.PathAccessCheck]
   text: "create credential or private-key temporary files with owner-only permissions before writing secret material"
 }
+review code.TempFileDirectoryCreationRace {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "create temporary directories atomically instead of deleting a temporary file and recreating the same path as a directory"
+}
 review code.BulkEmailRecipientDisclosure {
   category: "privacy"
   kind: "target"

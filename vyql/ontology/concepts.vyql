@@ -5066,6 +5066,15 @@ concept SensitiveTempFileDefaultPermission : sink {
   review_assumption: "the temporary directory may be shared with local users while the helper file exists"
   review_confidence: high
 }
+concept TempFileDirectoryCreationRace : sink {
+  vulnerable_to: [path.InsecureTempFile, path.LinkFollowing]
+  cwe: [CWE_377, CWE_367, CWE_59]
+  review_category: "path"
+  review_condition: "a temporary directory is created by first creating a temporary file, deleting it, and then calling mkdir"
+  review_evidence: "temporary-directory context {pattern} calls File.createTempFile, deletes the created path, and recreates it as a directory instead of using an atomic directory-creation API"
+  review_assumption: "an attacker with access to the temporary parent directory can race the delete/mkdir window or substitute a link/path before the directory is recreated"
+  review_confidence: high
+}
 concept BulkEmailRecipientDisclosure : sink {
   vulnerable_to: [secrets.SecretLeak]
   cwe: [CWE_200]

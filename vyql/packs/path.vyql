@@ -243,6 +243,11 @@ rule LockFileCreateMissingNoFollow {
   match code.LockFileCreateMissingNoFollow as sink
 }
 
+rule TempFileDirectoryCreationRace {
+  meta { id: "VYQL-PATH-055", severity: high, cwe: [CWE_377, CWE_367, CWE_59], confidence_floor: high }
+  match code.TempFileDirectoryCreationRace as sink
+}
+
 rule PublicUploadChunkPathTraversal {
   meta { id: "VYQL-PATH-046", severity: high, cwe: [CWE_22], confidence_floor: high }
   match code.PublicUploadChunkPathTraversal as sink
