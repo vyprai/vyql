@@ -7,6 +7,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -638,6 +639,28 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 	if len(hits) > 0 {
 		sort.Strings(hits)
 		t.Fatalf("production code must not call the legacy v1 parser outside migration/compat paths:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestSimplePresenceFlagsDoNotUseLegacyFlagBridge(t *testing.T) {
+	simpleLegacy := regexp.MustCompile(`query unstable\.legacyFlag as node where node\.kind == "any" and node\.method == "([^"]+)"\s*$`)
+	var hits []string
+	for path, src := range readDataFiles(t, "adapters", ".vyql") {
+		for i, line := range strings.Split(src, "\n") {
+			m := simpleLegacy.FindStringSubmatch(strings.TrimSpace(line))
+			if m == nil || strings.HasPrefix(m[1], "analysis.") {
+				continue
+			}
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel)+":"+strconv.Itoa(i+1)+": "+strings.TrimSpace(line))
+			if len(hits) >= 20 {
+				break
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("simple method presence flags must use stable `query pattern callExpr where callee.method ...`, not unstable.legacyFlag:\n%s", strings.Join(hits, "\n"))
 	}
 }
 

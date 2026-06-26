@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding lockAcquire267 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "lock"
-  emit issue code.LockAcquire at node
+  query pattern callExpr where callee.method == "lock"
+  emit issue code.LockAcquire at call
 }

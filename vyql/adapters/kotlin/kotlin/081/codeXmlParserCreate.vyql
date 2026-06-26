@@ -1,10 +1,6 @@
 module bindings.kotlin.migration.m304d1620;
 
 binding xmlParserCreate81 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "createXMLReader"
-  emit issue code.XmlParserCreate at node
+  query pattern callExpr where callee.method == "createXMLReader"
+  emit issue code.XmlParserCreate at call
 }

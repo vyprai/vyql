@@ -4,11 +4,7 @@ binding networkConnect0 {
   requires {
     dependency("qt5-serialport")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "open"
-  emit issue code.NetworkConnect at node
-  emit sink code.NetworkConnectSink at node
+  query pattern callExpr where callee.method == "open"
+  emit issue code.NetworkConnect at call
+  emit sink code.NetworkConnectSink at call
 }

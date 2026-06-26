@@ -4,11 +4,7 @@ binding regexCompile1 {
   requires {
     dependency("beberlei/assert")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "notRegex"
-  emit issue code.RegexCompile at node
-  emit sink code.RegexCompileSink at node
+  query pattern callExpr where callee.method == "notRegex"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
 }

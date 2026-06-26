@@ -4,11 +4,7 @@ binding privilegedOp3 {
   requires {
     dependency("elixir_ale")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "Elixir.ElixirALE.I2C.write_device"
-  emit issue code.PrivilegedOp at node
-  emit sink code.PrivilegedOpSink at node
+  query pattern callExpr where callee.method == "Elixir.ElixirALE.I2C.write_device"
+  emit issue code.PrivilegedOp at call
+  emit sink code.PrivilegedOpSink at call
 }

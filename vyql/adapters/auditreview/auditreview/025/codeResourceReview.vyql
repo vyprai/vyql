@@ -1,10 +1,6 @@
 module bindings.auditreview.migration.mbf0d19ec;
 
 binding resourceReview25 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "read_to_string"
-  emit issue code.ResourceReview at node
+  query pattern callExpr where callee.method == "read_to_string"
+  emit issue code.ResourceReview at call
 }

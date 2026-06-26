@@ -4,10 +4,6 @@ binding weakHash1 {
   requires {
     dependency("pbkdf2_elixir")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "Pbkdf2.verify_pass"
-  emit issue code.WeakHash at node
+  query pattern callExpr where callee.method == "Pbkdf2.verify_pass"
+  emit issue code.WeakHash at call
 }
