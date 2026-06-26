@@ -1163,6 +1163,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					if val != nil && val.Kind() == "object" {
 						out = append(out, c.objectMethodFuncDefs(val, false)...)
 					}
+					if val != nil {
+						out = append(out, c.classExpressionFuncDefs(val)...)
+					}
 				} else if targets := c.bindingNames(name); len(targets) > 0 {
 					for _, target := range targets {
 						out = append(out, nir.Assign{Targets: []string{target}, Value: v, Decl: true})
@@ -1417,6 +1420,26 @@ func (c *jsConv) returnedObjectMethodFuncDefs(fn *tree_sitter.Node, exported boo
 		}
 	}
 	walk(body)
+	return out
+}
+
+func (c *jsConv) classExpressionFuncDefs(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "class", "class_declaration", "abstract_class_declaration":
+			out = append(out, c.body(field(n, "body"))...)
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
 	return out
 }
 

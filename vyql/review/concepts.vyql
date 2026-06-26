@@ -883,6 +883,12 @@ review code.ProtocolStateReview {
   kind: "attention"
   text: "review protocol/state transitions for out-of-sequence, stale, or unauthenticated data accepted without the required state check"
 }
+review code.PostTlsIdentityRebindingMissingCheck {
+  category: "request"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify post-TLS identity exchanges compare stable peer identity fields before replacing the active handshake identity"
+}
 review code.StateChangingOp {
   category: "request"
   kind: "target"

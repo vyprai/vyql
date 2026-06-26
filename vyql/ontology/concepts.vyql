@@ -5726,6 +5726,15 @@ concept ProtocolStateReview : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
   cwe: [CWE_287, CWE_290, CWE_349, CWE_404, CWE_841]
 }
+concept PostTlsIdentityRebindingMissingCheck : sink {
+  vulnerable_to: [authentication.AuthenticationBypass, injection.ProtocolStateConfusion]
+  cwe: [CWE_287, CWE_290, CWE_349, CWE_841]
+  review_category: "request"
+  review_condition: "a protocol handshake exchanges identity packets again after TLS but overwrites the active peer identity without comparing stable identity fields"
+  review_evidence: "post-TLS identity exchange context {pattern} sends local identity, reads a second packet, and reassigns the active identity without observed device-id or protocol-version equality checks"
+  review_assumption: "an attacker can make the encrypted identity packet differ from the pre-TLS identity packet and impersonate or rebind the channel peer"
+  review_confidence: high
+}
 concept RequestPolicyStripped : sink {
   vulnerable_to: [injection.ProtocolStateConfusion]
   cwe: [CWE_200, CWE_441, CWE_524]

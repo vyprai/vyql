@@ -266,6 +266,61 @@ function addExternalEntities(externalEntities) {
 	}
 }
 
+func TestJavaScriptRegisteredClassExpressionMethodsAreExtracted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lan.js")
+	src := []byte(`
+export const Channel = GObject.registerClass({
+  GTypeName: 'LanChannel',
+}, class LanChannel extends Core.Channel {
+  async accept(connection) {
+    this.identity = new Core.Packet(data[0]);
+    if (this.identity.body.protocolVersion >= 8) {
+      await this.sendPacket(this.backend.identity);
+      this.identity = await this.readPacket();
+    }
+  }
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fn, ok := findFuncDef(prog, "accept")
+	if !ok {
+		t.Fatalf("registered class expression method accept was not extracted; program=%#v", prog)
+	}
+	if !funcBodyHasCall(fn.Body, "readPacket") {
+		t.Fatalf("registered class expression method body did not include readPacket call; body=%#v", fn.Body)
+	}
+
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "name=accept") &&
+			strings.Contains(tokens, "call_path:?.sendPacket") &&
+			strings.Contains(tokens, "call_path:?.readPacket") &&
+			strings.Contains(tokens, "assign:?.identity=awaitthis.readPacket()") {
+			return
+		}
+	}
+	t.Fatalf("registered class expression method context tokens missing; nodes=%#v", nodes)
+}
+
 func TestTypeScriptImportsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "session.ts")

@@ -1755,6 +1755,20 @@ adapter javascript {
     has "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE"
     lacks "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe"
   }
+  flag code.PostTlsIdentityRebindingMissingCheck in function {
+    lang "javascript"
+    call path "?.sendPacket"
+    call path "?.readPacket"
+    selector "?.identity.body.protocolVersion"
+    selector "?.identity.body.deviceId"
+    assign "?.identity=awaitthis.readPacket()"
+    not binary contains_any [
+      "this.identity.body.protocolVersion!==identity.body.protocolVersion",
+      "this.identity.body.deviceId!==identity.body.deviceId",
+      "this.identity.body.protocolVersion!=identity.body.protocolVersion",
+      "this.identity.body.deviceId!=identity.body.deviceId"
+    ]
+  }
   flag code.RemoteListingDownloadPath in function {
     has "_downloadFromWorkingDir"
     has "join(localDirPath,file.name)"

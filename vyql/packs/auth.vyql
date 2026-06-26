@@ -259,6 +259,11 @@ rule OwnedResourceDeleteMissingOwnershipCheck {
   match code.OwnedResourceDeleteMissingOwnershipCheck as delete
 }
 
+rule PostTlsIdentityRebindingMissingCheck {
+  meta { id: "VYQL-AUTH-077", severity: high, cwe: [CWE_287, CWE_290, CWE_349, CWE_841], confidence_floor: high }
+  match code.PostTlsIdentityRebindingMissingCheck as handshake
+}
+
 rule ShopwareStoreApiManyToManyCriteriaBypass {
   meta { id: "VYQL-AUTH-026", severity: medium, cwe: [CWE_284], confidence_floor: high }
   match code.ShopwareStoreApiManyToManyCriteriaBypass as criteria
