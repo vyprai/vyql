@@ -218,6 +218,15 @@ adapter java {
     has "targetUrl.substring"
     lacks "Util.isSafeToRedirectTo"
   }
+  flag code.ProtocolRelativeSavedRequestRedirect in function {
+    function contains_any ["savedRequestURL", "savedRequestUrl", "getSavedRequestURL", "getSavedRequestUrl"]
+    call path contains_any ["saved.getRequestURI", "saved.getRequestURL", "saved.getQueryString"]
+    call path "StringBuilder"
+    call path contains_any ["sb.append", "url.append", "redirect.append"]
+    token return_call_path contains_any ["sb.toString", "url.toString", "redirect.toString"]
+    not call path contains_any ["deleteCharAt", "stripLeading", "normalize", "isSafeToRedirectTo"]
+    not expr contains_any ["charAt(1)=='/'", "charAt(1)==\"/\""]
+  }
   flag code.JmxRmiRegistryExposure in function {
     function "createJMXServer"
     has "RMIExporter.EXPORTER_ATTRIBUTE"

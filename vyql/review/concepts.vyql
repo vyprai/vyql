@@ -497,6 +497,12 @@ review code.SessionStoredRedirectTarget {
   expected: [core.RedirectAllowlist]
   text: "review session-stored login redirect targets for relative-URL or same-origin validation before redirecting"
 }
+review code.ProtocolRelativeSavedRequestRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  text: "review saved-request redirect reconstruction for protocol-relative URLs beginning with double slash"
+}
 review code.PhpMyAdminSetupRedirectorOpenRedirect {
   category: "request_forgery"
   kind: "attention"

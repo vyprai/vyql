@@ -120,6 +120,11 @@ rule SessionStoredRedirectTarget {
   match code.SessionStoredRedirectTarget as redirect
 }
 
+rule ProtocolRelativeSavedRequestRedirect {
+  meta { id: "VYQL-RF-042", severity: medium, cwe: [CWE_601], confidence_floor: high }
+  match code.ProtocolRelativeSavedRequestRedirect as redirect
+}
+
 rule MethodGatedRedirectValidationBypass {
   meta { id: "VYQL-RF-008", severity: high, cwe: [CWE_601], confidence_floor: medium }
   match code.MethodGatedRedirectValidationBypass as bypass
