@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
@@ -310,6 +311,73 @@ func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" {
 		t.Fatalf("explicit package-block sink did not fire with SBOM evidence: %+v", got)
 	}
+}
+
+func TestPackageGateMatchesReferencePackageSemantics(t *testing.T) {
+	have := map[string]bool{
+		"org.apache.commons.lang3":      true,
+		"github.com/acme/widget/subpkg": true,
+		"@scope/pkg/lib":                true,
+		"expressive/router":             true,
+		"foo/bar.baz":                   true,
+		"pyyaml":                        true,
+	}
+	gate := newPackageGate(have)
+	wants := []string{
+		"",
+		"org.apache.commons.lang3",
+		"org.apache.commons",
+		"org.apache.commons.lang3.extra",
+		"github.com/acme/widget",
+		"acme",
+		"widget",
+		"subpkg",
+		"@scope/pkg",
+		"@scope/pkg/lib/router",
+		"@scope",
+		"pkg",
+		"express",
+		"expressive",
+		"router",
+		"bar",
+		"bar.baz",
+		"pyyaml",
+		"yaml",
+	}
+	for _, want := range wants {
+		want := want
+		t.Run(strings.ReplaceAll(want, "/", "_"), func(t *testing.T) {
+			expected := referencePackageInEvidence(want, have)
+			if got := gate.inEvidence(want); got != expected {
+				t.Fatalf("packageGate.inEvidence(%q)=%v, want %v", want, got, expected)
+			}
+			if got := packageAllowed([]string{want}, have); got != expected {
+				t.Fatalf("packageAllowed(%q)=%v, want %v", want, got, expected)
+			}
+		})
+	}
+	if !packageAllowed([]string{"missing", "pyyaml"}, have) {
+		t.Fatal("packageAllowed should accept when any requested package matches evidence")
+	}
+}
+
+func referencePackageInEvidence(want string, have map[string]bool) bool {
+	want = sca.NormalizePackageName(want)
+	if want == "" {
+		return true
+	}
+	if have[want] {
+		return true
+	}
+	if root := sca.PackageRoot(want); root != "" && have[root] {
+		return true
+	}
+	for got := range have {
+		if sca.PackageMatches(got, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {

@@ -1614,12 +1614,36 @@ func packageAllowed(want []string, have map[string]bool) bool {
 }
 
 type packageGate struct {
-	have  map[string]bool
-	cache map[string]bool
+	have     map[string]bool
+	prefixes map[string]bool
+	segments map[string]bool
+	cache    map[string]bool
 }
 
 func newPackageGate(have map[string]bool) *packageGate {
-	return &packageGate{have: have, cache: map[string]bool{}}
+	g := &packageGate{
+		have:     make(map[string]bool, len(have)),
+		prefixes: map[string]bool{},
+		segments: map[string]bool{},
+		cache:    map[string]bool{},
+	}
+	for raw := range have {
+		name := sca.NormalizePackageName(raw)
+		if name == "" {
+			continue
+		}
+		g.have[name] = true
+		if root := sca.PackageRoot(name); root != "" {
+			g.have[root] = true
+		}
+		for _, prefix := range packageGatePrefixes(name) {
+			g.prefixes[prefix] = true
+		}
+		for _, segment := range packageGatePathSegments(name) {
+			g.segments[segment] = true
+		}
+	}
+	return g
 }
 
 func (g *packageGate) allowed(want []string) bool {
@@ -1642,28 +1666,71 @@ func (g *packageGate) inEvidence(want string) bool {
 	if hit, ok := g.cache[want]; ok {
 		return hit
 	}
-	hit := packageInEvidence(want, g.have)
+	hit := g.matches(want)
 	g.cache[want] = hit
 	return hit
 }
 
-func packageInEvidence(want string, have map[string]bool) bool {
-	want = sca.NormalizePackageName(want)
-	if want == "" {
+func (g *packageGate) matches(want string) bool {
+	if g.have[want] {
 		return true
 	}
-	if have[want] {
+	if root := sca.PackageRoot(want); root != "" && g.have[root] {
 		return true
 	}
-	if root := sca.PackageRoot(want); root != "" && have[root] {
+	if g.prefixes[want] {
 		return true
 	}
-	for got := range have {
-		if sca.PackageMatches(got, want) {
+	for _, prefix := range packageGatePrefixes(want) {
+		if g.have[prefix] {
+			return true
+		}
+	}
+	if !strings.ContainsAny(want, "/.") && g.segments[want] {
+		return true
+	}
+	for _, segment := range packageGatePathSegments(want) {
+		if g.have[segment] {
 			return true
 		}
 	}
 	return false
+}
+
+func packageInEvidence(want string, have map[string]bool) bool {
+	return newPackageGate(have).inEvidence(want)
+}
+
+func packageGatePrefixes(name string) []string {
+	var out []string
+	for _, sep := range []byte{'.', '/'} {
+		for i := strings.IndexByte(name, sep); i >= 0; {
+			prefix := name[:i]
+			if prefix != "" {
+				out = append(out, prefix)
+			}
+			next := strings.IndexByte(name[i+1:], sep)
+			if next < 0 {
+				break
+			}
+			i += 1 + next
+		}
+	}
+	return out
+}
+
+func packageGatePathSegments(name string) []string {
+	if !strings.Contains(name, "/") {
+		return nil
+	}
+	parts := strings.Split(name, "/")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" && !strings.ContainsAny(part, "/.") {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 // flagAdapter labels nodes with presence/review concepts through the AST-shaped

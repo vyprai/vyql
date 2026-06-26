@@ -74,6 +74,45 @@ rule HighConfidenceReview {
 	}
 }
 
+func TestLoweredV2FindingFingerprintStableAcrossStores(t *testing.T) {
+	decls, err := parser.ParseV2Runtime(`
+module rules.injection;
+rule SqlInjection {
+  meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
+  taint code.HttpInput -> code.SqlExecution
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	onto := ontology.Seed()
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("CompileRules errors: %+v", errs)
+	}
+
+	mem := usg.NewInMemStore()
+	loadV2FingerprintGraph(t, mem)
+	memFP := v2SingleFingerprint(t, onto, mem, compiled[0])
+	if got := v2SingleFingerprint(t, onto, mem, compiled[0]); got != memFP {
+		t.Fatalf("in-memory v2 fingerprint changed across runs: %s then %s", memFP, got)
+	}
+
+	badger, err := usg.OpenBadger(":memory:")
+	if err != nil {
+		t.Fatalf("OpenBadger: %v", err)
+	}
+	defer badger.Close()
+	loadV2FingerprintGraph(t, badger)
+	badgerFP := v2SingleFingerprint(t, onto, badger, compiled[0])
+	if badgerFP != memFP {
+		t.Fatalf("v2 fingerprint differs across stores: mem=%s badger=%s", memFP, badgerFP)
+	}
+	if got := v2SingleFingerprint(t, onto, badger, compiled[0]); got != badgerFP {
+		t.Fatalf("badger v2 fingerprint changed across runs: %s then %s", badgerFP, got)
+	}
+}
+
 func TestCompileUsesAuthoredRuleVerbEndpointKinds(t *testing.T) {
 	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
@@ -188,4 +227,35 @@ func parseV2RuntimeSourcesForCompileTest(t *testing.T, raw []parser.V2RuntimeSou
 		t.Fatalf("LowerV2SourcesToRuntime: %v", err)
 	}
 	return decls
+}
+
+func loadV2FingerprintGraph(t *testing.T, store usg.Store) {
+	t.Helper()
+	if err := store.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{"loc": "app.py:10"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "app.py:20"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddEdge(usg.Edge{Type: "FLOWS", Src: "src", Dst: "sink"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddLabel("src", usg.Label{Concept: "code.HttpInput"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddLabel("sink", usg.Label{Concept: "code.SqlExecution"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func v2SingleFingerprint(t *testing.T, onto *ontology.Ontology, store usg.Store, cr *CompiledRule) string {
+	t.Helper()
+	fs, err := New(onto, store).Evaluate(cr)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("findings = %d, want 1: %+v", len(fs), fs)
+	}
+	return fs[0].Fingerprint()
 }
