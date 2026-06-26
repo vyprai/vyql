@@ -64,10 +64,6 @@ func main() {
 	switch cmd {
 	case "scan":
 		err = cmdScan(args)
-	case "prep":
-		err = cmdPrep(args)
-	case "review":
-		err = cmdReview(args)
 	case "trace":
 		err = cmdTrace(args)
 	case "explain":
@@ -107,18 +103,13 @@ func cmdScan(args []string) error {
 	format := fs.String("format", "text", "output format: text | sarif | json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
-	allResults := fs.Bool("all", false, "include review flags with findings (json output becomes {findings, flags})")
+	allResults := fs.Bool("all", false, "include all result sections: findings and flags (json output becomes {findings, flags})")
+	flagsOnly := fs.Bool("flags", false, "print flags only; replaces the old review command")
+	flagCategory := fs.String("flag-category", "all", "flag category filter when flags are enabled")
+	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
+	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	adapterOverlay := fs.String("adapter-overlay", os.Getenv("VYQL_ADAPTER_OVERLAY"), "optional repo-local adapter overlay directory")
-	agenticPrep := fs.Bool("agentic-prep", envBool("VYQL_AGENTIC_PREP"), "run optional agentic pre-scan adapter preparation")
-	agenticPrepOut := fs.String("agentic-prep-out", os.Getenv("VYQL_AGENTIC_PREP_OUT"), "directory for agentic prep manifest and adapter overlay")
-	agenticPrepProvider := fs.String("agentic-prep-provider", envDefault("VYQL_AGENTIC_PREP_PROVIDER", "vertex"), "agentic prep provider: vertex | off")
-	agenticPrepProject := fs.String("agentic-prep-project", os.Getenv("VYQL_VERTEX_PROJECT"), "Vertex project for --agentic-prep-provider vertex")
-	agenticPrepLocation := fs.String("agentic-prep-location", envDefault("VYQL_VERTEX_LOCATION", "global"), "Vertex location for agentic prep")
-	agenticPrepCredentials := fs.String("agentic-prep-credentials", defaultVertexCredentials(), "Vertex service-account JSON file for agentic prep")
-	agenticPrepModel := fs.String("agentic-prep-model", envDefault("VYQL_VERTEX_MODEL", "gemini-3.5-flash"), "Vertex model for agentic prep")
-	agenticPrepContextCache := fs.Bool("agentic-prep-context-cache", envBoolDefault("VYQL_VERTEX_CONTEXT_CACHE", true), "enable Vertex explicit context caching for repeated agentic prep prompt tokens")
-	agenticPrepDebug := fs.Bool("agentic-prep-debug", envBool("VYQL_AGENTIC_PREP_DEBUG"), "print agentic prep debug logs to stderr")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -127,28 +118,16 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
-	if *agenticPrep {
-		out, scanConfig, err := runAgenticPrepForScan(paths, prepCLIConfig{
-			OutDir:       *agenticPrepOut,
-			Provider:     *agenticPrepProvider,
-			Project:      *agenticPrepProject,
-			Location:     *agenticPrepLocation,
-			Model:        *agenticPrepModel,
-			Creds:        *agenticPrepCredentials,
-			ContextCache: *agenticPrepContextCache,
-			Debug:        *agenticPrepDebug,
-		})
-		if err != nil {
-			return err
-		}
-		*adapterOverlay = out
-		if (*profileName == "" || *profileName == "auto") && strings.TrimSpace(scanConfig.Profile) != "" {
-			*profileName = scanConfig.Profile
-		}
-	}
 	restore := setOptionalEnv("VYQL_ADAPTER_OVERLAY", *adapterOverlay)
 	defer restore()
-	return run(paths, *rulesPath, *format, *profileName, *stats, *allResults)
+	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
+		ShowStats:    *stats,
+		IncludeFlags: *allResults,
+		FlagsOnly:    *flagsOnly,
+		FlagCategory: *flagCategory,
+		FlagKind:     *flagKind,
+		FlagLoc:      *flagLoc,
+	})
 }
 
 // applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
@@ -240,6 +219,22 @@ func profileNames() string {
 	return strings.Join(names, " | ")
 }
 
+func setOptionalEnv(key, value string) func() {
+	value = strings.TrimSpace(value)
+	old, had := os.LookupEnv(key)
+	if value == "" {
+		return func() {}
+	}
+	_ = os.Setenv(key, value)
+	return func() {
+		if had {
+			_ = os.Setenv(key, old)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+}
+
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
@@ -273,7 +268,7 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 		}
 		all = append(all, got...)
 	}
-	// Possibility mode (opt-in, for the AI/triage pass): surface ontology sink
+	// Possibility mode (opt-in, for triage): surface ontology sink
 	// sites the confirmed rules did not flag, as low-confidence "possibility"
 	// findings. OFF by default so the protected benchmarks are unaffected.
 	if os.Getenv("VYQL_POSSIBILITY") != "" {
@@ -283,7 +278,20 @@ func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats,
 	return all, stats, g, nil
 }
 
-func run(paths []string, rulesPath, format, profileName string, showStats bool, includeAll bool) error {
+type scanRunOptions struct {
+	ShowStats    bool
+	IncludeFlags bool
+	FlagsOnly    bool
+	FlagCategory string
+	FlagKind     string
+	FlagLoc      string
+}
+
+func (o scanRunOptions) wantsFlags() bool {
+	return o.IncludeFlags || o.FlagsOnly || o.FlagCategory != "" && o.FlagCategory != "all" || o.FlagKind != "" && o.FlagKind != "all" || o.FlagLoc != ""
+}
+
+func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
 	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
 		f, _ := os.Create(cp)
 		_ = pprof.StartCPUProfile(f)
@@ -312,7 +320,8 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool, 
 	var stats scanStats
 	var graph usg.Store
 	hit := false
-	if cache != nil && syncCollector == nil && !includeAll {
+	wantsFlags := opts.wantsFlags()
+	if cache != nil && syncCollector == nil && !wantsFlags {
 		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
@@ -324,7 +333,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool, 
 		if err != nil {
 			return err
 		}
-		if cache != nil && syncCollector == nil && !includeAll {
+		if cache != nil && syncCollector == nil && !wantsFlags {
 			storeCachedScan(cache, rkey, all, stats)
 		}
 	}
@@ -339,11 +348,11 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool, 
 
 	// output
 	var flags []reviewItem
-	if includeAll {
+	if wantsFlags {
 		if format == "sarif" {
-			return fmt.Errorf("--all is supported with -format text or json")
+			return fmt.Errorf("flags are supported with -format text or json")
 		}
-		flags = collectReviewItems(graph)
+		flags = filterReviewItems(collectReviewItems(graph), opts.FlagCategory, opts.FlagKind, opts.FlagLoc)
 	}
 	switch format {
 	case "sarif":
@@ -352,21 +361,27 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool, 
 		fmt.Println(string(b))
 	case "json":
 		var payload any = findingsJSON(all)
-		if includeAll {
+		if opts.FlagsOnly {
+			payload = scanFlagsJSON{Flags: flags}
+		} else if wantsFlags {
 			payload = scanAllJSON{Findings: findingsJSON(all), Flags: flags}
 		}
 		b, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
-		printReport(all)
-		if includeAll {
-			fmt.Println()
+		if !opts.FlagsOnly {
+			printReport(all)
+			if wantsFlags {
+				fmt.Println()
+			}
+		}
+		if wantsFlags {
 			printScanFlags(flags)
 		}
-		printSummaryWithFlags(stats, len(all), len(flags), includeAll)
+		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
 	}
-	if showStats {
+	if opts.ShowStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
 		printScanStats(graph, stats)
 	}
@@ -434,6 +449,10 @@ type scanAllJSON struct {
 	Flags    []reviewItem  `json:"flags"`
 }
 
+type scanFlagsJSON struct {
+	Flags []reviewItem `json:"flags"`
+}
+
 func printScanFlags(rows []reviewItem) {
 	if len(rows) == 0 {
 		fmt.Println("No flags.")
@@ -485,9 +504,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json -profile -stats -all]")
-	fmt.Fprintln(os.Stderr, "  prep       build an optional repo-local adapter overlay for scan   [-provider off|vertex -out DIR]")
-	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

@@ -144,7 +144,7 @@ having SCA and SAST in one graph.
    ([08](08-dataflow-and-taint.md)) and reused across every consuming app. This
    turns "is this library function exploitable here" into a cached cross-boundary
    taint join. Summaries are keyed to the advisory + version range and are a
-   natural artifact for the AI layer to generate and humans to review
+   natural artifact for external assistants to draft and humans to review
    ([18](18-ai-integration.md)).
 
 **Where the data comes from** ([16](16-standards-alignment.md)): OSV's

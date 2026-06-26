@@ -139,7 +139,7 @@ Untrusted data reaches a SQL query without parameterization.
 
 The "why this matters here" line is generated from graph-context joins
 (exposure, asset labels) — the cross-domain payoff surfaced at the
-individual-finding level. LLM-polished explanations are allowed as a
+individual-finding level. Externally polished explanations are allowed as a
 presentation layer but must be generated *from the proof tree* and carry no
 claims absent from it ([18](18-ai-integration.md)).
 

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -100,84 +98,35 @@ func reviewList(fields map[string]any, key string) []string {
 	return nil
 }
 
-func cmdReview(args []string) error {
-	fs := flag.NewFlagSet("review", flag.ExitOnError)
-	format := fs.String("format", "text", "output format: text | json")
-	profileName := fs.String("profile", "auto", "analysis profile")
-	category := fs.String("category", "all", "review category filter")
-	loc := fs.String("loc", "", "location substring filter, e.g. core.c:422")
-	checksOnly := fs.Bool("checks", false, "show only check/control sites")
-	targetsOnly := fs.Bool("targets", false, "show only review targets")
-	_ = fs.Parse(args)
-	paths := fs.Args()
-	if len(paths) == 0 {
-		return fmt.Errorf("usage: vyql review [-format text|json] [-category NAME|all] [-loc SUBSTR] [-checks|-targets] <path>...")
-	}
-	if *checksOnly && *targetsOnly {
-		return fmt.Errorf("-checks and -targets are mutually exclusive")
-	}
-	applyProfile(paths, *profileName)
-	g, _, err := buildGraph(paths)
-	if err != nil {
-		return err
-	}
-	if g == nil {
-		fmt.Println("(no analyzable source)")
-		return nil
-	}
-	reviewConcepts, err := loadReviewConcepts()
-	if err != nil {
-		return err
-	}
-	rows := collectReviewItemsWith(g, reviewConcepts)
-	if *category != "" && *category != "all" {
-		filtered := rows[:0]
-		for _, r := range rows {
-			if r.Category == *category {
-				filtered = append(filtered, r)
-			}
-		}
-		rows = filtered
-	}
-	if *loc != "" {
-		filtered := rows[:0]
-		for _, r := range rows {
-			if strings.Contains(r.Loc, *loc) {
-				filtered = append(filtered, r)
-			}
-		}
-		rows = filtered
-	}
-	if *checksOnly || *targetsOnly {
-		filtered := rows[:0]
-		for _, r := range rows {
-			if *checksOnly && r.Kind == "check" {
-				filtered = append(filtered, r)
-			}
-			if *targetsOnly && r.Kind == "target" {
-				filtered = append(filtered, r)
-			}
-		}
-		rows = filtered
-	}
-	switch *format {
-	case "json":
-		b, _ := json.MarshalIndent(rows, "", "  ")
-		fmt.Println(string(b))
-	case "text":
-		printReviewItems(rows)
-	default:
-		return fmt.Errorf("unknown -format %q (use text or json)", *format)
-	}
-	return nil
-}
-
 func collectReviewItems(g usg.Store) []reviewItem {
 	reviewConcepts, err := loadReviewConcepts()
 	if err != nil {
 		return nil
 	}
 	return collectReviewItemsWith(g, reviewConcepts)
+}
+
+func filterReviewItems(rows []reviewItem, category, kind, loc string) []reviewItem {
+	category = strings.TrimSpace(category)
+	kind = strings.TrimSpace(kind)
+	loc = strings.TrimSpace(loc)
+	if (category == "" || category == "all") && (kind == "" || kind == "all") && loc == "" {
+		return rows
+	}
+	filtered := rows[:0]
+	for _, r := range rows {
+		if category != "" && category != "all" && r.Category != category {
+			continue
+		}
+		if kind != "" && kind != "all" && r.Kind != kind {
+			continue
+		}
+		if loc != "" && !strings.Contains(r.Loc, loc) {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered
 }
 
 func collectReviewItemsWith(g usg.Store, reviewConcepts map[string]reviewConceptInfo) []reviewItem {

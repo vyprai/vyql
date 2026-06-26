@@ -26,7 +26,7 @@ func writeNeutralPy(t *testing.T) string {
 func TestRunOutputFormats(t *testing.T) {
 	dir := writeNeutralPy(t)
 	for _, format := range []string{"text", "sarif"} {
-		if err := run([]string{dir}, "", format, "auto", false, false); err != nil {
+		if err := run([]string{dir}, "", format, "auto", scanRunOptions{}); err != nil {
 			t.Errorf("run(format=%s) errored: %v", format, err)
 		}
 	}
@@ -35,7 +35,7 @@ func TestRunOutputFormats(t *testing.T) {
 func TestRunWithExplicitProfile(t *testing.T) {
 	dir := writeNeutralPy(t)
 	for _, prof := range []string{"auto", "generic", "web", "cli"} {
-		if err := run([]string{dir}, "", "text", prof, false, false); err != nil {
+		if err := run([]string{dir}, "", "text", prof, scanRunOptions{}); err != nil {
 			t.Errorf("run(--profile %s) errored: %v", prof, err)
 		}
 	}
@@ -43,14 +43,14 @@ func TestRunWithExplicitProfile(t *testing.T) {
 
 func TestRunInvalidRulesErrors(t *testing.T) {
 	dir := writeNeutralPy(t)
-	if err := run([]string{dir}, "/no/such/rules.vyql", "text", "auto", false, false); err == nil {
+	if err := run([]string{dir}, "/no/such/rules.vyql", "text", "auto", scanRunOptions{}); err == nil {
 		t.Error("run with a nonexistent --rules path should error, not panic or pass")
 	}
 }
 
 func TestRunNoSourceErrors(t *testing.T) {
 	dir := t.TempDir() // empty — nothing to scan
-	if err := run([]string{dir}, "", "text", "auto", false, false); err == nil {
+	if err := run([]string{dir}, "", "text", "auto", scanRunOptions{}); err == nil {
 		t.Error("run on a dir with no recognized source should error")
 	}
 }
@@ -66,7 +66,7 @@ func TestRunAllIncludesFlags(t *testing.T) {
 	}
 
 	defaultOut, err := captureStdout(t, func() error {
-		return run([]string{dir}, "", "json", "auto", false, false)
+		return run([]string{dir}, "", "json", "auto", scanRunOptions{})
 	})
 	if err != nil {
 		t.Fatalf("default json scan failed: %v", err)
@@ -76,7 +76,7 @@ func TestRunAllIncludesFlags(t *testing.T) {
 	}
 
 	allOut, err := captureStdout(t, func() error {
-		return run([]string{dir}, "", "json", "auto", false, true)
+		return run([]string{dir}, "", "json", "auto", scanRunOptions{IncludeFlags: true})
 	})
 	if err != nil {
 		t.Fatalf("scan --all json failed: %v", err)
@@ -99,10 +99,46 @@ func TestRunAllIncludesFlags(t *testing.T) {
 	}
 }
 
+func TestRunFlagsOnlyJSON(t *testing.T) {
+	dir := t.TempDir()
+	src := `function verify(data, userToken) {
+  return data['x-csrf-token'] === userToken;
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "app.js"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "json", "auto", scanRunOptions{FlagsOnly: true, FlagCategory: "crypto"})
+	})
+	if err != nil {
+		t.Fatalf("scan --flags json failed: %v", err)
+	}
+	var payload struct {
+		Findings []jsonFinding `json:"findings"`
+		Flags    []reviewItem  `json:"flags"`
+	}
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("scan --flags json should be an object payload: %v\n%s", err, out)
+	}
+	if len(payload.Findings) != 0 {
+		t.Fatalf("scan --flags should not include findings, got %#v", payload.Findings)
+	}
+	if len(payload.Flags) == 0 {
+		t.Fatalf("scan --flags should include filtered flags, got %#v", payload.Flags)
+	}
+	for _, flag := range payload.Flags {
+		if flag.Category != "crypto" {
+			t.Fatalf("scan --flags category filter leaked %#v", flag)
+		}
+	}
+}
+
 func TestRunAllRejectsSarif(t *testing.T) {
 	dir := writeNeutralPy(t)
-	if err := run([]string{dir}, "", "sarif", "auto", false, true); err == nil {
-		t.Error("scan --all should reject SARIF until flags have a SARIF representation")
+	if err := run([]string{dir}, "", "sarif", "auto", scanRunOptions{IncludeFlags: true}); err == nil {
+		t.Error("scan flags should reject SARIF until flags have a SARIF representation")
 	}
 }
 

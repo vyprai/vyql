@@ -581,7 +581,7 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 				return nil, fmt.Errorf("overlay adapter %s declares %q, which is not present in this scan", file, ad.Name)
 			}
 			spec := specFromDecl(ad)
-			spec.Name = "agentic." + spec.Name
+			spec.Name = "overlay." + spec.Name
 			out = append(out, adaptersFromSpec(spec)...)
 		}
 	}
