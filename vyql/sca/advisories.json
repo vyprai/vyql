@@ -30,6 +30,14 @@
         "min_safe": "v1.3.10"
       }
     ],
+    "github.com/consensys/gnark-crypto": [
+      {
+        "version": "*",
+        "id": "CVE-2025-58157",
+        "cwe": ["CWE-400"],
+        "min_safe": "v0.17.1-0.20250502112255-56600883e0e9"
+      }
+    ],
     "github.com/tidwall/match": [
       {
         "version": "*",

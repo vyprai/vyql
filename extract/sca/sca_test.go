@@ -287,6 +287,22 @@ func TestBuildSBOMPatchedIsClean(t *testing.T) {
 	}
 }
 
+func TestGoPseudoVersionMinSafeAdvisoryMatch(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{
+		"go": {
+			"github.com/consensys/gnark-crypto": {
+				{Version: "*", ID: "CVE-2025-58157", MinSafe: "v0.17.1-0.20250502112255-56600883e0e9"},
+			},
+		},
+	}}
+	if adv, ok := matchAdvisory(d, "go", "github.com/consensys/gnark-crypto", "v0.17.1-0.20250415081852-c838dcdfa844", "v0.17.1-0.20250415081852-c838dcdfa844"); !ok || adv.ID != "CVE-2025-58157" {
+		t.Fatalf("old gnark-crypto pseudo-version should match min_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "go", "github.com/consensys/gnark-crypto", "v0.17.1-0.20250502112255-56600883e0e9", "v0.17.1-0.20250502112255-56600883e0e9"); ok {
+		t.Fatal("fixed gnark-crypto pseudo-version should be clean for min_safe advisory")
+	}
+}
+
 func TestLinkReachability(t *testing.T) {
 	g := usg.NewInMemStore()
 	// two packages; only `requests` is actually called.
