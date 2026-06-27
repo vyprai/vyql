@@ -17,7 +17,8 @@ var (
 		"literal": true, "function": true, "class": true, "import": true,
 		"route": true, "config": true, "param": true,
 	}
-	v2SemanticFamilies = map[string]bool{
+	v2SchemaGatedCodeFamilies = map[string]string{"route": "nir", "config": "nir"}
+	v2SemanticFamilies        = map[string]bool{
 		"concept": true, "finding": true, "exposure": true, "asset": true,
 		"principal": true, "privilege": true, "state": true,
 	}
@@ -1206,6 +1207,7 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 			if !v2FamilyAllowed(item.Name, "recognition") {
 				errs = append(errs, fmt.Errorf("pattern %s: node family %q is not a project/code family", pat.Name, item.Name))
 			}
+			errs = append(errs, validateV2SchemaGatedFamily("pattern "+pat.Name, item.Name, false)...)
 			if strings.HasPrefix(item.Name, "unstable.") && !unstableOK {
 				errs = append(errs, fmt.Errorf("pattern %s: unstable node family %q requires owner and reason metadata", pat.Name, item.Name))
 			}
@@ -1236,6 +1238,7 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 			errs = append(errs, fmt.Errorf("binding %s: unstable query family %q requires owner and reason metadata", b.Name, b.Query.Expr.Family))
 		}
 		errs = append(errs, validateV2QueryFamilies("binding "+b.Name, *b.Query.Expr, "recognition")...)
+		errs = append(errs, validateV2SchemaGatedQueryFamilies("binding "+b.Name, *b.Query.Expr, v2RequirementsHaveHardSchema(b.Requirements, "nir", "2.0"))...)
 		if len(b.Query.Expr.Steps) > 0 {
 			errs = append(errs, fmt.Errorf("binding %s: query relation steps need native production v2 lowering", b.Name))
 		}
@@ -1421,6 +1424,58 @@ func validateV2QueryFamilies(ctx string, q V2QueryExpr, role string) []error {
 		}
 	}
 	return errs
+}
+
+func validateV2SchemaGatedQueryFamilies(ctx string, q V2QueryExpr, hasNIRSchema bool) []error {
+	var errs []error
+	errs = append(errs, validateV2SchemaGatedFamily(ctx, q.Family, hasNIRSchema)...)
+	for _, step := range q.Steps {
+		errs = append(errs, validateV2SchemaGatedFamily(ctx, step.Family, hasNIRSchema)...)
+	}
+	return errs
+}
+
+func validateV2SchemaGatedFamily(ctx, family string, hasNIRSchema bool) []error {
+	schema, ok := v2SchemaGatedCodeFamilies[family]
+	if !ok || hasNIRSchema {
+		return nil
+	}
+	return []error{fmt.Errorf("%s: query family %q requires hard schema(%q, \"2.0\") requirement", ctx, family, schema)}
+}
+
+func v2RequirementsHaveHardSchema(reqs []V2Requirement, schema, version string) bool {
+	for _, req := range reqs {
+		if v2RequirementHasHardSchema(req, schema, version) {
+			return true
+		}
+	}
+	return false
+}
+
+func v2RequirementHasHardSchema(req V2Requirement, schema, version string) bool {
+	switch req.Name {
+	case "schema":
+		values := v2RequirementStringArgs(req)
+		return len(values) >= 2 && values[0] == schema && values[1] == version
+	case "all":
+		for _, raw := range req.Args {
+			child, ok := raw.(V2Requirement)
+			if ok && v2RequirementHasHardSchema(child, schema, version) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func v2RequirementStringArgs(req V2Requirement) []string {
+	out := make([]string, 0, len(req.Args))
+	for _, raw := range req.Args {
+		if s, ok := raw.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func v2FamilyAllowed(family, role string) bool {

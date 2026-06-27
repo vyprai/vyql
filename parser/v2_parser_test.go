@@ -798,6 +798,27 @@ rule Bad {
 			want: "not allowed in semantic-tier query",
 		},
 		{
+			name: "staged route query without schema",
+			src: `module bindings.javascript.routes;
+concept Input : source {}
+binding bad {
+  query route as r where r.public == true
+  emit source Input at r
+}`,
+			want: `query family "route" requires hard schema("nir", "2.0") requirement`,
+		},
+		{
+			name: "soft schema does not enable staged query",
+			src: `module bindings.javascript.routes;
+concept Input : source {}
+binding bad {
+  requires { soft(schema("nir", "2.0")) }
+  query config as c where c.key == "secret"
+  emit source Input at c
+}`,
+			want: `query family "config" requires hard schema("nir", "2.0") requirement`,
+		},
+		{
 			name: "binding query relation steps not implemented",
 			src: `module bindings.javascript.composed;
 binding bad {
@@ -972,6 +993,24 @@ pattern bad {
 				t.Fatalf("error = %v, want substring %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestParseV2ValidationAllowsStagedQueryWithHardSchema(t *testing.T) {
+	_, err := ParseV2(`
+module bindings.javascript.routes;
+concept Input : source {}
+binding routeInput {
+  requires {
+    language("javascript")
+    schema("nir", "2.0")
+  }
+  query route as r where r.public == true
+  emit source Input at r
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2 rejected hard-schema staged query: %v", err)
 	}
 }
 
