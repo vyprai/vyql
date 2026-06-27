@@ -811,6 +811,40 @@ binding secretAttr {
 	}
 }
 
+func TestV2BinaryExprPatternLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.compare;
+pattern equalityComparison as cmp {
+  node: binaryExpr
+  where cmp.operator in ["==", "==="]
+}
+binding secretComparison {
+  query pattern equalityComparison
+  emit issue code.SecretComparisonReview at cmp
+}
+binding weakCompare {
+  query binaryExpr as op where op.op == "!="
+  emit issue code.SecretComparisonReview at op
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 3 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "mark_method" || got.Pattern != "eq" || got.NodeType != "code.BinOp" {
+		t.Fatalf("binaryExpr equality lowering wrong: %+v", got)
+	}
+	if got := adapter.Mappings[1]; got.Kind != "mark_method" || got.Pattern != "===" || got.NodeType != "code.BinOp" {
+		t.Fatalf("binaryExpr strict equality lowering wrong: %+v", got)
+	}
+	if got := adapter.Mappings[2]; got.Kind != "mark_method" || got.Pattern != "ne" || got.NodeType != "code.BinOp" {
+		t.Fatalf("binaryExpr inline lowering wrong: %+v", got)
+	}
+}
+
 func TestV2ComposedSingleNodePatternLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.composed;

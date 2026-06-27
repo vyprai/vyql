@@ -2212,6 +2212,37 @@ binding domValueSource {
 	}
 }
 
+func TestV2BinaryExprPatternOnlyLabelsBinOps(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.compare;
+pattern equalityComparison as cmp {
+  node: binaryExpr
+  where cmp.operator == "=="
+}
+binding secretComparison {
+  query pattern equalityComparison
+  emit issue custom.SecretComparison at cmp
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.js:1", "callee_path": "__binop.eq", "method": "eq",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:2", "callee_path": "__binop.eq", "method": "eq",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
+		t.Fatalf("binaryExpr pattern matched wrong nodes: %+v", got)
+	}
+}
+
 func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

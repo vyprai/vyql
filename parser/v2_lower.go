@@ -609,8 +609,10 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		case "call":
 		case "memberAccess":
 			queryNodeType = "code.Attr"
+		case "binaryExpr":
+			queryNodeType = "code.BinOp"
 		default:
-			return nil, fmt.Errorf("binding %s: inline query lowering is only implemented for single call or memberAccess queries", b.Name)
+			return nil, fmt.Errorf("binding %s: inline query lowering is only implemented for single call, memberAccess, or binaryExpr queries", b.Name)
 		}
 		queryWhere = b.Query.Expr.Where
 		queryAlias = b.Query.Expr.Alias
@@ -871,6 +873,8 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 			case "call", "callExpr", "node":
 			case "memberAccess":
 				nodeType = "code.Attr"
+			case "binaryExpr":
+				nodeType = "code.BinOp"
 			default:
 				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
 			}
@@ -1813,6 +1817,8 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return []v2CallShape{{ValMatches: []string{value}}}, nil
 	}
 	switch field {
+	case "operator":
+		return lowerV2OperatorShapes(binding, cmp, cmpNeg)
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
 		"callee.analysis", "call.callee.analysis":
 		return lowerV2CalleeShapes(binding, strings.TrimPrefix(field, "call."), cmp, cmpNeg)
@@ -1936,6 +1942,76 @@ func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v
 	return out, nil
 }
 
+func lowerV2OperatorShapes(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	if neg {
+		return nil, fmt.Errorf("binding %s: negated operator predicate is not implemented in scanner IR lowering", binding)
+	}
+	var values []string
+	switch cmp.Op {
+	case "==":
+		pat, ok := v2LiteralString(cmp.Right)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: operator predicate right side must be a string", binding)
+		}
+		values = []string{pat}
+	case "in":
+		var ok bool
+		values, ok = v2RuleWhereStringList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, fmt.Errorf("binding %s: operator in predicate requires a non-empty string list", binding)
+		}
+	default:
+		return nil, fmt.Errorf("binding %s: operator predicate operator %q is not implemented in scanner IR lowering", binding, cmp.Op)
+	}
+	if err := checkV2CallShapeExpansion(binding, "operator", len(values)); err != nil {
+		return nil, err
+	}
+	out := make([]v2CallShape, 0, len(values))
+	for _, value := range values {
+		out = append(out, v2CallShape{Field: "callee.method", Pattern: v2BinaryOperatorMethod(value), Exact: true})
+	}
+	return out, nil
+}
+
+func v2BinaryOperatorMethod(op string) string {
+	switch op {
+	case "+":
+		return "add"
+	case "-":
+		return "sub"
+	case "*":
+		return "mul"
+	case "/":
+		return "div"
+	case "%":
+		return "mod"
+	case "<<":
+		return "shl"
+	case ">>":
+		return "shr"
+	case "==":
+		return "eq"
+	case "!=":
+		return "ne"
+	case "<":
+		return "lt"
+	case "<=":
+		return "le"
+	case ">":
+		return "gt"
+	case ">=":
+		return "ge"
+	case "&&":
+		return "and"
+	case "||":
+		return "or"
+	}
+	if op == "" {
+		return "op"
+	}
+	return strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub").Replace(op)
+}
+
 func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, error) {
 	out := left
 	if right.Field != "" {
@@ -2017,6 +2093,8 @@ func v2MappedCallQueryField(name string) string {
 		return "callee.method"
 	case "path", "memberAccess.path":
 		return "callee.path"
+	case "operator", "op", "binaryExpr.operator", "binaryExpr.op":
+		return "operator"
 	default:
 		if v2IsKnownCallQueryField(name) {
 			return name
