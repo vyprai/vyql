@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m3bcc9343;
+module bindings.elixir.generated.m3bcc9343;
 
 binding networkConnect9 {
   requires {

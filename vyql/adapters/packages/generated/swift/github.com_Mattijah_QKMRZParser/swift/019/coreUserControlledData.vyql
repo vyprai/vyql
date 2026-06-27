@@ -1,4 +1,4 @@
-module bindings.swift.migration.mb63ccca5;
+module bindings.swift.generated.mb63ccca5;
 
 binding userControlledData19 {
   requires {

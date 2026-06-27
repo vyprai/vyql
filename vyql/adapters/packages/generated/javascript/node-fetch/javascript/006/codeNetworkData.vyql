@@ -1,4 +1,4 @@
-module bindings.javascript.migration.me3be893c;
+module bindings.javascript.generated.me3be893c;
 
 binding networkData6 {
   requires {

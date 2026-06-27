@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mae193afb;
+module bindings.cpp.generated.mae193afb;
 
 binding deserialization0 {
   requires {

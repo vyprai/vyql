@@ -1,4 +1,4 @@
-module bindings.go.migration.m9c8cbdfa;
+module bindings.go.generated.m9c8cbdfa;
 
 binding networkConnect0 {
   requires {

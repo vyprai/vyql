@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding nestedPathInheritedPropertyPrototypePollution585 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "key.split" and node.context.callPath contains "split.shift" and node.context.callPath contains "__js_dynamic_property_write" and not (node.context.literal contains "__proto__")

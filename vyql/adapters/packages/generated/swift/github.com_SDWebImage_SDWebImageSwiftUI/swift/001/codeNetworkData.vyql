@@ -1,4 +1,4 @@
-module bindings.swift.migration.mfe64604a;
+module bindings.swift.generated.mfe64604a;
 
 binding networkData1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding httpInput2 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionParamType contains "PPFrame" and not args.any.context.paramType contains "Parser" and not args.any.context.paramType contains "PPFrame" and not args.any.context.paramType contains "OutputPage" and not args.any.context.paramType contains "Skin" and not args.any.context.paramType contains "Title" and not args.any.context.paramType contains "MimeAnalyzer"

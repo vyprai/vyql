@@ -1,4 +1,4 @@
-module bindings.objc.migration.mde4307ef;
+module bindings.objc.generated.mde4307ef;
 
 binding filePathAccess0 {
   requires {

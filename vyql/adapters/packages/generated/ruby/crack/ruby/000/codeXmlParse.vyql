@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m7ce6821e;
+module bindings.ruby.generated.m7ce6821e;
 
 binding xmlParse0 {
   requires {

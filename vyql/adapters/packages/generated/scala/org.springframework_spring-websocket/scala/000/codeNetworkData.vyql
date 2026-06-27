@@ -1,4 +1,4 @@
-module bindings.scala.migration.m2dab7975;
+module bindings.scala.generated.m2dab7975;
 
 binding networkData0 {
   requires {

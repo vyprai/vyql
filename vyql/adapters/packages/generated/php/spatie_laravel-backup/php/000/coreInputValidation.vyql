@@ -1,4 +1,4 @@
-module bindings.php.migration.mac7238f3;
+module bindings.php.generated.mac7238f3;
 
 binding inputValidation0 {
   requires {

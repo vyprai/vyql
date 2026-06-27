@@ -1,4 +1,4 @@
-module bindings.java.migration.m59d20bc5;
+module bindings.java.generated.m59d20bc5;
 
 binding networkSend0 {
   requires {

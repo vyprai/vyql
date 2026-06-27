@@ -1,4 +1,4 @@
-module bindings.objc.migration.mbb6a5efd;
+module bindings.objc.generated.mbb6a5efd;
 
 binding cliArgument0 {
   requires {

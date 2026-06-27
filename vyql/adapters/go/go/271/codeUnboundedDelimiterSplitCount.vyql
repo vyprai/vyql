@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding unboundedDelimiterSplitCount271 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "strings.Split" and node.context.literal contains "." and node.context.callPath contains "len" and node.context.index contains "parts:1" and node.context.callPath contains "base64.RawURLEncoding.DecodeString" and not (node.context.callPath contains "strings.Count") and not (node.context.callPath contains "strings.SplitN")

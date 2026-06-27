@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m8748d7e9;
+module bindings.cpp.generated.m8748d7e9;
 
 binding regexCompile0 {
   requires {

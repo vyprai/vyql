@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding catastrophicRegex546 {
   query pattern presenceNode where node.kind == "any" and node.method == "match" and node.token contains "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]" and not (node.token contains "([^*]|\\*(?!\\/))*?")

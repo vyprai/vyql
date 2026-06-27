@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding oversizedWebsocketPayloadDefault556 {
   query pattern presenceNode where node.scope == "class" and node.context.language == "javascript" and node.token contains "maxHttpBufferSize:104857600" and node.token contains "maxPayload:this.opts.maxHttpBufferSize" and not (node.token contains "maxHttpBufferSize:1e6")

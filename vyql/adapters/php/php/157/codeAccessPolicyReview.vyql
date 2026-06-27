@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding accessPolicyReview157 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "groupblog_edit_settings" and node.token contains "groupblog-blogid" and node.token contains "groupblog_edit_base_settings" and not (node.token contains "groups_is_user_admin") and not (node.token contains "current_user_can_for_blog")

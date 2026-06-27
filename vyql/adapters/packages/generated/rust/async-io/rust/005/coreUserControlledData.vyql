@@ -1,4 +1,4 @@
-module bindings.rust.migration.med5b2857;
+module bindings.rust.generated.med5b2857;
 
 binding userControlledData5 {
   requires {

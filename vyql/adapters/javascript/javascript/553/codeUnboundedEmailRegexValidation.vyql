@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unboundedEmailRegexValidation553 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "/^\\S+@\\S+$/.test(email)" and node.token contains "dns.resolveMx(email.split('@')[1]" and not (node.token contains "MAX_EMAIL_LEN<email.length") and not (node.token contains "email.length>300") and not (node.token contains "email.length>=300")

@@ -1,4 +1,4 @@
-module bindings.bash.migration.m0b4a7601;
+module bindings.bash.generated.m0b4a7601;
 
 binding regexCompile0 {
   requires {

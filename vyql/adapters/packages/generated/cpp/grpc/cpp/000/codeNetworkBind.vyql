@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m2ce1e70f;
+module bindings.cpp.generated.m2ce1e70f;
 
 binding networkBind0 {
   requires {

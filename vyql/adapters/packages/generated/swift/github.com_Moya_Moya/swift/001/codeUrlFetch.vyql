@@ -1,4 +1,4 @@
-module bindings.swift.migration.mac82bc87;
+module bindings.swift.generated.mac82bc87;
 
 binding urlFetch1 {
   requires {

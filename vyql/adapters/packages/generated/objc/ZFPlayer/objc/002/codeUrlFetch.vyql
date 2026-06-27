@@ -1,4 +1,4 @@
-module bindings.objc.migration.m85430821;
+module bindings.objc.generated.m85430821;
 
 binding urlFetch2 {
   requires {

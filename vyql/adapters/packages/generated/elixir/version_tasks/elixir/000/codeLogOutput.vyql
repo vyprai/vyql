@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma959295a;
+module bindings.elixir.generated.ma959295a;
 
 binding logOutput0 {
   requires {

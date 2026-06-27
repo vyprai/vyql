@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding requestTokenCacheCleanupBypass170 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "AddParameterToEndpoint" and node.token contains "ParameterBasedFrom<IToken<IUser>>" and node.token contains "returnthis.AuthenticateToken(context,database);" and node.token contains "returntoken.User;" and node.token contains "this._tokenCache.Value=null;"

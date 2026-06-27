@@ -1,4 +1,4 @@
-module bindings.javascript.migration.md3d2ac70;
+module bindings.javascript.generated.md3d2ac70;
 
 binding weakRandomValue0 {
   requires {

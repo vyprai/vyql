@@ -1,4 +1,4 @@
-module bindings.php.migration.mc187badd;
+module bindings.php.generated.mc187badd;
 
 binding storedDataRead2 {
   requires {

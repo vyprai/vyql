@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding ldapQuery76 {
   query pattern callExpr where callee.path ~= "ldap_search_ext_s"

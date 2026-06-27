@@ -1,4 +1,4 @@
-module bindings.java.migration.m2e09998c;
+module bindings.java.generated.m2e09998c;
 
 binding httpInput2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m1afd114b;
+module bindings.go.generated.m1afd114b;
 
 binding templateRender3 {
   requires {

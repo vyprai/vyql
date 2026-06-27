@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mb7311fac;
+module bindings.cpp.generated.mb7311fac;
 
 binding responseHeaderWrite10 {
   requires {

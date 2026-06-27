@@ -1,4 +1,4 @@
-module bindings.rust.migration.mfc2b5290;
+module bindings.rust.generated.mfc2b5290;
 
 binding deserialization0 {
   requires {

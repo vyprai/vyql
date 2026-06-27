@@ -1,4 +1,4 @@
-module bindings.go.migration.m898cef88;
+module bindings.go.generated.m898cef88;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding integerSizeArithmetic262 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readBlock" and node.context.call contains "ReadLong" and node.context.call contains "make" and not (node.context.selector contains "math.MaxInt")

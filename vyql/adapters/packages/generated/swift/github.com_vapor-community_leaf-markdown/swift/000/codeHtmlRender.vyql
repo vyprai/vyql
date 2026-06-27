@@ -1,4 +1,4 @@
-module bindings.swift.migration.mbe1aee1d;
+module bindings.swift.generated.mbe1aee1d;
 
 binding htmlRender0 {
   requires {

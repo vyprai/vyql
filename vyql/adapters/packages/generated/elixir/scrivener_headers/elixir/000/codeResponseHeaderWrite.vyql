@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m47e38bbf;
+module bindings.elixir.generated.m47e38bbf;
 
 binding responseHeaderWrite0 {
   requires {

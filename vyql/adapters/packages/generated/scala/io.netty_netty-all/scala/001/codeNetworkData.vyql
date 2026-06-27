@@ -1,4 +1,4 @@
-module bindings.scala.migration.mdf5c9fa9;
+module bindings.scala.generated.mdf5c9fa9;
 
 binding networkData1 {
   requires {

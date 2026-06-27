@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc312bd2f;
+module bindings.elixir.generated.mc312bd2f;
 
 binding weakHash2 {
   requires {

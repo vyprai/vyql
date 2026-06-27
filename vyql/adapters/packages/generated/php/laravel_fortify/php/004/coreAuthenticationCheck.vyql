@@ -1,4 +1,4 @@
-module bindings.php.migration.m4bbd7017;
+module bindings.php.generated.m4bbd7017;
 
 binding authenticationCheck4 {
   requires {

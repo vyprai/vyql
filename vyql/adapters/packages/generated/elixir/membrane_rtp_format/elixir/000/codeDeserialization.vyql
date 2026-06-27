@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mfc30ae77;
+module bindings.elixir.generated.mfc30ae77;
 
 binding deserialization0 {
   requires {

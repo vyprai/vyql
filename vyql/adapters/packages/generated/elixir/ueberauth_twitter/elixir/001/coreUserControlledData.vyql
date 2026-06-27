@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mca05011a;
+module bindings.elixir.generated.mca05011a;
 
 binding userControlledData1 {
   requires {

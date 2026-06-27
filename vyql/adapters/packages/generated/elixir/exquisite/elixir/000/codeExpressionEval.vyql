@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m652af54a;
+module bindings.elixir.generated.m652af54a;
 
 binding expressionEval0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.m13522699;
+module bindings.perl.generated.m13522699;
 
 binding redirectTarget0 {
   requires {

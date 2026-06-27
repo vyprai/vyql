@@ -1,4 +1,4 @@
-module bindings.java.migration.mbcfbfb01;
+module bindings.java.generated.mbcfbfb01;
 
 binding htmlRender6 {
   requires {

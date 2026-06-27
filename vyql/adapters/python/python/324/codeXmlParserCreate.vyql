@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding xmlParserCreate324 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "etree.XMLParser" and not (containsAny(node.context.callArg, ["etree.XMLParser:resolve_entities=False", "etree.XMLParser:no_network=True"]))

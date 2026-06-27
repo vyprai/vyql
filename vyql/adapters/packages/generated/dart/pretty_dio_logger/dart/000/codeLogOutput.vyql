@@ -1,4 +1,4 @@
-module bindings.dart.migration.m36ec1897;
+module bindings.dart.generated.m36ec1897;
 
 binding logOutput0 {
   requires {

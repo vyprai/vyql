@@ -1,4 +1,4 @@
-module bindings.go.migration.mde2a4ee5;
+module bindings.go.generated.mde2a4ee5;
 
 binding httpInput0 {
   requires {

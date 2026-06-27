@@ -1,4 +1,4 @@
-module bindings.rust.migration.m8c380b71;
+module bindings.rust.generated.m8c380b71;
 
 binding storedDataRead1 {
   requires {

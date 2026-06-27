@@ -1,4 +1,4 @@
-module bindings.php.migration.m70032eae;
+module bindings.php.generated.m70032eae;
 
 binding networkConnect1 {
   requires {

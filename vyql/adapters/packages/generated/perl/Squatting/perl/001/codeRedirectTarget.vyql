@@ -1,4 +1,4 @@
-module bindings.perl.migration.m2830a609;
+module bindings.perl.generated.m2830a609;
 
 binding redirectTarget1 {
   requires {

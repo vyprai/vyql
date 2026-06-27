@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbcfbc88e;
+module bindings.elixir.generated.mbcfbc88e;
 
 binding deserialization1 {
   requires {

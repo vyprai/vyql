@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06d0685b;
+module bindings.scala.generated.m06d0685b;
 
 binding resourceHandle49 {
   query pattern presenceNode where node.path ~= "Files.newOutputStream"

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding browserlessWorkspaceFilePathTraversal641 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "<lambda>" and node.token contains "req.params[0]" and node.token contains "path.join(workspaceDir,file)" and node.token contains "res.sendFile(filePath" and not (node.token contains "filePath.includes(workspaceDir)")

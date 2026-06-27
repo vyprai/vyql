@@ -1,4 +1,4 @@
-module bindings.c.migration.m1850c2bf;
+module bindings.c.generated.m1850c2bf;
 
 binding userControlledData1 {
   requires {

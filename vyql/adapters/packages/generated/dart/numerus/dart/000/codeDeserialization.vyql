@@ -1,4 +1,4 @@
-module bindings.dart.migration.m0e0fd30a;
+module bindings.dart.generated.m0e0fd30a;
 
 binding deserialization0 {
   requires {

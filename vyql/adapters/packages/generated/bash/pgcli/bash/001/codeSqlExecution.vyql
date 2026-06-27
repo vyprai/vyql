@@ -1,4 +1,4 @@
-module bindings.bash.migration.mf01a1501;
+module bindings.bash.generated.mf01a1501;
 
 binding sqlExecution1 {
   requires {

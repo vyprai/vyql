@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding offsetLengthBoundsOverflow264 {
   query pattern presenceNode where node.scope == "function" and node.context.call contains "int" and node.context.call contains "len" and node.context.callArg contains "int:header.StringOff+header.StringLen" and node.context.callArg contains "len:btf" and node.token contains "slice:btf:header.StringOff:" and node.token contains "slice:btf::header.StringOff+header.StringLen" and not (node.context.scopeCall contains "uint64") and not (node.context.callArg contains "uint64:header.StringOff")

@@ -1,4 +1,4 @@
-module bindings.swift.migration.mf98b16d0;
+module bindings.swift.generated.mf98b16d0;
 
 binding sqlExecution0 {
   requires {

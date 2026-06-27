@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding tempPathJoinBeforeSeparatorCheck81 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "zipdl" and node.context.assignCallMethod contains "getTempPath" and node.context.assignLiteral contains "DIRECTORY_SEPARATOR" and node.token contains "global_subscript_write=true" and node.token contains "$GLOBALS['elFinderTempFiles'][$path]=true;" and not (node.token contains "strpos($file,DIRECTORY_SEPARATOR)")

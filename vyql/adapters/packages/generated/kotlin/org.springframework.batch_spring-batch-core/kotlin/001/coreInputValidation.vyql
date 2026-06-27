@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m8ad4e9b5;
+module bindings.kotlin.generated.m8ad4e9b5;
 
 binding inputValidation1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding untrustedSupportUrlNotification222 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.name contains "post" and containsAny(node.context.callPath, ["validate_request", "self.validate_request"]) and containsAny(node.context.callPath, ["schedule_support_email", "send_support_email", "notify_admin", "send_mail", "send_email"]) and containsAny(node.context.literal, ["Site:", "URL:", "Url:", "Website:"]) and containsAny(node.context.subscript, ["request['url']", "request['uri']", "request['site']", "payload['url']", "data['url']"]) and not (containsAny(node.context.selector, ["request.hostname", "request.host", "request.host_url", "self.request.hostname", "self.request.host"])) and not (containsAny(node.context.callPath, ["defang", "url_has_allowed_host_and_scheme", "is_safe_url", "same_origin", "allowed_host"]))

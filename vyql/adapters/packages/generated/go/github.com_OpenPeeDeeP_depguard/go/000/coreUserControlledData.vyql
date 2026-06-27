@@ -1,4 +1,4 @@
-module bindings.go.migration.m2b4e8d98;
+module bindings.go.generated.m2b4e8d98;
 
 binding userControlledData0 {
   requires {

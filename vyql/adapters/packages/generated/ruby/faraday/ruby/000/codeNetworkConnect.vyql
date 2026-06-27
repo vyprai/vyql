@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mdb706b1a;
+module bindings.ruby.generated.mdb706b1a;
 
 binding networkConnect0 {
   requires {

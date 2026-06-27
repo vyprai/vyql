@@ -1,4 +1,4 @@
-module bindings.python.migration.me505bad2;
+module bindings.python.generated.me505bad2;
 
 binding httpInput0 {
   requires {

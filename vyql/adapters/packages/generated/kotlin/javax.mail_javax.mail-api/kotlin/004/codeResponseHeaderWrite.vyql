@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.maf65a911;
+module bindings.kotlin.generated.maf65a911;
 
 binding responseHeaderWrite4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m4b71d183;
+module bindings.ruby.generated.m4b71d183;
 
 binding redirectTarget0 {
   requires {

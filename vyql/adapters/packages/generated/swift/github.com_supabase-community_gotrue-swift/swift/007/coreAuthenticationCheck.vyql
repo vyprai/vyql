@@ -1,4 +1,4 @@
-module bindings.swift.migration.m6e17abe9;
+module bindings.swift.generated.m6e17abe9;
 
 binding authenticationCheck7 {
   requires {

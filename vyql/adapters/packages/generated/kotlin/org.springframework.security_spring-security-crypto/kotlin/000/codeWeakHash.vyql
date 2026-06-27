@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m4a710fb5;
+module bindings.kotlin.generated.m4a710fb5;
 
 binding weakHash0 {
   requires {

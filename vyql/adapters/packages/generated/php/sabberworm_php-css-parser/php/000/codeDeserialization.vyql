@@ -1,4 +1,4 @@
-module bindings.php.migration.mbcac32cf;
+module bindings.php.generated.mbcac32cf;
 
 binding deserialization0 {
   requires {

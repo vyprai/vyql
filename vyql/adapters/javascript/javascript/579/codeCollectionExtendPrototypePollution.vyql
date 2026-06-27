@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding collectionExtendPrototypePollution579 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "Collection.prototype.extend" and node.token contains "forEach((el,key)=>" and node.token contains "byLink" and node.token contains "setVal(data,key,val)" and not (node.token contains "key==='__proto__'")

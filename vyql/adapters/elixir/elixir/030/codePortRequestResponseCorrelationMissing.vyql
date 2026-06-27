@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m728b8a72;
+module bindings.elixir.generated.m728b8a72;
 
 binding portRequestResponseCorrelationMissing30 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "elixir" and node.context.callPath contains "Port.command" and node.context.callPath contains "Jason.encode!" and node.context.callPath contains "get_response" and not (node.token contains "uid_counter") and not (node.token contains "expected_uid") and not (node.token contains "extract_uid")

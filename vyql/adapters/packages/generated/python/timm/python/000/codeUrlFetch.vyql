@@ -1,4 +1,4 @@
-module bindings.python.migration.m205c7f09;
+module bindings.python.generated.m205c7f09;
 
 binding urlFetch0 {
   requires {

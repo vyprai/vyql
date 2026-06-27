@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mf960e945;
+module bindings.ruby.generated.mf960e945;
 
 binding inputValidation2 {
   requires {

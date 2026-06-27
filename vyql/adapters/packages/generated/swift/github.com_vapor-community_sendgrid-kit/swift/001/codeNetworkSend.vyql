@@ -1,4 +1,4 @@
-module bindings.swift.migration.m8d7a68d4;
+module bindings.swift.generated.m8d7a68d4;
 
 binding networkSend1 {
   requires {

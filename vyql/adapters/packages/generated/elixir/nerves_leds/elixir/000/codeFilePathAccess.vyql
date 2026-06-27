@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mdb3264a9;
+module bindings.elixir.generated.mdb3264a9;
 
 binding filePathAccess0 {
   requires {

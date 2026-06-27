@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mea10675c;
+module bindings.elixir.generated.mea10675c;
 
 binding networkConnect3 {
   requires {

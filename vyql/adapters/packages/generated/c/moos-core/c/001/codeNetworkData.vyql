@@ -1,4 +1,4 @@
-module bindings.c.migration.m734b81f3;
+module bindings.c.generated.m734b81f3;
 
 binding networkData1 {
   requires {

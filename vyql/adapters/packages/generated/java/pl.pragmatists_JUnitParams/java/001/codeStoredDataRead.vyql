@@ -1,4 +1,4 @@
-module bindings.java.migration.me23b1e66;
+module bindings.java.generated.me23b1e66;
 
 binding storedDataRead1 {
   requires {

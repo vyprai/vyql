@@ -1,4 +1,4 @@
-module bindings.java.migration.mee6535e0;
+module bindings.java.generated.mee6535e0;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc105f924;
+module bindings.elixir.generated.mc105f924;
 
 binding commandExecution0 {
   requires {

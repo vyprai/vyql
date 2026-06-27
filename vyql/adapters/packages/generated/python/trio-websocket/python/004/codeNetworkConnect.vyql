@@ -1,4 +1,4 @@
-module bindings.python.migration.m240fa5ae;
+module bindings.python.generated.m240fa5ae;
 
 binding networkConnect4 {
   requires {

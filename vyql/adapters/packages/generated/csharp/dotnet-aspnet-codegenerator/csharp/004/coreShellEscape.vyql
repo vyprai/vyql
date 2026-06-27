@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m5333e552;
+module bindings.csharp.generated.m5333e552;
 
 binding shellEscape4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.m3ac2633c;
+module bindings.c.generated.m3ac2633c;
 
 binding weakRandomValue0 {
   requires {

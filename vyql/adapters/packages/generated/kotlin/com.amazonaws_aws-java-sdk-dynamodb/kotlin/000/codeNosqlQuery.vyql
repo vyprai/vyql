@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m8b6a47ac;
+module bindings.kotlin.generated.m8b6a47ac;
 
 binding nosqlQuery0 {
   requires {

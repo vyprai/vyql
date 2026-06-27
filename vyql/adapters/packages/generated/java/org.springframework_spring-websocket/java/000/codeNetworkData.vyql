@@ -1,4 +1,4 @@
-module bindings.java.migration.m12b4af15;
+module bindings.java.generated.m12b4af15;
 
 binding networkData0 {
   requires {

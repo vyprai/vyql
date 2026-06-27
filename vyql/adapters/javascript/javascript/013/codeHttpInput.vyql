@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding httpInput13 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_lambda_param" and args.any.context.callPath contains "ipcMain" and args.any.context.callMethod contains "handle" and not args.any.context.paramIndex contains "0"

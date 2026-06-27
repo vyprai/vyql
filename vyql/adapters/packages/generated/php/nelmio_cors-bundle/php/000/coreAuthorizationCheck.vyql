@@ -1,4 +1,4 @@
-module bindings.php.migration.m7568bed9;
+module bindings.php.generated.m7568bed9;
 
 binding authorizationCheck0 {
   requires {

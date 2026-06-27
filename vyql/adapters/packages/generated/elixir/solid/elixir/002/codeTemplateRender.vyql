@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m5c3d006c;
+module bindings.elixir.generated.m5c3d006c;
 
 binding templateRender2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m96bbc96e;
+module bindings.ruby.generated.m96bbc96e;
 
 binding authenticationCheck1 {
   requires {

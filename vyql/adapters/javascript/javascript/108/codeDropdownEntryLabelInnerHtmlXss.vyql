@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding dropdownEntryLabelInnerHtmlXss108 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "addDropDownEntry" and node.context.selector contains "li.innerHTML" and node.context.literal contains "dropdown-item" and node.context.identifier contains "label" and not (node.context.callArg contains "sanitizeHTML:label") and not (node.context.selector contains "textContent")

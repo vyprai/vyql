@@ -1,4 +1,4 @@
-module bindings.java.migration.m4a156c89;
+module bindings.java.generated.m4a156c89;
 
 binding networkSend3 {
   requires {

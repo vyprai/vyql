@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m32f513a3;
+module bindings.cpp.generated.m32f513a3;
 
 binding weakHash0 {
   requires {

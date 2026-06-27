@@ -1,4 +1,4 @@
-module bindings.c.migration.mc5f1cd3a;
+module bindings.c.generated.mc5f1cd3a;
 
 binding networkData0 {
   requires {

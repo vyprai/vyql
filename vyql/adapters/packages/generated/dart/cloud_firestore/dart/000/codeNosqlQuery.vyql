@@ -1,4 +1,4 @@
-module bindings.dart.migration.mdb6a0506;
+module bindings.dart.generated.mdb6a0506;
 
 binding nosqlQuery0 {
   requires {

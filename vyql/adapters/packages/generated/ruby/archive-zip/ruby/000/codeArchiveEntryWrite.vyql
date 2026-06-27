@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m9af36424;
+module bindings.ruby.generated.m9af36424;
 
 binding archiveEntryWrite0 {
   requires {

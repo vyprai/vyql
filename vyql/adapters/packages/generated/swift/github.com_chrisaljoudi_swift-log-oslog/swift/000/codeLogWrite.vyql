@@ -1,4 +1,4 @@
-module bindings.swift.migration.m72f5ed2f;
+module bindings.swift.generated.m72f5ed2f;
 
 binding logWrite0 {
   requires {

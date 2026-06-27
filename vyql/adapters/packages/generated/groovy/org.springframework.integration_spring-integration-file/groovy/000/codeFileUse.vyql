@@ -1,4 +1,4 @@
-module bindings.groovy.migration.me871342f;
+module bindings.groovy.generated.me871342f;
 
 binding fileUse0 {
   requires {

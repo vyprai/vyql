@@ -1,4 +1,4 @@
-module bindings.rust.migration.m5da00152;
+module bindings.rust.generated.m5da00152;
 
 binding networkConnect3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m6f7d8776;
+module bindings.go.generated.m6f7d8776;
 
 binding deserialization2 {
   requires {

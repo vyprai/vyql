@@ -1,4 +1,4 @@
-module bindings.dart.migration.m1ef8df3a;
+module bindings.dart.generated.m1ef8df3a;
 
 binding redirectTarget0 {
   requires {

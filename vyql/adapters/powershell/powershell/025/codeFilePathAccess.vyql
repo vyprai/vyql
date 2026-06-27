@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m390f1180;
+module bindings.powershell.generated.m390f1180;
 
 binding filePathAccess25 {
   query pattern callExpr where callee.path ~= "Get-Content"

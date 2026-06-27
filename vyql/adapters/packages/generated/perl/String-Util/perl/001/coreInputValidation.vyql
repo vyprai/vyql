@@ -1,4 +1,4 @@
-module bindings.perl.migration.m64082567;
+module bindings.perl.generated.m64082567;
 
 binding inputValidation1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.med0ad15e;
+module bindings.javascript.generated.med0ad15e;
 
 binding commandExecution0 {
   requires {

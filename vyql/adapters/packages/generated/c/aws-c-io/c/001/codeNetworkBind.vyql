@@ -1,4 +1,4 @@
-module bindings.c.migration.m56be988b;
+module bindings.c.generated.m56be988b;
 
 binding networkBind1 {
   requires {

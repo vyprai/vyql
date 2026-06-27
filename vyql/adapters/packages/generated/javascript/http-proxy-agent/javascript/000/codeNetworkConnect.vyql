@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mcd855a78;
+module bindings.javascript.generated.mcd855a78;
 
 binding networkConnect0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m15b7d022;
+module bindings.javascript.generated.m15b7d022;
 
 binding weakHash0 {
   requires {

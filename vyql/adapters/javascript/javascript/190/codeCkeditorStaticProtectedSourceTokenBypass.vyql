@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding ckeditorStaticProtectedSourceTokenBypass190 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "protectSource" and node.token contains "protectedHtml" and node.token contains "cke_tempcomment" and node.token contains "/cke_temp(comment)?/" and node.token contains "'<!--{cke_temp}'" and not (node.token contains "randomNumber") and not (node.token contains "cke_temp_")

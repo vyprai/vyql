@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m718f063b;
+module bindings.kotlin.generated.m718f063b;
 
 binding deserialization0 {
   requires {

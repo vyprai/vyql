@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding remoteUrlObjectDebugLog395 {
   query pattern presenceNode where node.kind == "call" and node.path ~= "logger.debug" and operand(node, where: containsAny(operand.identifier, [url, uri]))

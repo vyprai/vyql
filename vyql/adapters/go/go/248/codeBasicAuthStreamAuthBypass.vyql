@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding basicAuthStreamAuthBypass248 {
   query pattern presenceNode where node.kind == "any" and node.path == "Options" and node.token contains "BasicAuthEnabled" and node.token contains "Creds" and not (node.token contains "AuthRequired")

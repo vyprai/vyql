@@ -1,4 +1,4 @@
-module bindings.php.migration.maf3e46de;
+module bindings.php.generated.maf3e46de;
 
 binding redirectTarget0 {
   requires {

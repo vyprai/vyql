@@ -1,4 +1,4 @@
-module bindings.objc.migration.m3f1906eb;
+module bindings.objc.generated.m3f1906eb;
 
 binding inputValidation1 {
   requires {

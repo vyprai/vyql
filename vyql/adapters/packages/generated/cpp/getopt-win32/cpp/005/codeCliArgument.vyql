@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mcd3ba3ee;
+module bindings.cpp.generated.mcd3ba3ee;
 
 binding cliArgument5 {
   requires {

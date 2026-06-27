@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mcf6401d7;
+module bindings.csharp.generated.mcf6401d7;
 
 binding inputValidation0 {
   requires {

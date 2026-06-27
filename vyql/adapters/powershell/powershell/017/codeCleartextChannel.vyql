@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m390f1180;
+module bindings.powershell.generated.m390f1180;
 
 binding cleartextChannel17 {
   query pattern callExpr where callee.path ~= "Invoke-RestMethod" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

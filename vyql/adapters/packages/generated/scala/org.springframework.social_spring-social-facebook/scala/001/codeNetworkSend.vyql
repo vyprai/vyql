@@ -1,4 +1,4 @@
-module bindings.scala.migration.mdacb1de9;
+module bindings.scala.generated.mdacb1de9;
 
 binding networkSend1 {
   requires {

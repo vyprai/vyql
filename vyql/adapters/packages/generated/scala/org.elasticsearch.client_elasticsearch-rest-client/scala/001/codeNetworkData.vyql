@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7bbad49d;
+module bindings.scala.generated.m7bbad49d;
 
 binding networkData1 {
   requires {

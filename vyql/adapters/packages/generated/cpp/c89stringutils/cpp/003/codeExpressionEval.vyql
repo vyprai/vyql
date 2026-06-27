@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mc096a7db;
+module bindings.cpp.generated.mc096a7db;
 
 binding expressionEval3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m7bd5016b;
+module bindings.elixir.generated.m7bd5016b;
 
 binding certificateValidation0 {
   requires {

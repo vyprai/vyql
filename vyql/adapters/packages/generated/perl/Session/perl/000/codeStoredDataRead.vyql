@@ -1,4 +1,4 @@
-module bindings.perl.migration.m935fdd23;
+module bindings.perl.generated.m935fdd23;
 
 binding storedDataRead0 {
   requires {

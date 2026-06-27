@@ -1,4 +1,4 @@
-module bindings.cpp.migration.maeb7633b;
+module bindings.cpp.generated.maeb7633b;
 
 binding cliArgument0 {
   requires {

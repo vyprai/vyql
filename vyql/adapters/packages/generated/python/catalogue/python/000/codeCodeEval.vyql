@@ -1,4 +1,4 @@
-module bindings.python.migration.mf26f2d09;
+module bindings.python.generated.mf26f2d09;
 
 binding codeEval0 {
   requires {

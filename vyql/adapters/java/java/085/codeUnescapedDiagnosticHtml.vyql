@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding unescapedDiagnosticHtml85 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "IOUtils.toString" and node.context.literal contains "text/html" and node.context.callPath contains "Fault" and not (node.context.callPath contains "MessageUtils.isRequestor") and not (node.context.callPath contains "StringEscapeUtils.escapeHtml") and not (node.context.callPath contains "HtmlUtils.htmlEscape")

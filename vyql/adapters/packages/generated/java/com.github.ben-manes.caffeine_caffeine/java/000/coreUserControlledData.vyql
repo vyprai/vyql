@@ -1,4 +1,4 @@
-module bindings.java.migration.m9c9bf51b;
+module bindings.java.generated.m9c9bf51b;
 
 binding userControlledData0 {
   requires {

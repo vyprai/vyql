@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding csrfProtection424 {
   query pattern callExpr where callee.path ~= "check_csrf_token"

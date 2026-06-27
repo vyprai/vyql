@@ -1,4 +1,4 @@
-module bindings.perl.migration.m1f45aed0;
+module bindings.perl.generated.m1f45aed0;
 
 binding databaseRead3 {
   requires {

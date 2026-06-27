@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding stateChangingOp349 {
   query pattern callExpr where callee.method == "updatePassword"

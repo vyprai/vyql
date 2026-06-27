@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m4b4a65da;
+module bindings.groovy.generated.m4b4a65da;
 
 binding stdinInput1 {
   requires {

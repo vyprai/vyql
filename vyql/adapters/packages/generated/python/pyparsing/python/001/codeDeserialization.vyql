@@ -1,4 +1,4 @@
-module bindings.python.migration.mdac15921;
+module bindings.python.generated.mdac15921;
 
 binding deserialization1 {
   requires {

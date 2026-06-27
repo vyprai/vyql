@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding insecureCookie189 {
   query pattern callExpr where callee.path ~= "SetHttpOnly" and args.any.literal contains "false"

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding commandOptionInjection234 {
   query pattern callExpr where callee.path ~= "subprocess.Popen" and args.any.literal contains "self.args" and args.any.literal contains "tag.filename" and not args.any.literal contains "--"

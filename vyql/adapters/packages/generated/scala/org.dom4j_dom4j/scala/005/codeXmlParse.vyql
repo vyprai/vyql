@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06478325;
+module bindings.scala.generated.m06478325;
 
 binding xmlParse5 {
   requires {

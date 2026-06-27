@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding urlFetch81 {
   query pattern callExpr where callee.method == "URLWithString"

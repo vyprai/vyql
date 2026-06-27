@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m4e127658;
+module bindings.javascript.generated.m4e127658;
 
 binding networkSend1 {
   requires {

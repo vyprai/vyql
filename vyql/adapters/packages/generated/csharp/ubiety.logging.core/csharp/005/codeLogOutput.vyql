@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mba4a391f;
+module bindings.csharp.generated.mba4a391f;
 
 binding logOutput5 {
   requires {

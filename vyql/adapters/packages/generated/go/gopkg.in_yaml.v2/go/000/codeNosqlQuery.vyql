@@ -1,4 +1,4 @@
-module bindings.go.migration.m0fe3d655;
+module bindings.go.generated.m0fe3d655;
 
 binding nosqlQuery0 {
   requires {

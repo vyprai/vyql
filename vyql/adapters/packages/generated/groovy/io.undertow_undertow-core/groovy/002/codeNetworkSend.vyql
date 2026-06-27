@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m7cd5c635;
+module bindings.groovy.generated.m7cd5c635;
 
 binding networkSend2 {
   requires {

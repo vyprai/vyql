@@ -1,4 +1,4 @@
-module bindings.python.migration.mefc26b2f;
+module bindings.python.generated.mefc26b2f;
 
 binding deserialization1 {
   requires {

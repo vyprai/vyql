@@ -1,4 +1,4 @@
-module bindings.objc.migration.mb992950e;
+module bindings.objc.generated.mb992950e;
 
 binding userControlledData4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbad6caaf;
+module bindings.elixir.generated.mbad6caaf;
 
 binding deserialization1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.m61576ded;
+module bindings.perl.generated.m61576ded;
 
 binding privilegedOp0 {
   requires {

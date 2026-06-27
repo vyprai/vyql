@@ -1,4 +1,4 @@
-module bindings.javascript.migration.maaed3251;
+module bindings.javascript.generated.maaed3251;
 
 binding userControlledData0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5f5fcb35;
+module bindings.ruby.generated.m5f5fcb35;
 
 binding httpInput1 {
   requires {

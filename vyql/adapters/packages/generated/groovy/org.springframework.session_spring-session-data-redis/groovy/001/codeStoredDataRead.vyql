@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m05712b07;
+module bindings.groovy.generated.m05712b07;
 
 binding storedDataRead1 {
   requires {

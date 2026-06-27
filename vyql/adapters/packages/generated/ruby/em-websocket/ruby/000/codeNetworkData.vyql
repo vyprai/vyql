@@ -1,4 +1,4 @@
-module bindings.ruby.migration.ma3ae0f84;
+module bindings.ruby.generated.ma3ae0f84;
 
 binding networkData0 {
   requires {

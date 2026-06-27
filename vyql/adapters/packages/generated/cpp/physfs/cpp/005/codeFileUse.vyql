@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m35718952;
+module bindings.cpp.generated.m35718952;
 
 binding fileUse5 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding cobblerDjangoStateChangeGetCsrf615 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "generic_delete" and node.token contains "remote.remove_item" and not (node.context.decoratorPath contains "require_POST")

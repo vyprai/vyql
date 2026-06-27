@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding unboundedStateGrowthReview167 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "GetValidity" and node.token contains "GetValidity(node.ChildNodes[i])" and not (node.token contains "MaxValidationDepth")

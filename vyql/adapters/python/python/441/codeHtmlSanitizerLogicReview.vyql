@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding htmlSanitizerLogicReview441 {
   query pattern presenceNode where node.scope == "function" and node.token contains "class_bases=HTMLSerializer" and node.context.name contains "serialize" and not (node.token contains "escape_rcdata=True")

@@ -1,4 +1,4 @@
-module bindings.dart.migration.mf9a0b1bc;
+module bindings.dart.generated.mf9a0b1bc;
 
 binding weakRandomValue0 {
   requires {

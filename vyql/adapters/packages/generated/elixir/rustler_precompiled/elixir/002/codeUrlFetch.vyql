@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbfe07de5;
+module bindings.elixir.generated.mbfe07de5;
 
 binding urlFetch2 {
   requires {

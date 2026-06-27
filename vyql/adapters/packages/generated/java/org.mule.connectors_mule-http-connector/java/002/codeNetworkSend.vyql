@@ -1,4 +1,4 @@
-module bindings.java.migration.md5711d48;
+module bindings.java.generated.md5711d48;
 
 binding networkSend2 {
   requires {

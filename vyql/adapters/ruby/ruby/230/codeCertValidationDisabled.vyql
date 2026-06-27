@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding certValidationDisabled230 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.token contains "SSLContext.new" and node.token contains "ca_file" and not (node.token contains "verify_mode")

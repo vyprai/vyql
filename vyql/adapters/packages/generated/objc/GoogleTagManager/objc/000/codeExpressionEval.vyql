@@ -1,4 +1,4 @@
-module bindings.objc.migration.mdb99f906;
+module bindings.objc.generated.mdb99f906;
 
 binding expressionEval0 {
   requires {

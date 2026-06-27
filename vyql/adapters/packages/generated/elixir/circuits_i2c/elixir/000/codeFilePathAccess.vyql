@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbb4bffae;
+module bindings.elixir.generated.mbb4bffae;
 
 binding filePathAccess0 {
   requires {

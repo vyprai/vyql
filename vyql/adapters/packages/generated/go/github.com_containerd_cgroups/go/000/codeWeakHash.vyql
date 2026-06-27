@@ -1,4 +1,4 @@
-module bindings.go.migration.m22ff4284;
+module bindings.go.generated.m22ff4284;
 
 binding weakHash0 {
   requires {

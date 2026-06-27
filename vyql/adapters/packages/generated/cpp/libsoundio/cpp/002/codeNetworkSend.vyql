@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m26182671;
+module bindings.cpp.generated.m26182671;
 
 binding networkSend2 {
   requires {

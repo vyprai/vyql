@@ -1,4 +1,4 @@
-module bindings.scala.migration.m9343860d;
+module bindings.scala.generated.m9343860d;
 
 binding storedDataWrite0 {
   requires {

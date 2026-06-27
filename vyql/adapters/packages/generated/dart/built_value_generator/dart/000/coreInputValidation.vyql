@@ -1,4 +1,4 @@
-module bindings.dart.migration.m7fbb96c7;
+module bindings.dart.generated.m7fbb96c7;
 
 binding inputValidation0 {
   requires {

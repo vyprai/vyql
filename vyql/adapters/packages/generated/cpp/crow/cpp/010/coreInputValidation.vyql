@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m03268d36;
+module bindings.cpp.generated.m03268d36;
 
 binding inputValidation10 {
   requires {

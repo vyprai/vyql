@@ -1,4 +1,4 @@
-module bindings.c.migration.md601388a;
+module bindings.c.generated.md601388a;
 
 binding authenticationCheck3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m15c49333;
+module bindings.java.generated.m15c49333;
 
 binding inputValidation4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mc32ad952;
+module bindings.groovy.generated.mc32ad952;
 
 binding deserialization3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.mba7fb4c0;
+module bindings.python.generated.mba7fb4c0;
 
 binding sqlExecution1 {
   requires {

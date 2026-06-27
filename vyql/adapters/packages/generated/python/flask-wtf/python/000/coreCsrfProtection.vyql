@@ -1,4 +1,4 @@
-module bindings.python.migration.ma2b95db9;
+module bindings.python.generated.ma2b95db9;
 
 binding csrfProtection0 {
   requires {

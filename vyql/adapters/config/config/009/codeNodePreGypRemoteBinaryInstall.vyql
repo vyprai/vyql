@@ -1,4 +1,4 @@
-module bindings.config.migration.m2b6375a9;
+module bindings.config.generated.m2b6375a9;
 
 binding nodePreGypRemoteBinaryInstall9 {
   query pattern presenceNode where node.analysis ~= "config.npm.node_pre_gyp_remote_binary_install"

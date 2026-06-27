@@ -1,4 +1,4 @@
-module bindings.c.migration.m9c49fefa;
+module bindings.c.generated.m9c49fefa;
 
 binding weakRandomValue1 {
   requires {

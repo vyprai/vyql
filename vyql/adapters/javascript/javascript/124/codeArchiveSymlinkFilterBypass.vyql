@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding archiveSymlinkFilterBypass124 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "tar.extract" and node.token contains "ignore:isSymlink" and node.token contains "functionisSymlink(entry)" and node.token contains "entry.type==='SymbolicLink'" and not (node.token contains "functionisSymlink(_,entry)") and not (node.token contains "entry.type==='symlink'")

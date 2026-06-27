@@ -1,4 +1,4 @@
-module bindings.objc.migration.md5b71b24;
+module bindings.objc.generated.md5b71b24;
 
 binding certificateValidation1 {
   requires {

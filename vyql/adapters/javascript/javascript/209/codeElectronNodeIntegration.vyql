@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding electronNodeIntegration209 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "webPreferences" and node.token contains "nodeIntegration=true"

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mdec79204;
+module bindings.elixir.generated.mdec79204;
 
 binding xpathEscape0 {
   requires {

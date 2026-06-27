@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m802cb70c;
+module bindings.elixir.generated.m802cb70c;
 
 binding sqlExecution2 {
   requires {

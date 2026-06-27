@@ -1,4 +1,4 @@
-module bindings.python.migration.mbc0437ed;
+module bindings.python.generated.mbc0437ed;
 
 binding networkData5 {
   requires {

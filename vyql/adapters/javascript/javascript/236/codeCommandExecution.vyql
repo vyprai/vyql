@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandExecution236 {
   query pattern callExpr where callee.path ~= "execFile" and args.any.literal contains "shell" and args.any.literal contains "true"

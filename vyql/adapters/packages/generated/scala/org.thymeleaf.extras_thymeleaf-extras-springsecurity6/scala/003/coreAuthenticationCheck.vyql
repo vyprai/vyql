@@ -1,4 +1,4 @@
-module bindings.scala.migration.m120ceb6a;
+module bindings.scala.generated.m120ceb6a;
 
 binding authenticationCheck3 {
   requires {

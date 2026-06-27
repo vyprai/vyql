@@ -1,4 +1,4 @@
-module bindings.scala.migration.m2987ea5b;
+module bindings.scala.generated.m2987ea5b;
 
 binding logOutput0 {
   requires {

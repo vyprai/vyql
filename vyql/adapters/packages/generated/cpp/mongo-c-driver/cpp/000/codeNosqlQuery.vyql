@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mf50eb35c;
+module bindings.cpp.generated.mf50eb35c;
 
 binding nosqlQuery0 {
   requires {

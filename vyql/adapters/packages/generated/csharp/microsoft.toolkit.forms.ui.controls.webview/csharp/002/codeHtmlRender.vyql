@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m4e76e37d;
+module bindings.csharp.generated.m4e76e37d;
 
 binding htmlRender2 {
   requires {

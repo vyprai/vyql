@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m6f8a6e46;
+module bindings.groovy.generated.m6f8a6e46;
 
 binding htmlEscape4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mdf68fcd6;
+module bindings.groovy.generated.mdf68fcd6;
 
 binding userControlledData1 {
   requires {

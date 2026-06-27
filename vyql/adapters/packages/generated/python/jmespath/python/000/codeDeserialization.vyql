@@ -1,4 +1,4 @@
-module bindings.python.migration.meeba7410;
+module bindings.python.generated.meeba7410;
 
 binding deserialization0 {
   requires {

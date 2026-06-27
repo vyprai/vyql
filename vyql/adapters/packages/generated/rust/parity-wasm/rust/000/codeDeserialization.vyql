@@ -1,4 +1,4 @@
-module bindings.rust.migration.mf2835cae;
+module bindings.rust.generated.mf2835cae;
 
 binding deserialization0 {
   requires {

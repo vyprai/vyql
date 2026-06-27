@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m1d0d8b8d;
+module bindings.cpp.generated.m1d0d8b8d;
 
 binding cookie3 {
   requires {

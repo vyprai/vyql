@@ -1,4 +1,4 @@
-module bindings.java.migration.m970397bf;
+module bindings.java.generated.m970397bf;
 
 binding fileUse1 {
   requires {

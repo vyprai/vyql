@@ -1,4 +1,4 @@
-module bindings.objc.migration.mc6062c70;
+module bindings.objc.generated.mc6062c70;
 
 binding redirectTarget1 {
   requires {

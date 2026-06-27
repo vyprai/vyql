@@ -1,4 +1,4 @@
-module bindings.dart.migration.ma6b87b6b;
+module bindings.dart.generated.ma6b87b6b;
 
 binding htmlRender3 {
   requires {

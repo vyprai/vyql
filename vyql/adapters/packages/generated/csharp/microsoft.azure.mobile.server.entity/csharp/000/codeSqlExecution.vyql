@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mc2476898;
+module bindings.csharp.generated.mc2476898;
 
 binding sqlExecution0 {
   requires {

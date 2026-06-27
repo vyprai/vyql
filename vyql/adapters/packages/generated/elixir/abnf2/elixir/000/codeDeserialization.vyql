@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mac461e64;
+module bindings.elixir.generated.mac461e64;
 
 binding deserialization0 {
   requires {

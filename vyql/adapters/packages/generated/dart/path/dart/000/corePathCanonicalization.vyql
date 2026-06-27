@@ -1,4 +1,4 @@
-module bindings.dart.migration.m675a6a50;
+module bindings.dart.generated.m675a6a50;
 
 binding pathCanonicalization0 {
   requires {

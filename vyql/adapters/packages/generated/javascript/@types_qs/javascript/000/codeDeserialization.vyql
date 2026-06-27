@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mc60ce35f;
+module bindings.javascript.generated.mc60ce35f;
 
 binding deserialization0 {
   requires {

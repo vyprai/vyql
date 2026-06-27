@@ -1,4 +1,4 @@
-module bindings.go.migration.m210edfbc;
+module bindings.go.generated.m210edfbc;
 
 binding nosqlQuery0 {
   requires {

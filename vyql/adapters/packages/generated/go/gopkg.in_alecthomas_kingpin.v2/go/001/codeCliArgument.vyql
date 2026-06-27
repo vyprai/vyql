@@ -1,4 +1,4 @@
-module bindings.go.migration.m3c22f632;
+module bindings.go.generated.m3c22f632;
 
 binding cliArgument1 {
   requires {

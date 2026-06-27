@@ -1,4 +1,4 @@
-module bindings.php.migration.mddcc8a15;
+module bindings.php.generated.mddcc8a15;
 
 binding inputValidation0 {
   requires {

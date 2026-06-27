@@ -1,4 +1,4 @@
-module bindings.go.migration.m82a64db5;
+module bindings.go.generated.m82a64db5;
 
 binding deserialization0 {
   requires {

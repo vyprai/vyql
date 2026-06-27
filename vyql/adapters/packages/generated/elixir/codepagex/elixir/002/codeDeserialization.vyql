@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mabadd313;
+module bindings.elixir.generated.mabadd313;
 
 binding deserialization2 {
   requires {

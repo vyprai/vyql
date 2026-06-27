@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m8754e0db;
+module bindings.groovy.generated.m8754e0db;
 
 binding networkData1 {
   requires {

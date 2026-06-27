@@ -1,4 +1,4 @@
-module bindings.java.migration.mcf337d65;
+module bindings.java.generated.mcf337d65;
 
 binding filePathAccess5 {
   requires {

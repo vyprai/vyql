@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding databaseRead18 {
   query pattern callExpr where callee.method == "find_by"

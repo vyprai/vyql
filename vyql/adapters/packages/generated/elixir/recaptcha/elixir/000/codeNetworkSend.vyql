@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m07a2f162;
+module bindings.elixir.generated.m07a2f162;
 
 binding networkSend0 {
   requires {

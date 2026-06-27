@@ -1,4 +1,4 @@
-module bindings.python.migration.m38fd08c7;
+module bindings.python.generated.m38fd08c7;
 
 binding deserialization3 {
   requires {

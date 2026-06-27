@@ -1,4 +1,4 @@
-module bindings.php.migration.m7db2c217;
+module bindings.php.generated.m7db2c217;
 
 binding authenticationCheck0 {
   requires {

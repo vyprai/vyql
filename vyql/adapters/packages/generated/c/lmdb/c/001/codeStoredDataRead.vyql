@@ -1,4 +1,4 @@
-module bindings.c.migration.m89f98ea8;
+module bindings.c.generated.m89f98ea8;
 
 binding storedDataRead1 {
   requires {

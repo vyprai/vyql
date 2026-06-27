@@ -1,4 +1,4 @@
-module bindings.go.migration.m38e46b57;
+module bindings.go.generated.m38e46b57;
 
 binding networkSend0 {
   requires {

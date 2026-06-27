@@ -1,4 +1,4 @@
-module bindings.dart.migration.med754eaa;
+module bindings.dart.generated.med754eaa;
 
 binding httpInput8 {
   requires {

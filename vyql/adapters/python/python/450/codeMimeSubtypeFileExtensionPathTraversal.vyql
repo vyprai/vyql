@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding mimeSubtypeFileExtensionPathTraversal450 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "connect" and node.token contains "content_type.split('/',1)" and node.token contains "subtype" and node.token contains "self.ext='.'+subtype.replace('jpeg','jpg')" and not (node.token contains "mimetypes.guess_extension")

@@ -1,4 +1,4 @@
-module bindings.go.migration.m8d0f1389;
+module bindings.go.generated.m8d0f1389;
 
 binding pathCanonicalization0 {
   requires {

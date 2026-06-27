@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m77ba0d23;
+module bindings.elixir.generated.m77ba0d23;
 
 binding networkData0 {
   requires {

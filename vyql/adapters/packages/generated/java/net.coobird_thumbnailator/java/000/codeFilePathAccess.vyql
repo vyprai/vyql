@@ -1,4 +1,4 @@
-module bindings.java.migration.mdef4acda;
+module bindings.java.generated.mdef4acda;
 
 binding filePathAccess0 {
   requires {

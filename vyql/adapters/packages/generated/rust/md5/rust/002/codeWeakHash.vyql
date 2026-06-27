@@ -1,4 +1,4 @@
-module bindings.rust.migration.m820bc722;
+module bindings.rust.generated.m820bc722;
 
 binding weakHash2 {
   requires {

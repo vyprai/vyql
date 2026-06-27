@@ -1,4 +1,4 @@
-module bindings.dart.migration.me0c7bf86;
+module bindings.dart.generated.me0c7bf86;
 
 binding cliArgument1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m382d8800;
+module bindings.php.generated.m382d8800;
 
 binding sqlParameterization8 {
   requires {

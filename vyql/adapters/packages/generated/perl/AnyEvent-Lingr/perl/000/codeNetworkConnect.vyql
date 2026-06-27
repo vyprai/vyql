@@ -1,4 +1,4 @@
-module bindings.perl.migration.m0858f74e;
+module bindings.perl.generated.m0858f74e;
 
 binding networkConnect0 {
   requires {

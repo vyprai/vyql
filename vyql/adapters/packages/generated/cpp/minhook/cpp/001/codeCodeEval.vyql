@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mcdd63778;
+module bindings.cpp.generated.mcdd63778;
 
 binding codeEval1 {
   requires {

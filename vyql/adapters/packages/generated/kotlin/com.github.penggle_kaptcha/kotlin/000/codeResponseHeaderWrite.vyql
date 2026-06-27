@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m29726d38;
+module bindings.kotlin.generated.m29726d38;
 
 binding responseHeaderWrite0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m55495d35;
+module bindings.elixir.generated.m55495d35;
 
 binding deserialization1 {
   requires {

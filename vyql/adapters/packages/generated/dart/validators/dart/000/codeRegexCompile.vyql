@@ -1,4 +1,4 @@
-module bindings.dart.migration.m29b70590;
+module bindings.dart.generated.m29b70590;
 
 binding regexCompile0 {
   requires {

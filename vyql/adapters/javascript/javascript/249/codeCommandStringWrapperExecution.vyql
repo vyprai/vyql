@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandStringWrapperExecution249 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "writeConfigRemote" and node.context.callPath contains "execAsyncRemote" and node.context.identifier contains "traefikConfig" and node.context.identifier contains "configPath" and node.context.literal contains "echo" and not (node.context.callArg contains "encodeBase64:traefikConfig") and not (node.context.literal contains "base64 -d") and not (node.context.literal contains "shell-quote") and not (node.context.callPath contains "shellQuote.quote")

@@ -1,4 +1,4 @@
-module bindings.python.migration.m7cad1acc;
+module bindings.python.generated.m7cad1acc;
 
 binding cliArgument0 {
   requires {

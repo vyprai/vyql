@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m88f2378e;
+module bindings.kotlin.generated.m88f2378e;
 
 binding responseHeaderWrite4 {
   requires {

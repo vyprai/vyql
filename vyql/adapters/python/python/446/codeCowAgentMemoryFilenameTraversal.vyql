@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding cowAgentMemoryFilenameTraversal446 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "_resolve_path" and node.token contains "os.path.join(self.memory_dir,filename)" and node.token contains "os.path.join(self.workspace_root,filename)" and not (node.token contains "os.path.realpath") and not (node.token contains "startswith(allowed+os.sep)")

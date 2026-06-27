@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m986988d4;
+module bindings.cpp.generated.m986988d4;
 
 binding responseHeaderWrite0 {
   requires {

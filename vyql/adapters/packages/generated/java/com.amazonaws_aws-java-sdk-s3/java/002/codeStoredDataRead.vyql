@@ -1,4 +1,4 @@
-module bindings.java.migration.md4870d71;
+module bindings.java.generated.md4870d71;
 
 binding storedDataRead2 {
   requires {

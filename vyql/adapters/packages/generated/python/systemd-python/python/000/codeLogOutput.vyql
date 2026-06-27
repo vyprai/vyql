@@ -1,4 +1,4 @@
-module bindings.python.migration.me7353ec6;
+module bindings.python.generated.me7353ec6;
 
 binding logOutput0 {
   requires {

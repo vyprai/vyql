@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding cobblerDjangoStateChangeGetCsrf613 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "hardlink" and node.token contains "remote.background_hardlink" and not (node.context.decoratorPath contains "require_POST")

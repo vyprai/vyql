@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding httpInput10 {
   query pattern callExpr where callee.path ~= "$HTTP_POST_VARS"

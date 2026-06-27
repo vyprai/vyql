@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mfc9ceb84;
+module bindings.ruby.generated.mfc9ceb84;
 
 binding httpInput1 {
   requires {

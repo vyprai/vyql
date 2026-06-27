@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mac427ddf;
+module bindings.javascript.generated.mac427ddf;
 
 binding filePathAccess0 {
   requires {

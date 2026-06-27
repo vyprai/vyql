@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma10737f9;
+module bindings.elixir.generated.ma10737f9;
 
 binding htmlEscape3 {
   requires {

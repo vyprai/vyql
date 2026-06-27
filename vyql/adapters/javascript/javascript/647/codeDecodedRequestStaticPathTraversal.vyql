@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding decodedRequestStaticPathTraversal647 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.attrPath contains "config.staticFilePath" and node.context.callPath contains "decodeURIComponent" and node.context.callPath contains "utils.file.existsSync" and node.context.callPath contains "handleStaticFile" and not (node.context.callPath contains "indexOf") and not (node.context.callPath contains "startsWith") and not (node.context.callPath contains "path.relative")

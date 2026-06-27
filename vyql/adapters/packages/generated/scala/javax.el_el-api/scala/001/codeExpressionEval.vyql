@@ -1,4 +1,4 @@
-module bindings.scala.migration.m4e9a013c;
+module bindings.scala.generated.m4e9a013c;
 
 binding expressionEval1 {
   requires {

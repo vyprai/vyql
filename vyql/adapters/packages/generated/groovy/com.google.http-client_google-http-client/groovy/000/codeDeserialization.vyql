@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m0018ad73;
+module bindings.groovy.generated.m0018ad73;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mdf2230b1;
+module bindings.php.generated.mdf2230b1;
 
 binding networkSend0 {
   requires {

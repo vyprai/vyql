@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mac720eb8;
+module bindings.javascript.generated.mac720eb8;
 
 binding filePathAccess2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.swift.migration.m73c4a9ef;
+module bindings.swift.generated.m73c4a9ef;
 
 binding logOutput2 {
   requires {

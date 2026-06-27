@@ -1,4 +1,4 @@
-module bindings.java.migration.m0e15969b;
+module bindings.java.generated.m0e15969b;
 
 binding htmlRender0 {
   requires {

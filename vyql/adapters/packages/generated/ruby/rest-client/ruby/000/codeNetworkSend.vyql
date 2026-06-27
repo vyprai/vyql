@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mf641581a;
+module bindings.ruby.generated.mf641581a;
 
 binding networkSend0 {
   requires {

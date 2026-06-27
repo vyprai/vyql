@@ -1,4 +1,4 @@
-module bindings.elixir.migration.me6cbbaf4;
+module bindings.elixir.generated.me6cbbaf4;
 
 binding htmlEscape2 {
   requires {

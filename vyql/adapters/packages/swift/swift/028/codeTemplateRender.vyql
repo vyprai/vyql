@@ -1,4 +1,4 @@
-module bindings.swift.migration.mc6005d88;
+module bindings.swift.generated.mc6005d88;
 
 binding templateRender28 {
   requires {

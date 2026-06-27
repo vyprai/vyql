@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m6eabb149;
+module bindings.groovy.generated.m6eabb149;
 
 binding checksumErrorLogoutRedirect22 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "groovy" and node.token contains "checksumError" and node.token contains "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient)" and not (node.token contains "invalid(validationResponse.getKey(),validationResponse.getValue(),redirectClient,\"\",false)")

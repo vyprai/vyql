@@ -1,4 +1,4 @@
-module bindings.java.migration.md40ee1af;
+module bindings.java.generated.md40ee1af;
 
 binding networkData3 {
   requires {

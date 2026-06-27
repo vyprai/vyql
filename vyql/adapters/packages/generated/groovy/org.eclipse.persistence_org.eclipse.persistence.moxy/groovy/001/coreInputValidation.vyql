@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m70c83aba;
+module bindings.groovy.generated.m70c83aba;
 
 binding inputValidation1 {
   requires {

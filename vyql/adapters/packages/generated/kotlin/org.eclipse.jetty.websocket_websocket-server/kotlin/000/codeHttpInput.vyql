@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfcf318d7;
+module bindings.kotlin.generated.mfcf318d7;
 
 binding httpInput0 {
   requires {

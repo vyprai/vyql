@@ -1,4 +1,4 @@
-module bindings.python.migration.mf16a0cc3;
+module bindings.python.generated.mf16a0cc3;
 
 binding commandExecution4 {
   requires {

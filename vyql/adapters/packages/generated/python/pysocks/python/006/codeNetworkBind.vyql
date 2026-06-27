@@ -1,4 +1,4 @@
-module bindings.python.migration.me11298ae;
+module bindings.python.generated.me11298ae;
 
 binding networkBind6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m86aacb26;
+module bindings.ruby.generated.m86aacb26;
 
 binding xmlParse6 {
   requires {

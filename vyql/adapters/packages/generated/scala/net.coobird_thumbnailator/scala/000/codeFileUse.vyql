@@ -1,4 +1,4 @@
-module bindings.scala.migration.m561f6fba;
+module bindings.scala.generated.m561f6fba;
 
 binding fileUse0 {
   requires {

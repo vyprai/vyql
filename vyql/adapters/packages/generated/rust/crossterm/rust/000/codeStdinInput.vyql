@@ -1,4 +1,4 @@
-module bindings.rust.migration.m08f2517c;
+module bindings.rust.generated.m08f2517c;
 
 binding stdinInput0 {
   requires {

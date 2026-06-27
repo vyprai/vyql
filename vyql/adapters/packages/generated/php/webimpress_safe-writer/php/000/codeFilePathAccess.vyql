@@ -1,4 +1,4 @@
-module bindings.php.migration.mfa589cfb;
+module bindings.php.generated.mfa589cfb;
 
 binding filePathAccess0 {
   requires {

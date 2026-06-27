@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc1b20608;
+module bindings.elixir.generated.mc1b20608;
 
 binding filePathAccess0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding cryptoMissingOptimizationBarrier41 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "sub" and node.token contains "underflow_mask=((borrow>>63)^1).wrapping_sub(1)" and node.token contains "constants::L[i]&underflow_mask" and not (node.token contains "read_volatile") and not (node.token contains "black_box(underflow_mask)")

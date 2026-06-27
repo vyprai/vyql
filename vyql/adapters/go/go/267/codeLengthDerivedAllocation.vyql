@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding lengthDerivedAllocation267 {
   query pattern presenceNode where node.scope == "function" and node.context.selector contains "r.ContentLength" and node.context.call contains "make" and node.context.callPath contains "io.ReadFull" and not (node.context.callPath contains "io.LimitReader") and not (node.context.callPath contains "http.MaxBytesReader")

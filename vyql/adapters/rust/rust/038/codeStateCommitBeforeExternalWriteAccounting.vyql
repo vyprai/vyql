@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding stateCommitBeforeExternalWriteAccounting38 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "cleanup_for_create" and node.token contains "record_deposit(out.len())" and node.token contains "letexit_result=self.exit_substate(StackExitKind::Succeeded);ifletErr(e)=self.record_external_operation" and node.token contains "ExternalOperation::Write(U256::from(out.len()))" and node.token contains "self.state.set_code(address,out)"

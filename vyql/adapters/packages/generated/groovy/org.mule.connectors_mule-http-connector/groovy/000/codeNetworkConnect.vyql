@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m5fe6fdbe;
+module bindings.groovy.generated.m5fe6fdbe;
 
 binding networkConnect0 {
   requires {

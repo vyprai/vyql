@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m1caae882;
+module bindings.groovy.generated.m1caae882;
 
 binding htmlRender3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding stateMutationBeforeOperationPreconditions37 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "apply_smart_op_tx" and node.token contains "self.ensure_smart_account_at_round(&tx.from,current_round);" and node.token contains "self.debit(&tx.from,tx.fee)?;" and node.token contains "self.increment_nonce(&tx.from);" and node.token contains "SmartOpType::Stake{amount}=>{" and node.token contains "returnErr(CoinError::ValidationError(\"belowminimumstake\".into()))" and node.token contains "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?" and not (node.token contains "tx.fee.saturating_add(*amount)")

@@ -1,4 +1,4 @@
-module bindings.go.migration.m4c256cfd;
+module bindings.go.generated.m4c256cfd;
 
 binding filePathAccess1 {
   requires {

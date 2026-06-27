@@ -1,4 +1,4 @@
-module bindings.go.migration.ma1dcd30c;
+module bindings.go.generated.ma1dcd30c;
 
 binding sqlExecution1 {
   requires {

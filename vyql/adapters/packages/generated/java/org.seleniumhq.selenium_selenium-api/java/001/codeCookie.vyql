@@ -1,4 +1,4 @@
-module bindings.java.migration.m9309da93;
+module bindings.java.generated.m9309da93;
 
 binding cookie1 {
   requires {

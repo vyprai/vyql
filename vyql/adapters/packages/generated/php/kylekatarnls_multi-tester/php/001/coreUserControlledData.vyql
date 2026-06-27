@@ -1,4 +1,4 @@
-module bindings.php.migration.mf3409925;
+module bindings.php.generated.mf3409925;
 
 binding userControlledData1 {
   requires {

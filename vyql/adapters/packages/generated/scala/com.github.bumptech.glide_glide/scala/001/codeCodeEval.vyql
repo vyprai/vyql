@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7c794bbf;
+module bindings.scala.generated.m7c794bbf;
 
 binding codeEval1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding pythonDunderPathClassPollution261 {
   query pattern presenceNode where node.scope == "function" and node.token contains ".split(\".\")" and node.token contains "hasattr(" and node.token contains "getattr(" and node.token contains "setattr(" and node.token contains "property_name_part" and not (node.token contains "part.startswith") and not (node.token contains "part.endswith") and not (node.token contains ".startswith(\"__\")") and not (node.token contains ".endswith(\"__\")") and not (node.token contains ".startswith('__')") and not (node.token contains ".endswith('__')")

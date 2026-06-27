@@ -1,4 +1,4 @@
-module bindings.perl.migration.ma0389f7d;
+module bindings.perl.generated.ma0389f7d;
 
 binding deserialization0 {
   requires {

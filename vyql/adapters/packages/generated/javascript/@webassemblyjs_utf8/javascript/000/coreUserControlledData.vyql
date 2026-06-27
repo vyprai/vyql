@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbad3401a;
+module bindings.javascript.generated.mbad3401a;
 
 binding userControlledData0 {
   requires {

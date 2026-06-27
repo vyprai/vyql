@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m6665dbcb;
+module bindings.ruby.generated.m6665dbcb;
 
 binding networkData0 {
   requires {

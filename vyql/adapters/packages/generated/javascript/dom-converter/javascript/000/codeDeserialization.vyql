@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mdab3cbca;
+module bindings.javascript.generated.mdab3cbca;
 
 binding deserialization0 {
   requires {

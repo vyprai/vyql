@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mb80e1451;
+module bindings.groovy.generated.mb80e1451;
 
 binding nosqlQuery2 {
   requires {

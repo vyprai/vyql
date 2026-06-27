@@ -1,4 +1,4 @@
-module bindings.php.migration.med01f18a;
+module bindings.php.generated.med01f18a;
 
 binding httpInput5 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m27183c4e;
+module bindings.go.generated.m27183c4e;
 
 binding stdinInput0 {
   requires {

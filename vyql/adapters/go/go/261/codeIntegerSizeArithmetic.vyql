@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding integerSizeArithmetic261 {
   query pattern presenceNode where node.scope == "function" and node.context.call contains "SkipNBytes" and node.context.call contains "int" and not (node.context.scopeCall contains "SkipNBytesInt64") and not (node.context.functionName contains "SkipNBytesInt64")

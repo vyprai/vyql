@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding protocolStateReview78 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "Record_Type::ApplicationData" and node.token contains "callbacks().tls_record_received" and not (node.token contains "can_decrypt_application_traffic")

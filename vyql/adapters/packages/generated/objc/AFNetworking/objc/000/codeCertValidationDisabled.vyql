@@ -1,4 +1,4 @@
-module bindings.objc.migration.mfa27ee45;
+module bindings.objc.generated.mfa27ee45;
 
 binding certValidationDisabled0 {
   requires {

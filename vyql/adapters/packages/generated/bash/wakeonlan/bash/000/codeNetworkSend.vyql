@@ -1,4 +1,4 @@
-module bindings.bash.migration.m1eb7ce1a;
+module bindings.bash.generated.m1eb7ce1a;
 
 binding networkSend0 {
   requires {

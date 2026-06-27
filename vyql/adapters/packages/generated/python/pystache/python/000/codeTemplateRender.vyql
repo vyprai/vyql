@@ -1,4 +1,4 @@
-module bindings.python.migration.m438e571f;
+module bindings.python.generated.m438e571f;
 
 binding templateRender0 {
   requires {

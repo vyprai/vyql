@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mba778d10;
+module bindings.csharp.generated.mba778d10;
 
 binding inputValidation0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.mddb29b43;
+module bindings.java.generated.mddb29b43;
 
 binding userControlledData7 {
   requires {

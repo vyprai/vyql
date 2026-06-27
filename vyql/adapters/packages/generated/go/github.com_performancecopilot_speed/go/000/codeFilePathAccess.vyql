@@ -1,4 +1,4 @@
-module bindings.go.migration.m994ad20f;
+module bindings.go.generated.m994ad20f;
 
 binding filePathAccess0 {
   requires {

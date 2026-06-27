@@ -1,4 +1,4 @@
-module bindings.python.migration.m8d225ccd;
+module bindings.python.generated.m8d225ccd;
 
 binding httpInput0 {
   requires {

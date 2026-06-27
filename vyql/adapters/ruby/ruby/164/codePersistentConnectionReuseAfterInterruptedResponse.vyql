@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding persistentConnectionReuseAfterInterruptedResponse164 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.name contains "request" and node.token contains "datum=response(datum)" and node.token contains "datum[:persistent]" and node.token contains "reset" and not (node.token contains "@persistent_socket_reusable")

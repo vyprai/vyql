@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding authenticatedDecryptionTagReview409 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "openssl_decrypt" and node.token contains "VAL_CRYPTO_ALGO" and node.token contains "base64_decode" and node.token contains "['tag']" and not (node.token contains "strlen($tag)")

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding insecurePermission130 {
   query pattern callExpr where callee.method == "mode" and args.any.literal contains "0o777"

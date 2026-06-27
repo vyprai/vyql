@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m2d34304f;
+module bindings.kotlin.generated.m2d34304f;
 
 binding networkSend21 {
   requires {

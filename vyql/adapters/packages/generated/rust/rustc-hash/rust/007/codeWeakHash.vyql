@@ -1,4 +1,4 @@
-module bindings.rust.migration.mac101614;
+module bindings.rust.generated.mac101614;
 
 binding weakHash7 {
   requires {

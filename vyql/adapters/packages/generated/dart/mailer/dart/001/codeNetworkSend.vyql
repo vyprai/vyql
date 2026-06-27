@@ -1,4 +1,4 @@
-module bindings.dart.migration.me672db61;
+module bindings.dart.generated.me672db61;
 
 binding networkSend1 {
   requires {

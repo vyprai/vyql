@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mcfe0b1f9;
+module bindings.kotlin.generated.mcfe0b1f9;
 
 binding storedDataRead3 {
   requires {

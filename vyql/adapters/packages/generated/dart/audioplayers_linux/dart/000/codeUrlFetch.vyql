@@ -1,4 +1,4 @@
-module bindings.dart.migration.mdf0c12c2;
+module bindings.dart.generated.mdf0c12c2;
 
 binding urlFetch0 {
   requires {

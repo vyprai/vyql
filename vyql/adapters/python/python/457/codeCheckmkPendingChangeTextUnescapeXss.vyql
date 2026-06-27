@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding checkmkPendingChangeTextUnescapeXss457 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "get_all_data_required_for_activation_popout" and node.token contains "PendingChangeSummary(" and node.token contains "changeText=unescape(change[\"text\"])" and not (node.token contains "changeText=change[\"text\"]")

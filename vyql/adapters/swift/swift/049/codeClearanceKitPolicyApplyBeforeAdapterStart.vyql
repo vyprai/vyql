@@ -1,4 +1,4 @@
-module bindings.swift.migration.m388f23d0;
+module bindings.swift.generated.m388f23d0;
 
 binding clearanceKitPolicyApplyBeforeAdapterStart49 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.token contains "server.applyPolicyToFilter()server.applyAllowlistToFilter()server.applyJailRulesToFilter()" and node.token contains "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})" and not (node.token contains "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})server.applyPolicyToFilter()")

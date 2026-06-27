@@ -1,4 +1,4 @@
-module bindings.c.migration.m13ca74f7;
+module bindings.c.generated.m13ca74f7;
 
 binding xmlParse3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mc8fbe00f;
+module bindings.rust.generated.mc8fbe00f;
 
 binding inputValidation2 {
   requires {

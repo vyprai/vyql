@@ -1,4 +1,4 @@
-module bindings.php.migration.mede12f86;
+module bindings.php.generated.mede12f86;
 
 binding deserialization0 {
   requires {

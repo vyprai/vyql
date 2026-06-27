@@ -1,4 +1,4 @@
-module bindings.elixir.migration.medc51638;
+module bindings.elixir.generated.medc51638;
 
 binding commandExecution0 {
   requires {

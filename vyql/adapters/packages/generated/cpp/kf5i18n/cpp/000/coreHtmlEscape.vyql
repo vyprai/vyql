@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mea8c6765;
+module bindings.cpp.generated.mea8c6765;
 
 binding htmlEscape0 {
   requires {

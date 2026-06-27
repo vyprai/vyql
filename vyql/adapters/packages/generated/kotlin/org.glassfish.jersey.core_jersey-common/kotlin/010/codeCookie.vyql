@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m07b92913;
+module bindings.kotlin.generated.m07b92913;
 
 binding cookie10 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.mc8a5efdc;
+module bindings.objc.generated.mc8a5efdc;
 
 binding networkSend8 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unsignedStorageDownloadRoute51 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "Route.get" and node.context.callPath contains "Route.get.where" and node.context.callArg contains "Route.get.where:.*" and node.context.callPath contains "Storage.disk.path" and node.context.callPath contains "response.download" and node.context.callPath contains "response.download.deleteFileAfterSend" and containsAny(node.context.literal, ["{path}", "{file}", "{filename}"]) and not (node.context.callPath contains "Route.get.middleware") and not (containsAny(node.context.literal, ["signed", "auth", "can:"]))

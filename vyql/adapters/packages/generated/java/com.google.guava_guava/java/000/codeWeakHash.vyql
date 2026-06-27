@@ -1,4 +1,4 @@
-module bindings.java.migration.m465a50f5;
+module bindings.java.generated.m465a50f5;
 
 binding weakHash0 {
   requires {

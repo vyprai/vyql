@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m437ce122;
+module bindings.cpp.generated.m437ce122;
 
 binding archiveEntryWrite2 {
   requires {

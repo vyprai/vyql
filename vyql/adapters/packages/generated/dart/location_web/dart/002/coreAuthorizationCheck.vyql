@@ -1,4 +1,4 @@
-module bindings.dart.migration.mdd32c5df;
+module bindings.dart.generated.mdd32c5df;
 
 binding authorizationCheck2 {
   requires {

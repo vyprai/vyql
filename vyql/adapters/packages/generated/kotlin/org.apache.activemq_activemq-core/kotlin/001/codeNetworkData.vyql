@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m99702a2a;
+module bindings.kotlin.generated.m99702a2a;
 
 binding networkData1 {
   requires {

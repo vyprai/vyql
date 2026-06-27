@@ -1,4 +1,4 @@
-module bindings.java.migration.m0efc5269;
+module bindings.java.generated.m0efc5269;
 
 binding networkSend7 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding windowsBacktickDiffCommandInjection177 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.token contains "WINDOWS" and node.token contains "sprintf" and node.token contains "diff_options.join(' ')" and node.token contains "@paths.map" and node.token contains "cmd" and not (node.token contains "Open3.capture3") and not (node.token contains "Shellwords") and not (node.token contains "shellescape")

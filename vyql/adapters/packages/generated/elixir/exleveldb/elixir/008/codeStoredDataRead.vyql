@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m23562f2c;
+module bindings.elixir.generated.m23562f2c;
 
 binding storedDataRead8 {
   requires {

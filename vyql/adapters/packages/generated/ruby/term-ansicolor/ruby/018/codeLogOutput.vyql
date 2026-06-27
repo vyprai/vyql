@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mde62ae8b;
+module bindings.ruby.generated.mde62ae8b;
 
 binding logOutput18 {
   requires {

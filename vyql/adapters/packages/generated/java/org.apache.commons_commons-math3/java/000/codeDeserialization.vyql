@@ -1,4 +1,4 @@
-module bindings.java.migration.m21f300df;
+module bindings.java.generated.m21f300df;
 
 binding deserialization0 {
   requires {

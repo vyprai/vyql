@@ -1,4 +1,4 @@
-module bindings.swift.migration.mb7560a12;
+module bindings.swift.generated.mb7560a12;
 
 binding htmlEscape0 {
   requires {

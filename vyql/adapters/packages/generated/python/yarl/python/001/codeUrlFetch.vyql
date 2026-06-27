@@ -1,4 +1,4 @@
-module bindings.python.migration.meb479096;
+module bindings.python.generated.meb479096;
 
 binding urlFetch1 {
   requires {

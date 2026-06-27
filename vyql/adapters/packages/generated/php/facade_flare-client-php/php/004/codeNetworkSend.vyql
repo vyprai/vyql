@@ -1,4 +1,4 @@
-module bindings.php.migration.mca3f8814;
+module bindings.php.generated.mca3f8814;
 
 binding networkSend4 {
   requires {

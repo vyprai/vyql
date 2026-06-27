@@ -1,4 +1,4 @@
-module bindings.rust.migration.m448854f2;
+module bindings.rust.generated.m448854f2;
 
 binding templateRender1 {
   requires {

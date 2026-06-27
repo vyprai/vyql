@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mfa6a3e56;
+module bindings.ruby.generated.mfa6a3e56;
 
 binding commandExecution0 {
   requires {

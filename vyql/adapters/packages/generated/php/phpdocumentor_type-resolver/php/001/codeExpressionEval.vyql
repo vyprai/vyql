@@ -1,4 +1,4 @@
-module bindings.php.migration.mb80b1c34;
+module bindings.php.generated.mb80b1c34;
 
 binding expressionEval1 {
   requires {

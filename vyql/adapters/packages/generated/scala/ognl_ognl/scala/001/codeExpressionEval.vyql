@@ -1,4 +1,4 @@
-module bindings.scala.migration.meea5184f;
+module bindings.scala.generated.meea5184f;
 
 binding expressionEval1 {
   requires {

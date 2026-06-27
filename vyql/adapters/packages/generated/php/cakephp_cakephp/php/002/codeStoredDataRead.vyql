@@ -1,4 +1,4 @@
-module bindings.php.migration.m9daecf9b;
+module bindings.php.generated.m9daecf9b;
 
 binding storedDataRead2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m92038514;
+module bindings.java.generated.m92038514;
 
 binding redirectTarget10 {
   requires {

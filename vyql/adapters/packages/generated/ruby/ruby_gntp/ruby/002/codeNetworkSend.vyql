@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m4c232184;
+module bindings.ruby.generated.m4c232184;
 
 binding networkSend2 {
   requires {

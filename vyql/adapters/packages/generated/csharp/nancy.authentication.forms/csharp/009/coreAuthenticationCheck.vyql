@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mf90978f3;
+module bindings.csharp.generated.mf90978f3;
 
 binding authenticationCheck9 {
   requires {

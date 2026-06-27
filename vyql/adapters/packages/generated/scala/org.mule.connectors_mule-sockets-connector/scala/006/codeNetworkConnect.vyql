@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7e40519e;
+module bindings.scala.generated.m7e40519e;
 
 binding networkConnect6 {
   requires {

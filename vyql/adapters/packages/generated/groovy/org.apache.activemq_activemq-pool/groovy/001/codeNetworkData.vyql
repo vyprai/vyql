@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m7f9c2cb0;
+module bindings.groovy.generated.m7f9c2cb0;
 
 binding networkData1 {
   requires {

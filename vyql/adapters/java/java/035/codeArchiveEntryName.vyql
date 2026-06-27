@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding archiveEntryName35 {
   query pattern callExpr where callee.method == "getName" and callee.receiver.type == "ZipEntry"

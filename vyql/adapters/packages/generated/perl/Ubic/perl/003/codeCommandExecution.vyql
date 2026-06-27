@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfb3ee384;
+module bindings.perl.generated.mfb3ee384;
 
 binding commandExecution3 {
   requires {

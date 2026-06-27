@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m94ad0752;
+module bindings.kotlin.generated.m94ad0752;
 
 binding userControlledData7 {
   requires {

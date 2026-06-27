@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding coderAgentManifestInfoLog156 {
   query pattern presenceNode where node.kind == "any" and node.path == "a.logger.Info" and node.token contains "fetched manifest" and node.token contains "slog.F" and node.token contains "manifest"

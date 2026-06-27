@@ -1,4 +1,4 @@
-module bindings.swift.migration.m4f97ace3;
+module bindings.swift.generated.m4f97ace3;
 
 binding fileUpload0 {
   requires {

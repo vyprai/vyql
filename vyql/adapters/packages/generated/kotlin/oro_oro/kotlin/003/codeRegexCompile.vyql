@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma8d6c5d2;
+module bindings.kotlin.generated.ma8d6c5d2;
 
 binding regexCompile3 {
   requires {

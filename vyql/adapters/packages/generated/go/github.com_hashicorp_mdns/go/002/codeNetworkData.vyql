@@ -1,4 +1,4 @@
-module bindings.go.migration.m176f0037;
+module bindings.go.generated.m176f0037;
 
 binding networkData2 {
   requires {

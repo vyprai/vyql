@@ -1,4 +1,4 @@
-module bindings.scala.migration.mbb3face7;
+module bindings.scala.generated.mbb3face7;
 
 binding deserialization0 {
   requires {

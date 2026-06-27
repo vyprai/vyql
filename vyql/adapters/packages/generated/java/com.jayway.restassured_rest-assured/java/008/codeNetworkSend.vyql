@@ -1,4 +1,4 @@
-module bindings.java.migration.m676afa76;
+module bindings.java.generated.m676afa76;
 
 binding networkSend8 {
   requires {

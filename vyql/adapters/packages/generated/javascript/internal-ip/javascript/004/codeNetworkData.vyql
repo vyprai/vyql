@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfd3bf356;
+module bindings.javascript.generated.mfd3bf356;
 
 binding networkData4 {
   requires {

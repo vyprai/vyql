@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mdf85c1b6;
+module bindings.cpp.generated.mdf85c1b6;
 
 binding filePathAccess0 {
   requires {

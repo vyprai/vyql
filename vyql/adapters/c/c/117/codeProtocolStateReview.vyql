@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding protocolStateReview117 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "__of_unflatten_dtb" and node.token contains "FDT_BEGIN_NODE" and node.token contains "FDT_PROP" and node.token contains "is_reserved_name(pathp)" and node.token contains "is_reserved_name(name)" and node.token contains "of_new_node(node,pathp)" and node.token contains "of_new_property" and not (node.token contains "is_allowed_input_name") and not (node.token contains "strchr(name,'/')")

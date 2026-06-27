@@ -1,4 +1,4 @@
-module bindings.rust.migration.m4ae449f7;
+module bindings.rust.generated.m4ae449f7;
 
 binding httpInput0 {
   requires {

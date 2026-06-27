@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m5ac66786;
+module bindings.cpp.generated.m5ac66786;
 
 binding networkBind7 {
   requires {

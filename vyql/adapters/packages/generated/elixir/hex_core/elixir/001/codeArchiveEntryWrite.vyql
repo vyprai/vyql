@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mf4fc1a90;
+module bindings.elixir.generated.mf4fc1a90;
 
 binding archiveEntryWrite1 {
   requires {

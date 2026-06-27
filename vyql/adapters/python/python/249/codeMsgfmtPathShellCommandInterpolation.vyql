@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding msgfmtPathShellCommandInterpolation249 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "compile_messages" and node.token contains "os.walk(basedir)" and node.token contains "os.path.splitext(os.path.join" and node.token contains "msgfmt -o" and node.token contains "% (pf, pf)" and node.token contains "os.system(cmd)" and not (node.token contains "os.environ['djangocompilemo']") and not (node.token contains "os.environ['djangocompilepo']") and not (node.token contains "$djangocompilemo") and not (node.token contains "%djangocompilemo%")

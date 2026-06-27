@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m0d696c93;
+module bindings.kotlin.generated.m0d696c93;
 
 binding cliArgument0 {
   requires {

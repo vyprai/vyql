@@ -1,4 +1,4 @@
-module bindings.scala.migration.md8b105ec;
+module bindings.scala.generated.md8b105ec;
 
 binding networkSend3 {
   requires {

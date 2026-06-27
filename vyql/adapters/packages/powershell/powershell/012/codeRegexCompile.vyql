@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m92132a18;
+module bindings.powershell.generated.m92132a18;
 
 binding regexCompile12 {
   requires {

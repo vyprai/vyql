@@ -1,4 +1,4 @@
-module bindings.scala.migration.m9f6eff75;
+module bindings.scala.generated.m9f6eff75;
 
 binding commandExecution0 {
   requires {

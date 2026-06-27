@@ -1,4 +1,4 @@
-module bindings.java.migration.m2adc9342;
+module bindings.java.generated.m2adc9342;
 
 binding commandExecution0 {
   requires {

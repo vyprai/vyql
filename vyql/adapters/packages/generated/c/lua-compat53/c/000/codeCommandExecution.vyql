@@ -1,4 +1,4 @@
-module bindings.c.migration.m7dd3202a;
+module bindings.c.generated.m7dd3202a;
 
 binding commandExecution0 {
   requires {

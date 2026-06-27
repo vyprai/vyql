@@ -1,4 +1,4 @@
-module bindings.objc.migration.mca543c21;
+module bindings.objc.generated.mca543c21;
 
 binding storedDataRead3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mecdba9b5;
+module bindings.php.generated.mecdba9b5;
 
 binding authenticationCheck6 {
   requires {

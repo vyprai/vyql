@@ -1,4 +1,4 @@
-module bindings.go.migration.m5030e2b8;
+module bindings.go.generated.m5030e2b8;
 
 binding weakRandomValue0 {
   requires {

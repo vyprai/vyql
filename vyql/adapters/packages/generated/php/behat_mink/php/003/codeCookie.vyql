@@ -1,4 +1,4 @@
-module bindings.php.migration.m44f70df4;
+module bindings.php.generated.m44f70df4;
 
 binding cookie3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mb60d868c;
+module bindings.php.generated.mb60d868c;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding cleartextChannel451 {
   query pattern callExpr where callee.path ~= "curl_setopt" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

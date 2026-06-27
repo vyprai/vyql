@@ -1,4 +1,4 @@
-module bindings.java.migration.md4f900e2;
+module bindings.java.generated.md4f900e2;
 
 binding htmlEscape2 {
   requires {

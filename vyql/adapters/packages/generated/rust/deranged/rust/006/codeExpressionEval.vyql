@@ -1,4 +1,4 @@
-module bindings.rust.migration.mb3c377ba;
+module bindings.rust.generated.mb3c377ba;
 
 binding expressionEval6 {
   requires {

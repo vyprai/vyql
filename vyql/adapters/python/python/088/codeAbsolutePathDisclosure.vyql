@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding absolutePathDisclosure88 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "configure" and node.token contains "CASE_DEMO_NONRANDOM_UUID_BASE" and node.token contains "sys.argv[0]" and node.token contains "command_original_path.resolve()" and node.token contains "command_resolved_path.relative_to" and node.token contains "demo_uuid_base_parts.append(str(command_resolved_path))" and not (node.token contains "_is_relative_to(command_resolved_path,venv_resolved_path)") and not (node.token contains "demo_uuid_base_parts.append(str(command_original_path))")

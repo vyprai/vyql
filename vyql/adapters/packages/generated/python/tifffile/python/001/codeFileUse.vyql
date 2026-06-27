@@ -1,4 +1,4 @@
-module bindings.python.migration.m64b32cf9;
+module bindings.python.generated.m64b32cf9;
 
 binding fileUse1 {
   requires {

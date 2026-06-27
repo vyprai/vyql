@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m96ae3eb2;
+module bindings.kotlin.generated.m96ae3eb2;
 
 binding xmlParse0 {
   requires {

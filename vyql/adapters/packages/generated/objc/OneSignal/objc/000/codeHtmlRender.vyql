@@ -1,4 +1,4 @@
-module bindings.objc.migration.m8098c78a;
+module bindings.objc.generated.m8098c78a;
 
 binding htmlRender0 {
   requires {

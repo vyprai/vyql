@@ -1,4 +1,4 @@
-module bindings.java.migration.mfa63337f;
+module bindings.java.generated.mfa63337f;
 
 binding filePathAccess2 {
   requires {

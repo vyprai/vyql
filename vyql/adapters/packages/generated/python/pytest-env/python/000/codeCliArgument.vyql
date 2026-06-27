@@ -1,4 +1,4 @@
-module bindings.python.migration.m2854f6a1;
+module bindings.python.generated.m2854f6a1;
 
 binding cliArgument0 {
   requires {

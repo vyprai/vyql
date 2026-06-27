@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding sniffCsvExternalAccessBypass85 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.name contains "CSVSniffBind" and node.token contains "result->path=input.inputs[0].ToString();" and node.token contains "result->options.FromNamedParameters(input.named_parameters,context);" and not (node.token contains "enable_external_access")

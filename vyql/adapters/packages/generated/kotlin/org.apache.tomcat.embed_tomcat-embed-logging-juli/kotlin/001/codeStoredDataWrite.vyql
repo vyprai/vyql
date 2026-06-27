@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m9f81b7a8;
+module bindings.kotlin.generated.m9f81b7a8;
 
 binding storedDataWrite1 {
   requires {

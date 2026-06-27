@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m3720f5ba;
+module bindings.cpp.generated.m3720f5ba;
 
 binding codeEval0 {
   requires {

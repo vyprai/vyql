@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding domInput85 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_lambda_param" and args.any.context.callMethod contains "getJSON"

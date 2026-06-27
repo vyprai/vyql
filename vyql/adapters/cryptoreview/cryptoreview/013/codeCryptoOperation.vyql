@@ -1,4 +1,4 @@
-module bindings.cryptoreview.migration.m4f475b34;
+module bindings.cryptoreview.generated.m4f475b34;
 
 binding cryptoOperation13 {
   query pattern presenceNode where node.path ~= "KeyGenerator.getInstance"

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m304d1620;
+module bindings.kotlin.generated.m304d1620;
 
 binding authenticationRequiredOp38 {
   query pattern presenceNode where node.path ~= "changePassword"

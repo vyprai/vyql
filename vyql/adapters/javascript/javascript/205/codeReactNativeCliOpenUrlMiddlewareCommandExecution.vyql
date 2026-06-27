@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding reactNativeCliOpenUrlMiddlewareCommandExecution205 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "openURLMiddleware" and node.token contains "req.body" and node.token contains "awaitopen(url);" and not (node.token contains "newURL(url)") and not (node.token contains "parsedUrl.protocol")

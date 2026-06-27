@@ -1,4 +1,4 @@
-module bindings.scala.migration.m6557b527;
+module bindings.scala.generated.m6557b527;
 
 binding sqlExecution1 {
   requires {

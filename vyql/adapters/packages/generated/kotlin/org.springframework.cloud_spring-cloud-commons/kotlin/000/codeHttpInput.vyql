@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mc202cc7c;
+module bindings.kotlin.generated.mc202cc7c;
 
 binding httpInput0 {
   requires {

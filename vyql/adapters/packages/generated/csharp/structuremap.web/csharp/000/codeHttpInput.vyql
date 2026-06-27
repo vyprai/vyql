@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m819e6a4c;
+module bindings.csharp.generated.m819e6a4c;
 
 binding httpInput0 {
   requires {

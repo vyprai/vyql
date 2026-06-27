@@ -1,4 +1,4 @@
-module bindings.php.migration.maa180515;
+module bindings.php.generated.maa180515;
 
 binding networkSend3 {
   requires {

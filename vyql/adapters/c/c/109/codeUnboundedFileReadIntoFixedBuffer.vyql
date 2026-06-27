@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding unboundedFileReadIntoFixedBuffer109 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "chartemp[" and node.token contains "for(;;)" and node.token contains "temp[i]=fgetc(" and not (node.token contains "i>=") and not (node.token contains "realloc(")

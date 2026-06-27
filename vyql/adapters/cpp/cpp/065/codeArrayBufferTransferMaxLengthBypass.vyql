@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding arrayBufferTransferMaxLengthBypass65 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "newByteLength=argv[0].toIndex(state)" and node.token contains "maxLength=obj->maxByteLength()" and node.token contains "allocateArrayBuffer(state,state.context()->globalObject()->arrayBuffer(),newByteLength,maxLength)" and not (node.token contains "newByteLength>maxLength.value()") and not (node.token contains "throwTypeErrorIfDetached(state);Optional")

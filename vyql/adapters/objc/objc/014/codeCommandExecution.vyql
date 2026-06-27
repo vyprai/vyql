@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding commandExecution14 {
   query pattern callExpr where callee.path ~= "system"

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m41a18650;
+module bindings.javascript.generated.m41a18650;
 
 binding networkSend1 {
   requires {

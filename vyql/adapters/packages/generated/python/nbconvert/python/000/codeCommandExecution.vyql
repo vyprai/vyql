@@ -1,4 +1,4 @@
-module bindings.python.migration.mbad44e6b;
+module bindings.python.generated.mbad44e6b;
 
 binding commandExecution0 {
   requires {

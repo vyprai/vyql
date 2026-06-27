@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m877ef237;
+module bindings.cpp.generated.m877ef237;
 
 binding inputValidation1 {
   requires {

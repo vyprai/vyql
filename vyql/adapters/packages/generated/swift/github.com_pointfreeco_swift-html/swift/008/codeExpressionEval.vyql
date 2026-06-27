@@ -1,4 +1,4 @@
-module bindings.swift.migration.mceef4e68;
+module bindings.swift.generated.mceef4e68;
 
 binding expressionEval8 {
   requires {

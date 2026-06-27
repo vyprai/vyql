@@ -1,4 +1,4 @@
-module bindings.php.migration.m6dad44bc;
+module bindings.php.generated.m6dad44bc;
 
 binding csrfProtection0 {
   requires {

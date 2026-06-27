@@ -1,4 +1,4 @@
-module bindings.rust.migration.m897f6a26;
+module bindings.rust.generated.m897f6a26;
 
 binding expressionEval0 {
   requires {

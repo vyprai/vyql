@@ -1,4 +1,4 @@
-module bindings.java.migration.m86b063bc;
+module bindings.java.generated.m86b063bc;
 
 binding sqlParameterization1 {
   requires {

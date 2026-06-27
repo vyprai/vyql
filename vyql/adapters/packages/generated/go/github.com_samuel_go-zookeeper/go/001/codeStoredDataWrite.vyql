@@ -1,4 +1,4 @@
-module bindings.go.migration.m7d6b69dc;
+module bindings.go.generated.m7d6b69dc;
 
 binding storedDataWrite1 {
   requires {

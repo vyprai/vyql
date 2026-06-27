@@ -1,4 +1,4 @@
-module bindings.dart.migration.m60609d5f;
+module bindings.dart.generated.m60609d5f;
 
 binding weakHash0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.m35a2f451;
+module bindings.scala.generated.m35a2f451;
 
 binding userControlledData1 {
   requires {

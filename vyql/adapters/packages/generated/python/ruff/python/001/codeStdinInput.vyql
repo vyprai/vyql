@@ -1,4 +1,4 @@
-module bindings.python.migration.md6d022b9;
+module bindings.python.generated.md6d022b9;
 
 binding stdinInput1 {
   requires {

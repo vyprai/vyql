@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m6d1dbfdf;
+module bindings.ruby.generated.m6d1dbfdf;
 
 binding codeEval2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc0510dbf;
+module bindings.perl.generated.mc0510dbf;
 
 binding filePathAccess5 {
   requires {

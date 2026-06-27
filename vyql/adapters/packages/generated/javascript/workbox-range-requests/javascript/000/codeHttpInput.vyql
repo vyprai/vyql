@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbdeabaaa;
+module bindings.javascript.generated.mbdeabaaa;
 
 binding httpInput0 {
   requires {

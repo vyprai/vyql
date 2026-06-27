@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding weakCipher63 {
   query pattern presenceNode where node.path ~= "Crypt.DES"

@@ -1,4 +1,4 @@
-module bindings.python.migration.m4cad6409;
+module bindings.python.generated.m4cad6409;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.m1542b362;
+module bindings.c.generated.m1542b362;
 
 binding filePathAccess0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma81629d0;
+module bindings.kotlin.generated.ma81629d0;
 
 binding databaseRead1 {
   requires {

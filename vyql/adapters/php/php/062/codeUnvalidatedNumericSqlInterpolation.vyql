@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation62 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.subscript contains "$HTTP_GET_VARS['lid']" and node.context.callPath contains "$xoopsDB.query" and node.context.literal contains " where " and not (node.context.callArg contains "is_numeric:$lid")

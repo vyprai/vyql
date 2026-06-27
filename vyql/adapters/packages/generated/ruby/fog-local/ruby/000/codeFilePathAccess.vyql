@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbf5b106a;
+module bindings.ruby.generated.mbf5b106a;
 
 binding filePathAccess0 {
   requires {

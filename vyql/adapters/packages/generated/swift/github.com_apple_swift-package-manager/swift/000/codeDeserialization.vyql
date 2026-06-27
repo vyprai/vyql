@@ -1,4 +1,4 @@
-module bindings.swift.migration.meba4fcb5;
+module bindings.swift.generated.meba4fcb5;
 
 binding deserialization0 {
   requires {

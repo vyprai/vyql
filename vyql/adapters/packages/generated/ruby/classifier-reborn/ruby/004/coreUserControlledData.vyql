@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m18dedbda;
+module bindings.ruby.generated.m18dedbda;
 
 binding userControlledData4 {
   requires {

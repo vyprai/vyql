@@ -1,4 +1,4 @@
-module bindings.scala.migration.med41240a;
+module bindings.scala.generated.med41240a;
 
 binding httpInput1 {
   requires {

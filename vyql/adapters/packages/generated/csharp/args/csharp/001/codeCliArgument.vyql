@@ -1,4 +1,4 @@
-module bindings.csharp.migration.md76d1bac;
+module bindings.csharp.generated.md76d1bac;
 
 binding cliArgument1 {
   requires {

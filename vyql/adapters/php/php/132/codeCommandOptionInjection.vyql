@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding commandOptionInjection132 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "escapeshellarg($keyId)" and node.token contains "$operation='--utf8-strings--list-secret-keys'.escapeshellarg($keyId)" and not (node.token contains "$operation='--utf8-strings--list-secret-keys--'.escapeshellarg($keyId)")

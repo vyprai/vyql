@@ -1,4 +1,4 @@
-module bindings.swift.migration.m6e375a2a;
+module bindings.swift.generated.m6e375a2a;
 
 binding privilegedOp0 {
   requires {

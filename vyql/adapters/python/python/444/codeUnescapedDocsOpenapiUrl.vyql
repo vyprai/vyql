@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding unescapedDocsOpenapiUrl444 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "redoc_dashboard" and node.token contains "req.query_params.get(\"version\")" and node.token contains "openapi_url=root_path+f\"{self.openapi_url}?version={version}\"" and node.token contains "get_redoc_html" and not (node.token contains "quote(version,safe='')")

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc9bf9bf6;
+module bindings.elixir.generated.mc9bf9bf6;
 
 binding databaseRead7 {
   requires {

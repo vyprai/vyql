@@ -1,4 +1,4 @@
-module bindings.php.migration.mc8298519;
+module bindings.php.generated.mc8298519;
 
 binding htmlRender0 {
   requires {

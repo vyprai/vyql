@@ -1,4 +1,4 @@
-module bindings.rust.migration.m86000b79;
+module bindings.rust.generated.m86000b79;
 
 binding networkData12 {
   requires {

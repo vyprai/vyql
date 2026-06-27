@@ -1,4 +1,4 @@
-module bindings.scala.migration.m69c562ee;
+module bindings.scala.generated.m69c562ee;
 
 binding weakHash0 {
   requires {

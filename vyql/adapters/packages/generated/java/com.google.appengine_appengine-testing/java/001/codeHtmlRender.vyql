@@ -1,4 +1,4 @@
-module bindings.java.migration.ma8891afe;
+module bindings.java.generated.ma8891afe;
 
 binding htmlRender1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m8d992d37;
+module bindings.cpp.generated.m8d992d37;
 
 binding cliArgument1 {
   requires {

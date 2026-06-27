@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m058b6a47;
+module bindings.ruby.generated.m058b6a47;
 
 binding storedDataRead0 {
   requires {

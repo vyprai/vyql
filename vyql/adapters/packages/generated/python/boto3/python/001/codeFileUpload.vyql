@@ -1,4 +1,4 @@
-module bindings.python.migration.m45dd8f7b;
+module bindings.python.generated.m45dd8f7b;
 
 binding fileUpload1 {
   requires {

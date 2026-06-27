@@ -1,4 +1,4 @@
-module bindings.scala.migration.m11426ff4;
+module bindings.scala.generated.m11426ff4;
 
 binding codeEval1 {
   requires {

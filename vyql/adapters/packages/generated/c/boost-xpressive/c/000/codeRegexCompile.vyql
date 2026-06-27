@@ -1,4 +1,4 @@
-module bindings.c.migration.m310c8162;
+module bindings.c.generated.m310c8162;
 
 binding regexCompile0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.ma399f56c;
+module bindings.objc.generated.ma399f56c;
 
 binding authenticationCheck2 {
   requires {

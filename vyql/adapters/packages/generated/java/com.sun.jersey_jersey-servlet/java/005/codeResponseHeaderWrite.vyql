@@ -1,4 +1,4 @@
-module bindings.java.migration.mdfe57a12;
+module bindings.java.generated.mdfe57a12;
 
 binding responseHeaderWrite5 {
   requires {

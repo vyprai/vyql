@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding webhookUrlFetchMissingSsrfGuard168 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.name, ["callWebhook", "sendWebhook", "deliverWebhook", "postWebhook"]) and containsAny(node.context.callPath, ["axios.post", "axios.request", "request.post", "undici.fetch", "fetch"]) and containsAny(node.context.selector, ["webhookUrl.url", "webhook.url", "callbackUrl", "callback.url"]) and not (node.context.identifier contains "secureDispatcher") and not (containsAny(node.context.scopeCall, [safeFetch, fetchWithSsrfGuard, validateUrl, assertPublicUrl]))

@@ -1,4 +1,4 @@
-module bindings.powershell.migration.ma84ab135;
+module bindings.powershell.generated.ma84ab135;
 
 binding htmlEscape0 {
   requires {

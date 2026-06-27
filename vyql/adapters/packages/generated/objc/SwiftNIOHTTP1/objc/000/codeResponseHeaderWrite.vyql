@@ -1,4 +1,4 @@
-module bindings.objc.migration.mc70908b8;
+module bindings.objc.generated.mc70908b8;
 
 binding responseHeaderWrite0 {
   requires {

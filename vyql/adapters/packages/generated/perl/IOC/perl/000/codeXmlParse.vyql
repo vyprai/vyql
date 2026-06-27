@@ -1,4 +1,4 @@
-module bindings.perl.migration.m26a64718;
+module bindings.perl.generated.m26a64718;
 
 binding xmlParse0 {
   requires {

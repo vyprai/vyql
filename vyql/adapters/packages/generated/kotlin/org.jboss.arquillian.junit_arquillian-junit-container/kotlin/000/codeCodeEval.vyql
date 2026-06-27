@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.maefccb10;
+module bindings.kotlin.generated.maefccb10;
 
 binding codeEval0 {
   requires {

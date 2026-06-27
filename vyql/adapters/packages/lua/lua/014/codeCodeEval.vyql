@@ -1,4 +1,4 @@
-module bindings.lua.migration.m49b0a04f;
+module bindings.lua.generated.m49b0a04f;
 
 binding codeEval14 {
   requires {

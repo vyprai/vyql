@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbbb9062e;
+module bindings.ruby.generated.mbbb9062e;
 
 binding commandExecution2 {
   requires {

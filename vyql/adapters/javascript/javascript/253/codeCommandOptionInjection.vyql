@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandOptionInjection253 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["spawn", "crossSpawn", "child_process.spawn", "spawnSync"]) and node.token contains "git_clone_argv_missing_delimiter=true"

@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding callerControlledFilenameComponentPathTraversal234 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["buildFilename", "buildFileName", "makeFilename", "makeFileName"]) and node.context.identifier contains "appName" and node.context.identifier contains "appVersion" and containsAny(node.context.identifier, ["filename", "fileName"]) and not (containsAny(node.context.callPath, ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]))

@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding uncheckedPythonCapiHashError102 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "CBORTag_hash" and node.token contains "PyObject_Hash(tmp)" and node.token contains "PySet_Discard(running_hashes,self_id)" and node.token contains "PySequence_Length(running_hashes)" and not (node.token contains "ret==-1")

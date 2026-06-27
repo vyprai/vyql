@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m543c1528;
+module bindings.javascript.generated.m543c1528;
 
 binding codeEval0 {
   requires {

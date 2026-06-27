@@ -1,4 +1,4 @@
-module bindings.python.migration.mbfec3dfd;
+module bindings.python.generated.mbfec3dfd;
 
 binding deserialization1 {
   requires {

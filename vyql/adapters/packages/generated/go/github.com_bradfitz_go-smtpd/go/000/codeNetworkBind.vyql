@@ -1,4 +1,4 @@
-module bindings.go.migration.m4996c30b;
+module bindings.go.generated.m4996c30b;
 
 binding networkBind0 {
   requires {

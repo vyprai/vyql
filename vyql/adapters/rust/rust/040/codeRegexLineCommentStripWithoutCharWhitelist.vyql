@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding regexLineCommentStripWithoutCharWhitelist40 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "strip_comments" and node.token contains "Regex::new" and node.token contains "(?m)//.*$" and node.token contains "replace_all" and not (node.token contains "verify_string") and not (node.token contains "is_permitted_char") and not (node.token contains "strip_comments_and_verify")

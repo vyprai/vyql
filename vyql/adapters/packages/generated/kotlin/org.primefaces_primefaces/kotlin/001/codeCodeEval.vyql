@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m04e8861e;
+module bindings.kotlin.generated.m04e8861e;
 
 binding codeEval1 {
   requires {

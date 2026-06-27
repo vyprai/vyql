@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding authenticationRequiredOp45 {
   query pattern presenceNode where node.path ~= "update_password"

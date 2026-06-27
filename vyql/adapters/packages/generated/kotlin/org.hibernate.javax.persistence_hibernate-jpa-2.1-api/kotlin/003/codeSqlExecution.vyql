@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3cab3142;
+module bindings.kotlin.generated.m3cab3142;
 
 binding sqlExecution3 {
   requires {

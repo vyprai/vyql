@@ -1,4 +1,4 @@
-module bindings.go.migration.m571f7b1a;
+module bindings.go.generated.m571f7b1a;
 
 binding regexCompile2 {
   requires {

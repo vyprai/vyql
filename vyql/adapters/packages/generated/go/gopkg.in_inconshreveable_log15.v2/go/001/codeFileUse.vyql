@@ -1,4 +1,4 @@
-module bindings.go.migration.med2d97cf;
+module bindings.go.generated.med2d97cf;
 
 binding fileUse1 {
   requires {

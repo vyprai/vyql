@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unboundedResourceOperation627 {
   query pattern presenceNode where node.scope == "function" and node.token contains "responseBuffer.push(chunk)" and node.token contains "Buffer.concat(responseBuffer).length>config.maxContentLength" and not (node.token contains "stream.destroy()")

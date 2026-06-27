@@ -1,4 +1,4 @@
-module bindings.java.migration.m3d7da622;
+module bindings.java.generated.m3d7da622;
 
 binding deserialization1 {
   requires {

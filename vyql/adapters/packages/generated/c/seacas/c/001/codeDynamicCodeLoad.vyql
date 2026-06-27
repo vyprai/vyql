@@ -1,4 +1,4 @@
-module bindings.c.migration.m0ec13c4f;
+module bindings.c.generated.m0ec13c4f;
 
 binding dynamicCodeLoad1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.ma41d989b;
+module bindings.cpp.generated.ma41d989b;
 
 binding expressionEval0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.m22971185;
+module bindings.c.generated.m22971185;
 
 binding pathCanonicalization0 {
   requires {

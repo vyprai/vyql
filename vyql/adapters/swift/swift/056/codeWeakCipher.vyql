@@ -1,4 +1,4 @@
-module bindings.swift.migration.m388f23d0;
+module bindings.swift.generated.m388f23d0;
 
 binding weakCipher56 {
   query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "Blowfish"

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mc2b1535f;
+module bindings.cpp.generated.mc2b1535f;
 
 binding deserialization0 {
   requires {

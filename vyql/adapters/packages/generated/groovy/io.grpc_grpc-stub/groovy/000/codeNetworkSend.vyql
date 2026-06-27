@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m727ae6bc;
+module bindings.groovy.generated.m727ae6bc;
 
 binding networkSend0 {
   requires {

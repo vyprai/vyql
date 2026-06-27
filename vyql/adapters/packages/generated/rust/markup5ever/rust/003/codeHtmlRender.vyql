@@ -1,4 +1,4 @@
-module bindings.rust.migration.mb89fff27;
+module bindings.rust.generated.mb89fff27;
 
 binding htmlRender3 {
   requires {

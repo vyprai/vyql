@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding networkFilteringDisabled237 {
   query pattern callExpr where callee.path ~= "command" and args.any.literal contains "bridge-nf-call-arptables" and args.any.literal contains "echo 0"

@@ -1,4 +1,4 @@
-module bindings.scala.migration.ma93e774e;
+module bindings.scala.generated.ma93e774e;
 
 binding htmlRender0 {
   requires {

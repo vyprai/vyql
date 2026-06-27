@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding commonMarkPreserveEntitiesUrlAttributeXss115 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "render" and node.token contains "RegexHelper::isLinkPotentiallyUnsafe($inline->getUrl())" and node.token contains "Xml::escape($inline->getUrl(),true)" and not (node.token contains "Xml::escape($inline->getUrl())")

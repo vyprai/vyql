@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mf42faf38;
+module bindings.cpp.generated.mf42faf38;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mf932fff7;
+module bindings.javascript.generated.mf932fff7;
 
 binding httpInput1 {
   requires {

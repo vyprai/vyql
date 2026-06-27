@@ -1,4 +1,4 @@
-module bindings.go.migration.macc16ee5;
+module bindings.go.generated.macc16ee5;
 
 binding deserialization2 {
   requires {

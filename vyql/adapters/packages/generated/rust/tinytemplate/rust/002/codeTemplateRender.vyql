@@ -1,4 +1,4 @@
-module bindings.rust.migration.m402d926e;
+module bindings.rust.generated.m402d926e;
 
 binding templateRender2 {
   requires {

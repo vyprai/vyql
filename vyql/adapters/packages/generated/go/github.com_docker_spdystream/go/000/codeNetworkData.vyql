@@ -1,4 +1,4 @@
-module bindings.go.migration.m90cc954c;
+module bindings.go.generated.m90cc954c;
 
 binding networkData0 {
   requires {

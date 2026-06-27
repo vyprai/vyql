@@ -1,4 +1,4 @@
-module bindings.objc.migration.meb0a3545;
+module bindings.objc.generated.meb0a3545;
 
 binding commandExecution0 {
   requires {

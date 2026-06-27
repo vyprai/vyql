@@ -1,4 +1,4 @@
-module bindings.c.migration.m814dc436;
+module bindings.c.generated.m814dc436;
 
 binding networkSend1 {
   requires {

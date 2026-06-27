@@ -1,4 +1,4 @@
-module bindings.go.migration.mca2a6026;
+module bindings.go.generated.mca2a6026;
 
 binding urlFetch0 {
   requires {

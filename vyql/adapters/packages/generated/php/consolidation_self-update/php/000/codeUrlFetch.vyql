@@ -1,4 +1,4 @@
-module bindings.php.migration.mf7120673;
+module bindings.php.generated.mf7120673;
 
 binding urlFetch0 {
   requires {

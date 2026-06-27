@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandExecution215 {
   query pattern callExpr where callee.path ~= "child_process.spawn" and args.any.literal contains "cmd.exe"

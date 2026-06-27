@@ -1,4 +1,4 @@
-module bindings.go.migration.m39efcd29;
+module bindings.go.generated.m39efcd29;
 
 binding htmlEscape29 {
   requires {

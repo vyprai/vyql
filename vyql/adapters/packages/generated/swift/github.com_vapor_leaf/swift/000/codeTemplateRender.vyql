@@ -1,4 +1,4 @@
-module bindings.swift.migration.m74b0b779;
+module bindings.swift.generated.m74b0b779;
 
 binding templateRender0 {
   requires {

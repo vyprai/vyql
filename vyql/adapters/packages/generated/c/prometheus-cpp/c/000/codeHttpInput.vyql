@@ -1,4 +1,4 @@
-module bindings.c.migration.m12cfcb63;
+module bindings.c.generated.m12cfcb63;
 
 binding httpInput0 {
   requires {

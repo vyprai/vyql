@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding unboundedCopy24 {
   query pattern callExpr where callee.path ~= "strcpy"

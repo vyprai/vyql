@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m2ecdc9e1;
+module bindings.javascript.generated.m2ecdc9e1;
 
 binding domInput0 {
   requires {

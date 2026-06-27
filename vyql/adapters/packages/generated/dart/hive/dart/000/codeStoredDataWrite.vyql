@@ -1,4 +1,4 @@
-module bindings.dart.migration.m6331c3af;
+module bindings.dart.generated.m6331c3af;
 
 binding storedDataWrite0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m72a6943d;
+module bindings.php.generated.m72a6943d;
 
 binding networkData1 {
   requires {

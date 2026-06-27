@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding optionalClientSignatureVerification378 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["authenticate", "verify", "validate", "check"]) and node.context.call contains "getSignature" and node.context.callPath contains "Signature.getInstance" and node.context.call contains "initVerify" and node.context.call contains "verify" and containsAny(node.context.expr, ["signature!=null", "sigBytes!=null", "clientSignature!=null"]) and not (containsAny(node.context.expr, ["signature==null", "sigBytes==null", "clientSignature==null"])) and not (node.context.literal contains "Client signature required") and not (node.context.literal contains "signature required") and not (node.context.literal contains "missing signature")

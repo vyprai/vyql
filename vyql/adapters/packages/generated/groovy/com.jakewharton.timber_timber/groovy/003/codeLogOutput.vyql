@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m03fb46b2;
+module bindings.groovy.generated.m03fb46b2;
 
 binding logOutput3 {
   requires {

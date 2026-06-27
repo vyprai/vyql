@@ -1,4 +1,4 @@
-module bindings.php.migration.m845f0980;
+module bindings.php.generated.m845f0980;
 
 binding xmlParse2 {
   requires {

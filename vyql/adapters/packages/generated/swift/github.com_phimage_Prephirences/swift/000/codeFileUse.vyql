@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2171b554;
+module bindings.swift.generated.m2171b554;
 
 binding fileUse0 {
   requires {

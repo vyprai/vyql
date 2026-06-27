@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding signedMessageLengthUnderflowCopy105 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "crypto_sign_open" and node.token contains "*mlen=smlen-(unsignedlonglong)sizeof(CROSS_sig_t)" and node.token contains "memcpy((unsignedchar*)m,(constunsignedchar*)sm,(size_t)*mlen)" and not (node.token contains "smlen<(size_t)sizeof(CROSS_sig_t)")

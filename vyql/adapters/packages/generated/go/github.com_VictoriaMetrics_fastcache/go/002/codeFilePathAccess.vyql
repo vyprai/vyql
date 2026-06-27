@@ -1,4 +1,4 @@
-module bindings.go.migration.m859cab60;
+module bindings.go.generated.m859cab60;
 
 binding filePathAccess2 {
   requires {

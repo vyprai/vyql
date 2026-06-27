@@ -1,4 +1,4 @@
-module bindings.java.migration.mb44fb858;
+module bindings.java.generated.mb44fb858;
 
 binding httpInput0 {
   requires {

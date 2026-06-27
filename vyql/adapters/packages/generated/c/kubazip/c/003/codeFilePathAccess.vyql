@@ -1,4 +1,4 @@
-module bindings.c.migration.mc021190d;
+module bindings.c.generated.mc021190d;
 
 binding filePathAccess3 {
   requires {

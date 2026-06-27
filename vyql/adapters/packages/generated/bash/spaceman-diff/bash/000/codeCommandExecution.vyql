@@ -1,4 +1,4 @@
-module bindings.bash.migration.m06442c8c;
+module bindings.bash.generated.m06442c8c;
 
 binding commandExecution0 {
   requires {

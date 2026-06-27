@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0a76e97f;
+module bindings.ruby.generated.m0a76e97f;
 
 binding networkConnect1 {
   requires {

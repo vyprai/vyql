@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m25456827;
+module bindings.ruby.generated.m25456827;
 
 binding templateRender0 {
   requires {

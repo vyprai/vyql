@@ -1,4 +1,4 @@
-module bindings.java.migration.md734fff2;
+module bindings.java.generated.md734fff2;
 
 binding networkConnect1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.swift.migration.mcf8275fa;
+module bindings.swift.generated.mcf8275fa;
 
 binding deserialization0 {
   requires {

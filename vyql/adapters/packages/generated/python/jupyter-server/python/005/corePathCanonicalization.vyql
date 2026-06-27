@@ -1,4 +1,4 @@
-module bindings.python.migration.mca78dda3;
+module bindings.python.generated.mca78dda3;
 
 binding pathCanonicalization5 {
   requires {

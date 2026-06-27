@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbfd454d1;
+module bindings.groovy.generated.mbfd454d1;
 
 binding authenticationCheck29 {
   requires {

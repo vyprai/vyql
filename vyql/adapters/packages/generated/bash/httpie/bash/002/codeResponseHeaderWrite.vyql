@@ -1,4 +1,4 @@
-module bindings.bash.migration.mb0418fa4;
+module bindings.bash.generated.mb0418fa4;
 
 binding responseHeaderWrite2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.mde557412;
+module bindings.java.generated.mde557412;
 
 binding htmlEscape1 {
   requires {

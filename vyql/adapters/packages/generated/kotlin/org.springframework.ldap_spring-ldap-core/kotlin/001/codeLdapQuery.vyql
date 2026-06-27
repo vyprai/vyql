@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m296d367b;
+module bindings.kotlin.generated.m296d367b;
 
 binding ldapQuery1 {
   requires {

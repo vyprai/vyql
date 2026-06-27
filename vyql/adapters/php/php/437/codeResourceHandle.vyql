@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding resourceHandle437 {
   query pattern presenceNode where node.path ~= "fsockopen"

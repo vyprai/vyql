@@ -1,4 +1,4 @@
-module bindings.c.migration.mc68d9ca5;
+module bindings.c.generated.mc68d9ca5;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.me8fa15d3;
+module bindings.ruby.generated.me8fa15d3;
 
 binding xmlParse0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.m2e732851;
+module bindings.c.generated.m2e732851;
 
 binding htmlRender2 {
   requires {

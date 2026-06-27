@@ -1,4 +1,4 @@
-module bindings.c.migration.mba25dfe2;
+module bindings.c.generated.mba25dfe2;
 
 binding authenticationCheck0 {
   requires {

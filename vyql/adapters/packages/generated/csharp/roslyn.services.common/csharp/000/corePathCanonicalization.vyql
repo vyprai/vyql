@@ -1,4 +1,4 @@
-module bindings.csharp.migration.md3e72d6d;
+module bindings.csharp.generated.md3e72d6d;
 
 binding pathCanonicalization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mb9f51062;
+module bindings.cpp.generated.mb9f51062;
 
 binding networkConnect0 {
   requires {

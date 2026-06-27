@@ -1,4 +1,4 @@
-module bindings.swift.migration.mc56187db;
+module bindings.swift.generated.mc56187db;
 
 binding domInput1 {
   requires {

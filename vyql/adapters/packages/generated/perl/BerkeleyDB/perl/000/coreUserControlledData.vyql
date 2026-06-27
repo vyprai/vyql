@@ -1,4 +1,4 @@
-module bindings.perl.migration.mdc6801fc;
+module bindings.perl.generated.mdc6801fc;
 
 binding userControlledData0 {
   requires {

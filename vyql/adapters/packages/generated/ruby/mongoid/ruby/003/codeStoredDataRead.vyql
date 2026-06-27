@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m942d4423;
+module bindings.ruby.generated.m942d4423;
 
 binding storedDataRead3 {
   requires {

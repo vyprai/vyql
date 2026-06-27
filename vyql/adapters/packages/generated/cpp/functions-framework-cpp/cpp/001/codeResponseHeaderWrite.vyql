@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mc4540a81;
+module bindings.cpp.generated.mc4540a81;
 
 binding responseHeaderWrite1 {
   requires {

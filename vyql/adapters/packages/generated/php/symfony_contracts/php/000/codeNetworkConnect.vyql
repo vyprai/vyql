@@ -1,4 +1,4 @@
-module bindings.php.migration.mdf53e095;
+module bindings.php.generated.mdf53e095;
 
 binding networkConnect0 {
   requires {

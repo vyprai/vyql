@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding requestSelectedDeserializationFormat311 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "api_endpoint" and node.token contains "request.headers.get" and node.token contains "Content-Type" and node.token contains "ALL_SERDE.get" and node.token contains "from_http_request" and not (node.context.name contains "api_endpoint_wrapper") and not (node.token contains "UNSUPPORTED_MEDIA_TYPE")

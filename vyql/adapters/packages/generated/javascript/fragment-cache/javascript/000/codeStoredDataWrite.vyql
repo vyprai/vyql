@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m60db8bfa;
+module bindings.javascript.generated.m60db8bfa;
 
 binding storedDataWrite0 {
   requires {

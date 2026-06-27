@@ -1,4 +1,4 @@
-module bindings.javascript.migration.md3ee2f79;
+module bindings.javascript.generated.md3ee2f79;
 
 binding networkConnect0 {
   requires {

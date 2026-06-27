@@ -1,4 +1,4 @@
-module bindings.c.migration.mce355dd5;
+module bindings.c.generated.mce355dd5;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding disabledRelationshipMetadataExposure163 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getRelatableResourceTypes" and node.token contains "$fieldinstanceofResourceTypeRelationship" and node.token contains "$field->getRelatableResourceTypes()" and not (node.token contains "$field->isFieldEnabled()")

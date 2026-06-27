@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mb3b3eb92;
+module bindings.javascript.generated.mb3b3eb92;
 
 binding userControlledData3 {
   requires {

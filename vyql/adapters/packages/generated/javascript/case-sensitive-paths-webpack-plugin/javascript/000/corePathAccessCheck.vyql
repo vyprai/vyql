@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m3c10970f;
+module bindings.javascript.generated.m3c10970f;
 
 binding pathAccessCheck0 {
   requires {

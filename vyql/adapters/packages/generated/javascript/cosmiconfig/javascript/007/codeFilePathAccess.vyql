@@ -1,4 +1,4 @@
-module bindings.javascript.migration.md2fd4000;
+module bindings.javascript.generated.md2fd4000;
 
 binding filePathAccess7 {
   requires {

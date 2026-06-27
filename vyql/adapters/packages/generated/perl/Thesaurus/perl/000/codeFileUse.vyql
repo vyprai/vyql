@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfda1c597;
+module bindings.perl.generated.mfda1c597;
 
 binding fileUse0 {
   requires {

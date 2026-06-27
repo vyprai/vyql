@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding ezPublishSearchNumericParamXss107 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "eZSearch.search" and node.context.callPath contains "$tpl.setVariable" and node.context.assignCall contains "$searchTimestamp:$http.variable" and node.context.assignLiteral contains "$searchTimestamp:SearchTimestamp" and node.context.callArg contains "eZSearch.search:array" and node.context.callArg contains "$tpl.setVariable:$searchTimestamp" and not (node.context.castCallLiteral contains "int:$http.variable:SearchTimestamp")

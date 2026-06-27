@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccc8be40;
+module bindings.objc.generated.mccc8be40;
 
 binding weakHash0 {
   requires {

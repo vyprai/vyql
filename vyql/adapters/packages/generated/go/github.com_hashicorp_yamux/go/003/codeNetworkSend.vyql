@@ -1,4 +1,4 @@
-module bindings.go.migration.mf4d208b3;
+module bindings.go.generated.mf4d208b3;
 
 binding networkSend3 {
   requires {

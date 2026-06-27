@@ -1,4 +1,4 @@
-module bindings.objc.migration.md74ce000;
+module bindings.objc.generated.md74ce000;
 
 binding sqlParameterization1 {
   requires {

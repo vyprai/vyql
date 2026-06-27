@@ -1,4 +1,4 @@
-module bindings.perl.migration.m80c06a83;
+module bindings.perl.generated.m80c06a83;
 
 binding deserialization0 {
   requires {

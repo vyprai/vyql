@@ -1,4 +1,4 @@
-module bindings.dart.migration.m948ce80e;
+module bindings.dart.generated.m948ce80e;
 
 binding commandExecution2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma85bb290;
+module bindings.elixir.generated.ma85bb290;
 
 binding userControlledData0 {
   requires {

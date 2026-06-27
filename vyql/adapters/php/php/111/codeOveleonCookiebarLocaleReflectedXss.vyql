@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding oveleonCookiebarLocaleReflectedXss111 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "blockAction" and node.token contains "System::loadLanguageFile('tl_cookiebar',$locale)" and node.token contains "$objTemplate->language=$locale" and node.token contains "return$objTemplate->getResponse();" and not (node.token contains "Validator::isLocale($locale)")

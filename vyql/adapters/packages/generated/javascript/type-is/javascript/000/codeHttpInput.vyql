@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbcc0a584;
+module bindings.javascript.generated.mbcc0a584;
 
 binding httpInput0 {
   requires {

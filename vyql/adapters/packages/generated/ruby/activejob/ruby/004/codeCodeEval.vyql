@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m70d3d45f;
+module bindings.ruby.generated.m70d3d45f;
 
 binding codeEval4 {
   requires {

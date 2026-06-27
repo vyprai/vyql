@@ -1,4 +1,4 @@
-module bindings.swift.migration.m7eccf070;
+module bindings.swift.generated.m7eccf070;
 
 binding inputValidation0 {
   requires {

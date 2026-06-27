@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mda51fdd0;
+module bindings.ruby.generated.mda51fdd0;
 
 binding responseHeaderWrite1 {
   requires {

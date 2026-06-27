@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m2cbd08e3;
+module bindings.javascript.generated.m2cbd08e3;
 
 binding shellEscape3 {
   requires {

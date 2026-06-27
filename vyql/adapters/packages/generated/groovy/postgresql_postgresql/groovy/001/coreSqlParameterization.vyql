@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m71bf7d49;
+module bindings.groovy.generated.m71bf7d49;
 
 binding sqlParameterization1 {
   requires {

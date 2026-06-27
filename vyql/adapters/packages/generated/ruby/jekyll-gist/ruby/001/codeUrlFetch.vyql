@@ -1,4 +1,4 @@
-module bindings.ruby.migration.me04e4aed;
+module bindings.ruby.generated.me04e4aed;
 
 binding urlFetch1 {
   requires {

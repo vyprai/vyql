@@ -1,4 +1,4 @@
-module bindings.java.migration.ma5b4c264;
+module bindings.java.generated.ma5b4c264;
 
 binding deserialization0 {
   requires {

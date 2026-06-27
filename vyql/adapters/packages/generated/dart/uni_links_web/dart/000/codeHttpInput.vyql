@@ -1,4 +1,4 @@
-module bindings.dart.migration.m44223454;
+module bindings.dart.generated.m44223454;
 
 binding httpInput0 {
   requires {

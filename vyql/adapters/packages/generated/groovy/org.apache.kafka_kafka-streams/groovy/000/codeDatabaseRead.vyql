@@ -1,4 +1,4 @@
-module bindings.groovy.migration.md7280db7;
+module bindings.groovy.generated.md7280db7;
 
 binding databaseRead0 {
   requires {

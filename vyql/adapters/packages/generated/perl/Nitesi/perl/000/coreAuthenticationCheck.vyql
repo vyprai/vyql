@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc570794f;
+module bindings.perl.generated.mc570794f;
 
 binding authenticationCheck0 {
   requires {

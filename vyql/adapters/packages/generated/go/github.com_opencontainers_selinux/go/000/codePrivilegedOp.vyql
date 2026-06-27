@@ -1,4 +1,4 @@
-module bindings.go.migration.m56c12cbe;
+module bindings.go.generated.m56c12cbe;
 
 binding privilegedOp0 {
   requires {

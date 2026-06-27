@@ -1,4 +1,4 @@
-module bindings.ruby.migration.ma1da0d8f;
+module bindings.ruby.generated.ma1da0d8f;
 
 binding authorizationCheck5 {
   requires {

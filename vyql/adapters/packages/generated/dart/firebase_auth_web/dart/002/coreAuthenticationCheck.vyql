@@ -1,4 +1,4 @@
-module bindings.dart.migration.m3494680c;
+module bindings.dart.generated.m3494680c;
 
 binding authenticationCheck2 {
   requires {

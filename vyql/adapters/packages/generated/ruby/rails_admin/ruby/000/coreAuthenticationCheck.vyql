@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m68f6610f;
+module bindings.ruby.generated.m68f6610f;
 
 binding authenticationCheck0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding dtlsEpochZeroApplicationData311 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "handleIncomingPacket" and node.context.callPath contains "h.Unmarshal" and node.context.selector contains "h.epoch" and node.context.callPath contains "c.state.cipherSuite.decrypt" and node.context.callPath contains "r.Unmarshal" and node.context.selector contains "c.decrypted" and not (node.context.binary contains "h.epoch==0") and not (node.context.binary contains "0==h.epoch")

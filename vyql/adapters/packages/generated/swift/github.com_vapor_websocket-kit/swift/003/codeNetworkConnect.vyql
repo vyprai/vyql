@@ -1,4 +1,4 @@
-module bindings.swift.migration.md8c32dbd;
+module bindings.swift.generated.md8c32dbd;
 
 binding networkConnect3 {
   requires {

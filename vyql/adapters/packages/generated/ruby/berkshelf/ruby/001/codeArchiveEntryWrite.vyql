@@ -1,4 +1,4 @@
-module bindings.ruby.migration.me77b5eaa;
+module bindings.ruby.generated.me77b5eaa;
 
 binding archiveEntryWrite1 {
   requires {

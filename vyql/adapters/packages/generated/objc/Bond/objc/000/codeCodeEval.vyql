@@ -1,4 +1,4 @@
-module bindings.objc.migration.m57d286f5;
+module bindings.objc.generated.m57d286f5;
 
 binding codeEval0 {
   requires {

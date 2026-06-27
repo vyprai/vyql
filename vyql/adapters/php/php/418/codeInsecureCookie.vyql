@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding insecureCookie418 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "setcookie" and node.token contains "secure=false"

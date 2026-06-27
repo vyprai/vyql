@@ -1,4 +1,4 @@
-module bindings.java.migration.mc1571c75;
+module bindings.java.generated.mc1571c75;
 
 binding logOutput0 {
   requires {

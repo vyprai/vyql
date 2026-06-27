@@ -1,4 +1,4 @@
-module bindings.rust.migration.ma840f320;
+module bindings.rust.generated.ma840f320;
 
 binding envVariable2 {
   requires {

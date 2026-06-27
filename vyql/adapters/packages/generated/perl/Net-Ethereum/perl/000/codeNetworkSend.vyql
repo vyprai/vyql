@@ -1,4 +1,4 @@
-module bindings.perl.migration.mf98bb4e8;
+module bindings.perl.generated.mf98bb4e8;
 
 binding networkSend0 {
   requires {

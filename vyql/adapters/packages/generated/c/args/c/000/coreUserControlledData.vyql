@@ -1,4 +1,4 @@
-module bindings.c.migration.m930f8c54;
+module bindings.c.generated.m930f8c54;
 
 binding userControlledData0 {
   requires {

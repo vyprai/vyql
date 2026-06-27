@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding jwtUnverified226 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "JWT.decode" and node.token contains "algorithm=none"

@@ -1,4 +1,4 @@
-module bindings.php.migration.mab7f883a;
+module bindings.php.generated.mab7f883a;
 
 binding inputValidation16 {
   requires {

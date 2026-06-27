@@ -1,4 +1,4 @@
-module bindings.objc.migration.m942721f9;
+module bindings.objc.generated.m942721f9;
 
 binding regexCompile12 {
   requires {

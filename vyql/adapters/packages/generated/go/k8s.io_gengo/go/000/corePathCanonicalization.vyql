@@ -1,4 +1,4 @@
-module bindings.go.migration.mf4dadbdd;
+module bindings.go.generated.mf4dadbdd;
 
 binding pathCanonicalization0 {
   requires {

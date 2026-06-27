@@ -1,4 +1,4 @@
-module bindings.python.migration.mbf7260e3;
+module bindings.python.generated.mbf7260e3;
 
 binding networkData2 {
   requires {

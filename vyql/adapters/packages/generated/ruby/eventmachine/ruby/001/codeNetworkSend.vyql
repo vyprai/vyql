@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mdb4485cf;
+module bindings.ruby.generated.mdb4485cf;
 
 binding networkSend1 {
   requires {

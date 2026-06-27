@@ -1,4 +1,4 @@
-module bindings.groovy.migration.md237ae6d;
+module bindings.groovy.generated.md237ae6d;
 
 binding cookie8 {
   requires {

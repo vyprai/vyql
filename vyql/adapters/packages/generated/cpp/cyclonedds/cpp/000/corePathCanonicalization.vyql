@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mad6d4b2d;
+module bindings.cpp.generated.mad6d4b2d;
 
 binding pathCanonicalization0 {
   requires {

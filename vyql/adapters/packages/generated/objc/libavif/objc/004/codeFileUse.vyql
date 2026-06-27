@@ -1,4 +1,4 @@
-module bindings.objc.migration.mf608c243;
+module bindings.objc.generated.mf608c243;
 
 binding fileUse4 {
   requires {

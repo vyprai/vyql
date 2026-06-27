@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding incompleteHtmlEntityEscape494 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "string.replace" and node.token contains "&amp;" and node.token contains "\\w+;" and not (node.token contains "#\\d") and not (node.token contains "#x")

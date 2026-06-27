@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding lockRelease339 {
   query pattern callExpr where callee.method == "Unlock"

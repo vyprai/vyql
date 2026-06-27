@@ -1,4 +1,4 @@
-module bindings.python.migration.mdb63aab3;
+module bindings.python.generated.mdb63aab3;
 
 binding deserialization0 {
   requires {

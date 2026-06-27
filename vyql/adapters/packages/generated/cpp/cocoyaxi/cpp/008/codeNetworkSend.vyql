@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m2661708c;
+module bindings.cpp.generated.m2661708c;
 
 binding networkSend8 {
   requires {

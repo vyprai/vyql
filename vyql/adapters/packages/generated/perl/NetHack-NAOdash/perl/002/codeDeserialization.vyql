@@ -1,4 +1,4 @@
-module bindings.perl.migration.m2d32aa40;
+module bindings.perl.generated.m2d32aa40;
 
 binding deserialization2 {
   requires {

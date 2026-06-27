@@ -1,4 +1,4 @@
-module bindings.dart.migration.mcf9444db;
+module bindings.dart.generated.mcf9444db;
 
 binding networkData2 {
   requires {

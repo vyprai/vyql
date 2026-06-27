@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2c229fe1;
+module bindings.swift.generated.m2c229fe1;
 
 binding networkData3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mf6f16430;
+module bindings.rust.generated.mf6f16430;
 
 binding rawMemoryCopySize0 {
   requires {

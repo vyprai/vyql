@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding insecurePermission66 {
   query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "0666"

@@ -1,4 +1,4 @@
-module bindings.c.migration.m2816daee;
+module bindings.c.generated.m2816daee;
 
 binding commandExecution3 {
   requires {

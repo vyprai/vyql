@@ -1,4 +1,4 @@
-module bindings.rust.migration.m264fd2f1;
+module bindings.rust.generated.m264fd2f1;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mae52a612;
+module bindings.javascript.generated.mae52a612;
 
 binding userControlledData2 {
   requires {

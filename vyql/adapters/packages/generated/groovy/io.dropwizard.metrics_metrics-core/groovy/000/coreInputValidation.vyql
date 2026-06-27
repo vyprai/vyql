@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbd995cff;
+module bindings.groovy.generated.mbd995cff;
 
 binding inputValidation0 {
   requires {

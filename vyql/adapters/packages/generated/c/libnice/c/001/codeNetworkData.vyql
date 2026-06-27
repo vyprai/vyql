@@ -1,4 +1,4 @@
-module bindings.c.migration.m9c988fbb;
+module bindings.c.generated.m9c988fbb;
 
 binding networkData1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m5574829d;
+module bindings.kotlin.generated.m5574829d;
 
 binding expressionEval0 {
   requires {

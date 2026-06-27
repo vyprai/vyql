@@ -1,4 +1,4 @@
-module bindings.go.migration.m32ea2e1f;
+module bindings.go.generated.m32ea2e1f;
 
 binding cliArgument6 {
   requires {

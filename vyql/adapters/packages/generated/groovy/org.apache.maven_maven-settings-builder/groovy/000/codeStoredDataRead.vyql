@@ -1,4 +1,4 @@
-module bindings.groovy.migration.med520b51;
+module bindings.groovy.generated.med520b51;
 
 binding storedDataRead0 {
   requires {

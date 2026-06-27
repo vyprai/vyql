@@ -1,4 +1,4 @@
-module bindings.perl.migration.ma6b12da1;
+module bindings.perl.generated.ma6b12da1;
 
 binding storedDataWrite0 {
   requires {

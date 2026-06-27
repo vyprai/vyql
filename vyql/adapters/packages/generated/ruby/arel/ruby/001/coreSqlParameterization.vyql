@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m187cb072;
+module bindings.ruby.generated.m187cb072;
 
 binding sqlParameterization1 {
   requires {

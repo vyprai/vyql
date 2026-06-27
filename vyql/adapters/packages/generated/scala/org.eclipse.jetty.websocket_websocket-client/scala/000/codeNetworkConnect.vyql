@@ -1,4 +1,4 @@
-module bindings.scala.migration.mf59ca472;
+module bindings.scala.generated.mf59ca472;
 
 binding networkConnect0 {
   requires {

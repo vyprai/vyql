@@ -1,4 +1,4 @@
-module bindings.scala.migration.mf32bdc07;
+module bindings.scala.generated.mf32bdc07;
 
 binding deserialization0 {
   requires {

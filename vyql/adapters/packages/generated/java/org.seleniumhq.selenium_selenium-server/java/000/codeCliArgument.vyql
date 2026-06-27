@@ -1,4 +1,4 @@
-module bindings.java.migration.md65ebee4;
+module bindings.java.generated.md65ebee4;
 
 binding cliArgument0 {
   requires {

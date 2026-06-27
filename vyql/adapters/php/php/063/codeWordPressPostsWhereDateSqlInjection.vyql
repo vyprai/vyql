@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding wordPressPostsWhereDateSqlInjection63 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "$where.=" and node.token contains "post_date" and node.token contains "$edcal_startDate" and node.token contains "$edcal_endDate" and node.token contains "return$where" and not (node.token contains "is_numeric(str_replace(\"-\",\"\",$edcal_startDate))") and not (node.token contains "is_numeric(str_replace(\"-\",\"\",$edcal_endDate))") and not (node.token contains "preg_match") and not (node.token contains "$wpdb->prepare") and not (node.token contains "esc_sql") and not (node.token contains "sanitize_text_field")

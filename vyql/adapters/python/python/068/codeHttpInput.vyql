@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding httpInput68 {
   query pattern callExpr where callee.path ~= "self.get_body_argument"

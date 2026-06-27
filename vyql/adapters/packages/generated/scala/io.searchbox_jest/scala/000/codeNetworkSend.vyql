@@ -1,4 +1,4 @@
-module bindings.scala.migration.m5dbdfc12;
+module bindings.scala.generated.m5dbdfc12;
 
 binding networkSend0 {
   requires {

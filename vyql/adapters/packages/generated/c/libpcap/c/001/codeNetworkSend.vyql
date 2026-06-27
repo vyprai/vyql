@@ -1,4 +1,4 @@
-module bindings.c.migration.m12bad274;
+module bindings.c.generated.m12bad274;
 
 binding networkSend1 {
   requires {

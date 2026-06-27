@@ -1,4 +1,4 @@
-module bindings.scala.migration.m54c5e144;
+module bindings.scala.generated.m54c5e144;
 
 binding htmlEscape0 {
   requires {

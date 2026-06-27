@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding protocolFrameBindingReview116 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "match" and node.token contains "cur->peercallno==callno" and node.token contains "dcallno==cur->callno" and not (node.token contains "full_frame?dcallno==cur->callno")

@@ -1,4 +1,4 @@
-module bindings.php.migration.m97e8f2b5;
+module bindings.php.generated.m97e8f2b5;
 
 binding userControlledData0 {
   requires {

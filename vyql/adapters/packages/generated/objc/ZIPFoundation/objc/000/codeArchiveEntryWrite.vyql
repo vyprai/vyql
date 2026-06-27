@@ -1,4 +1,4 @@
-module bindings.objc.migration.m4ff285e0;
+module bindings.objc.generated.m4ff285e0;
 
 binding archiveEntryWrite0 {
   requires {

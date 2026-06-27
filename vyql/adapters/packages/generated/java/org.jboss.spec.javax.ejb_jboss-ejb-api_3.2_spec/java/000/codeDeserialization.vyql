@@ -1,4 +1,4 @@
-module bindings.java.migration.me9f4cb48;
+module bindings.java.generated.me9f4cb48;
 
 binding deserialization0 {
   requires {

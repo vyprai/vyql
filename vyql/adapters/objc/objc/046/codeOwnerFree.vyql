@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding ownerFree46 {
   query pattern presenceNode where node.path ~= "xmlFreeDoc"

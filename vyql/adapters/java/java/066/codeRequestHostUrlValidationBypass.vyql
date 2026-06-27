@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding requestHostUrlValidationBypass66 {
   query pattern presenceNode where node.scope == "function" and node.context.call contains "getServerName" and node.context.call contains "getHost" and node.context.call contains "equals" and not (node.context.scopeCall contains "contains")

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mffd63f21;
+module bindings.csharp.generated.mffd63f21;
 
 binding domInput0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.me7aaa909;
+module bindings.objc.generated.me7aaa909;
 
 binding httpInput0 {
   requires {

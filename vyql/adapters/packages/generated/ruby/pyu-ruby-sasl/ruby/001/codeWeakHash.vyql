@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m7de4bb21;
+module bindings.ruby.generated.m7de4bb21;
 
 binding weakHash1 {
   requires {

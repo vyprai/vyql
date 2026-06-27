@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding jwtUnverified156 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "TokenValidationParameters" and node.token contains "ValidateIssuerSigningKey=false"

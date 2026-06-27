@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1534383c;
+module bindings.csharp.generated.m1534383c;
 
 binding filePathAccess3 {
   requires {

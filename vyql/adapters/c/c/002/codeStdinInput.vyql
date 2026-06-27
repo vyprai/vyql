@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding stdinInput2 {
   query pattern callExpr where callee.path ~= "fgets"

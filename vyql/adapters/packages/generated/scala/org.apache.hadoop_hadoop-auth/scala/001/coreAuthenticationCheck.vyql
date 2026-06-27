@@ -1,4 +1,4 @@
-module bindings.scala.migration.md22be8dc;
+module bindings.scala.generated.md22be8dc;
 
 binding authenticationCheck1 {
   requires {

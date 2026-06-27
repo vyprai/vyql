@@ -1,4 +1,4 @@
-module bindings.java.migration.med0f485c;
+module bindings.java.generated.med0f485c;
 
 binding codeEval3 {
   requires {

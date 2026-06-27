@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m94f6e70d;
+module bindings.cpp.generated.m94f6e70d;
 
 binding inputValidation0 {
   requires {

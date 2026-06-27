@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding chakraScopeSlotArrayUncheckedIndex76 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "propertyIdsForScopeSlotArray[sym->GetScopeSlot()]=sym->EnsurePosition(funcInfo)" and node.token contains "propertyIdsForScopeSlotArray[funcInfo->thisScopeSlot]=Js::PropertyIds::_lexicalThisSlotSymbol" and node.token contains "propertyIdsForScopeSlotArray[funcInfo->superCtorScopeSlot]=Js::PropertyIds::_superCtorReferenceSymbol" and not (node.token contains "setPropertyIdForScopeSlotArray(sym->GetScopeSlot(),sym->EnsurePosition(funcInfo))") and not (node.token contains "slot<0||(uint)slot>=scopeSlotCount") and not (node.token contains "Js::Throw::FatalInternalError()")

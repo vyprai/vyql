@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m39c3b7a9;
+module bindings.csharp.generated.m39c3b7a9;
 
 binding deserialization0 {
   requires {

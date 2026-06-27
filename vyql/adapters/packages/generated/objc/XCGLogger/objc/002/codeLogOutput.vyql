@@ -1,4 +1,4 @@
-module bindings.objc.migration.mb551c984;
+module bindings.objc.generated.mb551c984;
 
 binding logOutput2 {
   requires {

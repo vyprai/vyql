@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandArgumentValidation518 {
   query pattern callExpr where callee.analysis ~= "javascript.command_argument_regex_guard"

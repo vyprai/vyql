@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m4b05a11d;
+module bindings.kotlin.generated.m4b05a11d;
 
 binding logOutput5 {
   requires {

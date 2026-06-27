@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbda29f3a;
+module bindings.elixir.generated.mbda29f3a;
 
 binding networkSend0 {
   requires {

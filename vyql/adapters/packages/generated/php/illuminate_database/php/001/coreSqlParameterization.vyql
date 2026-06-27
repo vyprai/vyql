@@ -1,4 +1,4 @@
-module bindings.php.migration.m280ce894;
+module bindings.php.generated.m280ce894;
 
 binding sqlParameterization1 {
   requires {

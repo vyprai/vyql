@@ -1,4 +1,4 @@
-module bindings.go.migration.mdd3f43e2;
+module bindings.go.generated.mdd3f43e2;
 
 binding htmlEscape0 {
   requires {

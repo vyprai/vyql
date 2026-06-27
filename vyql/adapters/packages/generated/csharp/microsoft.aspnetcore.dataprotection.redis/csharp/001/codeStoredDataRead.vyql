@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mbb14a39b;
+module bindings.csharp.generated.mbb14a39b;
 
 binding storedDataRead1 {
   requires {

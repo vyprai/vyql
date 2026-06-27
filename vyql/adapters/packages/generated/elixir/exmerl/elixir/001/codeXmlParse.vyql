@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m4c2a21d8;
+module bindings.elixir.generated.m4c2a21d8;
 
 binding xmlParse1 {
   requires {

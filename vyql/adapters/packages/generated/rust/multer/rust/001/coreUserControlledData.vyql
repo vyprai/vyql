@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdb8da629;
+module bindings.rust.generated.mdb8da629;
 
 binding userControlledData1 {
   requires {

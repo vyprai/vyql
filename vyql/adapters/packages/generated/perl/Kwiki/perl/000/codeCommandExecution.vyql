@@ -1,4 +1,4 @@
-module bindings.perl.migration.m60116a70;
+module bindings.perl.generated.m60116a70;
 
 binding commandExecution0 {
   requires {

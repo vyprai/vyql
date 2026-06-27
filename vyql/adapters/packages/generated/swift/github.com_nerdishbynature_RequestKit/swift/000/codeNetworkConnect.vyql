@@ -1,4 +1,4 @@
-module bindings.swift.migration.mffa042d5;
+module bindings.swift.generated.mffa042d5;
 
 binding networkConnect0 {
   requires {

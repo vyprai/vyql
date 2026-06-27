@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding cleartextChannel198 {
   query pattern callExpr where callee.path ~= "GetStringAsync" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbfa501c2;
+module bindings.groovy.generated.mbfa501c2;
 
 binding httpInput1 {
   requires {

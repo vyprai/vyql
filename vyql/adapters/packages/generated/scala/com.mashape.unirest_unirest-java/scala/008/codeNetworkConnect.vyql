@@ -1,4 +1,4 @@
-module bindings.scala.migration.m16284c04;
+module bindings.scala.generated.m16284c04;
 
 binding networkConnect8 {
   requires {

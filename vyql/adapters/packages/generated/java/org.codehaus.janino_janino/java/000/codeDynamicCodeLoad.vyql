@@ -1,4 +1,4 @@
-module bindings.java.migration.m8a4ad29d;
+module bindings.java.generated.m8a4ad29d;
 
 binding dynamicCodeLoad0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding unboundedRouteFilenameCacheAccess456 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.decoratorMethod contains "route" and containsAny(node.context.paramName, ["file_name", "filename", "camera_name", "path"]) and containsAny(node.context.callPath, ["secure_filename", "werkzeug.utils.secure_filename"]) and node.context.callPath contains "os.path.join" and containsAny(node.context.identifier, ["CACHE_DIR", "cache_dir", "preview_dir"]) and not (containsAny(node.context.expr, ["len(file_name)>1000", "len(file_name)>=1000", "1000<len(file_name)", "1000<=len(file_name)", "len(filename)>1000", "len(filename)>=1000", "1000<len(filename)", "1000<=len(filename)"]))

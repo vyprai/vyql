@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding archiveSymlinkFilterBypass47 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "safe_extract" and node.token contains "tar.getmembers()" and node.token contains "os.path.join(path,member.name)" and node.token contains "is_within_directory(path,member_path)" and node.token contains "tar.extractall(path,members,numeric_owner=numeric_owner)" and not (node.token contains "member.issym()") and not (node.token contains "member.islnk()") and not (node.token contains "member.linkname")

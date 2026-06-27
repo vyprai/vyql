@@ -1,4 +1,4 @@
-module bindings.dart.migration.m5e90730a;
+module bindings.dart.generated.m5e90730a;
 
 binding networkConnect0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.lua.migration.ma99d12f7;
+module bindings.lua.generated.ma99d12f7;
 
 binding authenticationRequiredOp59 {
   query pattern presenceNode where node.path ~= "change_email"

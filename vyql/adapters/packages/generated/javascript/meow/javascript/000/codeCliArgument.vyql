@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m94a41eab;
+module bindings.javascript.generated.m94a41eab;
 
 binding cliArgument0 {
   requires {

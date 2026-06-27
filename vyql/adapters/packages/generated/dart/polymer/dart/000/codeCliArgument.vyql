@@ -1,4 +1,4 @@
-module bindings.dart.migration.mad8ecff1;
+module bindings.dart.generated.mad8ecff1;
 
 binding cliArgument0 {
   requires {

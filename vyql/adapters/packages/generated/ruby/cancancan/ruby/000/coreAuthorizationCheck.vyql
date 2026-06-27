@@ -1,4 +1,4 @@
-module bindings.ruby.migration.md7188f92;
+module bindings.ruby.generated.md7188f92;
 
 binding authorizationCheck0 {
   requires {

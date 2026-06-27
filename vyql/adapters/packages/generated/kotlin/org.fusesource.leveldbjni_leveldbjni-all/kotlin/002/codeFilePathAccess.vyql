@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfe67d068;
+module bindings.kotlin.generated.mfe67d068;
 
 binding filePathAccess2 {
   requires {

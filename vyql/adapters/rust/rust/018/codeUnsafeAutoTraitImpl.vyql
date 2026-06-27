@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding unsafeAutoTraitImpl18 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unsafe_impl" and node.token contains "trait:Sync" and not (node.token contains "bound:Sync") and not (node.token contains "bound:Send")

@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding compressedBlockSizeCapacityMismatch99 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "blosc_c" and node.token contains "_sw32(dest-4,-value)" and node.token contains "ntbytes+maxout>maxbytes" and node.token contains "maxout=(int64_t)maxbytes-(int64_t)ntbytes" and node.token contains "(ntbytes+neblock)>maxbytes" and not (node.token contains "destsize") and not (node.token contains "ntbytes>destsize")

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding uninitializedBufferExposure21 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "Vec::with_capacity" and node.token contains "set_len" and node.token contains "read_exact(&mut" and not (node.token contains "resize")

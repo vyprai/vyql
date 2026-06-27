@@ -1,4 +1,4 @@
-module bindings.c.migration.m9f19aa00;
+module bindings.c.generated.m9f19aa00;
 
 binding sqlParameterization1 {
   requires {

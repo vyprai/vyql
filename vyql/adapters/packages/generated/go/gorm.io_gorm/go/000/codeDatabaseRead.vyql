@@ -1,4 +1,4 @@
-module bindings.go.migration.m860a1f2b;
+module bindings.go.generated.m860a1f2b;
 
 binding databaseRead0 {
   requires {

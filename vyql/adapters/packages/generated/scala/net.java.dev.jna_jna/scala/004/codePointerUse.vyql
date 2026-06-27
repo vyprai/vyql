@@ -1,4 +1,4 @@
-module bindings.scala.migration.maf6a4921;
+module bindings.scala.generated.maf6a4921;
 
 binding pointerUse4 {
   requires {

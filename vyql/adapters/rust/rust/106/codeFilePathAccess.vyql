@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding filePathAccess106 {
   query pattern callExpr where callee.path ~= "File.open"

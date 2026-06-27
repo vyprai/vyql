@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding memberStoreMissingCreateAuthorization53 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "store" and node.context.callPath contains "$request.getParsedBody" and node.context.callPath contains "$member.setSelfMembership" and node.context.callPath contains "$member.canEdit" and node.context.callPath contains "$member.store" and node.context.callPath contains "$this.isSelfMembership" and not (node.context.callPath contains "$member.canCreate")

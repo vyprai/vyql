@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.md3def842;
+module bindings.kotlin.generated.md3def842;
 
 binding cliArgument1 {
   requires {

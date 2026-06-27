@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding apiScanFoundActionCommandExecution296 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "postScanHandler" and node.context.callPath contains "c.Bind" and node.context.selector contains "rq.Options" and node.context.callPath contains "ScanFromAPI" and not (node.context.callPath contains "sanitizeAPIScanOptions")

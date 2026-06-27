@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m19ec740d;
+module bindings.kotlin.generated.m19ec740d;
 
 binding networkData6 {
   requires {

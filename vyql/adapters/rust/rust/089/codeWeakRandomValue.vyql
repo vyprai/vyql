@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding weakRandomValue89 {
   query pattern presenceNode where node.path ~= "StdRng.seed_from_u64"

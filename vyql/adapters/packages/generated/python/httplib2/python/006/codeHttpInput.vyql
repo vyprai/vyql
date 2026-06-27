@@ -1,4 +1,4 @@
-module bindings.python.migration.m5d2093cb;
+module bindings.python.generated.m5d2093cb;
 
 binding httpInput6 {
   requires {

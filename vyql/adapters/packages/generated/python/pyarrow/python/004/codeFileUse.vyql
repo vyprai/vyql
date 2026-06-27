@@ -1,4 +1,4 @@
-module bindings.python.migration.m4aa0977e;
+module bindings.python.generated.m4aa0977e;
 
 binding fileUse4 {
   requires {

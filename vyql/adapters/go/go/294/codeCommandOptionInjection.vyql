@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding commandOptionInjection294 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "NodePublishVolume" and node.context.call contains "GetVolumeContext" and node.context.call contains "append" and node.context.call contains "Mount" and not (node.context.scopeCall contains "ParseIP")

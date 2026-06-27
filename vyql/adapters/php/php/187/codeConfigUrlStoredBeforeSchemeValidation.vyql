@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding configUrlStoredBeforeSchemeValidation187 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.name, ["configureJob", "store", "update"]) and node.context.subscript contains "$data['fints_url']" and node.context.subscript contains "$config['fints_url']" and node.context.callPath contains "$this.repository.setConfiguration" and node.context.callPath contains "$finTS.checkConnection" and not (node.context.callPath contains "$this.validURI") and not (node.context.callPath contains "filter_var") and not (node.context.callPath contains "parse_url")

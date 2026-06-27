@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mcfe5d43b;
+module bindings.elixir.generated.mcfe5d43b;
 
 binding weakRandomValue0 {
   requires {

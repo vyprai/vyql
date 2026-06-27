@@ -1,4 +1,4 @@
-module bindings.python.migration.mac4e01b5;
+module bindings.python.generated.mac4e01b5;
 
 binding stateChangingOp3 {
   requires {

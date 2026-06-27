@@ -1,4 +1,4 @@
-module bindings.c.migration.mdbbb55eb;
+module bindings.c.generated.mdbbb55eb;
 
 binding weakHash0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding manualZipEntryFileWrite274 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "UnzipDirectory" and node.context.callPath contains "zip.OpenReader" and node.context.callPath contains "filepath.Join" and node.context.selector contains "f.Name" and node.context.callPath contains "os.OpenFile" and node.context.callArg contains "os.OpenFile:filePath" and node.context.selector contains "os.O_TRUNC" and not (node.context.callPath contains "os.Stat") and not (node.context.callPath contains "GetInput")

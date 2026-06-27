@@ -1,4 +1,4 @@
-module bindings.java.migration.m87251a0e;
+module bindings.java.generated.m87251a0e;
 
 binding ldapQuery0 {
   requires {

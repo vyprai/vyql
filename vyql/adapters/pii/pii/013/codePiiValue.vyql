@@ -1,4 +1,4 @@
-module bindings.pii.migration.m24e11c07;
+module bindings.pii.generated.m24e11c07;
 
 binding piiValue13 {
   query pattern callExpr where callee.method == "date_of_birth"

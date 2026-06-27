@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdb97838d;
+module bindings.swift.generated.mdb97838d;
 
 binding fileUse9 {
   requires {

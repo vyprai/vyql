@@ -1,4 +1,4 @@
-module bindings.scala.migration.mbeda684d;
+module bindings.scala.generated.mbeda684d;
 
 binding xpathQuery0 {
   requires {

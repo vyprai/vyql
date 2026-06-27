@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m6c1ecf21;
+module bindings.elixir.generated.m6c1ecf21;
 
 binding httpInput0 {
   requires {

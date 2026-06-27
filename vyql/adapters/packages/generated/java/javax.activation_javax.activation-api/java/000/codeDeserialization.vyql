@@ -1,4 +1,4 @@
-module bindings.java.migration.m11e79dbc;
+module bindings.java.generated.m11e79dbc;
 
 binding deserialization0 {
   requires {

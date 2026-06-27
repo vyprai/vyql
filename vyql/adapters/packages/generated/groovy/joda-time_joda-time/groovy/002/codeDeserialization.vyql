@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mdeea1403;
+module bindings.groovy.generated.mdeea1403;
 
 binding deserialization2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.m21559073;
+module bindings.perl.generated.m21559073;
 
 binding fileUse13 {
   requires {

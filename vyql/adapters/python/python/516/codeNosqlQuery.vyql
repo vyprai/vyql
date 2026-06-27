@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding nosqlQuery516 {
   query pattern callExpr where callee.path ~= "collection.find_one"

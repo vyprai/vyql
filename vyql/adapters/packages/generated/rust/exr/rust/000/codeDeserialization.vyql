@@ -1,4 +1,4 @@
-module bindings.rust.migration.m32ef6cad;
+module bindings.rust.generated.m32ef6cad;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.mf53d7a7d;
+module bindings.scala.generated.mf53d7a7d;
 
 binding dynamicCodeLoad0 {
   requires {

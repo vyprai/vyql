@@ -1,4 +1,4 @@
-module bindings.rust.migration.mbcf696d3;
+module bindings.rust.generated.mbcf696d3;
 
 binding userControlledData1 {
   requires {

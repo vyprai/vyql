@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m684a3e9b;
+module bindings.groovy.generated.m684a3e9b;
 
 binding commandExecution0 {
   requires {

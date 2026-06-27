@@ -1,4 +1,4 @@
-module bindings.bash.migration.m929250d2;
+module bindings.bash.generated.m929250d2;
 
 binding weakHash0 {
   requires {

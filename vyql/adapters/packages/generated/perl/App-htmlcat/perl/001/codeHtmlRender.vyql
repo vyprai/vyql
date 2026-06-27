@@ -1,4 +1,4 @@
-module bindings.perl.migration.m9a80f6a4;
+module bindings.perl.generated.m9a80f6a4;
 
 binding htmlRender1 {
   requires {

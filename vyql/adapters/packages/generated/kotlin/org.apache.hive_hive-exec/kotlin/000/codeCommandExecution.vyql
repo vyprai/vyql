@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3ca236bc;
+module bindings.kotlin.generated.m3ca236bc;
 
 binding commandExecution0 {
   requires {

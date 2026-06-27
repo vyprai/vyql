@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding insecurePermission587 {
   query pattern presenceNode where node.kind == "any" and node.method == "mkdir" and node.token contains "parents=True" and node.token contains "exist_ok=True" and not (node.token contains "mode=")

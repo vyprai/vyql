@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding ffiEnumLayoutRisk16 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "rust.enum" and node.token contains "kind:enum" and node.context.repr contains "C"

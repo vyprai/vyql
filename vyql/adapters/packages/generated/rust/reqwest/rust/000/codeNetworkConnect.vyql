@@ -1,4 +1,4 @@
-module bindings.rust.migration.m9db35a9b;
+module bindings.rust.generated.m9db35a9b;
 
 binding networkConnect0 {
   requires {

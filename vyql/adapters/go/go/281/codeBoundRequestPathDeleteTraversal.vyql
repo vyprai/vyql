@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding boundRequestPathDeleteTraversal281 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Delete" and node.context.callPath contains "self.Validate" and node.context.selector contains "params.Path" and node.context.callPath contains "GetSaveRealPath" and node.context.callPath contains "os.Remove" and not (node.context.callPath contains "filepath.IsLocal") and not (node.context.callPath contains "filepath.Clean")

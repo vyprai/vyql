@@ -1,4 +1,4 @@
-module bindings.swift.migration.mf434d638;
+module bindings.swift.generated.mf434d638;
 
 binding authenticationCheck4 {
   requires {

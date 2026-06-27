@@ -1,4 +1,4 @@
-module bindings.rust.migration.m5de2182e;
+module bindings.rust.generated.m5de2182e;
 
 binding cliArgument0 {
   requires {

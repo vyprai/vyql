@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding caseInsensitiveLocalIdentityAuthorizationBypass123 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "cupsdIsAuthorized" and node.token contains "_cups_strcasecmp(username,name)" and not (node.token contains "strcmp(pw->pw_name,name)")

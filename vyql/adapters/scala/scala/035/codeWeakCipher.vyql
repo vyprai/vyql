@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06d0685b;
+module bindings.scala.generated.m06d0685b;
 
 binding weakCipher35 {
   query pattern callExpr where callee.path ~= "Cipher.getInstance" and args.any.literal contains "DES"

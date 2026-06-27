@@ -1,4 +1,4 @@
-module bindings.rust.migration.m53e123db;
+module bindings.rust.generated.m53e123db;
 
 binding networkData0 {
   requires {

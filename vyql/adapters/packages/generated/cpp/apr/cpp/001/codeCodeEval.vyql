@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mdf2ffe22;
+module bindings.cpp.generated.mdf2ffe22;
 
 binding codeEval1 {
   requires {

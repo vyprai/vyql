@@ -1,4 +1,4 @@
-module bindings.swift.migration.mcd86b936;
+module bindings.swift.generated.mcd86b936;
 
 binding filePathAccess0 {
   requires {

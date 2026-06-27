@@ -1,4 +1,4 @@
-module bindings.rust.migration.m8dce55b2;
+module bindings.rust.generated.m8dce55b2;
 
 binding dynamicCodeLoad0 {
   requires {

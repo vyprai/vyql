@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding csrfDisabled310 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "CheckOrigin" and node.context.paramType contains "http.Request" and node.context.return contains "true" and not (node.context.callPath contains "r.Header.Get") and not (node.context.selector contains "r.Host")

@@ -1,4 +1,4 @@
-module bindings.php.migration.mf44fbe20;
+module bindings.php.generated.mf44fbe20;
 
 binding fileUse1 {
   requires {

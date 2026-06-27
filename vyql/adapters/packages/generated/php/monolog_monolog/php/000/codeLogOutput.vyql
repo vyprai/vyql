@@ -1,4 +1,4 @@
-module bindings.php.migration.m0f7dfbd3;
+module bindings.php.generated.m0f7dfbd3;
 
 binding logOutput0 {
   requires {

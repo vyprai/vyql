@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding cryptoScalarRandomBitsByteLengthConfusion43 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "next_k" and node.token contains "try_random_bits(rng,bit_length)" and node.token contains "k<*" and node.token contains "::ORDER" and node.token contains "is_zero" and not (node.token contains "try_generate_from_rng") and not (node.token contains "NonZeroScalar")

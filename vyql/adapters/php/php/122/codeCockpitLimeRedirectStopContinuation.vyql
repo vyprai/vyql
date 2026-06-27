@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding cockpitLimeRedirectStopContinuation122 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "stop" and node.token contains "$this->request->stopped=true" and not (node.token contains "app:request:stop")

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m68a90020;
+module bindings.elixir.generated.m68a90020;
 
 binding inputValidation0 {
   requires {

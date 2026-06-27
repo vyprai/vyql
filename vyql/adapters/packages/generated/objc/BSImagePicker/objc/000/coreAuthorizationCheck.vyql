@@ -1,4 +1,4 @@
-module bindings.objc.migration.m95666194;
+module bindings.objc.generated.m95666194;
 
 binding authorizationCheck0 {
   requires {

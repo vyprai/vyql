@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mefa2b744;
+module bindings.ruby.generated.mefa2b744;
 
 binding httpInput0 {
   requires {

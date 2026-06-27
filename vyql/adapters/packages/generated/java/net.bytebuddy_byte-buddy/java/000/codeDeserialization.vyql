@@ -1,4 +1,4 @@
-module bindings.java.migration.mde87c791;
+module bindings.java.generated.mde87c791;
 
 binding deserialization0 {
   requires {

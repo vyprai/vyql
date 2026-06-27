@@ -1,4 +1,4 @@
-module bindings.c.migration.ma9fdd97e;
+module bindings.c.generated.ma9fdd97e;
 
 binding xmlParse0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m25436b30;
+module bindings.python.generated.m25436b30;
 
 binding htmlRender0 {
   requires {

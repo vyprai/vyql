@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.me12c5d0a;
+module bindings.kotlin.generated.me12c5d0a;
 
 binding codeEval0 {
   requires {

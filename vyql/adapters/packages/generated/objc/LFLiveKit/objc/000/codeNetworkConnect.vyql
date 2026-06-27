@@ -1,4 +1,4 @@
-module bindings.objc.migration.m6190fe32;
+module bindings.objc.generated.m6190fe32;
 
 binding networkConnect0 {
   requires {

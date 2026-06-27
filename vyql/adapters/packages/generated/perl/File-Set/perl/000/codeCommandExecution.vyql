@@ -1,4 +1,4 @@
-module bindings.perl.migration.mefc0058c;
+module bindings.perl.generated.mefc0058c;
 
 binding commandExecution0 {
   requires {

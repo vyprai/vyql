@@ -1,4 +1,4 @@
-module bindings.scala.migration.m3608f193;
+module bindings.scala.generated.m3608f193;
 
 binding archiveEntryWrite21 {
   requires {

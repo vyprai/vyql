@@ -1,4 +1,4 @@
-module bindings.python.migration.m37bdfae0;
+module bindings.python.generated.m37bdfae0;
 
 binding networkSend8 {
   requires {

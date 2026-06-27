@@ -1,4 +1,4 @@
-module bindings.swift.migration.me6c981bb;
+module bindings.swift.generated.me6c981bb;
 
 binding xmlParse2 {
   requires {

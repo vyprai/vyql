@@ -1,4 +1,4 @@
-module bindings.java.migration.mfc452233;
+module bindings.java.generated.mfc452233;
 
 binding networkData0 {
   requires {

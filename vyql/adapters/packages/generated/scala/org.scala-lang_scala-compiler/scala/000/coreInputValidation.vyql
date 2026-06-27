@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7837d86e;
+module bindings.scala.generated.m7837d86e;
 
 binding inputValidation0 {
   requires {

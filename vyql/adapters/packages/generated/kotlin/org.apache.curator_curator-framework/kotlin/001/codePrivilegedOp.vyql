@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mf0957eb3;
+module bindings.kotlin.generated.mf0957eb3;
 
 binding privilegedOp1 {
   requires {

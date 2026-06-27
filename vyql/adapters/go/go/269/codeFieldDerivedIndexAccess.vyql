@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding fieldDerivedIndexAccess269 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readObject" and node.context.index contains "ber:offset" and node.context.binary contains "contentEnd>len(ber)" and node.context.literal contains "ber2der: BER tag length is more than available data" and not (node.context.binary contains "len(ber)<=offset")

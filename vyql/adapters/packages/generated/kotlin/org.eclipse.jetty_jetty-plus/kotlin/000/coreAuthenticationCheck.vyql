@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m449b10dc;
+module bindings.kotlin.generated.m449b10dc;
 
 binding authenticationCheck0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.bash.migration.mbd4add60;
+module bindings.bash.generated.mbd4add60;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m575bcf05;
+module bindings.java.generated.m575bcf05;
 
 binding commandExecution0 {
   requires {

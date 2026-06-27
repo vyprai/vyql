@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unescapedLocalFileContentHtmlRender275 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "file_get_contents" and node.context.callPath contains "print" and not (containsAny(node.context.callPath, ["htmlspecialchars", "htmlentities", "esc_html", "html_escape", "strip_tags"]))

@@ -1,4 +1,4 @@
-module bindings.objc.migration.meac4888f;
+module bindings.objc.generated.meac4888f;
 
 binding networkData3 {
   requires {

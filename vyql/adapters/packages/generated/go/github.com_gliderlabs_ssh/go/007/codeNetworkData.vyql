@@ -1,4 +1,4 @@
-module bindings.go.migration.m785e0061;
+module bindings.go.generated.m785e0061;
 
 binding networkData7 {
   requires {

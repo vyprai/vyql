@@ -1,4 +1,4 @@
-module bindings.c.migration.ma3e9db91;
+module bindings.c.generated.ma3e9db91;
 
 binding commandExecution0 {
   requires {

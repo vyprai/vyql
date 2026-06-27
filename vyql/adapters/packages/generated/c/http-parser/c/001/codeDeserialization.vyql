@@ -1,4 +1,4 @@
-module bindings.c.migration.mc344dc19;
+module bindings.c.generated.mc344dc19;
 
 binding deserialization1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m053b035d;
+module bindings.php.generated.m053b035d;
 
 binding storedDataWrite1 {
   requires {

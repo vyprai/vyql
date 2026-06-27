@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding hostExpandedUrlSanitizedBeforeExpansionSsti92 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "safeCanonicalUrl" and node.token contains "$url=Craft::$app->getRequest()->getPathInfo()" and node.token contains "$url=DynamicMetaHelper::sanitizeUrl($url)" and node.token contains "returnUrlHelper::absoluteUrlWithProtocol($url)" and not (node.token contains "returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))")

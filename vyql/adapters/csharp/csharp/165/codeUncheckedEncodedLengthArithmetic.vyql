@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding uncheckedEncodedLengthArithmetic165 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.token contains "value.Length<<1" and not (node.token contains "checked(value.Length*2)")

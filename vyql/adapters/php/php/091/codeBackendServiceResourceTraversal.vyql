@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding backendServiceResourceTraversal91 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "handleServiceRequest" and node.token contains "$resource" and node.token contains "ServiceManager::handleServiceRequest" and not (node.token contains "str_replace(['..'],'',$resource)") and not (node.token contains "str_replace(array('..'),'',$resource)") and not (node.token contains "PathAccessCheck")

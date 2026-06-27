@@ -1,4 +1,4 @@
-module bindings.python.migration.m03dd2918;
+module bindings.python.generated.m03dd2918;
 
 binding csrfProtection1 {
   requires {

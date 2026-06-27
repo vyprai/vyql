@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding unescapedContentDispositionFilename162 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Attachment" and node.context.callPath contains "filepath.Base" and node.context.callPath contains "ctx.Set" and node.context.callArg contains "ctx.Set:HeaderContentDisposition" and node.context.literal contains "attachment; filename=" and not (node.context.callPath contains "url.QueryEscape") and not (node.context.callPath contains "url.PathEscape")

@@ -1,4 +1,4 @@
-module bindings.java.migration.mfecec275;
+module bindings.java.generated.mfecec275;
 
 binding deserialization0 {
   requires {

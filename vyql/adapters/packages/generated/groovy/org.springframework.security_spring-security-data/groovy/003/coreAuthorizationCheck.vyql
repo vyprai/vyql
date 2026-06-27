@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m41a9d7d3;
+module bindings.groovy.generated.m41a9d7d3;
 
 binding authorizationCheck3 {
   requires {

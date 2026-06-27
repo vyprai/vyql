@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m503e3def;
+module bindings.kotlin.generated.m503e3def;
 
 binding inputValidation0 {
   requires {

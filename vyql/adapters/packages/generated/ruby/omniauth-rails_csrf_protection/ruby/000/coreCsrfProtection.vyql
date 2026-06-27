@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m417c6f50;
+module bindings.ruby.generated.m417c6f50;
 
 binding csrfProtection0 {
   requires {

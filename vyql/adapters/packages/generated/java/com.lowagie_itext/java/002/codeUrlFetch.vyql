@@ -1,4 +1,4 @@
-module bindings.java.migration.mafdb53dc;
+module bindings.java.generated.mafdb53dc;
 
 binding urlFetch2 {
   requires {

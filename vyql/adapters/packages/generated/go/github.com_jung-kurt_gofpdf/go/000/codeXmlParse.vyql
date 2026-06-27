@@ -1,4 +1,4 @@
-module bindings.go.migration.m671f996f;
+module bindings.go.generated.m671f996f;
 
 binding xmlParse0 {
   requires {

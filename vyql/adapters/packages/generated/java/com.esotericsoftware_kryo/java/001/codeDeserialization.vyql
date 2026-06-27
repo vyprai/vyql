@@ -1,4 +1,4 @@
-module bindings.java.migration.m911d270c;
+module bindings.java.generated.m911d270c;
 
 binding deserialization1 {
   requires {

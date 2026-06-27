@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding elefantAdminPreviewMissingAdminXss80 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "$wp=newWebpage($_POST);" and node.token contains "$page->title=$_POST['title'];" and node.token contains "$tpl->run_includes($_POST['body']);" and not (node.token contains "$this->require_admin();")

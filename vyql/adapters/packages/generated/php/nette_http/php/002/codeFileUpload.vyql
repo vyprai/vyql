@@ -1,4 +1,4 @@
-module bindings.php.migration.m3722870d;
+module bindings.php.generated.m3722870d;
 
 binding fileUpload2 {
   requires {

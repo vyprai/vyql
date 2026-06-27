@@ -1,4 +1,4 @@
-module bindings.swift.migration.meb48b266;
+module bindings.swift.generated.meb48b266;
 
 binding userControlledData2 {
   requires {

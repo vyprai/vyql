@@ -1,4 +1,4 @@
-module bindings.php.migration.mea539daf;
+module bindings.php.generated.mea539daf;
 
 binding redirectTarget2 {
   requires {

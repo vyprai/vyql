@@ -1,4 +1,4 @@
-module bindings.c.migration.m9846a2b0;
+module bindings.c.generated.m9846a2b0;
 
 binding weakHash0 {
   requires {

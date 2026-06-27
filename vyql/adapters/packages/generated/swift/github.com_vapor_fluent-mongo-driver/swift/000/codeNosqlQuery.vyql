@@ -1,4 +1,4 @@
-module bindings.swift.migration.m0397b173;
+module bindings.swift.generated.m0397b173;
 
 binding nosqlQuery0 {
   requires {

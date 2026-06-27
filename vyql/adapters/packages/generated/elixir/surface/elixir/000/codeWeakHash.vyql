@@ -1,4 +1,4 @@
-module bindings.elixir.migration.macc32cec;
+module bindings.elixir.generated.macc32cec;
 
 binding weakHash0 {
   requires {

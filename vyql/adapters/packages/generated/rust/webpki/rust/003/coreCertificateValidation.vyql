@@ -1,4 +1,4 @@
-module bindings.rust.migration.maf4788c0;
+module bindings.rust.generated.maf4788c0;
 
 binding certificateValidation3 {
   requires {

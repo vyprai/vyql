@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mca8a4cf4;
+module bindings.cpp.generated.mca8a4cf4;
 
 binding deserialization1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m337afefd;
+module bindings.go.generated.m337afefd;
 
 binding inputValidation2 {
   requires {

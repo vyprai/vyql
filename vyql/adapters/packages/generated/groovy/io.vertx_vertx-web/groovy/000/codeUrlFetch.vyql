@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mab1f8670;
+module bindings.groovy.generated.mab1f8670;
 
 binding urlFetch0 {
   requires {

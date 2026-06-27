@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m9b5ee6dd;
+module bindings.cpp.generated.m9b5ee6dd;
 
 binding filePathAccess5 {
   requires {

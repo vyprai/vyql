@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unvalidatedDynamicRequirePathTraversal644 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "runWidget" and node.token contains "widgetId" and node.token contains "widget-${widgetId}.js" and node.token contains "path.join(__dirname,file)" and node.token contains "require(path.join(__dirname,file))" and not (node.token contains "resolveWidgetPath") and not (node.token contains "path.relative") and not (node.token contains "widgetIdPattern")

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mb7697fce;
+module bindings.groovy.generated.mb7697fce;
 
 binding htmlRender0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.mde178117;
+module bindings.go.generated.mde178117;
 
 binding networkConnect0 {
   requires {

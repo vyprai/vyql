@@ -1,4 +1,4 @@
-module bindings.scala.migration.mde751e8f;
+module bindings.scala.generated.mde751e8f;
 
 binding cliArgument0 {
   requires {

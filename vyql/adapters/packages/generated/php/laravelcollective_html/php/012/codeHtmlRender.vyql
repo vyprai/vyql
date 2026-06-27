@@ -1,4 +1,4 @@
-module bindings.php.migration.m001c4b27;
+module bindings.php.generated.m001c4b27;
 
 binding htmlRender12 {
   requires {

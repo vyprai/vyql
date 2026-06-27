@@ -1,4 +1,4 @@
-module bindings.php.migration.m3388e338;
+module bindings.php.generated.m3388e338;
 
 binding shellEscape3 {
   requires {

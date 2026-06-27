@@ -1,4 +1,4 @@
-module bindings.scala.migration.m40e67106;
+module bindings.scala.generated.m40e67106;
 
 binding authenticationCheck3 {
   requires {

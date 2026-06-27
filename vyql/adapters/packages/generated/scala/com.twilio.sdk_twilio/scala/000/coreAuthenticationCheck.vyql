@@ -1,4 +1,4 @@
-module bindings.scala.migration.maa0525d4;
+module bindings.scala.generated.maa0525d4;
 
 binding authenticationCheck0 {
   requires {

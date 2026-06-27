@@ -1,4 +1,4 @@
-module bindings.java.migration.maa48f2c3;
+module bindings.java.generated.maa48f2c3;
 
 binding networkData2 {
   requires {

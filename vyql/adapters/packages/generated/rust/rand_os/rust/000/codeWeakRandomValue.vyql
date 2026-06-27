@@ -1,4 +1,4 @@
-module bindings.rust.migration.m98553bcc;
+module bindings.rust.generated.m98553bcc;
 
 binding weakRandomValue0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mfb74f871;
+module bindings.rust.generated.mfb74f871;
 
 binding privilegedOp4 {
   requires {

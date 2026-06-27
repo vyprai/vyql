@@ -1,4 +1,4 @@
-module bindings.perl.migration.m9d72423c;
+module bindings.perl.generated.m9d72423c;
 
 binding pathCanonicalization1 {
   requires {

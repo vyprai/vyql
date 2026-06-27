@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mdfc7c2b8;
+module bindings.groovy.generated.mdfc7c2b8;
 
 binding htmlRender0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.mfa3aca3a;
+module bindings.go.generated.mfa3aca3a;
 
 binding httpInput1 {
   requires {

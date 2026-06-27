@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mb204f76f;
+module bindings.cpp.generated.mb204f76f;
 
 binding sqlExecution6 {
   requires {

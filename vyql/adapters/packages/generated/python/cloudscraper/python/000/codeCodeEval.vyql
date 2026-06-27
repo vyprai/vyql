@@ -1,4 +1,4 @@
-module bindings.python.migration.mcd686a39;
+module bindings.python.generated.mcd686a39;
 
 binding codeEval0 {
   requires {

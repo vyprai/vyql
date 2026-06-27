@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mea9e392b;
+module bindings.kotlin.generated.mea9e392b;
 
 binding httpInput3 {
   requires {

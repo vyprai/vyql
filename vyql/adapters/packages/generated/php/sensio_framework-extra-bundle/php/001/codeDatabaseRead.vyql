@@ -1,4 +1,4 @@
-module bindings.php.migration.m3c07ec34;
+module bindings.php.generated.m3c07ec34;
 
 binding databaseRead1 {
   requires {

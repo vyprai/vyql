@@ -1,4 +1,4 @@
-module bindings.dart.migration.m63a883b0;
+module bindings.dart.generated.m63a883b0;
 
 binding templateRender1 {
   requires {

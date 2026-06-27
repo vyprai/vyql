@@ -1,4 +1,4 @@
-module bindings.ruby.migration.meb3abca7;
+module bindings.ruby.generated.meb3abca7;
 
 binding sqlExecution3 {
   requires {

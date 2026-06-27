@@ -1,4 +1,4 @@
-module bindings.perl.migration.meb0b0e80;
+module bindings.perl.generated.meb0b0e80;
 
 binding logOutput0 {
   requires {

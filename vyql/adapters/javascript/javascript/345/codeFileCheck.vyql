@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding fileCheck345 {
   query pattern presenceNode where node.path ~= "fs.lstatSync"

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding uncheckedEncodedLengthArithmetic163 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "SkipBytes" and node.token contains "position+=count" and not (node.token contains "checked(position+count)")

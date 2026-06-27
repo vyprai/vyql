@@ -1,4 +1,4 @@
-module bindings.perl.migration.me65fd766;
+module bindings.perl.generated.me65fd766;
 
 binding xmlParse0 {
   requires {

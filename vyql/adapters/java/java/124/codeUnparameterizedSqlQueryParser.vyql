@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding unparameterizedSqlQueryParser124 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "function.return" and node.context.functionName contains "toString" and node.token contains "::box"

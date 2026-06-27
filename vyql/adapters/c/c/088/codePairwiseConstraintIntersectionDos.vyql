@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding pairwiseConstraintIntersectionDos88 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.callPath, ["intersect_nodes", "name_constraints_intersect_nodes"]) and containsAny(node.context.callPath, ["node_list_add", "name_constraints_node_list_add"]) and containsAny(node.context.selector, ["permitted.size", "permitted2.size", "removed.size"]) and containsAny(node.context.binary, ["i<permitted2->size", "j<removed.size", "j<permitted2->size"]) and not (containsAny(node.context.callPath, ["ensure_sorted", "compare_name_constraint_nodes"])) and not (node.context.selector contains "sorted_view")

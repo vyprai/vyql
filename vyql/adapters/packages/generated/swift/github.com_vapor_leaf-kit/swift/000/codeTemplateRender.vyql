@@ -1,4 +1,4 @@
-module bindings.swift.migration.mef3132a6;
+module bindings.swift.generated.mef3132a6;
 
 binding templateRender0 {
   requires {

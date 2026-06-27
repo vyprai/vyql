@@ -1,4 +1,4 @@
-module bindings.java.migration.m79bd0cb4;
+module bindings.java.generated.m79bd0cb4;
 
 binding filePathAccess2 {
   requires {

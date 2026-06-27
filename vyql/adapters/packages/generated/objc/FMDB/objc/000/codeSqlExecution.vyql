@@ -1,4 +1,4 @@
-module bindings.objc.migration.m764368db;
+module bindings.objc.generated.m764368db;
 
 binding sqlExecution0 {
   requires {

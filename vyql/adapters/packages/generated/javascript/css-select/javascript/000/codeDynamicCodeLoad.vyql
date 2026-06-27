@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mba4ed5dd;
+module bindings.javascript.generated.mba4ed5dd;
 
 binding dynamicCodeLoad0 {
   requires {

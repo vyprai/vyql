@@ -1,4 +1,4 @@
-module bindings.python.migration.m69de2c61;
+module bindings.python.generated.m69de2c61;
 
 binding shellEscape1 {
   requires {

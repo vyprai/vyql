@@ -1,4 +1,4 @@
-module bindings.java.migration.mac157ef2;
+module bindings.java.generated.mac157ef2;
 
 binding commandExecution0 {
   requires {

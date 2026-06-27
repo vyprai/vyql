@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding containerPrimaryGidMissingSupplementalGroup231 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "setupContainerUser" and node.context.callPath contains "specgen.SetProcessGID" and node.context.selector contains "sc.RunAsGroup" and node.context.callPath contains "specgen.AddProcessAdditionalGid" and not (node.context.callArg contains "specgen.AddProcessAdditionalGid:gid")

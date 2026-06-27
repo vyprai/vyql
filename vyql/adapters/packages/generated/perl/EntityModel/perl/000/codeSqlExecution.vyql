@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc542c3f3;
+module bindings.perl.generated.mc542c3f3;
 
 binding sqlExecution0 {
   requires {

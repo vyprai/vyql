@@ -1,4 +1,4 @@
-module bindings.python.migration.mcc8c2628;
+module bindings.python.generated.mcc8c2628;
 
 binding cliArgument1 {
   requires {

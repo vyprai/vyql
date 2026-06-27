@@ -1,4 +1,4 @@
-module bindings.elixir.migration.md062d001;
+module bindings.elixir.generated.md062d001;
 
 binding storedDataRead6 {
   requires {

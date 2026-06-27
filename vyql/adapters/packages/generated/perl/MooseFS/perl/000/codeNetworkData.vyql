@@ -1,4 +1,4 @@
-module bindings.perl.migration.maff4fe59;
+module bindings.perl.generated.maff4fe59;
 
 binding networkData0 {
   requires {

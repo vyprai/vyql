@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding accessPolicyReview150 {
   query pattern presenceNode where node.kind == "any" and node.path == "__object_literal" and node.token contains "locale/currency/groups" and node.token contains "admin"

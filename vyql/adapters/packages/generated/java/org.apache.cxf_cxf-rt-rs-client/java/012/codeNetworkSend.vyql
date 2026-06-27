@@ -1,4 +1,4 @@
-module bindings.java.migration.mb2560d14;
+module bindings.java.generated.mb2560d14;
 
 binding networkSend12 {
   requires {

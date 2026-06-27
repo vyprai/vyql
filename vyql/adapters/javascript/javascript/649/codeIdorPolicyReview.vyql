@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding idorPolicyReview649 {
   query pattern presenceNode where node.scope == "function" and node.token contains "prisma.accounts.update" and node.token contains "where:{id}" and node.token contains "passwordHash" and node.token contains "originalPassword" and not (node.token contains "currentUserId") and not (node.token contains "ctx.id")

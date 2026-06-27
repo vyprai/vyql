@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding httpInput4 {
   query pattern callExpr where callee.path ~= "$_GET"

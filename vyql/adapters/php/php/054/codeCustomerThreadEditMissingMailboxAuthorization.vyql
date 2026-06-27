@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding customerThreadEditMissingMailboxAuthorization54 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "edit" and node.context.paramType contains "User" and node.context.paramType contains "Thread" and node.context.attrPath contains "$thread.created_by_customer_id" and node.context.attrPath contains "$thread.type" and node.context.callPath contains "in_array" and node.context.callArg contains "Thread::TYPE_CUSTOMER" and node.token contains "returntrue;" and not (node.context.callPath contains "userHasAccessToMailbox")

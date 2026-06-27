@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06ca2d42;
+module bindings.scala.generated.m06ca2d42;
 
 binding redirectTarget0 {
   requires {

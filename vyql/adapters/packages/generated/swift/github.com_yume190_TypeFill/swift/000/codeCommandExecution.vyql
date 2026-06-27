@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdc06f2c6;
+module bindings.swift.generated.mdc06f2c6;
 
 binding commandExecution0 {
   requires {

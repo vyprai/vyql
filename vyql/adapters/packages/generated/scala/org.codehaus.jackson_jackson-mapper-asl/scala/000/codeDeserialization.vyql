@@ -1,4 +1,4 @@
-module bindings.scala.migration.m0f7313aa;
+module bindings.scala.generated.m0f7313aa;
 
 binding deserialization0 {
   requires {

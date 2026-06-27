@@ -1,4 +1,4 @@
-module bindings.rust.migration.mfa58e746;
+module bindings.rust.generated.mfa58e746;
 
 binding authorizationCheck0 {
   requires {

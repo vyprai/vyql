@@ -1,4 +1,4 @@
-module bindings.java.migration.mcdede0a8;
+module bindings.java.generated.mcdede0a8;
 
 binding stdinInput1 {
   requires {

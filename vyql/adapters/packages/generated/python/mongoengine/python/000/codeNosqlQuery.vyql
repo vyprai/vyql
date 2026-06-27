@@ -1,4 +1,4 @@
-module bindings.python.migration.m2e1eefbc;
+module bindings.python.generated.m2e1eefbc;
 
 binding nosqlQuery0 {
   requires {

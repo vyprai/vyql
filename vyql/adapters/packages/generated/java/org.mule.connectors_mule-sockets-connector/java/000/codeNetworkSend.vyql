@@ -1,4 +1,4 @@
-module bindings.java.migration.macff0dbe;
+module bindings.java.generated.macff0dbe;
 
 binding networkSend0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m6cedf005;
+module bindings.java.generated.m6cedf005;
 
 binding storedDataRead2 {
   requires {

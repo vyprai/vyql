@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m0c675155;
+module bindings.cpp.generated.m0c675155;
 
 binding dynamicCodeLoad0 {
   requires {

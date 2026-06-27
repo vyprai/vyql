@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma160c909;
+module bindings.kotlin.generated.ma160c909;
 
 binding deserialization0 {
   requires {

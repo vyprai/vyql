@@ -1,4 +1,4 @@
-module bindings.python.migration.ma90f2717;
+module bindings.python.generated.ma90f2717;
 
 binding userControlledData1 {
   requires {

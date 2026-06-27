@@ -1,4 +1,4 @@
-module bindings.solidity.migration.m88e544d8;
+module bindings.solidity.generated.m88e544d8;
 
 binding privilegedOp11 {
   query pattern callExpr where callee.path ~= "suicide"

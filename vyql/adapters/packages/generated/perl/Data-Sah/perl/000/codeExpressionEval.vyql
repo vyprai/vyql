@@ -1,4 +1,4 @@
-module bindings.perl.migration.m436fe6c6;
+module bindings.perl.generated.m436fe6c6;
 
 binding expressionEval0 {
   requires {

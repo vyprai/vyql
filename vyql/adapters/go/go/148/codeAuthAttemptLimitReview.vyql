@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding authAttemptLimitReview148 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "SolveChallenge" and node.context.selector contains "challenge.tries" and node.context.selector contains "s.challenges"

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mb12ac73f;
+module bindings.elixir.generated.mb12ac73f;
 
 binding storedDataRead2 {
   requires {

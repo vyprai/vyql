@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mc8d886c6;
+module bindings.javascript.generated.mc8d886c6;
 
 binding commandExecution0 {
   requires {

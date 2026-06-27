@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mce11883d;
+module bindings.elixir.generated.mce11883d;
 
 binding weakHash6 {
   requires {

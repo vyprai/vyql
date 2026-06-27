@@ -1,4 +1,4 @@
-module bindings.rust.migration.m32e28bbf;
+module bindings.rust.generated.m32e28bbf;
 
 binding xmlParse0 {
   requires {

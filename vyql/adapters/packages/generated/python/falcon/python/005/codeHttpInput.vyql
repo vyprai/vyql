@@ -1,4 +1,4 @@
-module bindings.python.migration.m2982b66d;
+module bindings.python.generated.m2982b66d;
 
 binding httpInput5 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc27c860d;
+module bindings.perl.generated.mc27c860d;
 
 binding inputValidation0 {
   requires {

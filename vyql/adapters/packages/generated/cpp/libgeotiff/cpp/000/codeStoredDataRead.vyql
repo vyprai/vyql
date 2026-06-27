@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4876bc2a;
+module bindings.cpp.generated.m4876bc2a;
 
 binding storedDataRead0 {
   requires {

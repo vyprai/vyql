@@ -1,4 +1,4 @@
-module bindings.rust.migration.maeb3cd42;
+module bindings.rust.generated.maeb3cd42;
 
 binding httpInput0 {
   requires {

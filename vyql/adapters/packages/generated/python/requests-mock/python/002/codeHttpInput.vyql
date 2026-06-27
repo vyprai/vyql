@@ -1,4 +1,4 @@
-module bindings.python.migration.mad97f1d3;
+module bindings.python.generated.mad97f1d3;
 
 binding httpInput2 {
   requires {

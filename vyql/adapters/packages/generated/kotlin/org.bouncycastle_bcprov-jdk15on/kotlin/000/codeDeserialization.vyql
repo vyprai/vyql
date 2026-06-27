@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m95bedc5b;
+module bindings.kotlin.generated.m95bedc5b;
 
 binding deserialization0 {
   requires {

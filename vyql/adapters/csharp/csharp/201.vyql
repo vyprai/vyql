@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding binding201 {
   query pattern callExpr where callee.path ~= "Regex.Replace" and call.filter.global == true

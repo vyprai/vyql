@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unescapedHtmlPresenter104 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.assign contains "presentType=html" and node.context.identifier contains "present" and node.context.identifier contains "encodings" and node.context.callPath contains "Utils.printable" and node.context.literal contains "<td>${value}</td>" and not (node.context.callPath contains "Utils.escapeHtml") and not (node.context.callPath contains "DOMPurify")

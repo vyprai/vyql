@@ -1,4 +1,4 @@
-module bindings.perl.migration.mdd98cc15;
+module bindings.perl.generated.mdd98cc15;
 
 binding networkData0 {
   requires {

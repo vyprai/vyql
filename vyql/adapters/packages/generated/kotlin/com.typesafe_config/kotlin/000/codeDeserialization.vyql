@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mde208c02;
+module bindings.kotlin.generated.mde208c02;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.lua.migration.ma99d12f7;
+module bindings.lua.generated.ma99d12f7;
 
 binding cleartextChannel48 {
   query pattern callExpr where callee.path ~= "http.request" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

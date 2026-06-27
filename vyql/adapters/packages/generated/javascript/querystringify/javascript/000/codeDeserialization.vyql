@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfcad1314;
+module bindings.javascript.generated.mfcad1314;
 
 binding deserialization0 {
   requires {

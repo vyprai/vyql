@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4107ab81;
+module bindings.cpp.generated.m4107ab81;
 
 binding httpInput2 {
   requires {

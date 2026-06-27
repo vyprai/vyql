@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m4c791c58;
+module bindings.csharp.generated.m4c791c58;
 
 binding networkSend7 {
   requires {

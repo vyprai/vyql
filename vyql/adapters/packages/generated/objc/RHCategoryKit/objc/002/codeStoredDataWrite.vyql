@@ -1,4 +1,4 @@
-module bindings.objc.migration.mef2186dc;
+module bindings.objc.generated.mef2186dc;
 
 binding storedDataWrite2 {
   requires {

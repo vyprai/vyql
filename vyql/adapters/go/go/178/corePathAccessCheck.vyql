@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding pathAccessCheck178 {
   query pattern callExpr where callee.path ~= "regexp.MatchString" and args.any.literal contains "^/var/lib/casaos/\\d"

@@ -1,4 +1,4 @@
-module bindings.c.migration.mfe3b0a07;
+module bindings.c.generated.mfe3b0a07;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.maea7cb04;
+module bindings.ruby.generated.maea7cb04;
 
 binding networkConnect0 {
   requires {

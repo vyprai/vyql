@@ -1,4 +1,4 @@
-module bindings.python.migration.mbe22346c;
+module bindings.python.generated.mbe22346c;
 
 binding filePathAccess0 {
   requires {

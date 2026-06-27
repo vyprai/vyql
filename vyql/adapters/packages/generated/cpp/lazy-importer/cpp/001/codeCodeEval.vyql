@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mebe89998;
+module bindings.cpp.generated.mebe89998;
 
 binding codeEval1 {
   requires {

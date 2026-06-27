@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding chartkickRecursiveExtendPrototypePollution578 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "extend" and node.token contains "for(keyinsource)" and node.token contains "target[key]=source[key]" and node.token contains "extend(target[key],source[key])" and not (node.token contains "key===\"__proto__\"")

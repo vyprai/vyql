@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding djangoAttachmentSaveWithoutModelValidation260 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "process_attachments" and node.token contains "attached_files" and node.token contains "FollowUpAttachment(" and node.token contains "file=attached" and node.token contains "filename=filename" and node.token contains "att.save()" and not (node.token contains "att.full_clean()") and not (node.token contains "full_clean()")

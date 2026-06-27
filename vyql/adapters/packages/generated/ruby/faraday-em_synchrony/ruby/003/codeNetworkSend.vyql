@@ -1,4 +1,4 @@
-module bindings.ruby.migration.me8a8c411;
+module bindings.ruby.generated.me8a8c411;
 
 binding networkSend3 {
   requires {

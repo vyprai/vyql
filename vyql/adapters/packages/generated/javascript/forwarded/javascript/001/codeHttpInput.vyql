@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mdd2d8125;
+module bindings.javascript.generated.mdd2d8125;
 
 binding httpInput1 {
   requires {

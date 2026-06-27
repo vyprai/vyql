@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding uninitializedBufferExposure20 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "with_capacity" and node.token contains "as_mut_ptr" and node.token contains "from_raw_parts_mut" and node.token contains "read_exact" and node.token contains "set_len"

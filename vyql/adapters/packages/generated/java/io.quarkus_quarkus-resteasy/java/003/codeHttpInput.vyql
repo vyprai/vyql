@@ -1,4 +1,4 @@
-module bindings.java.migration.m0f1fd39c;
+module bindings.java.generated.m0f1fd39c;
 
 binding httpInput3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m4685cbb4;
+module bindings.php.generated.m4685cbb4;
 
 binding responseHeaderWrite9 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.m5f43f196;
+module bindings.perl.generated.m5f43f196;
 
 binding redirectTarget1 {
   requires {

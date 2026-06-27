@@ -1,4 +1,4 @@
-module bindings.java.migration.m51c331b3;
+module bindings.java.generated.m51c331b3;
 
 binding httpInput3 {
   requires {

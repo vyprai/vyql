@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unparameterizedSqlQueryParser191 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "toLegacyOrderBy" and node.token contains "toLegacyOrderWay" and node.token contains "orderBy" and not (node.token contains "isOrderBy") and not (node.token contains "isOrderWay")

@@ -1,4 +1,4 @@
-module bindings.swift.migration.m1dfd5712;
+module bindings.swift.generated.m1dfd5712;
 
 binding stdinInput1 {
   requires {

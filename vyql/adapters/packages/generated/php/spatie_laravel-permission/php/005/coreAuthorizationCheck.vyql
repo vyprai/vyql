@@ -1,4 +1,4 @@
-module bindings.php.migration.m140375a4;
+module bindings.php.generated.m140375a4;
 
 binding authorizationCheck5 {
   requires {

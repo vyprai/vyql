@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mefb968d9;
+module bindings.elixir.generated.mefb968d9;
 
 binding codeEval0 {
   requires {

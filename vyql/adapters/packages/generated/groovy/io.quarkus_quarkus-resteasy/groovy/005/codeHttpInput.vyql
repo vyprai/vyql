@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbe357b56;
+module bindings.groovy.generated.mbe357b56;
 
 binding httpInput5 {
   requires {

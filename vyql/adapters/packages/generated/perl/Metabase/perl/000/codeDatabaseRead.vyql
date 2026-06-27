@@ -1,4 +1,4 @@
-module bindings.perl.migration.m889b1b9d;
+module bindings.perl.generated.m889b1b9d;
 
 binding databaseRead0 {
   requires {

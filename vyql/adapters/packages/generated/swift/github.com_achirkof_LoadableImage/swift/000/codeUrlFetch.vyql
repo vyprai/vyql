@@ -1,4 +1,4 @@
-module bindings.swift.migration.mfdf90b71;
+module bindings.swift.generated.mfdf90b71;
 
 binding urlFetch0 {
   requires {

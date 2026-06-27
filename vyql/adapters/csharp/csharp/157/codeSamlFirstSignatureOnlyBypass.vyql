@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding samlFirstSignatureOnlyBypass157 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "VerifySignature" and node.token contains "signedDocument.GetElementsByTagName" and node.token contains "nodeList[0]" and node.token contains "signedXml.LoadXml" and node.token contains "signedXml.CheckSignature" and not (node.token contains "VerifyAllSignatures") and not (node.token contains "signatureNodes")

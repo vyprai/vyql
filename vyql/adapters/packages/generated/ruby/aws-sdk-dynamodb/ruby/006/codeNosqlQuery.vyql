@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m47da9b45;
+module bindings.ruby.generated.m47da9b45;
 
 binding nosqlQuery6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m1dbf86b9;
+module bindings.python.generated.m1dbf86b9;
 
 binding weakHash0 {
   requires {

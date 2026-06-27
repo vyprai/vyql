@@ -1,4 +1,4 @@
-module bindings.swift.migration.m1d687958;
+module bindings.swift.generated.m1d687958;
 
 binding privilegedOp1 {
   requires {

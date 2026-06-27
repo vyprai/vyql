@@ -1,4 +1,4 @@
-module bindings.rust.migration.mca3699df;
+module bindings.rust.generated.mca3699df;
 
 binding deserialization0 {
   requires {

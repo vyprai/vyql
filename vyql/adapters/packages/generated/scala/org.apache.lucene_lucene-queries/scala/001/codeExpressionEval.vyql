@@ -1,4 +1,4 @@
-module bindings.scala.migration.m32d8b300;
+module bindings.scala.generated.m32d8b300;
 
 binding expressionEval1 {
   requires {

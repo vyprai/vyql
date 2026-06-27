@@ -1,4 +1,4 @@
-module bindings.objc.migration.m4b7ff71b;
+module bindings.objc.generated.m4b7ff71b;
 
 binding expressionEval1 {
   requires {

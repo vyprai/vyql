@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m07f32de8;
+module bindings.kotlin.generated.m07f32de8;
 
 binding pathCanonicalization1 {
   requires {

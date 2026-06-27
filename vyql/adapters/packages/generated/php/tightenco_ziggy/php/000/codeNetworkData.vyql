@@ -1,4 +1,4 @@
-module bindings.php.migration.mfa66feae;
+module bindings.php.generated.mfa66feae;
 
 binding networkData0 {
   requires {

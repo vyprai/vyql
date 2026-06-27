@@ -1,4 +1,4 @@
-module bindings.dart.migration.mc6b3e512;
+module bindings.dart.generated.mc6b3e512;
 
 binding storedDataRead0 {
   requires {

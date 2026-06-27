@@ -1,4 +1,4 @@
-module bindings.go.migration.mc7cb396a;
+module bindings.go.generated.mc7cb396a;
 
 binding commandExecution0 {
   requires {

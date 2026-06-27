@@ -1,4 +1,4 @@
-module bindings.c.migration.m253caba6;
+module bindings.c.generated.m253caba6;
 
 binding deserialization0 {
   requires {

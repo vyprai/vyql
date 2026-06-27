@@ -1,4 +1,4 @@
-module bindings.rust.migration.me0b8d47f;
+module bindings.rust.generated.me0b8d47f;
 
 binding pathCanonicalization0 {
   requires {

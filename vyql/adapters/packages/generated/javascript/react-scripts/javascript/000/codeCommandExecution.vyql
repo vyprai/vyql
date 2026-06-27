@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mec5fdd77;
+module bindings.javascript.generated.mec5fdd77;
 
 binding commandExecution0 {
   requires {

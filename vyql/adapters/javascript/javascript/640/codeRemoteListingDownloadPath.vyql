@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding remoteListingDownloadPath640 {
   query pattern presenceNode where node.scope == "function" and node.token contains "_downloadFromWorkingDir" and node.token contains "join(localDirPath,file.name)" and node.token contains "downloadTo(localPath,file.name)" and not (node.token contains "basename(file.name)")

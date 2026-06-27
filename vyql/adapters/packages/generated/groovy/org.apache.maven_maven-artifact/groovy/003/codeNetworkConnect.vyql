@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m8100a046;
+module bindings.groovy.generated.m8100a046;
 
 binding networkConnect3 {
   requires {

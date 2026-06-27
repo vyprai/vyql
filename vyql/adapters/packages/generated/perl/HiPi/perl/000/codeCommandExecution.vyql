@@ -1,4 +1,4 @@
-module bindings.perl.migration.mf2bec495;
+module bindings.perl.generated.mf2bec495;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.mde4847a1;
+module bindings.c.generated.mde4847a1;
 
 binding deserialization0 {
   requires {

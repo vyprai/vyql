@@ -1,4 +1,4 @@
-module bindings.java.migration.mbebeef99;
+module bindings.java.generated.mbebeef99;
 
 binding deserialization1 {
   requires {

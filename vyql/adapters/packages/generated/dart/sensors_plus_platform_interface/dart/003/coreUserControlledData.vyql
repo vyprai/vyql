@@ -1,4 +1,4 @@
-module bindings.dart.migration.m225dead5;
+module bindings.dart.generated.m225dead5;
 
 binding userControlledData3 {
   requires {

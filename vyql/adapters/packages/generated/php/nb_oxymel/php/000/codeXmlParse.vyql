@@ -1,4 +1,4 @@
-module bindings.php.migration.m09cebc4d;
+module bindings.php.generated.m09cebc4d;
 
 binding xmlParse0 {
   requires {

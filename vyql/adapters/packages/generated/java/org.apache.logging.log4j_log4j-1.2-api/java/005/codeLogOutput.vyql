@@ -1,4 +1,4 @@
-module bindings.java.migration.mda3f7b35;
+module bindings.java.generated.mda3f7b35;
 
 binding logOutput5 {
   requires {

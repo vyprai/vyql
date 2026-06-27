@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding weakHash87 {
   query pattern presenceNode where node.path ~= "CC_MD2"

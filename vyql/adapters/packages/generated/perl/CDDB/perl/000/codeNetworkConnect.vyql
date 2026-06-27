@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc51f2d06;
+module bindings.perl.generated.mc51f2d06;
 
 binding networkConnect0 {
   requires {

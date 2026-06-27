@@ -1,4 +1,4 @@
-module bindings.dart.migration.m9a96523c;
+module bindings.dart.generated.m9a96523c;
 
 binding networkConnect8 {
   requires {

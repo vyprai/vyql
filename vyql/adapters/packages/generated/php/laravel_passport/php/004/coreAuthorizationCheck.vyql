@@ -1,4 +1,4 @@
-module bindings.php.migration.mdd0f105e;
+module bindings.php.generated.mdd0f105e;
 
 binding authorizationCheck4 {
   requires {

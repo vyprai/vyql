@@ -1,4 +1,4 @@
-module bindings.java.migration.mce5e8387;
+module bindings.java.generated.mce5e8387;
 
 binding responseHeaderWrite4 {
   requires {

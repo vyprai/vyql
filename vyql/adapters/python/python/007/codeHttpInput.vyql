@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding httpInput7 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "route" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"

@@ -1,4 +1,4 @@
-module bindings.go.migration.maea0f571;
+module bindings.go.generated.maea0f571;
 
 binding codeEval0 {
   requires {

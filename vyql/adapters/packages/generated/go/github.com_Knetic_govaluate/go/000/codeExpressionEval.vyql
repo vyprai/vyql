@@ -1,4 +1,4 @@
-module bindings.go.migration.m46b092d4;
+module bindings.go.generated.m46b092d4;
 
 binding expressionEval0 {
   requires {

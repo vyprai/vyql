@@ -1,4 +1,4 @@
-module bindings.perl.migration.mdac0c410;
+module bindings.perl.generated.mdac0c410;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding nestedPathInheritedPropertyPrototypePollution584 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "currentKeyPath" and node.token contains "remainingKeyPath" and node.token contains "obj[currentKeyPath]" and node.token contains "obj[currentKeyPath]={}" and node.token contains "setByKeyPath(innerObj,remainingKeyPath,value)" and not (node.token contains "hasOwn(obj,currentKeyPath)") and not (node.token contains "Object.prototype.hasOwnProperty.call(obj,currentKeyPath)")

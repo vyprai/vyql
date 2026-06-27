@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mad63a117;
+module bindings.cpp.generated.mad63a117;
 
 binding storedDataWrite1 {
   requires {

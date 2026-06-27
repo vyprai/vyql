@@ -1,4 +1,4 @@
-module bindings.rust.migration.ma29edc0d;
+module bindings.rust.generated.ma29edc0d;
 
 binding xmlParse0 {
   requires {

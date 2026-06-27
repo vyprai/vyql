@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m25311c92;
+module bindings.ruby.generated.m25311c92;
 
 binding authenticationCheck3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding cocotaisEchoPlatformTagInjection123 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "builtin:echo" and node.token contains "\"/echo\"" and node.token contains "_msgs.join(\" \")" and node.token contains "event.reply(content)"

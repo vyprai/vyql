@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding logWrite393 {
   query pattern presenceNode where node.path ~= "logger.error"

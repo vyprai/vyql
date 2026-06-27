@@ -1,4 +1,4 @@
-module bindings.swift.migration.mfd35c129;
+module bindings.swift.generated.mfd35c129;
 
 binding inputValidation1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m0edc6b5b;
+module bindings.csharp.generated.m0edc6b5b;
 
 binding expressionEval0 {
   requires {

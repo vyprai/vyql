@@ -1,4 +1,4 @@
-module bindings.python.migration.m3e2f1546;
+module bindings.python.generated.m3e2f1546;
 
 binding archiveEntryWrite0 {
   requires {

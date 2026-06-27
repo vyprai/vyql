@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding flowSpecOperatorLoopBoundOffByOne95 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "hex2bin" and node.context.callPath contains "hexstr2num" and node.context.selector contains "mval.value" and node.context.binary contains "loop>BGP_PBR_MATCH_VAL_MAX" and not (node.context.binary contains "loop>=BGP_PBR_MATCH_VAL_MAX")

@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m7e16e940;
+module bindings.powershell.generated.m7e16e940;
 
 binding htmlRender0 {
   requires {

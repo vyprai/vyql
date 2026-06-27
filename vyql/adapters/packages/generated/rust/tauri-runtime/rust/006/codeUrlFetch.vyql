@@ -1,4 +1,4 @@
-module bindings.rust.migration.m24cf5420;
+module bindings.rust.generated.m24cf5420;
 
 binding urlFetch6 {
   requires {

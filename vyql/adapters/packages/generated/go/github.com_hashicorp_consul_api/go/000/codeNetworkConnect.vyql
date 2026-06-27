@@ -1,4 +1,4 @@
-module bindings.go.migration.ma206a1a4;
+module bindings.go.generated.ma206a1a4;
 
 binding networkConnect0 {
   requires {

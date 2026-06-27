@@ -1,4 +1,4 @@
-module bindings.python.migration.m78ea425f;
+module bindings.python.generated.m78ea425f;
 
 binding weakHash0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.mdbb65ebb;
+module bindings.c.generated.mdbb65ebb;
 
 binding expressionEval1 {
   requires {

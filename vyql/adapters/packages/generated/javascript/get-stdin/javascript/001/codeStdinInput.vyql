@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mc4997308;
+module bindings.javascript.generated.mc4997308;
 
 binding stdinInput1 {
   requires {

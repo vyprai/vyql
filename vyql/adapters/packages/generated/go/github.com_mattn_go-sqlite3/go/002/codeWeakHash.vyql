@@ -1,4 +1,4 @@
-module bindings.go.migration.m85270cdc;
+module bindings.go.generated.m85270cdc;
 
 binding weakHash2 {
   requires {

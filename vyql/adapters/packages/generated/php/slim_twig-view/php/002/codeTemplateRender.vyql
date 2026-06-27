@@ -1,4 +1,4 @@
-module bindings.php.migration.md811e02f;
+module bindings.php.generated.md811e02f;
 
 binding templateRender2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding cleartextChannel61 {
   query pattern callExpr where callee.path ~= "ureq.post" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

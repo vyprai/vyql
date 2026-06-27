@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding filePathAccess250 {
   query pattern callExpr where callee.path ~= "file_get_contents"

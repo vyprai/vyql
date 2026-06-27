@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m2a73d5f6;
+module bindings.kotlin.generated.m2a73d5f6;
 
 binding networkBind1 {
   requires {

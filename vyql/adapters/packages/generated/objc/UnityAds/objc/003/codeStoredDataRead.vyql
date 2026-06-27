@@ -1,4 +1,4 @@
-module bindings.objc.migration.m89200495;
+module bindings.objc.generated.m89200495;
 
 binding storedDataRead3 {
   requires {

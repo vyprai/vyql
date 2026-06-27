@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mfddaade8;
+module bindings.cpp.generated.mfddaade8;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfc154ad2;
+module bindings.javascript.generated.mfc154ad2;
 
 binding deserialization11 {
   requires {

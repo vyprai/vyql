@@ -1,4 +1,4 @@
-module bindings.csharp.migration.me666ff19;
+module bindings.csharp.generated.me666ff19;
 
 binding authenticationCheck1 {
   requires {

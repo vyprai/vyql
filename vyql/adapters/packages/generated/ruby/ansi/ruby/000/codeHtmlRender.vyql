@@ -1,4 +1,4 @@
-module bindings.ruby.migration.madbfcc3d;
+module bindings.ruby.generated.madbfcc3d;
 
 binding htmlRender0 {
   requires {

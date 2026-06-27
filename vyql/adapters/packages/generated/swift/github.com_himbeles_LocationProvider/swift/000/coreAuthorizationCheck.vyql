@@ -1,4 +1,4 @@
-module bindings.swift.migration.me1e0c650;
+module bindings.swift.generated.me1e0c650;
 
 binding authorizationCheck0 {
   requires {

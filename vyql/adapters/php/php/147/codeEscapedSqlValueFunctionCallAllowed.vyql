@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding escapedSqlValueFunctionCallAllowed147 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "ConditionExpr" and node.context.callPath contains "is_array" and node.context.callPath contains "array_keys" and node.context.index contains "$Value.__subscript" and node.context.callPath contains "stripos" and node.context.callPath contains "sprintf" and not (node.context.callPath contains "Gdn_UserException")

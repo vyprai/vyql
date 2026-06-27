@@ -1,4 +1,4 @@
-module bindings.rust.migration.m2d951392;
+module bindings.rust.generated.m2d951392;
 
 binding commandExecution0 {
   requires {

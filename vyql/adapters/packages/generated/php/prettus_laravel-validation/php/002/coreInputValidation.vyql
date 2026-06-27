@@ -1,4 +1,4 @@
-module bindings.php.migration.mcfec5cd5;
+module bindings.php.generated.mcfec5cd5;
 
 binding inputValidation2 {
   requires {

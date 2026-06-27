@@ -1,4 +1,4 @@
-module bindings.go.migration.mce0b0ff2;
+module bindings.go.generated.mce0b0ff2;
 
 binding filePathAccess2 {
   requires {

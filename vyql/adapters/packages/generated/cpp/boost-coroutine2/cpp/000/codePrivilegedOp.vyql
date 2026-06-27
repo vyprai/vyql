@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mdf3503dd;
+module bindings.cpp.generated.mdf3503dd;
 
 binding privilegedOp0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mf08a8ff3;
+module bindings.elixir.generated.mf08a8ff3;
 
 binding logOutput3 {
   requires {

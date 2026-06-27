@@ -1,4 +1,4 @@
-module bindings.textpattern.migration.mf0439c30;
+module bindings.textpattern.generated.mf0439c30;
 
 pattern adapterMetadata {
   adapter: {

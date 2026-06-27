@@ -1,4 +1,4 @@
-module bindings.objc.migration.me36f2000;
+module bindings.objc.generated.me36f2000;
 
 binding httpInput2 {
   requires {

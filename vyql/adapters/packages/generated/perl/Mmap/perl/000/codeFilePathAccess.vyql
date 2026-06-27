@@ -1,4 +1,4 @@
-module bindings.perl.migration.mcabe6480;
+module bindings.perl.generated.mcabe6480;
 
 binding filePathAccess0 {
   requires {

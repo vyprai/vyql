@@ -1,4 +1,4 @@
-module bindings.perl.migration.m2d8bc0d5;
+module bindings.perl.generated.m2d8bc0d5;
 
 binding userControlledData0 {
   requires {

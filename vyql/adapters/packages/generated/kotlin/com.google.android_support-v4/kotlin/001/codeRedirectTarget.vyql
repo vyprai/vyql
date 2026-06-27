@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mec43e687;
+module bindings.kotlin.generated.mec43e687;
 
 binding redirectTarget1 {
   requires {

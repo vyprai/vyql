@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding gsonObjectTypeAdapterRecursiveRead137 {
   query pattern presenceNode where node.scope == "function" and node.context.selector contains "ObjectTypeAdapter.FACTORY" and node.context.identifier contains "read" and node.context.call contains "read" and node.context.callPath contains "list.add" and node.context.callPath contains "map.put" and not (node.context.scopeCall contains "tryBeginNesting") and not (node.context.scopeCall contains "readTerminal")

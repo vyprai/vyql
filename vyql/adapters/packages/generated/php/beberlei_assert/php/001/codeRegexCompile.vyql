@@ -1,4 +1,4 @@
-module bindings.php.migration.mba7e2cbb;
+module bindings.php.generated.mba7e2cbb;
 
 binding regexCompile1 {
   requires {

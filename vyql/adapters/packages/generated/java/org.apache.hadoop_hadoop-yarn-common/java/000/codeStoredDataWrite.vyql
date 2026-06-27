@@ -1,4 +1,4 @@
-module bindings.java.migration.mfe5be262;
+module bindings.java.generated.mfe5be262;
 
 binding storedDataWrite0 {
   requires {

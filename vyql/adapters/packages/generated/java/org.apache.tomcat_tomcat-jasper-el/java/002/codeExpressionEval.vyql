@@ -1,4 +1,4 @@
-module bindings.java.migration.mbf7b934b;
+module bindings.java.generated.mbf7b934b;
 
 binding expressionEval2 {
   requires {

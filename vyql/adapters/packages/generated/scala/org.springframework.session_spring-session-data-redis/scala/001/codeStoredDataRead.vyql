@@ -1,4 +1,4 @@
-module bindings.scala.migration.m061d45f5;
+module bindings.scala.generated.m061d45f5;
 
 binding storedDataRead1 {
   requires {

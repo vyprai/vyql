@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding methodGatedRedirectValidationBypass187 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.selector, ["ctx.request.method", "ctx.request?.method"]) and node.context.literal contains "POST" and node.context.identifier contains "callbackURL" and node.context.identifier contains "redirectURL" and node.context.selector contains "body.redirectTo" and node.context.identifier contains "trustedOrigins" and node.context.callPath contains "validateURL"

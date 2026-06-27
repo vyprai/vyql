@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m1a723a04;
+module bindings.kotlin.generated.m1a723a04;
 
 binding sqlExecution0 {
   requires {

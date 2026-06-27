@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding weakRandomValue88 {
   query pattern presenceNode where node.path ~= "thread_rng"

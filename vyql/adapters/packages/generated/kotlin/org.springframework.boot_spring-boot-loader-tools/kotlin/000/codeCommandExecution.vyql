@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m8abe6a05;
+module bindings.kotlin.generated.m8abe6a05;
 
 binding commandExecution0 {
   requires {

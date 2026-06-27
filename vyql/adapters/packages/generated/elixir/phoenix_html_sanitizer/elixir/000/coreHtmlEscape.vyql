@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc5e10e08;
+module bindings.elixir.generated.mc5e10e08;
 
 binding htmlEscape0 {
   requires {

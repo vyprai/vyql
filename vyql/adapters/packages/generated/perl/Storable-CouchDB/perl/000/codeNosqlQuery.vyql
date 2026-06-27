@@ -1,4 +1,4 @@
-module bindings.perl.migration.m17989e44;
+module bindings.perl.generated.m17989e44;
 
 binding nosqlQuery0 {
   requires {

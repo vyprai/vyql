@@ -1,4 +1,4 @@
-module bindings.swift.migration.m96997166;
+module bindings.swift.generated.m96997166;
 
 binding networkSend0 {
   requires {

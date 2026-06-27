@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbf3bad59;
+module bindings.javascript.generated.mbf3bad59;
 
 binding responseHeaderWrite0 {
   requires {

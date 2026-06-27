@@ -1,4 +1,4 @@
-module bindings.scala.migration.m710d03bd;
+module bindings.scala.generated.m710d03bd;
 
 binding regexCompile0 {
   requires {

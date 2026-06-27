@@ -1,4 +1,4 @@
-module bindings.c.migration.mbb741b84;
+module bindings.c.generated.mbb741b84;
 
 binding weakRandomValue3 {
   requires {

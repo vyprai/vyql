@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m1df5cfef;
+module bindings.groovy.generated.m1df5cfef;
 
 binding responseHeaderWrite3 {
   requires {

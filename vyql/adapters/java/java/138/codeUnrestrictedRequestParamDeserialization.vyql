@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding unrestrictedRequestParamDeserialization138 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createXStream" and node.context.callPath contains "XStream" and node.context.call contains "registerConverter" and not (node.context.scopeCall contains "addDefaultPermissions") and not (node.context.scopeCall contains "addPermissions") and not (node.context.scopeCall contains "addPermission") and not (node.context.scopeCall contains "denyPermission")

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding certValidationDisabled430 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "curl_setopt_array" and node.token contains "CURLOPT_SSL_VERIFYPEER=false"

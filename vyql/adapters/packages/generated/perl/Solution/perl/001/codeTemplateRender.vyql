@@ -1,4 +1,4 @@
-module bindings.perl.migration.m6eefbbe0;
+module bindings.perl.generated.m6eefbbe0;
 
 binding templateRender1 {
   requires {

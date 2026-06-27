@@ -1,4 +1,4 @@
-module bindings.rust.migration.mbc8ea658;
+module bindings.rust.generated.mbc8ea658;
 
 binding networkConnect0 {
   requires {

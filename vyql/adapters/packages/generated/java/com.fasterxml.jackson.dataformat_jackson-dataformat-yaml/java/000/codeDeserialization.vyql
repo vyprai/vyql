@@ -1,4 +1,4 @@
-module bindings.java.migration.mceda4a0f;
+module bindings.java.generated.mceda4a0f;
 
 binding deserialization0 {
   requires {

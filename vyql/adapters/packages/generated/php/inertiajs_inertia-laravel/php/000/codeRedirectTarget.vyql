@@ -1,4 +1,4 @@
-module bindings.php.migration.m1db1da0e;
+module bindings.php.generated.m1db1da0e;
 
 binding redirectTarget0 {
   requires {

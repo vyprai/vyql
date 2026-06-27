@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding dnsInterfaceNewlineValidationMissing42 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "initConfig" and node.context.literal contains "dns.interface" and node.context.attrPath contains "conf.dns.interface.c" and node.context.attrPath contains "conf.dns.interface.t" and node.context.assign contains "conf.dns.interface.c=validate_stub" and not (containsAny(node.context.assign, ["conf.dns.interface.c=validate_str_no_newline"]))

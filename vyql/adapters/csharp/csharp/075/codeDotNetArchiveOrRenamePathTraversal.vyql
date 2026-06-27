@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding dotNetArchiveOrRenamePathTraversal75 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "RenameAsync" and node.token contains "Path.Combine(path.Directory.Parent.FullName,name)" and node.token contains "Directory.Move(path.Directory.FullName,newPath.FullName)" and not (node.token contains "Path.GetFullPath(newPath.FullName)") and not (node.token contains "StartsWith(path.RootVolume.RootDirectory")

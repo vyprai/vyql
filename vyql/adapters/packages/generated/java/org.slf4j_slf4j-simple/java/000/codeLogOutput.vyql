@@ -1,4 +1,4 @@
-module bindings.java.migration.m787f8968;
+module bindings.java.generated.m787f8968;
 
 binding logOutput0 {
   requires {

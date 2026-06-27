@@ -1,4 +1,4 @@
-module bindings.java.migration.me48c3402;
+module bindings.java.generated.me48c3402;
 
 binding authenticationCheck1 {
   requires {

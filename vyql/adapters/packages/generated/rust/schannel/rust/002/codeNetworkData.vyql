@@ -1,4 +1,4 @@
-module bindings.rust.migration.maacb195e;
+module bindings.rust.generated.maacb195e;
 
 binding networkData2 {
   requires {

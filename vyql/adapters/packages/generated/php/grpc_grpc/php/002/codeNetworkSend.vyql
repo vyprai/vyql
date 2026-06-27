@@ -1,4 +1,4 @@
-module bindings.php.migration.ma81f61c1;
+module bindings.php.generated.ma81f61c1;
 
 binding networkSend2 {
   requires {

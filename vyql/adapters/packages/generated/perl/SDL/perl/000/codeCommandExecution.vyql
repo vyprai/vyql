@@ -1,4 +1,4 @@
-module bindings.perl.migration.m4fbadbb4;
+module bindings.perl.generated.m4fbadbb4;
 
 binding commandExecution0 {
   requires {

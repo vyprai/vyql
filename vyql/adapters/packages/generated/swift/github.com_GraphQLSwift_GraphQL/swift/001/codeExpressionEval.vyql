@@ -1,4 +1,4 @@
-module bindings.swift.migration.m6a41e85e;
+module bindings.swift.generated.m6a41e85e;
 
 binding expressionEval1 {
   requires {

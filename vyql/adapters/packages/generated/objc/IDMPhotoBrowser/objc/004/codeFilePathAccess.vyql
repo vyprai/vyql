@@ -1,4 +1,4 @@
-module bindings.objc.migration.m26887366;
+module bindings.objc.generated.m26887366;
 
 binding filePathAccess4 {
   requires {

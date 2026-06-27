@@ -1,4 +1,4 @@
-module bindings.dart.migration.meb2e0012;
+module bindings.dart.generated.meb2e0012;
 
 binding databaseRead8 {
   requires {

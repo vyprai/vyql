@@ -1,4 +1,4 @@
-module bindings.java.migration.m8a3460e9;
+module bindings.java.generated.m8a3460e9;
 
 binding networkData1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.mffa4519e;
+module bindings.go.generated.mffa4519e;
 
 binding deserialization0 {
   requires {

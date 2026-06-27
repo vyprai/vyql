@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdb7d904e;
+module bindings.swift.generated.mdb7d904e;
 
 binding networkSend19 {
   requires {

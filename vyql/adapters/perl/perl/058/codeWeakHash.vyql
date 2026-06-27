@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding weakHash58 {
   query pattern presenceNode where node.path ~= "Digest.SHA1"

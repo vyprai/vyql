@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mb54676b8;
+module bindings.cpp.generated.mb54676b8;
 
 binding networkSend1 {
   requires {

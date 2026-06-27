@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m8f316b0e;
+module bindings.cpp.generated.m8f316b0e;
 
 binding weakHash4 {
   requires {

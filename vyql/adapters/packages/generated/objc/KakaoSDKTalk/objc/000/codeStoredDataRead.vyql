@@ -1,4 +1,4 @@
-module bindings.objc.migration.m29559e25;
+module bindings.objc.generated.m29559e25;
 
 binding storedDataRead0 {
   requires {

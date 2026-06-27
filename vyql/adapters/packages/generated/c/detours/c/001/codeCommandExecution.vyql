@@ -1,4 +1,4 @@
-module bindings.c.migration.m113f4c6b;
+module bindings.c.generated.m113f4c6b;
 
 binding commandExecution1 {
   requires {

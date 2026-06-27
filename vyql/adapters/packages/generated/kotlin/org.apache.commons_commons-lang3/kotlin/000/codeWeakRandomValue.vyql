@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m7aa2d804;
+module bindings.kotlin.generated.m7aa2d804;
 
 binding weakRandomValue0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mf33adf56;
+module bindings.groovy.generated.mf33adf56;
 
 binding ldapQuery1 {
   requires {

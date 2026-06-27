@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding xmlParserCreate150 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "getTaskUnmarshaller.unmarshal" and not (node.context.callPath contains "getXMLStreamReader")

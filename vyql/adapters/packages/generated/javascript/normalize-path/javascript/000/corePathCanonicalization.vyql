@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m6c316470;
+module bindings.javascript.generated.m6c316470;
 
 binding pathCanonicalization0 {
   requires {

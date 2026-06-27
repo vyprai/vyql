@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m1c1357ee;
+module bindings.cpp.generated.m1c1357ee;
 
 binding sqlParameterization8 {
   requires {

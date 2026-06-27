@@ -1,4 +1,4 @@
-module bindings.java.migration.m30f2cdf5;
+module bindings.java.generated.m30f2cdf5;
 
 binding networkData2 {
   requires {

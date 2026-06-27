@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mf23a26ca;
+module bindings.ruby.generated.mf23a26ca;
 
 binding fileUse1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.dart.migration.m1c398214;
+module bindings.dart.generated.m1c398214;
 
 binding xpathQuery45 {
   query pattern callExpr where callee.method == "evaluate"

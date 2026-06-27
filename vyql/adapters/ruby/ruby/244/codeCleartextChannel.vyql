@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding cleartextChannel244 {
   query pattern callExpr where callee.path ~= "HTTParty" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

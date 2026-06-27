@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3dbac85a;
+module bindings.kotlin.generated.m3dbac85a;
 
 binding expressionEval8 {
   requires {

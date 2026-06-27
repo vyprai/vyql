@@ -1,4 +1,4 @@
-module bindings.ruby.migration.maec902d9;
+module bindings.ruby.generated.maec902d9;
 
 binding templateRender1 {
   requires {

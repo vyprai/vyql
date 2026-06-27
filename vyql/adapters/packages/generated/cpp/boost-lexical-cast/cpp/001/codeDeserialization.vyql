@@ -1,4 +1,4 @@
-module bindings.cpp.migration.maeacb755;
+module bindings.cpp.generated.maeacb755;
 
 binding deserialization1 {
   requires {

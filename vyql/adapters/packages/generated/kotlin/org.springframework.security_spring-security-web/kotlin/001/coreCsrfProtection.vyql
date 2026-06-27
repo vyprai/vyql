@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.md423725c;
+module bindings.kotlin.generated.md423725c;
 
 binding csrfProtection1 {
   requires {

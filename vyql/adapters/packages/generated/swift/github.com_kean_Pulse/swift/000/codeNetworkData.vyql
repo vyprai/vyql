@@ -1,4 +1,4 @@
-module bindings.swift.migration.mda5bfed3;
+module bindings.swift.generated.mda5bfed3;
 
 binding networkData0 {
   requires {

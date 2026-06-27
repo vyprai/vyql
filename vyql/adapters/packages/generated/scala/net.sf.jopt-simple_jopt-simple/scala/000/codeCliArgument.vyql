@@ -1,4 +1,4 @@
-module bindings.scala.migration.m455cab71;
+module bindings.scala.generated.m455cab71;
 
 binding cliArgument0 {
   requires {

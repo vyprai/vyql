@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mc7c52aa2;
+module bindings.elixir.generated.mc7c52aa2;
 
 binding deserialization6 {
   requires {

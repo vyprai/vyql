@@ -1,4 +1,4 @@
-module bindings.php.migration.m23fc1340;
+module bindings.php.generated.m23fc1340;
 
 binding filePathAccess13 {
   requires {

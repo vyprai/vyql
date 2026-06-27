@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m736e2978;
+module bindings.cpp.generated.m736e2978;
 
 binding networkData3 {
   requires {

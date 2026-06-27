@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m9dccb3eb;
+module bindings.javascript.generated.m9dccb3eb;
 
 binding regexCompile0 {
   requires {

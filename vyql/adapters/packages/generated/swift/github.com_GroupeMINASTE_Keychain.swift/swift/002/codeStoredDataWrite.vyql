@@ -1,4 +1,4 @@
-module bindings.swift.migration.me7b72329;
+module bindings.swift.generated.me7b72329;
 
 binding storedDataWrite2 {
   requires {

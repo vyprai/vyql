@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m389ac90a;
+module bindings.groovy.generated.m389ac90a;
 
 binding cookie5 {
   requires {

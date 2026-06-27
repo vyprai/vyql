@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding failurePathOwnedBufferFree81 {
   query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.release_then_return" and node.token contains "release=delete" and node.token contains "return=false" and node.token contains "storage=nonlocal"

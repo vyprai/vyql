@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m26ac4b8f;
+module bindings.javascript.generated.m26ac4b8f;
 
 binding htmlEscape3 {
   requires {

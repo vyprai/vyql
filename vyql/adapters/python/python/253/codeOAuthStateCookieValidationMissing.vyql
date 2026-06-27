@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding oAuthStateCookieValidationMissing253 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["verify_and_process", "oauth_callback", "auth_callback", "callback"]) and node.context.literal contains "state" and node.context.callPath contains "request.query_params.get" and containsAny(node.context.call, ["process_login", "exchange_code", "fetch_token"]) and not (node.context.literal contains "sso_state")

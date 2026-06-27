@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding ajaxBackslashProtocolRelativeUrlXss117 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "function ajax(url, handler)" and node.token contains "url[0] != '/'" and node.token contains "url[1] == '/'" and node.token contains "$.ajax" and node.token contains "url: url" and node.token contains "$(receivedHtml).find('.paginate-container')" and node.token contains ".append($(this).html())" and not (node.token contains "startsWith") and not (node.token contains "replace(/\\\\/g,'/')") and not (node.token contains "new URL")

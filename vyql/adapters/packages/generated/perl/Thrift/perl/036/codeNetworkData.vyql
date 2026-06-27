@@ -1,4 +1,4 @@
-module bindings.perl.migration.mec98890c;
+module bindings.perl.generated.mec98890c;
 
 binding networkData36 {
   requires {

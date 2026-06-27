@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m6cac2660;
+module bindings.ruby.generated.m6cac2660;
 
 binding deserialization0 {
   requires {

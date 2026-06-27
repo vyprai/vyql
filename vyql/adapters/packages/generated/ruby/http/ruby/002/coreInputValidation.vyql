@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m2f9ad228;
+module bindings.ruby.generated.m2f9ad228;
 
 binding inputValidation2 {
   requires {

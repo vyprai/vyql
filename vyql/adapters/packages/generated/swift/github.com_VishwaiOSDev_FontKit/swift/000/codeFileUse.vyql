@@ -1,4 +1,4 @@
-module bindings.swift.migration.mc74d2dce;
+module bindings.swift.generated.mc74d2dce;
 
 binding fileUse0 {
   requires {

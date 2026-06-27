@@ -1,4 +1,4 @@
-module bindings.python.migration.m54a8d93c;
+module bindings.python.generated.m54a8d93c;
 
 binding storedDataWrite1 {
   requires {

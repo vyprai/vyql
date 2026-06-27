@@ -1,4 +1,4 @@
-module bindings.go.migration.m881fd3cb;
+module bindings.go.generated.m881fd3cb;
 
 binding httpInput3 {
   requires {

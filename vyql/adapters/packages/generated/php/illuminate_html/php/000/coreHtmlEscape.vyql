@@ -1,4 +1,4 @@
-module bindings.php.migration.mf0c344bc;
+module bindings.php.generated.mf0c344bc;
 
 binding htmlEscape0 {
   requires {

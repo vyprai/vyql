@@ -1,4 +1,4 @@
-module bindings.java.migration.m1f95a22f;
+module bindings.java.generated.m1f95a22f;
 
 binding networkConnect0 {
   requires {

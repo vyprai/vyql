@@ -1,4 +1,4 @@
-module bindings.c.migration.m3baddb4d;
+module bindings.c.generated.m3baddb4d;
 
 binding deserialization0 {
   requires {

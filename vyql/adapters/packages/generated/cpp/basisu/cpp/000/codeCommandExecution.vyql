@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mde839750;
+module bindings.cpp.generated.mde839750;
 
 binding commandExecution0 {
   requires {

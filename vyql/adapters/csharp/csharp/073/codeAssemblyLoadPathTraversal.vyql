@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding assemblyLoadPathTraversal73 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "GetType" and node.token contains "AssemblyLoadContext.Default.LoadFromAssemblyPath" and node.token contains "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\"" and not (node.token contains "path.Contains(\"..\")") and not (node.token contains "path.Contains(':')")

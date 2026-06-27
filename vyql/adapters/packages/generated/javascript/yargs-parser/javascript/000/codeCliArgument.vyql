@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbc17c905;
+module bindings.javascript.generated.mbc17c905;
 
 binding cliArgument0 {
   requires {

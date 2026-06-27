@@ -1,4 +1,4 @@
-module bindings.perl.migration.m718368cb;
+module bindings.perl.generated.m718368cb;
 
 binding networkConnect1 {
   requires {

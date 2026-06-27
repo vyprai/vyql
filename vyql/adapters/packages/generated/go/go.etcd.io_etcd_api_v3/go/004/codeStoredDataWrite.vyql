@@ -1,4 +1,4 @@
-module bindings.go.migration.m50dab3f4;
+module bindings.go.generated.m50dab3f4;
 
 binding storedDataWrite4 {
   requires {

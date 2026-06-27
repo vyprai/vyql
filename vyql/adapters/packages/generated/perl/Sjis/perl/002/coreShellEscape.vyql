@@ -1,4 +1,4 @@
-module bindings.perl.migration.m25682e96;
+module bindings.perl.generated.m25682e96;
 
 binding shellEscape2 {
   requires {

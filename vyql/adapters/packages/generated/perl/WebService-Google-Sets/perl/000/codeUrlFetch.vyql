@@ -1,4 +1,4 @@
-module bindings.perl.migration.m68a8959c;
+module bindings.perl.generated.m68a8959c;
 
 binding urlFetch0 {
   requires {

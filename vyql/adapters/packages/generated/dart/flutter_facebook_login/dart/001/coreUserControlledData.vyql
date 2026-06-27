@@ -1,4 +1,4 @@
-module bindings.dart.migration.m954ec98e;
+module bindings.dart.generated.m954ec98e;
 
 binding userControlledData1 {
   requires {

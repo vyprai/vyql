@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unescapedHtmlOptionRenderer100 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "TomSelect" and node.context.selector contains "directoryName" and node.context.literal contains "<" and not (node.context.callPath contains "sanitizeDirectoryName") and not (node.context.selector contains "textContent") and not (node.context.selector contains "innerHTML")

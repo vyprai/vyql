@@ -1,4 +1,4 @@
-module bindings.perl.migration.m586d2dfa;
+module bindings.perl.generated.m586d2dfa;
 
 binding httpInput0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mf5dfe8b3;
+module bindings.kotlin.generated.mf5dfe8b3;
 
 binding fileUse1 {
   requires {

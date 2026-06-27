@@ -1,4 +1,4 @@
-module bindings.c.migration.mf30cd3b3;
+module bindings.c.generated.mf30cd3b3;
 
 binding weakHash0 {
   requires {

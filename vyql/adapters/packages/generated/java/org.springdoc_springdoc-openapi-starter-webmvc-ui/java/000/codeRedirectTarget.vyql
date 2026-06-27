@@ -1,4 +1,4 @@
-module bindings.java.migration.m8bff7dba;
+module bindings.java.generated.m8bff7dba;
 
 binding redirectTarget0 {
   requires {

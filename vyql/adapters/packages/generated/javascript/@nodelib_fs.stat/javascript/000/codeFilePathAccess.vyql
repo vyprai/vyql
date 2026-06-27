@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m9bc82c40;
+module bindings.javascript.generated.m9bc82c40;
 
 binding filePathAccess0 {
   requires {

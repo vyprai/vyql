@@ -1,4 +1,4 @@
-module bindings.c.migration.m2be50003;
+module bindings.c.generated.m2be50003;
 
 binding urlFetch0 {
   requires {

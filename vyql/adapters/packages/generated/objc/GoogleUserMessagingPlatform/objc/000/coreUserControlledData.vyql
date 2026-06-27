@@ -1,4 +1,4 @@
-module bindings.objc.migration.m1ca2de1f;
+module bindings.objc.generated.m1ca2de1f;
 
 binding userControlledData0 {
   requires {

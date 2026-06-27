@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m51a6149b;
+module bindings.groovy.generated.m51a6149b;
 
 binding archiveEntryWrite4 {
   requires {

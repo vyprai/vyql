@@ -1,4 +1,4 @@
-module bindings.swift.migration.mc537eea8;
+module bindings.swift.generated.mc537eea8;
 
 binding archiveEntryWrite9 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.dart.migration.m54302810;
+module bindings.dart.generated.m54302810;
 
 binding commandExecution1 {
   requires {

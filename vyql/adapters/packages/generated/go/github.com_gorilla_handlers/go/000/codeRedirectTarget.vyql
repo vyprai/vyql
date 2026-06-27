@@ -1,4 +1,4 @@
-module bindings.go.migration.m473df3a7;
+module bindings.go.generated.m473df3a7;
 
 binding redirectTarget0 {
   requires {

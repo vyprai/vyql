@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding codecovNodeGcovCommandInjection243 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "functionsanitizeVar(arg)" and node.token contains "arg.replace(/&/g,'')" and node.token contains "args.options['gcov-root']" and node.token contains "args.options['gcov-exec']" and node.token contains "args.options['gcov-args']" and node.token contains "execSync(gcov)" and not (node.token contains "execFileSync(gcov)")

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding xmlParse320 {
   query pattern callExpr where callee.path ~= "lxml.etree.parse"

@@ -1,4 +1,4 @@
-module bindings.python.migration.m2f84ffdb;
+module bindings.python.generated.m2f84ffdb;
 
 binding networkConnect0 {
   requires {

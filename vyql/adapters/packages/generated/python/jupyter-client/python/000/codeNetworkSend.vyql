@@ -1,4 +1,4 @@
-module bindings.python.migration.m4e196017;
+module bindings.python.generated.m4e196017;
 
 binding networkSend0 {
   requires {

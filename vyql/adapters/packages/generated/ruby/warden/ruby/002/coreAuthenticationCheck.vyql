@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m485a8c4f;
+module bindings.ruby.generated.m485a8c4f;
 
 binding authenticationCheck2 {
   requires {

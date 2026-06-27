@@ -1,4 +1,4 @@
-module bindings.swift.migration.m4a99fdf8;
+module bindings.swift.generated.m4a99fdf8;
 
 binding fileUse2 {
   requires {

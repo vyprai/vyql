@@ -1,4 +1,4 @@
-module bindings.rust.migration.mcf70774b;
+module bindings.rust.generated.mcf70774b;
 
 binding archiveEntryWrite0 {
   requires {

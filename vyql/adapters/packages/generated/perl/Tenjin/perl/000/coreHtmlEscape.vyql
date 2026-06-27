@@ -1,4 +1,4 @@
-module bindings.perl.migration.mccd9a275;
+module bindings.perl.generated.mccd9a275;
 
 binding htmlEscape0 {
   requires {

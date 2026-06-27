@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbe96c352;
+module bindings.ruby.generated.mbe96c352;
 
 binding storedDataRead4 {
   requires {

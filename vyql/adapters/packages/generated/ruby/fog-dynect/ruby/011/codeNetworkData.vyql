@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbbe1ca32;
+module bindings.ruby.generated.mbbe1ca32;
 
 binding networkData11 {
   requires {

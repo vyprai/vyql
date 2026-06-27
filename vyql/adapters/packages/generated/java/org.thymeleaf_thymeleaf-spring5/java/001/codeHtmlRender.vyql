@@ -1,4 +1,4 @@
-module bindings.java.migration.mf4cea4a2;
+module bindings.java.generated.mf4cea4a2;
 
 binding htmlRender1 {
   requires {

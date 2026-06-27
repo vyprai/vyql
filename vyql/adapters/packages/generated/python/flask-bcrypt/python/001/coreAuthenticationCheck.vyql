@@ -1,4 +1,4 @@
-module bindings.python.migration.mece5054e;
+module bindings.python.generated.mece5054e;
 
 binding authenticationCheck1 {
   requires {

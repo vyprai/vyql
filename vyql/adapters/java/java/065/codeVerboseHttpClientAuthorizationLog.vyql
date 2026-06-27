@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding verboseHttpClientAuthorizationLog65 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "RestAdapter.Builder" and node.context.call contains "setLogLevel" and node.context.call contains "setLog" and node.context.selector contains "RestAdapter.LogLevel.FULL" and not (node.context.selector contains "RestAdapter.LogLevel.BASIC") and not (node.context.selector contains "RestAdapter.LogLevel.NONE")

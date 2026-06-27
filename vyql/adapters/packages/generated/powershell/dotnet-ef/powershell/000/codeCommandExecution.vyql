@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m5cd31769;
+module bindings.powershell.generated.m5cd31769;
 
 binding commandExecution0 {
   requires {

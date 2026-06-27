@@ -1,4 +1,4 @@
-module bindings.c.migration.mb12bceb4;
+module bindings.c.generated.mb12bceb4;
 
 binding commandExecution0 {
   requires {

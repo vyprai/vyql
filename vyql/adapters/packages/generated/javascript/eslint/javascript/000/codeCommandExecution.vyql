@@ -1,4 +1,4 @@
-module bindings.javascript.migration.md18c1244;
+module bindings.javascript.generated.md18c1244;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding fieldDerivedIndexAccess44 {
   query pattern presenceNode where node.kind == "any" and node.analysis ~= "index.access" and node.token contains "index_kind=field_derived" and node.token contains "guard=missing_upper_bound"

@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding binarySearchTableIndexGuardBypass98 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "X86_insn_reg_intel" and node.token contains "insn_regs_intel_sorted[mid].insn<id" and node.token contains "first=mid+1" and node.token contains "last=mid-1" and node.token contains "mid=(first+last)/2" and not (node.token contains "insn_regs_intel_sorted[0].insn>id") and not (node.token contains "insn_regs_intel_sorted[last].insn<id")

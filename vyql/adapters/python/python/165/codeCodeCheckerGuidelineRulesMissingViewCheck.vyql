@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding codeCheckerGuidelineRulesMissingViewCheck165 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "getGuidelineRules" and node.token contains "rules_of_guideline" and node.token contains "checkers_by_labels" and not (node.token contains "self.__require_view()guideline_rules=defaultdict(list)")

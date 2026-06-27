@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation60 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "actionUpload" and node.token contains "performReadValidation($model_name,$model_id)" and node.token contains "'model_id'=>$model_id" and not (node.token contains "(int)$model_id")

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m8a3a36d0;
+module bindings.kotlin.generated.m8a3a36d0;
 
 binding dynamicCodeLoad0 {
   requires {

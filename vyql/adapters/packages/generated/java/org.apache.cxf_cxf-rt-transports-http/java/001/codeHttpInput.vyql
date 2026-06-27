@@ -1,4 +1,4 @@
-module bindings.java.migration.m16f93900;
+module bindings.java.generated.m16f93900;
 
 binding httpInput1 {
   requires {

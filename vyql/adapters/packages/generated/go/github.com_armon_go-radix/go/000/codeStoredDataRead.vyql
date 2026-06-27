@@ -1,4 +1,4 @@
-module bindings.go.migration.md9894d16;
+module bindings.go.generated.md9894d16;
 
 binding storedDataRead0 {
   requires {

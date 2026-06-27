@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m4ab802e1;
+module bindings.javascript.generated.m4ab802e1;
 
 binding filePathAccess0 {
   requires {

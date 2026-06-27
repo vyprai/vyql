@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding pickleUnsafeImportBlocklistGap312 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "unsafe_imports" and containsAny(node.context.literal, ["runpy", "cProfile", "marshal", "types", "subprocess", "os"]) and not (node.context.literal contains "ctypes")

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding clamscanBinaryPathShellCommandInjection246 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "_is_clamav_binary" and node.token contains "version_cmds" and node.token contains "${path}--version" and node.token contains "cp_exec(version_cmds[scanner])" and not (node.token contains "cp_execfile")

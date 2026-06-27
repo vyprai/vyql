@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding ecPointIdentityElementMissing89 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.paramType contains "PointZZ_p" and containsAny(node.context.name, ["pointZZ_pDouble", "pointZZ_pAdd"]) and node.context.callPath contains "mpz_invert" and not (containsAny(node.context.scopeCall, [IsIdentityElement, SetToIdentityElement, is_at_infinity, set_at_infinity, isInfinity, setInfinity]))

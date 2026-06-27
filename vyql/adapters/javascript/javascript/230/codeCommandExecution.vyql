@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandExecution230 {
   query pattern callExpr where callee.path ~= "spawnSync" and args.any.literal contains "cmd.exe"

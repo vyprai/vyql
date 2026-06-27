@@ -1,4 +1,4 @@
-module bindings.php.migration.m7d25bced;
+module bindings.php.generated.m7d25bced;
 
 binding networkSend0 {
   requires {

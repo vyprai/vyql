@@ -1,4 +1,4 @@
-module bindings.go.migration.m5cd9864d;
+module bindings.go.generated.m5cd9864d;
 
 binding logOutput0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.mc0758bed;
+module bindings.java.generated.mc0758bed;
 
 binding deserialization0 {
   requires {

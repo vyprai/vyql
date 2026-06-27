@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding leagueCommonMarkUnsafeHtmlMode116 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "Environment" and node.context.callPath contains "MarkdownConverter" and node.context.callPath contains "CommonMarkCoreExtension" and not (node.context.literal contains "html_input") and not (node.context.callPath contains "DisallowedRawHtmlExtension") and not (node.context.callPath contains "HTMLPurifier") and not (node.context.callPath contains "HtmlSanitizer") and not (node.context.callPath contains "sanitizeHtml")

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding captchaValidationTruthyReturnBypass259 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["validate", "verify", "check"]) and node.context.callPath contains "session.get" and node.context.callPath contains "session.__setitem__" and containsAny(node.context.callPath, ["request.form[].strip", "request.form.get"]) and node.context.callArg contains "session.get:captcha_answer" and containsAny(node.context.binary, ["__binop.and"]) and containsAny(node.context.binary, ["__binop.eq"]) and not (containsAny(node.context.binary, ["__binop.is not", "value != None", "answer != None"]))

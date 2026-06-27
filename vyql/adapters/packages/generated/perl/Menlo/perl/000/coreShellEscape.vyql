@@ -1,4 +1,4 @@
-module bindings.perl.migration.mda2db370;
+module bindings.perl.generated.mda2db370;
 
 binding shellEscape0 {
   requires {

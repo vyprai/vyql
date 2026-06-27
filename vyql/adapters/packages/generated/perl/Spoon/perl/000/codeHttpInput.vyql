@@ -1,4 +1,4 @@
-module bindings.perl.migration.meb3ce2f8;
+module bindings.perl.generated.meb3ce2f8;
 
 binding httpInput0 {
   requires {

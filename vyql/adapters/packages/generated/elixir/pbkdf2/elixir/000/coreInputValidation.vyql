@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mec9b130c;
+module bindings.elixir.generated.mec9b130c;
 
 binding inputValidation0 {
   requires {

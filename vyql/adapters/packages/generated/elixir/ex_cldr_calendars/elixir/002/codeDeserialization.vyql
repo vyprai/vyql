@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mb920a95c;
+module bindings.elixir.generated.mb920a95c;
 
 binding deserialization2 {
   requires {

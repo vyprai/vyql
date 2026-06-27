@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding railsRawTranslationHtmlInterpolationXss160 {
   query pattern presenceNode where node.kind == "call" and node.path ~= "raw" and not (containsAny(node.context.scopeCall, [content_tag, "ERB::Util.html_escape", "ERB::Util.h", CGI.escapeHTML, Rack.Utils.escape_html])) and operand(node, where: operand.path ~= "t")

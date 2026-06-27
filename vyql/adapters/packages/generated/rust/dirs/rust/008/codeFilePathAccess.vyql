@@ -1,4 +1,4 @@
-module bindings.rust.migration.mff40dc02;
+module bindings.rust.generated.mff40dc02;
 
 binding filePathAccess8 {
   requires {

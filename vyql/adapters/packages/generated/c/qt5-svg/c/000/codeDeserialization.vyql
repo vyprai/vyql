@@ -1,4 +1,4 @@
-module bindings.c.migration.mccacdd20;
+module bindings.c.generated.mccacdd20;
 
 binding deserialization0 {
   requires {

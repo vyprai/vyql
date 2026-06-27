@@ -1,4 +1,4 @@
-module bindings.rust.migration.mc6514917;
+module bindings.rust.generated.mc6514917;
 
 binding regexCompile0 {
   requires {

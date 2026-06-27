@@ -1,4 +1,4 @@
-module bindings.dart.migration.mbcdcfd28;
+module bindings.dart.generated.mbcdcfd28;
 
 binding userControlledData2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding emptySourceSliceMemoryExpansion26 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "set" and node.token contains "lettarget_size=target_size.unwrap_or(value.len());" and node.token contains "self.data.resize(offset+target_size,0)" and node.token contains "forindexin0..target_size" and node.token contains "value.len()>index" and not (node.token contains "value.is_empty()")

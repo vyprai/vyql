@@ -1,4 +1,4 @@
-module bindings.rust.migration.mecf0a991;
+module bindings.rust.generated.mecf0a991;
 
 binding regexCompile1 {
   requires {

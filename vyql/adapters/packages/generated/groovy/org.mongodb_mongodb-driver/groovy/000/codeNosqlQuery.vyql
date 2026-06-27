@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m61c14c8a;
+module bindings.groovy.generated.m61c14c8a;
 
 binding nosqlQuery0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m172b4264;
+module bindings.javascript.generated.m172b4264;
 
 binding codeEval0 {
   requires {

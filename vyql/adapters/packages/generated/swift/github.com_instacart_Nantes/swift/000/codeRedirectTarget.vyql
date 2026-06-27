@@ -1,4 +1,4 @@
-module bindings.swift.migration.me50545bb;
+module bindings.swift.generated.me50545bb;
 
 binding redirectTarget0 {
   requires {

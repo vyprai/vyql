@@ -1,4 +1,4 @@
-module bindings.java.migration.m2ab2b350;
+module bindings.java.generated.m2ab2b350;
 
 binding inputValidation3 {
   requires {

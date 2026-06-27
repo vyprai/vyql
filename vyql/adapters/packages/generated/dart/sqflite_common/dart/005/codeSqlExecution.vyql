@@ -1,4 +1,4 @@
-module bindings.dart.migration.mfc24417f;
+module bindings.dart.generated.mfc24417f;
 
 binding sqlExecution5 {
   requires {

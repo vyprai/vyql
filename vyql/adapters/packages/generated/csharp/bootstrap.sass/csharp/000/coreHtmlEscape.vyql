@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mc02bfdcd;
+module bindings.csharp.generated.mc02bfdcd;
 
 binding htmlEscape0 {
   requires {

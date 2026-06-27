@@ -1,4 +1,4 @@
-module bindings.groovy.migration.md570f727;
+module bindings.groovy.generated.md570f727;
 
 binding authorizationCheck1 {
   requires {

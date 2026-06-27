@@ -1,4 +1,4 @@
-module bindings.go.migration.m5818ebce;
+module bindings.go.generated.m5818ebce;
 
 binding fileUse3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.ma10f8a15;
+module bindings.php.generated.ma10f8a15;
 
 binding responseHeaderWrite10 {
   requires {

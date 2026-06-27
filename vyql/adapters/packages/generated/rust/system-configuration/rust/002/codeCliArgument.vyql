@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdb0b5b88;
+module bindings.rust.generated.mdb0b5b88;
 
 binding cliArgument2 {
   requires {

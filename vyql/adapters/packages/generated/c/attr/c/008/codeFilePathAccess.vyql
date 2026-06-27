@@ -1,4 +1,4 @@
-module bindings.c.migration.ma3178d8e;
+module bindings.c.generated.ma3178d8e;
 
 binding filePathAccess8 {
   requires {

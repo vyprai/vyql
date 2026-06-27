@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m191318b4;
+module bindings.kotlin.generated.m191318b4;
 
 binding authenticationCheck11 {
   requires {

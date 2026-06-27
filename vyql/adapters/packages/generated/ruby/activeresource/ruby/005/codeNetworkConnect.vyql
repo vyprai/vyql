@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m4cd96b0a;
+module bindings.ruby.generated.m4cd96b0a;
 
 binding networkConnect5 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m81a56e52;
+module bindings.java.generated.m81a56e52;
 
 binding sqlParameterization0 {
   requires {

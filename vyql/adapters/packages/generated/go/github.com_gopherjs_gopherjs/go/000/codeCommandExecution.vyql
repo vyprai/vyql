@@ -1,4 +1,4 @@
-module bindings.go.migration.mf300c03c;
+module bindings.go.generated.mf300c03c;
 
 binding commandExecution0 {
   requires {

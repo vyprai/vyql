@@ -1,4 +1,4 @@
-module bindings.perl.migration.mf2072dd9;
+module bindings.perl.generated.mf2072dd9;
 
 binding logOutput0 {
   requires {

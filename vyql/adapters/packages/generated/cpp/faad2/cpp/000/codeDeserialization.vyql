@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mee9790ef;
+module bindings.cpp.generated.mee9790ef;
 
 binding deserialization0 {
   requires {

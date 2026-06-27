@@ -1,4 +1,4 @@
-module bindings.php.migration.mdb8546c7;
+module bindings.php.generated.mdb8546c7;
 
 binding userControlledData1 {
   requires {

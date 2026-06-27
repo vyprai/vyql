@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m7f8e4ea3;
+module bindings.ruby.generated.m7f8e4ea3;
 
 binding htmlRender0 {
   requires {

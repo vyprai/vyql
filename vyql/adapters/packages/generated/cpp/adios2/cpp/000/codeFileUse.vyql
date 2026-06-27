@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m9f2ce05f;
+module bindings.cpp.generated.m9f2ce05f;
 
 binding fileUse0 {
   requires {

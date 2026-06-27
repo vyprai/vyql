@@ -1,4 +1,4 @@
-module bindings.powershell.migration.ma07e1cb9;
+module bindings.powershell.generated.ma07e1cb9;
 
 binding cliArgument0 {
   requires {

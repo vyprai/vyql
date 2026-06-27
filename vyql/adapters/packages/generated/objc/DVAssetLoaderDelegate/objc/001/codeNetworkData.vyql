@@ -1,4 +1,4 @@
-module bindings.objc.migration.m37087380;
+module bindings.objc.generated.m37087380;
 
 binding networkData1 {
   requires {

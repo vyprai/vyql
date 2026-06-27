@@ -1,4 +1,4 @@
-module bindings.groovy.migration.md284ce36;
+module bindings.groovy.generated.md284ce36;
 
 binding codeEval0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma746c578;
+module bindings.elixir.generated.ma746c578;
 
 binding httpInput0 {
   requires {

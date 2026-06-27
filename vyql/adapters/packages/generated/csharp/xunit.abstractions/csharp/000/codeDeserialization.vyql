@@ -1,4 +1,4 @@
-module bindings.csharp.migration.meeb20c20;
+module bindings.csharp.generated.meeb20c20;
 
 binding deserialization0 {
   requires {

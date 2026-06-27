@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.maeefe5fa;
+module bindings.kotlin.generated.maeefe5fa;
 
 binding codeEval0 {
   requires {

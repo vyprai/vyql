@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding binding452 {
   query pattern callExpr where callee.path ~= "preg_replace" and call.filter.global == true

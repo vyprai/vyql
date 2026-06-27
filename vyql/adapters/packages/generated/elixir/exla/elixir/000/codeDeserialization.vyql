@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mcf16adc1;
+module bindings.elixir.generated.mcf16adc1;
 
 binding deserialization0 {
   requires {

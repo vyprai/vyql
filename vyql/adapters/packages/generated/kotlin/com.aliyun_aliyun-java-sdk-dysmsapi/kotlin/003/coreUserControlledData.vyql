@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mde51090e;
+module bindings.kotlin.generated.mde51090e;
 
 binding userControlledData3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.swift.migration.ma512ad40;
+module bindings.swift.generated.ma512ad40;
 
 binding databaseRead0 {
   requires {

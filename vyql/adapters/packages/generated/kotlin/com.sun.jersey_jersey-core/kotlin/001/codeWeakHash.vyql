@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.meafcdfaf;
+module bindings.kotlin.generated.meafcdfaf;
 
 binding weakHash1 {
   requires {

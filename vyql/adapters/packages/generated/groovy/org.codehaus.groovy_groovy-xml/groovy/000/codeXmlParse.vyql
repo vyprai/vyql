@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m112c533d;
+module bindings.groovy.generated.m112c533d;
 
 binding xmlParse0 {
   requires {

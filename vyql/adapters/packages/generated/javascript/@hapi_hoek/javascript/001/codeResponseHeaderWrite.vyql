@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m632c12eb;
+module bindings.javascript.generated.m632c12eb;
 
 binding responseHeaderWrite1 {
   requires {

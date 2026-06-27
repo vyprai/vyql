@@ -1,4 +1,4 @@
-module bindings.python.migration.macd8d8ac;
+module bindings.python.generated.macd8d8ac;
 
 binding commandExecution0 {
   requires {

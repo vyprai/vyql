@@ -1,4 +1,4 @@
-module bindings.bash.migration.m744189ae;
+module bindings.bash.generated.m744189ae;
 
 binding filePathAccess0 {
   requires {

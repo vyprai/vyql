@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m728b8a72;
+module bindings.elixir.generated.m728b8a72;
 
 binding staticIv63 {
   query pattern callExpr where callee.path ~= "crypto_one_time" and args.any.literal contains "0000000000000000"

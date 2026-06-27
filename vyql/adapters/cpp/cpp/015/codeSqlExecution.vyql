@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding sqlExecution15 {
   query pattern callExpr where callee.path ~= "sqlite3_prepare_v2"

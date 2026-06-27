@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfa232f2b;
+module bindings.kotlin.generated.mfa232f2b;
 
 binding userControlledData3 {
   requires {

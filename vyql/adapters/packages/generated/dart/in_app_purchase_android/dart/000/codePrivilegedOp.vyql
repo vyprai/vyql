@@ -1,4 +1,4 @@
-module bindings.dart.migration.mcb5af206;
+module bindings.dart.generated.mcb5af206;
 
 binding privilegedOp0 {
   requires {

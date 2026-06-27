@@ -1,4 +1,4 @@
-module bindings.python.migration.m59cdc42c;
+module bindings.python.generated.m59cdc42c;
 
 binding fileUse0 {
   requires {

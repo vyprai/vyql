@@ -1,4 +1,4 @@
-module bindings.python.migration.md83add5e;
+module bindings.python.generated.md83add5e;
 
 binding fileUse2 {
   requires {

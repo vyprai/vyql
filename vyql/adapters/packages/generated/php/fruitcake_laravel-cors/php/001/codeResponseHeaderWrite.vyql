@@ -1,4 +1,4 @@
-module bindings.php.migration.m7f8b1724;
+module bindings.php.generated.m7f8b1724;
 
 binding responseHeaderWrite1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbe406f0a;
+module bindings.ruby.generated.mbe406f0a;
 
 binding networkConnect0 {
   requires {

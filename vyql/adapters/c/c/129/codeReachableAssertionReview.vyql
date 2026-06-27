@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding reachableAssertionReview129 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "AVAHI_FLAGS_VALID" and node.token contains "AVAHI_PUBLISH_USE_WIDE_AREA" and node.token contains "AVAHI_PUBLISH_USE_MULTICAST" and node.token contains "transport_flags_from_domain" and not (node.token contains "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)")

@@ -1,4 +1,4 @@
-module bindings.go.migration.mf8030fcb;
+module bindings.go.generated.mf8030fcb;
 
 binding networkData0 {
   requires {

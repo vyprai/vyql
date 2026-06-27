@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding civiCrmScientificNotationNumericValidationBypass201 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "numeric" and node.token contains "returnpreg_match" and not (node.token contains "!is_numeric($value)")

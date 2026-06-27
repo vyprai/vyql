@@ -1,4 +1,4 @@
-module bindings.c.migration.mce19183a;
+module bindings.c.generated.mce19183a;
 
 binding cliArgument1 {
   requires {

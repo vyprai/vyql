@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m8f20ccef;
+module bindings.cpp.generated.m8f20ccef;
 
 binding htmlRender1 {
   requires {

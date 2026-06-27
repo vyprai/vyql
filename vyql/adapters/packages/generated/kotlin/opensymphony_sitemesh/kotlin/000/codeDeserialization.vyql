@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mdc811daf;
+module bindings.kotlin.generated.mdc811daf;
 
 binding deserialization0 {
   requires {

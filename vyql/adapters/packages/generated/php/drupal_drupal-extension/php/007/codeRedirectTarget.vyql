@@ -1,4 +1,4 @@
-module bindings.php.migration.mb76847d9;
+module bindings.php.generated.mb76847d9;
 
 binding redirectTarget7 {
   requires {

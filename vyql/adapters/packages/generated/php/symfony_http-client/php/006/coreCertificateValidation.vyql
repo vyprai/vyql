@@ -1,4 +1,4 @@
-module bindings.php.migration.m5e085d6c;
+module bindings.php.generated.m5e085d6c;
 
 binding certificateValidation6 {
   requires {

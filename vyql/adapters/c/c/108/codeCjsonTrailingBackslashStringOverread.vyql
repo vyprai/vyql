@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding cjsonTrailingBackslashStringOverread108 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "parse_string" and node.token contains "while(*end_ptr!='\\\"'&&*end_ptr&&++len)" and node.token contains "if(*end_ptr++=='\\\\')end_ptr++" and node.token contains "cJSON_malloc(len+1)" and not (node.token contains "if(*end_ptr=='\\0')")

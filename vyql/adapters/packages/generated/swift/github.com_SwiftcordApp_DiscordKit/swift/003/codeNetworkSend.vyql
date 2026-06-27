@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2cfc0059;
+module bindings.swift.generated.m2cfc0059;
 
 binding networkSend3 {
   requires {

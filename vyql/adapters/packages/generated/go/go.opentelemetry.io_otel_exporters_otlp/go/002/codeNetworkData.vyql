@@ -1,4 +1,4 @@
-module bindings.go.migration.m4a873653;
+module bindings.go.generated.m4a873653;
 
 binding networkData2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unsanitizedSvgUpload113 {
   query pattern presenceNode where node.scope == "class" and node.context.language == "php" and containsAny(node.context.literal, ["svg", "image/svg+xml"]) and containsAny(node.context.callPath, ["getClientOriginalExtension", "storeAs", "getContent"]) and not (containsAny(node.context.scopeCall, [sanitizeSvg, svgSanitize, Sanitizer]))

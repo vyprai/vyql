@@ -1,4 +1,4 @@
-module bindings.auditreview.migration.mbf0d19ec;
+module bindings.auditreview.generated.mbf0d19ec;
 
 binding sensitiveOperation1 {
   query pattern callExpr where callee.method == "deleteAll"

@@ -1,4 +1,4 @@
-module bindings.php.migration.mde744b86;
+module bindings.php.generated.mde744b86;
 
 binding filePathAccess0 {
   requires {

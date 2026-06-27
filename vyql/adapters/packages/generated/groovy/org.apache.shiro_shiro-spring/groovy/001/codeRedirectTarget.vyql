@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m1eb4e987;
+module bindings.groovy.generated.m1eb4e987;
 
 binding redirectTarget1 {
   requires {

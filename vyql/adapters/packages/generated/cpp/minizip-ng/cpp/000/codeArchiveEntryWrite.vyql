@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mc9bca055;
+module bindings.cpp.generated.mc9bca055;
 
 binding archiveEntryWrite0 {
   requires {

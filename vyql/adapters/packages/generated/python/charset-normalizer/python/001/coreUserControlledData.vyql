@@ -1,4 +1,4 @@
-module bindings.python.migration.mabefb572;
+module bindings.python.generated.mabefb572;
 
 binding userControlledData1 {
   requires {

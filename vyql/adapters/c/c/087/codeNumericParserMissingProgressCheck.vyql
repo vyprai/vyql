@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding numericParserMissingProgressCheck87 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "fio_atol((char**)&tmp)" and node.token contains "fio_atof((char**)&tmp)" and node.token contains "JSON_NUMERAL[*tmp]" and node.token contains "tmp=pos" and not (node.token contains "tmp==pos")

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m6eabb149;
+module bindings.groovy.generated.m6eabb149;
 
 binding authenticationRequiredOp45 {
   query pattern presenceNode where node.path ~= "makeAdmin"

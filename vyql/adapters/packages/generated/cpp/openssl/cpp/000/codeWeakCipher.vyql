@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mdffc4e53;
+module bindings.cpp.generated.mdffc4e53;
 
 binding weakCipher0 {
   requires {

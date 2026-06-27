@@ -1,4 +1,4 @@
-module bindings.rust.migration.m9a3ec488;
+module bindings.rust.generated.m9a3ec488;
 
 binding codeEval2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m38cbb5e8;
+module bindings.kotlin.generated.m38cbb5e8;
 
 binding networkData0 {
   requires {

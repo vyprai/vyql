@@ -1,4 +1,4 @@
-module bindings.objc.migration.m6e3df7af;
+module bindings.objc.generated.m6e3df7af;
 
 binding commandExecution4 {
   requires {

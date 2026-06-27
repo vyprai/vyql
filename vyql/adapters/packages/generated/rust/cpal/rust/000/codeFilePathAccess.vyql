@@ -1,4 +1,4 @@
-module bindings.rust.migration.m1c74bd18;
+module bindings.rust.generated.m1c74bd18;
 
 binding filePathAccess0 {
   requires {

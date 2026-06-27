@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding prototypeKeyCachePoisoning573 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "cachedPathRelative" and node.token contains "cache[from]" and node.token contains "cache[from][to]" and node.token contains "relative.call(path,from,to)" and node.token contains "cache[from]=cache[from]||{}" and not (node.token contains "Object.create(null)")

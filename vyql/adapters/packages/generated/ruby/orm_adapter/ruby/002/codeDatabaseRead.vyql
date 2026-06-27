@@ -1,4 +1,4 @@
-module bindings.ruby.migration.ma860ad40;
+module bindings.ruby.generated.ma860ad40;
 
 binding databaseRead2 {
   requires {

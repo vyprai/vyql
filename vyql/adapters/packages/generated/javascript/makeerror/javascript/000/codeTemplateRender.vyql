@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m858e6af1;
+module bindings.javascript.generated.m858e6af1;
 
 binding templateRender0 {
   requires {

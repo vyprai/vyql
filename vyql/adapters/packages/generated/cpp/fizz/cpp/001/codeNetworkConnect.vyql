@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m6ebe8934;
+module bindings.cpp.generated.m6ebe8934;
 
 binding networkConnect1 {
   requires {

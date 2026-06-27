@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m18ea75ce;
+module bindings.groovy.generated.m18ea75ce;
 
 binding weakCipher11 {
   requires {

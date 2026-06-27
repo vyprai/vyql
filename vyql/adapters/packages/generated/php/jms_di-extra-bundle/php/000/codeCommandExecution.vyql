@@ -1,4 +1,4 @@
-module bindings.php.migration.m28aca1e0;
+module bindings.php.generated.m28aca1e0;
 
 binding commandExecution0 {
   requires {

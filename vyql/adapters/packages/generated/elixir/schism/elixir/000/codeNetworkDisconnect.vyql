@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m2615c0fc;
+module bindings.elixir.generated.m2615c0fc;
 
 binding networkDisconnect0 {
   requires {

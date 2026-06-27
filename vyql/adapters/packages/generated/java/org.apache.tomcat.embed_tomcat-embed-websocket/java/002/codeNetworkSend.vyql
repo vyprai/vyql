@@ -1,4 +1,4 @@
-module bindings.java.migration.m4b11c1f6;
+module bindings.java.generated.m4b11c1f6;
 
 binding networkSend2 {
   requires {

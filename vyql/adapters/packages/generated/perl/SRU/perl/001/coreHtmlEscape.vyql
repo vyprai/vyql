@@ -1,4 +1,4 @@
-module bindings.perl.migration.m60d17f1b;
+module bindings.perl.generated.m60d17f1b;
 
 binding htmlEscape1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdbe271c8;
+module bindings.rust.generated.mdbe271c8;
 
 binding sqlExecution0 {
   requires {

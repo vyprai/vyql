@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m4fb72a94;
+module bindings.ruby.generated.m4fb72a94;
 
 binding pathCanonicalization0 {
   requires {

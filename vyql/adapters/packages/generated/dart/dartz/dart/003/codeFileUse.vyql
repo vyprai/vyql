@@ -1,4 +1,4 @@
-module bindings.dart.migration.m1b732e90;
+module bindings.dart.generated.m1b732e90;
 
 binding fileUse3 {
   requires {

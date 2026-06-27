@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding templatePathComponentTraversal137 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "templates/{$type}/{$language}" and node.token contains "{$name}.tpl" and not (node.token contains "basename($language)")

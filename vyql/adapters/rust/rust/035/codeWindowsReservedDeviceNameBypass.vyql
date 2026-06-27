@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding windowsReservedDeviceNameBypass35 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "path.file_stem()" and node.token contains "stemstr.to_uppercase().as_str()" and node.token contains "\"LPT0\"" and node.token contains "\"LPT9\"" and node.token contains "manually::open" and not (node.token contains "\"LPT¹\"")

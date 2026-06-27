@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06d0685b;
+module bindings.scala.generated.m06d0685b;
 
 binding htmlEscape58 {
   query pattern callExpr where callee.path ~= "StringEscapeUtils.escapeHtml4"

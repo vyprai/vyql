@@ -1,4 +1,4 @@
-module bindings.swift.migration.m27c3090a;
+module bindings.swift.generated.m27c3090a;
 
 binding sqlExecution0 {
   requires {

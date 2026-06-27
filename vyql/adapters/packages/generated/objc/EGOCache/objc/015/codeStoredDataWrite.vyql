@@ -1,4 +1,4 @@
-module bindings.objc.migration.m048c22d9;
+module bindings.objc.generated.m048c22d9;
 
 binding storedDataWrite15 {
   requires {

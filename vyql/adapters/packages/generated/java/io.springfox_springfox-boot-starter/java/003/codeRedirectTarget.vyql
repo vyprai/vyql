@@ -1,4 +1,4 @@
-module bindings.java.migration.mf27d1696;
+module bindings.java.generated.mf27d1696;
 
 binding redirectTarget3 {
   requires {

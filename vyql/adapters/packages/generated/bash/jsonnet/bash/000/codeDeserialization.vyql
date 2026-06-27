@@ -1,4 +1,4 @@
-module bindings.bash.migration.m6d45d3c5;
+module bindings.bash.generated.m6d45d3c5;
 
 binding deserialization0 {
   requires {

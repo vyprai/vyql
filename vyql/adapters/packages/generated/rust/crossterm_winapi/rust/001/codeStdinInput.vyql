@@ -1,4 +1,4 @@
-module bindings.rust.migration.mce19a97d;
+module bindings.rust.generated.mce19a97d;
 
 binding stdinInput1 {
   requires {

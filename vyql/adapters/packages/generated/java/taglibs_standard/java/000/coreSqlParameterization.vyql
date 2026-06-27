@@ -1,4 +1,4 @@
-module bindings.java.migration.mdb911188;
+module bindings.java.generated.mdb911188;
 
 binding sqlParameterization0 {
   requires {

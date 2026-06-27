@@ -1,4 +1,4 @@
-module bindings.php.migration.m5c7effc5;
+module bindings.php.generated.m5c7effc5;
 
 binding regexCompile1 {
   requires {

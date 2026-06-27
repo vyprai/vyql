@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m9669be91;
+module bindings.kotlin.generated.m9669be91;
 
 binding htmlRender7 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m5d58d3db;
+module bindings.python.generated.m5d58d3db;
 
 binding networkConnect1 {
   requires {

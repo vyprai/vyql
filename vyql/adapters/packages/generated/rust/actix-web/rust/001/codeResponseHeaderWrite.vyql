@@ -1,4 +1,4 @@
-module bindings.rust.migration.mfcac2c50;
+module bindings.rust.generated.mfcac2c50;
 
 binding responseHeaderWrite1 {
   requires {

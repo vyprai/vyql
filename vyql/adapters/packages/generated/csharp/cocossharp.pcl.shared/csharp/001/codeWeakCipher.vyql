@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m3fba08c6;
+module bindings.csharp.generated.m3fba08c6;
 
 binding weakCipher1 {
   requires {

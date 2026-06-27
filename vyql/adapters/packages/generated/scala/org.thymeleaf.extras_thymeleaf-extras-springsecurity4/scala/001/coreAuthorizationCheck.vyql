@@ -1,4 +1,4 @@
-module bindings.scala.migration.m11d754bc;
+module bindings.scala.generated.m11d754bc;
 
 binding authorizationCheck1 {
   requires {

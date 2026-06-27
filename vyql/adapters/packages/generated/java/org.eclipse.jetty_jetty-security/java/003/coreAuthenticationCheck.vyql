@@ -1,4 +1,4 @@
-module bindings.java.migration.m88c293c3;
+module bindings.java.generated.m88c293c3;
 
 binding authenticationCheck3 {
   requires {

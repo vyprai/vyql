@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding commandStringWrapperExecution251 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["child_process.execSync", "execSync"]) and containsAny(node.context.identifier, ["command", "cmd"]) and not (containsAny(node.context.callPath, ["execFile", "execFileSync", "spawn", "spawnSync"]))

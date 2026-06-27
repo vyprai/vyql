@@ -1,4 +1,4 @@
-module bindings.ruby.migration.med3ca120;
+module bindings.ruby.generated.med3ca120;
 
 binding commandExecution0 {
   requires {

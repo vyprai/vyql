@@ -1,4 +1,4 @@
-module bindings.php.migration.meb96413c;
+module bindings.php.generated.meb96413c;
 
 binding sqlExecution2 {
   requires {

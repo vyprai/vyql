@@ -1,4 +1,4 @@
-module bindings.python.migration.m6a3c1aa5;
+module bindings.python.generated.m6a3c1aa5;
 
 binding filePathAccess0 {
   requires {

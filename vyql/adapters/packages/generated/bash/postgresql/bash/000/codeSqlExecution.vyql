@@ -1,4 +1,4 @@
-module bindings.bash.migration.m6ae05784;
+module bindings.bash.generated.m6ae05784;
 
 binding sqlExecution0 {
   requires {

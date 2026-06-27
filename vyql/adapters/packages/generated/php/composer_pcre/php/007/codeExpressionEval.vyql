@@ -1,4 +1,4 @@
-module bindings.php.migration.m881ff233;
+module bindings.php.generated.m881ff233;
 
 binding expressionEval7 {
   requires {

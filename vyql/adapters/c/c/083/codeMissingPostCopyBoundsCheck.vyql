@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding missingPostCopyBoundsCheck83 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "patch" and node.token contains "newpos+=x" and node.token contains "memcpy(newData+newpos,extraPtr,y)" and not (node.token contains "newpos+y>newDataLength")

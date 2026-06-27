@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mb2829d39;
+module bindings.groovy.generated.mb2829d39;
 
 binding storedDataRead4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m1952dde3;
+module bindings.elixir.generated.m1952dde3;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.mac91a530;
+module bindings.java.generated.mac91a530;
 
 binding deserialization0 {
   requires {

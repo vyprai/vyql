@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mca2e94cc;
+module bindings.elixir.generated.mca2e94cc;
 
 binding sqlExecution2 {
   requires {

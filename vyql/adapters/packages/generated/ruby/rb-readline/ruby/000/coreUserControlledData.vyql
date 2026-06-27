@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mff445663;
+module bindings.ruby.generated.mff445663;
 
 binding userControlledData0 {
   requires {

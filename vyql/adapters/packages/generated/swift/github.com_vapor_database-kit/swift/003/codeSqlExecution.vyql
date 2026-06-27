@@ -1,4 +1,4 @@
-module bindings.swift.migration.mef276195;
+module bindings.swift.generated.mef276195;
 
 binding sqlExecution3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding htmlEscape317 {
   query pattern callExpr where callee.path ~= "wp_kses_post"

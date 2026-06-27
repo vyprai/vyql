@@ -1,4 +1,4 @@
-module bindings.swift.migration.mc6882f18;
+module bindings.swift.generated.mc6882f18;
 
 binding commandExecution7 {
   requires {

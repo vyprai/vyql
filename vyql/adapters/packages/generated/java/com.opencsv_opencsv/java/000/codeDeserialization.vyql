@@ -1,4 +1,4 @@
-module bindings.java.migration.m434104fc;
+module bindings.java.generated.m434104fc;
 
 binding deserialization0 {
   requires {

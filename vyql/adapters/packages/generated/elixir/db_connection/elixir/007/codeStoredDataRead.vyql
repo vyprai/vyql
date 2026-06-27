@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m63f99da8;
+module bindings.elixir.generated.m63f99da8;
 
 binding storedDataRead7 {
   requires {

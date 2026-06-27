@@ -1,4 +1,4 @@
-module bindings.python.migration.mfda45aa6;
+module bindings.python.generated.mfda45aa6;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mcc3d1d4f;
+module bindings.groovy.generated.mcc3d1d4f;
 
 binding rawMemoryCopySize1 {
   requires {

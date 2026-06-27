@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding cinnyServiceWorkerMediaAuthLeak188 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "event.respondWith" and node.context.callPath contains "askForAccessToken" and node.context.callPath contains "fetchConfig" and node.context.literal contains "/_matrix/client/v1/media/download" and node.context.literal contains "/_matrix/client/v1/media/thumbnail" and not (node.context.callPath contains "validMediaRequest")

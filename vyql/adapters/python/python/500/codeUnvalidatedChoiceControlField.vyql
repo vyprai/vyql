@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding unvalidatedChoiceControlField500 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "set_transaction_type" and node.token contains "ifargs.transaction_type:" and node.token contains "args.transaction_type=\"selling\"" and node.token contains "args.transaction_type=\"buying\"" and not (node.token contains "args.transaction_typein[\"buying\",\"selling\"]")

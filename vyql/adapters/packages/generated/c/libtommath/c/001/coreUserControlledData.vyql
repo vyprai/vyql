@@ -1,4 +1,4 @@
-module bindings.c.migration.m0ead532e;
+module bindings.c.generated.m0ead532e;
 
 binding userControlledData1 {
   requires {

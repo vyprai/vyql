@@ -1,4 +1,4 @@
-module bindings.php.migration.mc41a1abc;
+module bindings.php.generated.mc41a1abc;
 
 binding authorizationCheck3 {
   requires {

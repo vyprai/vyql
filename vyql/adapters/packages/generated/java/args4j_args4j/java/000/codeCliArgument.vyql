@@ -1,4 +1,4 @@
-module bindings.java.migration.m75bd25f5;
+module bindings.java.generated.m75bd25f5;
 
 binding cliArgument0 {
   requires {

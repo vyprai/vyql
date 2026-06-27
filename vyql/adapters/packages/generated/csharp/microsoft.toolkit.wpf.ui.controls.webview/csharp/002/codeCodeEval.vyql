@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m3c797cdd;
+module bindings.csharp.generated.m3c797cdd;
 
 binding codeEval2 {
   requires {

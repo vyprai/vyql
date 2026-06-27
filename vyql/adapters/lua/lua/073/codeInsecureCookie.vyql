@@ -1,4 +1,4 @@
-module bindings.lua.migration.ma99d12f7;
+module bindings.lua.generated.ma99d12f7;
 
 binding insecureCookie73 {
   query pattern callExpr where callee.path ~= "set_secure" and args.any.literal contains "false"

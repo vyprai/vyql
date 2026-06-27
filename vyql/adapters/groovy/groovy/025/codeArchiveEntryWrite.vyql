@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m6eabb149;
+module bindings.groovy.generated.m6eabb149;
 
 binding archiveEntryWrite25 {
   query pattern callExpr where callee.method == "extractEntry"

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.me534ebd7;
+module bindings.kotlin.generated.me534ebd7;
 
 binding storedDataRead0 {
   requires {

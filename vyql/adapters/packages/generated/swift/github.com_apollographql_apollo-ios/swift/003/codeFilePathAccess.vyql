@@ -1,4 +1,4 @@
-module bindings.swift.migration.m662babba;
+module bindings.swift.generated.m662babba;
 
 binding filePathAccess3 {
   requires {

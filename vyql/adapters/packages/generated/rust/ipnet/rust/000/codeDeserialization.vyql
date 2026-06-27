@@ -1,4 +1,4 @@
-module bindings.rust.migration.mabbda022;
+module bindings.rust.generated.mabbda022;
 
 binding deserialization0 {
   requires {

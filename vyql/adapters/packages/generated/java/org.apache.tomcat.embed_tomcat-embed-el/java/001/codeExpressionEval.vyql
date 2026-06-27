@@ -1,4 +1,4 @@
-module bindings.java.migration.mdce6032a;
+module bindings.java.generated.mdce6032a;
 
 binding expressionEval1 {
   requires {

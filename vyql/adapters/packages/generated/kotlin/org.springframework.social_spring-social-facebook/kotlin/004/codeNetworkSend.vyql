@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mc556037a;
+module bindings.kotlin.generated.mc556037a;
 
 binding networkSend4 {
   requires {

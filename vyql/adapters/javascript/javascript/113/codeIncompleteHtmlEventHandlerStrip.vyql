@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding incompleteHtmlEventHandlerStrip113 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "ViewSource" and node.token contains "stripScripts" and node.token contains "stripIFrames" and node.token contains "stripComments" and node.token contains "_stripScripts" and node.token contains "_stripIFrames" and node.token contains "_filter" and not (node.token contains "stripEventHandlers") and not (node.token contains "_stripEventHandlers")

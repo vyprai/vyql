@@ -1,4 +1,4 @@
-module bindings.c.migration.m998ea3dd;
+module bindings.c.generated.m998ea3dd;
 
 binding archiveEntryWrite0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.ma91e227c;
+module bindings.php.generated.ma91e227c;
 
 binding fileUse2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding zeroStepSequenceExpansion629 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "Math.abs(numeric(n[2]))" and node.token contains "test(i,y)" and node.token contains "i+=incr" and not (node.token contains "Math.max(Math.abs(numeric(n[2])),1)")

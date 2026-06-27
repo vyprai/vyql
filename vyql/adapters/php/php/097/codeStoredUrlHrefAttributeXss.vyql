@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding storedUrlHrefAttributeXss97 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.literal, ["<a href='", "<a href=\"", "href='", "href=\""]) and containsAny(node.context.subscript, ["$this->fields['website']", "$this->fields[\"website\"]", "$this->fields['url']", "$this->fields[\"url\"]", "$this->fields['link']", "$this->fields[\"link\"]"]) and containsAny(node.context.callPath, ["Toolbox.formatOutputWebLink", "formatOutputWebLink", "formatOutputWebUrl", "formatUrl", "buildUrl"]) and not (containsAny(node.context.callPath, ["URL.sanitizeURL", "sanitizeURL", "htmlspecialchars", "htmlentities", "esc_url", "esc_attr", "filter_var"]))

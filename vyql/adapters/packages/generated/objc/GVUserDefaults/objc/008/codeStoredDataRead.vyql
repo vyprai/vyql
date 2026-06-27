@@ -1,4 +1,4 @@
-module bindings.objc.migration.mde09a442;
+module bindings.objc.generated.mde09a442;
 
 binding storedDataRead8 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m183b8c4b;
+module bindings.cpp.generated.m183b8c4b;
 
 binding commandExecution0 {
   requires {

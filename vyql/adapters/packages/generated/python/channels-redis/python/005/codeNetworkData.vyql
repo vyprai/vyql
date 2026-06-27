@@ -1,4 +1,4 @@
-module bindings.python.migration.m86ffa1d4;
+module bindings.python.generated.m86ffa1d4;
 
 binding networkData5 {
   requires {

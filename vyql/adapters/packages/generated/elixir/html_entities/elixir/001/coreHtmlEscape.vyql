@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mffdc188a;
+module bindings.elixir.generated.mffdc188a;
 
 binding htmlEscape1 {
   requires {

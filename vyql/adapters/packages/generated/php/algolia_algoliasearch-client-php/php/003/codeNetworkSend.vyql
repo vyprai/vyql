@@ -1,4 +1,4 @@
-module bindings.php.migration.m422ff57e;
+module bindings.php.generated.m422ff57e;
 
 binding networkSend3 {
   requires {

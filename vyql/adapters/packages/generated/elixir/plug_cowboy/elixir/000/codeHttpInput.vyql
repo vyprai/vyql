@@ -1,4 +1,4 @@
-module bindings.elixir.migration.maea1854f;
+module bindings.elixir.generated.maea1854f;
 
 binding httpInput0 {
   requires {

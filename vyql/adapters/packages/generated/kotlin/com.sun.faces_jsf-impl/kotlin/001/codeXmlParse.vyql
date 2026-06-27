@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mf071948f;
+module bindings.kotlin.generated.mf071948f;
 
 binding xmlParse1 {
   requires {

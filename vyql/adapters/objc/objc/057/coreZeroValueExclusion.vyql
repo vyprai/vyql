@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding zeroValueExclusion57 {
   query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"

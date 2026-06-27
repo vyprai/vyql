@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding cobblerDjangoStateChangeGetCsrf611 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "sync" and node.token contains "remote.background_sync" and not (node.context.decoratorPath contains "require_POST")

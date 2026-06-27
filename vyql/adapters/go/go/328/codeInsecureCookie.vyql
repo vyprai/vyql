@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding insecureCookie328 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "http.Cookie" and node.token contains "Secure=false"

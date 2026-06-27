@@ -1,4 +1,4 @@
-module bindings.rust.migration.m3a654c7a;
+module bindings.rust.generated.m3a654c7a;
 
 binding networkConnect2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.md67db989;
+module bindings.cpp.generated.md67db989;
 
 binding authorizationCheck3 {
   requires {

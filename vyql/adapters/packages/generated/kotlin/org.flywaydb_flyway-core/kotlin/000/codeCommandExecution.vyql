@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m633a64de;
+module bindings.kotlin.generated.m633a64de;
 
 binding commandExecution0 {
   requires {

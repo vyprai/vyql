@@ -1,4 +1,4 @@
-module bindings.config.migration.m2b6375a9;
+module bindings.config.generated.m2b6375a9;
 
 binding cleartextConfig4 {
   query pattern presenceNode where node.analysis ~= "config.plist.ats_arbitrary_loads"

@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding cgifAddframeSignedFrameCountOverflow106 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "cgif_addframe" and node.token contains "for(i=0;i<pGIF->config.width*pGIF->config.height;i++)" and node.token contains "cmpPixel(pGIF,pConfig,&pGIF->aFrames[pGIF->iHEAD]->config,pConfig->pImageData[i],pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])" and not (node.token contains "for(i=0;i<MULU16(pGIF->config.width,pGIF->config.height);i++)")

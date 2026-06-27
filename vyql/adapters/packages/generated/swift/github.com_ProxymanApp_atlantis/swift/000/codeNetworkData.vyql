@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdb6307d8;
+module bindings.swift.generated.mdb6307d8;
 
 binding networkData0 {
   requires {

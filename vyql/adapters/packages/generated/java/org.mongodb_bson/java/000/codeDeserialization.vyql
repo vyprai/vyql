@@ -1,4 +1,4 @@
-module bindings.java.migration.mfc16f61f;
+module bindings.java.generated.mfc16f61f;
 
 binding deserialization0 {
   requires {

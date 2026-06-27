@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1b942e7b;
+module bindings.csharp.generated.m1b942e7b;
 
 binding inputValidation2 {
   requires {

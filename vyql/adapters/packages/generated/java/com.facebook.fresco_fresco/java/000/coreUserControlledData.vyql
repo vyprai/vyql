@@ -1,4 +1,4 @@
-module bindings.java.migration.mf40494fa;
+module bindings.java.generated.mf40494fa;
 
 binding userControlledData0 {
   requires {

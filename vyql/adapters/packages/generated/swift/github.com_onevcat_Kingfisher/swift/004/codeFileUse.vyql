@@ -1,4 +1,4 @@
-module bindings.swift.migration.mcb2efc93;
+module bindings.swift.generated.mcb2efc93;
 
 binding fileUse4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m281351c1;
+module bindings.elixir.generated.m281351c1;
 
 binding cliArgument0 {
   requires {

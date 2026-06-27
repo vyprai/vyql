@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m06b56adb;
+module bindings.groovy.generated.m06b56adb;
 
 binding networkSend2 {
   requires {

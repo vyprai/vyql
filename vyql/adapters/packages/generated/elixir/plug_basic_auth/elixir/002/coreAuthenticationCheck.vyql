@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mbe60d0c5;
+module bindings.elixir.generated.mbe60d0c5;
 
 binding authenticationCheck2 {
   requires {

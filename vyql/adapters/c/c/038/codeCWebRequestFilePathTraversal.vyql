@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding cWebRequestFilePathTraversal38 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "http_request_param_get" and node.token contains "http_request_get_query_string" and node.token contains "file_read" and node.token contains "file_write" and node.token contains "unlink" and not (node.token contains "page_name_is_good(page)") and not (node.token contains "strstr(page,\"..\")") and not (node.token contains "strchr(page,'/')")

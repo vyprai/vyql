@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m4d904bd9;
+module bindings.ruby.generated.m4d904bd9;
 
 binding htmlEscape0 {
   requires {

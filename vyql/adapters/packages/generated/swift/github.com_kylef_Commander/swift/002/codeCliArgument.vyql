@@ -1,4 +1,4 @@
-module bindings.swift.migration.m05efabc2;
+module bindings.swift.generated.m05efabc2;
 
 binding cliArgument2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding uncheckedPrototypeConfigKey572 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "separateExposeGlobals" and node.token contains "Object.keys(shims).forEach" and node.token contains "exposeGlobals[k]=exp" and node.token contains "onlyShims[k]=val" and not (node.token contains "k==='__proto__'||k==='constructor'")

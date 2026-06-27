@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfa245b21;
+module bindings.perl.generated.mfa245b21;
 
 binding inputValidation1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding zeroSizeReallocation41 {
   query pattern presenceNode where node.path ~= "reallocarray"

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3b973a62;
+module bindings.kotlin.generated.m3b973a62;
 
 binding authorizationCheck3 {
   requires {

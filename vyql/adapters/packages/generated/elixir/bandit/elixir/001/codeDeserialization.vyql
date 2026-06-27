@@ -1,4 +1,4 @@
-module bindings.elixir.migration.maccf35a5;
+module bindings.elixir.generated.maccf35a5;
 
 binding deserialization1 {
   requires {

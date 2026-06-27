@@ -1,4 +1,4 @@
-module bindings.perl.migration.m6d7dec09;
+module bindings.perl.generated.m6d7dec09;
 
 binding weakRandomValue0 {
   requires {

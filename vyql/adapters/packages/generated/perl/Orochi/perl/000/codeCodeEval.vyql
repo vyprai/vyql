@@ -1,4 +1,4 @@
-module bindings.perl.migration.mcfc55109;
+module bindings.perl.generated.mcfc55109;
 
 binding codeEval0 {
   requires {

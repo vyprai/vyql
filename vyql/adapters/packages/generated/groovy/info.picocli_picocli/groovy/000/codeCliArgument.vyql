@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mb504eea1;
+module bindings.groovy.generated.mb504eea1;
 
 binding cliArgument0 {
   requires {

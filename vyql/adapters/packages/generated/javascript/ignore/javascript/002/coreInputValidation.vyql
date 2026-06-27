@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m32d27075;
+module bindings.javascript.generated.m32d27075;
 
 binding inputValidation2 {
   requires {

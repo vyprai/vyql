@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding partiallyEscapedSshCommand264 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "run_ssh_command_with_credentials" and node.token contains "escaped_password" and node.token contains "escaped_command" and node.token contains "{username}@{host}" and node.token contains "-p {port}" and node.token contains "run_command(ssh_command)" and not (node.token contains "quoted_username") and not (node.token contains "quoted_host") and not (node.token contains "port=int(port)")

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding protocolStateReview501 {
   query pattern presenceNode where node.scope == "function" and node.token contains "_original_transport" and node.token contains "_reader._transport" and node.token contains "_writer._transport" and not (node.token contains "_reader._buffer.clear")

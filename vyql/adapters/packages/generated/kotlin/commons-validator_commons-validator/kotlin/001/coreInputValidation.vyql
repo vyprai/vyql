@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.med602aa2;
+module bindings.kotlin.generated.med602aa2;
 
 binding inputValidation1 {
   requires {

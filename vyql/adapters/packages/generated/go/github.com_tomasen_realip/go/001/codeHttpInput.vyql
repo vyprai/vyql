@@ -1,4 +1,4 @@
-module bindings.go.migration.m9933733e;
+module bindings.go.generated.m9933733e;
 
 binding httpInput1 {
   requires {

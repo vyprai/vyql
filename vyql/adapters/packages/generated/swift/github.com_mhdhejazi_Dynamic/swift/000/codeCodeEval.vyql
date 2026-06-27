@@ -1,4 +1,4 @@
-module bindings.swift.migration.me3c0d926;
+module bindings.swift.generated.me3c0d926;
 
 binding codeEval0 {
   requires {

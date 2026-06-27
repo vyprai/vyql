@@ -1,4 +1,4 @@
-module bindings.rust.migration.mac59b6f7;
+module bindings.rust.generated.mac59b6f7;
 
 binding networkData0 {
   requires {

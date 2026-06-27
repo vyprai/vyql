@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding threadLocalScopeOverwriteWithoutCleanup331 {
   query pattern presenceNode where node.scope == "function" and node.context.className contains "RequestScopedCache" and node.context.functionName contains "beginRequest" and node.context.callPath contains "CACHE.set" and not (node.context.scopeCall contains "endRequest") and not (node.context.callPath contains "CACHE.remove")

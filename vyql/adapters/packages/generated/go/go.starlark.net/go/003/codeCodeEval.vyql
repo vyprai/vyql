@@ -1,4 +1,4 @@
-module bindings.go.migration.m4a74693d;
+module bindings.go.generated.m4a74693d;
 
 binding codeEval3 {
   requires {

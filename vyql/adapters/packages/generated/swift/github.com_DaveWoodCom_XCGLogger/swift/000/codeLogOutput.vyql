@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2087bdc7;
+module bindings.swift.generated.m2087bdc7;
 
 binding logOutput0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m4048a771;
+module bindings.go.generated.m4048a771;
 
 binding cliArgument1 {
   requires {

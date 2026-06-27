@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m8656c654;
+module bindings.cpp.generated.m8656c654;
 
 binding databaseRead0 {
   requires {

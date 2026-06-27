@@ -1,4 +1,4 @@
-module bindings.java.migration.mbcfbfb01;
+module bindings.java.generated.mbcfbfb01;
 
 binding httpInput2 {
   requires {

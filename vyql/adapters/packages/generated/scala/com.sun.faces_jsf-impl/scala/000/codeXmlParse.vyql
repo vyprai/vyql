@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7545b7d6;
+module bindings.scala.generated.m7545b7d6;
 
 binding xmlParse0 {
   requires {

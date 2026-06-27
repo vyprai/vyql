@@ -1,4 +1,4 @@
-module bindings.java.migration.m8da3688f;
+module bindings.java.generated.m8da3688f;
 
 binding deserialization0 {
   requires {

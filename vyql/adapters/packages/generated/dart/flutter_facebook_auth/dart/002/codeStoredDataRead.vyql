@@ -1,4 +1,4 @@
-module bindings.dart.migration.m21ec09bd;
+module bindings.dart.generated.m21ec09bd;
 
 binding storedDataRead2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma6195ec2;
+module bindings.elixir.generated.ma6195ec2;
 
 binding filePathAccess2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding csrfProtection152 {
   query pattern callExpr where callee.path ~= "validate_csrf_token"

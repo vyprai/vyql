@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m6eabb149;
+module bindings.groovy.generated.m6eabb149;
 
 binding weakHash27 {
   query pattern callExpr where callee.path ~= "MessageDigest.getInstance" and args.any.literal contains "MD5"

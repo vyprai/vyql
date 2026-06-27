@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m71388d4a;
+module bindings.elixir.generated.m71388d4a;
 
 binding urlFetch0 {
   requires {

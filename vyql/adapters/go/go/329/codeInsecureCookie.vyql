@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding insecureCookie329 {
   query pattern presenceNode where node.scope == "function" and node.token contains "ctx.SetCookie" and node.token contains "GenerateToken" and node.token contains "opt.CookieHttpOnly" and node.token contains "false" and not (node.token contains "opt.Secure")

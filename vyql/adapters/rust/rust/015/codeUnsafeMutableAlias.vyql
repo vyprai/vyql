@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding unsafeMutableAlias15 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "&mut" and node.token contains "as *const" and node.token contains "as *mut"

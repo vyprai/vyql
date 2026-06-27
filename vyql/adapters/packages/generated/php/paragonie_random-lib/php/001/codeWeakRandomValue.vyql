@@ -1,4 +1,4 @@
-module bindings.php.migration.mf48d19e2;
+module bindings.php.generated.mf48d19e2;
 
 binding weakRandomValue1 {
   requires {

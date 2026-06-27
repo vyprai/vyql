@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m14334e16;
+module bindings.groovy.generated.m14334e16;
 
 binding safeDeserialization0 {
   requires {

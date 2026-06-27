@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2f5001ed;
+module bindings.swift.generated.m2f5001ed;
 
 binding weakHash0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mcc80b170;
+module bindings.javascript.generated.mcc80b170;
 
 binding networkConnect0 {
   requires {

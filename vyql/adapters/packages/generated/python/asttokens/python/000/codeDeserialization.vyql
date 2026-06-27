@@ -1,4 +1,4 @@
-module bindings.python.migration.medc2fb30;
+module bindings.python.generated.medc2fb30;
 
 binding deserialization0 {
   requires {

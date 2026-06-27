@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding localRequestBypassReview182 {
   query pattern presenceNode where node.scope == "function" and node.token contains "isLocalRequest" and node.token contains "isLocal||awaithasValidToken" and not (node.token contains "hasValidCliToken")

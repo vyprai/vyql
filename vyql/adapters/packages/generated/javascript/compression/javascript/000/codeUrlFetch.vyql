@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mf59022db;
+module bindings.javascript.generated.mf59022db;
 
 binding urlFetch0 {
   requires {

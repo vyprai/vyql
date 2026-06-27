@@ -1,4 +1,4 @@
-module bindings.swift.migration.m98856ac6;
+module bindings.swift.generated.m98856ac6;
 
 binding htmlRender1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m86249842;
+module bindings.elixir.generated.m86249842;
 
 binding databaseRead0 {
   requires {

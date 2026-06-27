@@ -1,4 +1,4 @@
-module bindings.objc.migration.me5914404;
+module bindings.objc.generated.me5914404;
 
 binding databaseRead1 {
   requires {

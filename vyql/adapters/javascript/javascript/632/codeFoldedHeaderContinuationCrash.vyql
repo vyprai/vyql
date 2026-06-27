@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding foldedHeaderContinuationCrash632 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "this.buffer.split(RE_CRLF)" and node.token contains "lines[i][0]" and node.token contains "RE_HDR.exec(lines[i])" and node.token contains "this.header[h]" and node.token contains "lines[i]" and not (node.token contains "if(h)") and not (node.token contains "if(h!==undefined)") and not (node.token contains "if(h!=null)")

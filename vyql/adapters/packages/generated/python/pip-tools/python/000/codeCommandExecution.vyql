@@ -1,4 +1,4 @@
-module bindings.python.migration.med01abe3;
+module bindings.python.generated.med01abe3;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding effectiveUidRootCheckBypass163 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "run" and node.token contains "os.geteuid()==0" and node.token contains "superuser privileges" and not (node.context.name contains "run_worker") and not (node.token contains "os.getuid()==0")

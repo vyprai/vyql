@@ -1,4 +1,4 @@
-module bindings.lua.migration.ma99d12f7;
+module bindings.lua.generated.ma99d12f7;
 
 binding filePathAccess24 {
   query pattern callExpr where callee.path ~= "lfs.rmdir"

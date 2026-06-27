@@ -1,4 +1,4 @@
-module bindings.python.migration.mfe65b901;
+module bindings.python.generated.mfe65b901;
 
 binding authorizationCheck3 {
   requires {

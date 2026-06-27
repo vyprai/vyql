@@ -1,4 +1,4 @@
-module bindings.scala.migration.m733a6b1b;
+module bindings.scala.generated.m733a6b1b;
 
 binding templateRender3 {
   requires {

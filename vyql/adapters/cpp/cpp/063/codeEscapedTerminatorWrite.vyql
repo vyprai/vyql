@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding escapedTerminatorWrite63 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "unescapeChar(*readPtr++);}*writePtr++=c;"

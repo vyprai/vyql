@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding externalResourceIntegrityReview203 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "updateDynamicPageSriHashes" and node.token contains "integrityRegex.exec(attrs)" and node.token contains "globalHashes[t2].set(src,sriHash)" and not (node.token contains "Detected reference to not explicitly allowed external resource")

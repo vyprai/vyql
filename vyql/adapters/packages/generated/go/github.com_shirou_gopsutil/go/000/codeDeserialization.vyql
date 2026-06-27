@@ -1,4 +1,4 @@
-module bindings.go.migration.m5beafe11;
+module bindings.go.generated.m5beafe11;
 
 binding deserialization0 {
   requires {

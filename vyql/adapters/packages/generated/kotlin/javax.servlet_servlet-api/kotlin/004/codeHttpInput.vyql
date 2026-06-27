@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma8d8feef;
+module bindings.kotlin.generated.ma8d8feef;
 
 binding httpInput4 {
   requires {

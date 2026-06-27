@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfab0ec3a;
+module bindings.kotlin.generated.mfab0ec3a;
 
 binding databaseRead0 {
   requires {

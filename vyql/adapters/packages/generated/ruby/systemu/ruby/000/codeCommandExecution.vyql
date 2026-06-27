@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mebee6018;
+module bindings.ruby.generated.mebee6018;
 
 binding commandExecution0 {
   requires {

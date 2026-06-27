@@ -1,4 +1,4 @@
-module bindings.go.migration.mbb7730dd;
+module bindings.go.generated.mbb7730dd;
 
 binding deserialization0 {
   requires {

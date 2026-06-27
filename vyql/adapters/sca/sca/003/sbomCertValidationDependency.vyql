@@ -1,4 +1,4 @@
-module bindings.sca.migration.mc40a837e;
+module bindings.sca.generated.mc40a837e;
 
 binding certValidationDependency3 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-295"

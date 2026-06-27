@@ -1,4 +1,4 @@
-module bindings.go.migration.m600cfa6d;
+module bindings.go.generated.m600cfa6d;
 
 binding networkData4 {
   requires {

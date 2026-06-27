@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mc737875e;
+module bindings.kotlin.generated.mc737875e;
 
 binding templateRender0 {
   requires {

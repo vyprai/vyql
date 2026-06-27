@@ -1,4 +1,4 @@
-module bindings.rust.migration.mb5d825c9;
+module bindings.rust.generated.mb5d825c9;
 
 binding htmlEscape0 {
   requires {

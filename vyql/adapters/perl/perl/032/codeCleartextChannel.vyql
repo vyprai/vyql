@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding cleartextChannel32 {
   query pattern callExpr where callee.path ~= "request" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

@@ -1,4 +1,4 @@
-module bindings.perl.migration.maac68e8c;
+module bindings.perl.generated.maac68e8c;
 
 binding cliArgument4 {
   requires {

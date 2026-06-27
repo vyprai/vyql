@@ -1,4 +1,4 @@
-module bindings.rust.migration.me6084cbb;
+module bindings.rust.generated.me6084cbb;
 
 binding filePathAccess0 {
   requires {

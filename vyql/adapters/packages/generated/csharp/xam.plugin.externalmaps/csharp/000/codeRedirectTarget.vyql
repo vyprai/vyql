@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mc8424360;
+module bindings.csharp.generated.mc8424360;
 
 binding redirectTarget0 {
   requires {

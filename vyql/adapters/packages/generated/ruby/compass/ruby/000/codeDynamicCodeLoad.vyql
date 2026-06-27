@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0b7821ec;
+module bindings.ruby.generated.m0b7821ec;
 
 binding dynamicCodeLoad0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m801e6e81;
+module bindings.php.generated.m801e6e81;
 
 binding pathCanonicalization4 {
   requires {

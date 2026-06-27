@@ -1,4 +1,4 @@
-module bindings.config.migration.m2b6375a9;
+module bindings.config.generated.m2b6375a9;
 
 binding privilegedWorkflowUntrustedCodeExecution14 {
   query pattern presenceNode where node.analysis ~= "config.github_actions.privileged_pr_framework_execution"

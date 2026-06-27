@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding integerSizeArithmetic55 {
   query pattern presenceNode where node.path ~= "__binop.mul"

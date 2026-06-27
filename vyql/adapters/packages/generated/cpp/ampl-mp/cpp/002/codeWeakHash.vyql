@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m450a9861;
+module bindings.cpp.generated.m450a9861;
 
 binding weakHash2 {
   requires {

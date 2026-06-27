@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mabd4eead;
+module bindings.groovy.generated.mabd4eead;
 
 binding htmlEscape4 {
   requires {

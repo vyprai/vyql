@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m018359cb;
+module bindings.groovy.generated.m018359cb;
 
 binding regexCompile0 {
   requires {

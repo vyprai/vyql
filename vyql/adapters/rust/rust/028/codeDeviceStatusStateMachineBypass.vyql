@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding deviceStatusStateMachineBypass28 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.name, ["write_common_config", "write_device_status", "write_config_byte"]) and node.context.matchArm contains "DEVICE_STATUS" and node.context.assign contains "self.driver_status=value" and not (node.context.callPath contains "self.set_device_status")

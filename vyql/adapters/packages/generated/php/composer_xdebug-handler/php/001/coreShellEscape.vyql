@@ -1,4 +1,4 @@
-module bindings.php.migration.m6a1759a9;
+module bindings.php.generated.m6a1759a9;
 
 binding shellEscape1 {
   requires {

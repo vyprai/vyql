@@ -1,4 +1,4 @@
-module bindings.java.migration.m036a1795;
+module bindings.java.generated.m036a1795;
 
 binding pathCanonicalization0 {
   requires {

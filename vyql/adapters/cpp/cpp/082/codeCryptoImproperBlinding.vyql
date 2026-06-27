@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding cryptoImproperBlinding82 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "r.Randomize" and node.token contains "MultiplicativeInverse(r)" and node.token contains "Jacobi" and node.token contains "modn.Square(r)" and node.token contains "modn.Multiply(y,rInv)" and not (node.token contains "r=modn.Square(r);rInv=modn.MultiplicativeInverse(r)")

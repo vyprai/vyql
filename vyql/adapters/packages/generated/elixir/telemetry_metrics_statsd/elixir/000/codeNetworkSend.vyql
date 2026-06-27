@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mfbcab526;
+module bindings.elixir.generated.mfbcab526;
 
 binding networkSend0 {
   requires {

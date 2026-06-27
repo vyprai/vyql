@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding missingFrameProtection325 {
   query pattern callExpr where callee.path ~= "Header.Set" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"

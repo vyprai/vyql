@@ -1,4 +1,4 @@
-module bindings.ruby.migration.me5149708;
+module bindings.ruby.generated.me5149708;
 
 binding shellEscape0 {
   requires {

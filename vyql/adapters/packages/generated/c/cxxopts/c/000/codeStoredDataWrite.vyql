@@ -1,4 +1,4 @@
-module bindings.c.migration.m908e68cc;
+module bindings.c.generated.m908e68cc;
 
 binding storedDataWrite0 {
   requires {

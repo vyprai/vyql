@@ -1,4 +1,4 @@
-module bindings.scala.migration.mecaca4c7;
+module bindings.scala.generated.mecaca4c7;
 
 binding authenticationCheck0 {
   requires {

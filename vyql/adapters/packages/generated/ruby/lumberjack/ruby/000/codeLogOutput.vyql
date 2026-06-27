@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0581fd14;
+module bindings.ruby.generated.m0581fd14;
 
 binding logOutput0 {
   requires {

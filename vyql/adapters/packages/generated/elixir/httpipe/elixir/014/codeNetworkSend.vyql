@@ -1,4 +1,4 @@
-module bindings.elixir.migration.md8b53b09;
+module bindings.elixir.generated.md8b53b09;
 
 binding networkSend14 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.mfedb9024;
+module bindings.python.generated.mfedb9024;
 
 binding filePathAccess2 {
   requires {

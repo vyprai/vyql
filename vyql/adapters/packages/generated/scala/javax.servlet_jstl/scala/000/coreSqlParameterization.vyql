@@ -1,4 +1,4 @@
-module bindings.scala.migration.mb0e57905;
+module bindings.scala.generated.mb0e57905;
 
 binding sqlParameterization0 {
   requires {

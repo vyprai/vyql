@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mdd264b2f;
+module bindings.kotlin.generated.mdd264b2f;
 
 binding htmlEscape0 {
   requires {

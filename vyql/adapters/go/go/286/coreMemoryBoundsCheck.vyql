@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding memoryBoundsCheck286 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne" and node.token contains "Count" and node.token contains "0"

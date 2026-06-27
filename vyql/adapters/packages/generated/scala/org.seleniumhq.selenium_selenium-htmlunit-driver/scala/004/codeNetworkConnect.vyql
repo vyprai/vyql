@@ -1,4 +1,4 @@
-module bindings.scala.migration.mfea80497;
+module bindings.scala.generated.mfea80497;
 
 binding networkConnect4 {
   requires {

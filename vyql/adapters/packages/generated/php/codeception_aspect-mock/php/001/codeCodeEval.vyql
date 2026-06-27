@@ -1,4 +1,4 @@
-module bindings.php.migration.m08df6a57;
+module bindings.php.generated.m08df6a57;
 
 binding codeEval1 {
   requires {

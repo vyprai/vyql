@@ -1,4 +1,4 @@
-module bindings.python.migration.mb15e1e42;
+module bindings.python.generated.mb15e1e42;
 
 binding httpInput0 {
   requires {

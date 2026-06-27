@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mc96d565b;
+module bindings.cpp.generated.mc96d565b;
 
 binding weakRandomValue0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.m74425bad;
+module bindings.c.generated.m74425bad;
 
 binding inputValidation1 {
   requires {

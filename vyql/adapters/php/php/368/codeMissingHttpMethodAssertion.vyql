@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding missingHttpMethodAssertion368 {
   query pattern presenceNode where node.scope == "class" and node.token contains "Action" and node.token contains "$this->backendUserSessionRepository->terminateSessionByIdentifier" and not (node.token contains "$this->assertAllowedHttpMethod")

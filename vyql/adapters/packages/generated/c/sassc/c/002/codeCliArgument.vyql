@@ -1,4 +1,4 @@
-module bindings.c.migration.m313a9cbc;
+module bindings.c.generated.m313a9cbc;
 
 binding cliArgument2 {
   requires {

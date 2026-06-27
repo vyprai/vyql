@@ -1,4 +1,4 @@
-module bindings.scala.migration.m8970fe7d;
+module bindings.scala.generated.m8970fe7d;
 
 binding networkConnect0 {
   requires {

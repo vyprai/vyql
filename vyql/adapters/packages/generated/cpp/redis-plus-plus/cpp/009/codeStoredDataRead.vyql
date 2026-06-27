@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m2bcacd66;
+module bindings.cpp.generated.m2bcacd66;
 
 binding storedDataRead9 {
   requires {

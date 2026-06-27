@@ -1,4 +1,4 @@
-module bindings.scala.migration.mdbe8700e;
+module bindings.scala.generated.mdbe8700e;
 
 binding networkSend0 {
   requires {

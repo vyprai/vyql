@@ -1,4 +1,4 @@
-module bindings.java.migration.m08118ed7;
+module bindings.java.generated.m08118ed7;
 
 binding nosqlQuery0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m264d3a1c;
+module bindings.java.generated.m264d3a1c;
 
 binding storedDataRead0 {
   requires {

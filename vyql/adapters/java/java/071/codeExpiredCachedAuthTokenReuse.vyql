@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding expiredCachedAuthTokenReuse71 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "accessTokenCache.timeout.isBefore" and node.context.callPath contains "ZonedDateTime.now" and node.context.selector contains "accessTokenCache.resource" and node.context.callPath contains "accessToken.getExpiresAtAsInstant" and node.context.callPath contains "expiresAt.minus" and not (node.context.callPath contains "accessTokenCache.timeout.isAfter")

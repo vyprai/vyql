@@ -1,4 +1,4 @@
-module bindings.python.migration.m670ccd79;
+module bindings.python.generated.m670ccd79;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mea77056c;
+module bindings.elixir.generated.mea77056c;
 
 binding templateRender5 {
   requires {

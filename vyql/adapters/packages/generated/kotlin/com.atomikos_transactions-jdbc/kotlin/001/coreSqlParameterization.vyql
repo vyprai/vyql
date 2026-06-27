@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mc091c291;
+module bindings.kotlin.generated.mc091c291;
 
 binding sqlParameterization1 {
   requires {

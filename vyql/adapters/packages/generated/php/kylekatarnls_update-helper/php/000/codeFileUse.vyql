@@ -1,4 +1,4 @@
-module bindings.php.migration.m9ecb3ec0;
+module bindings.php.generated.m9ecb3ec0;
 
 binding fileUse0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.me31a5236;
+module bindings.rust.generated.me31a5236;
 
 binding responseHeaderWrite3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m46077ab1;
+module bindings.go.generated.m46077ab1;
 
 binding networkData3 {
   requires {

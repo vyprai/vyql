@@ -1,4 +1,4 @@
-module bindings.java.migration.me92dc180;
+module bindings.java.generated.me92dc180;
 
 binding codeEval1 {
   requires {

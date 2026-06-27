@@ -1,4 +1,4 @@
-module bindings.perl.migration.m8b46436f;
+module bindings.perl.generated.m8b46436f;
 
 binding httpInput6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m13f7a0a2;
+module bindings.php.generated.m13f7a0a2;
 
 binding sqlExecution1 {
   requires {

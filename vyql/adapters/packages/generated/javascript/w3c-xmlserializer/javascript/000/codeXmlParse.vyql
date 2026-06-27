@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mba879610;
+module bindings.javascript.generated.mba879610;
 
 binding xmlParse0 {
   requires {

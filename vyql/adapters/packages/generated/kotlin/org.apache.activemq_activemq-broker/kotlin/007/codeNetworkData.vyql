@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.md572087c;
+module bindings.kotlin.generated.md572087c;
 
 binding networkData7 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0afebd11;
+module bindings.ruby.generated.m0afebd11;
 
 binding databaseRead1 {
   requires {

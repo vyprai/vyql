@@ -1,4 +1,4 @@
-module bindings.scala.migration.mffceebc2;
+module bindings.scala.generated.mffceebc2;
 
 binding httpInput0 {
   requires {

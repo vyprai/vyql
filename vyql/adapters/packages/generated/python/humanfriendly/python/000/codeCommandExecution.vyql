@@ -1,4 +1,4 @@
-module bindings.python.migration.m66402d04;
+module bindings.python.generated.m66402d04;
 
 binding commandExecution0 {
   requires {

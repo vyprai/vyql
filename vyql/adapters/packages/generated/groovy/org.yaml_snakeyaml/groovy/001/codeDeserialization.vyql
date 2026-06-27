@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mdb6641db;
+module bindings.groovy.generated.mdb6641db;
 
 binding deserialization1 {
   requires {

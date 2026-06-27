@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding zeroValueExclusion146 {
   query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"

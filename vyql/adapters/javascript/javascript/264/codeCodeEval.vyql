@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding codeEval264 {
   query pattern callExpr where callee.path ~= "vm2.run"

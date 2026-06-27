@@ -1,4 +1,4 @@
-module bindings.scala.migration.m766f70e1;
+module bindings.scala.generated.m766f70e1;
 
 binding responseHeaderWrite5 {
   requires {

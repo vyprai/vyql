@@ -1,4 +1,4 @@
-module bindings.perl.migration.m88deec81;
+module bindings.perl.generated.m88deec81;
 
 binding sqlParameterization1 {
   requires {

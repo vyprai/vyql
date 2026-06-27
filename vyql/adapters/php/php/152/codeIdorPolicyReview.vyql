@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding idorPolicyReview152 {
   query pattern presenceNode where node.kind == "any" and node.path == "__object_literal" and node.token contains "review.id" and not (node.token contains "review.customerid")

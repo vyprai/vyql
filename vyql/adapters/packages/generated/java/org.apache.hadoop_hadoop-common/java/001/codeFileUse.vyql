@@ -1,4 +1,4 @@
-module bindings.java.migration.m18ceb325;
+module bindings.java.generated.m18ceb325;
 
 binding fileUse1 {
   requires {

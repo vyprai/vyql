@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding pointerOffsetBoundsCheck115 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "start+len+1>end" and node.token contains "start+=len" and not (node.token contains "buff_size") and not (node.token contains "end-start-1")

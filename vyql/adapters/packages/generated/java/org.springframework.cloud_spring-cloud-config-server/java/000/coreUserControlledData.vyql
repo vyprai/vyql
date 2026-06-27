@@ -1,4 +1,4 @@
-module bindings.java.migration.mcdb35e01;
+module bindings.java.generated.mcdb35e01;
 
 binding userControlledData0 {
   requires {

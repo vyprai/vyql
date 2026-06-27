@@ -1,4 +1,4 @@
-module bindings.php.migration.me4f39690;
+module bindings.php.generated.me4f39690;
 
 binding networkData4 {
   requires {

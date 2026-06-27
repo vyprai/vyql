@@ -1,4 +1,4 @@
-module bindings.php.migration.m3aabedbe;
+module bindings.php.generated.m3aabedbe;
 
 binding httpInput3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0f13fa05;
+module bindings.ruby.generated.m0f13fa05;
 
 binding networkSend5 {
   requires {

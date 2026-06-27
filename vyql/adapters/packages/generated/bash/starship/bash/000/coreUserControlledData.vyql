@@ -1,4 +1,4 @@
-module bindings.bash.migration.m8d568614;
+module bindings.bash.generated.m8d568614;
 
 binding userControlledData0 {
   requires {

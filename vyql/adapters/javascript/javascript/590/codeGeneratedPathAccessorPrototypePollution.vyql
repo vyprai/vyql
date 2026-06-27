@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding generatedPathAccessorPrototypePollution590 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "parsepath" and node.context.callPath contains "builder.push" and node.context.callPath contains "Function" and containsAny(node.context.literal, ["__proto__", "constructor", "prototype"]) and not (containsAny(node.context.callPath, ["Object.hasOwn", "hasOwnProperty"])) and not (containsAny(node.context.literal, ["removed method"]))

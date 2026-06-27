@@ -1,4 +1,4 @@
-module bindings.perl.migration.m4ddb520c;
+module bindings.perl.generated.m4ddb520c;
 
 binding deserialization1 {
   requires {

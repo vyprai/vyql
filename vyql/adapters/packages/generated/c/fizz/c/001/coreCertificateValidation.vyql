@@ -1,4 +1,4 @@
-module bindings.c.migration.md3928364;
+module bindings.c.generated.md3928364;
 
 binding certificateValidation1 {
   requires {

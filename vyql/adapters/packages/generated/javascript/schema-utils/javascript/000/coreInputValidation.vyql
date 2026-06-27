@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mdadea666;
+module bindings.javascript.generated.mdadea666;
 
 binding inputValidation0 {
   requires {

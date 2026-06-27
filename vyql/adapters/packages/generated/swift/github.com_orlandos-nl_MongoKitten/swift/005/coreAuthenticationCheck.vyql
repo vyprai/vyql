@@ -1,4 +1,4 @@
-module bindings.swift.migration.m64cf68f9;
+module bindings.swift.generated.m64cf68f9;
 
 binding authenticationCheck5 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding ckeditorRawElementLiveDocumentRenderXss191 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "viewToPlainText" and node.token contains "viewItem.is('rawElement')" and node.token contains "document.createElement('div')" and node.token contains "viewItem.render(tempElement,converter)" and node.token contains "domElementToPlainText(tempElement)" and not (node.token contains "createHTMLDocument")

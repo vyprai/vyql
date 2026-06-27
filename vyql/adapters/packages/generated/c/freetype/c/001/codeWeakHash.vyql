@@ -1,4 +1,4 @@
-module bindings.c.migration.maa8603ad;
+module bindings.c.generated.maa8603ad;
 
 binding weakHash1 {
   requires {

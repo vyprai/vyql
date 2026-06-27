@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding externalResourceNamespaceControl242 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "newBuildPod" and node.context.callPath contains "build.BuilderPodNamespace"

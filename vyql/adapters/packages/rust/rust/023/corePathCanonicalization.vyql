@@ -1,4 +1,4 @@
-module bindings.rust.migration.m222602a5;
+module bindings.rust.generated.m222602a5;
 
 binding pathCanonicalization23 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mb26cebfd;
+module bindings.kotlin.generated.mb26cebfd;
 
 binding networkSend9 {
   requires {

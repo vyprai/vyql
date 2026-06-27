@@ -1,4 +1,4 @@
-module bindings.swift.migration.mea55ba17;
+module bindings.swift.generated.mea55ba17;
 
 binding cliArgument0 {
   requires {

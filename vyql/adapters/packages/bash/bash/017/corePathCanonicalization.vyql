@@ -1,4 +1,4 @@
-module bindings.bash.migration.mb6f991a5;
+module bindings.bash.generated.mb6f991a5;
 
 binding pathCanonicalization17 {
   requires {

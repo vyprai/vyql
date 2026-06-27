@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2555baf7;
+module bindings.swift.generated.m2555baf7;
 
 binding userControlledData1 {
   requires {

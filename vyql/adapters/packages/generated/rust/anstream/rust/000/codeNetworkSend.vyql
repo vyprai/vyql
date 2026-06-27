@@ -1,4 +1,4 @@
-module bindings.rust.migration.mcf5c635b;
+module bindings.rust.generated.mcf5c635b;
 
 binding networkSend0 {
   requires {

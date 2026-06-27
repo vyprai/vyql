@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mac63cc12;
+module bindings.javascript.generated.mac63cc12;
 
 binding deserialization0 {
   requires {

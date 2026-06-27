@@ -1,4 +1,4 @@
-module bindings.go.migration.m1f67e858;
+module bindings.go.generated.m1f67e858;
 
 binding htmlRender0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding certValidationDisabled638 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "requests" and node.token contains "verify=False"

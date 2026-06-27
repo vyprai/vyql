@@ -1,4 +1,4 @@
-module bindings.c.migration.m205edcff;
+module bindings.c.generated.m205edcff;
 
 binding sqlExecution7 {
   requires {

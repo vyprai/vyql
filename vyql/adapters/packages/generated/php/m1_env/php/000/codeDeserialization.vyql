@@ -1,4 +1,4 @@
-module bindings.php.migration.mc7332f4c;
+module bindings.php.generated.mc7332f4c;
 
 binding deserialization0 {
   requires {

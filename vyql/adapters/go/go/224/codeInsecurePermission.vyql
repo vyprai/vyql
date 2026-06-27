@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding insecurePermission224 {
   query pattern callExpr where callee.path ~= "os.MkdirAll" and args.any.literal contains "0777"

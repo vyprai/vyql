@@ -1,4 +1,4 @@
-module bindings.java.migration.mfe97f080;
+module bindings.java.generated.mfe97f080;
 
 binding sqlExecution2 {
   requires {

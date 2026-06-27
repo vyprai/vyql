@@ -1,4 +1,4 @@
-module bindings.c.migration.m9fcabd2b;
+module bindings.c.generated.m9fcabd2b;
 
 binding networkConnect5 {
   requires {

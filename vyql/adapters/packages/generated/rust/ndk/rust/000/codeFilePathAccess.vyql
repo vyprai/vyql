@@ -1,4 +1,4 @@
-module bindings.rust.migration.mcd10808f;
+module bindings.rust.generated.mcd10808f;
 
 binding filePathAccess0 {
   requires {

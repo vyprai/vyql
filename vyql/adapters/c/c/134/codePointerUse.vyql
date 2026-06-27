@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding pointerUse134 {
   query pattern presenceNode where node.path ~= "__deref"

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m60522db4;
+module bindings.cpp.generated.m60522db4;
 
 binding xmlParse0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.me20be1d1;
+module bindings.python.generated.me20be1d1;
 
 binding networkConnect2 {
   requires {

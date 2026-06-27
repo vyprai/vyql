@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m1d6366bf;
+module bindings.javascript.generated.m1d6366bf;
 
 binding pathAccessCheck1 {
   requires {

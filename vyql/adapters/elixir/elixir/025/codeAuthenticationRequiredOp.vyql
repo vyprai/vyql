@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m728b8a72;
+module bindings.elixir.generated.m728b8a72;
 
 binding authenticationRequiredOp25 {
   query pattern presenceNode where node.path ~= "change_email"

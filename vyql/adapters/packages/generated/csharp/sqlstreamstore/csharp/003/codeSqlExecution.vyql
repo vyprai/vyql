@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mdd9493bc;
+module bindings.csharp.generated.mdd9493bc;
 
 binding sqlExecution3 {
   requires {

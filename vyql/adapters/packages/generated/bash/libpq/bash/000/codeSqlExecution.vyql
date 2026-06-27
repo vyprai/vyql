@@ -1,4 +1,4 @@
-module bindings.bash.migration.mfe205cfa;
+module bindings.bash.generated.mfe205cfa;
 
 binding sqlExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.maad4847d;
+module bindings.ruby.generated.maad4847d;
 
 binding urlFetch3 {
   requires {

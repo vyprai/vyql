@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mef9021ce;
+module bindings.ruby.generated.mef9021ce;
 
 binding inputValidation2 {
   requires {

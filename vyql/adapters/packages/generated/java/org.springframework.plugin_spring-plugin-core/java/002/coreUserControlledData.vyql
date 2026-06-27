@@ -1,4 +1,4 @@
-module bindings.java.migration.md6bba3e8;
+module bindings.java.generated.md6bba3e8;
 
 binding userControlledData2 {
   requires {

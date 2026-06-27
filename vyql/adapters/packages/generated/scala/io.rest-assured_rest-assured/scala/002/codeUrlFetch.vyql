@@ -1,4 +1,4 @@
-module bindings.scala.migration.m13705d49;
+module bindings.scala.generated.m13705d49;
 
 binding urlFetch2 {
   requires {

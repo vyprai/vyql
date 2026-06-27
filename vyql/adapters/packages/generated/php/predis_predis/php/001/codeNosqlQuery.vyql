@@ -1,4 +1,4 @@
-module bindings.php.migration.md47d0bbb;
+module bindings.php.generated.md47d0bbb;
 
 binding nosqlQuery1 {
   requires {

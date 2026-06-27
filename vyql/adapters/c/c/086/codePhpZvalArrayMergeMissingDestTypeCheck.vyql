@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding phpZvalArrayMergeMissingDestTypeCheck86 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "Z_ARRVAL_PP" and node.context.callPath contains "zend_hash_find" and node.context.callPath contains "zend_hash_index_find" and node.context.binary contains "Z_TYPE_PP(test_ptr)==IS_ARRAY" and not (node.context.binary contains "Z_TYPE_PP(test_ptr)==IS_ARRAY&&Z_TYPE_PP(ptr)==IS_ARRAY")

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding sqlExecution29 {
   query pattern callExpr where callee.path ~= "OracleCommand"

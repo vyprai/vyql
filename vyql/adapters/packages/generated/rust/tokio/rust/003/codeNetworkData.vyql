@@ -1,4 +1,4 @@
-module bindings.rust.migration.m21476910;
+module bindings.rust.generated.m21476910;
 
 binding networkData3 {
   requires {

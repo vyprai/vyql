@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mcecd886e;
+module bindings.javascript.generated.mcecd886e;
 
 binding pathCanonicalization0 {
   requires {

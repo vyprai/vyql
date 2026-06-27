@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mf88fa75b;
+module bindings.javascript.generated.mf88fa75b;
 
 binding deserialization4 {
   requires {

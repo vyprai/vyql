@@ -1,4 +1,4 @@
-module bindings.java.migration.me32f2523;
+module bindings.java.generated.me32f2523;
 
 binding authorizationCheck2 {
   requires {

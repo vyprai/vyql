@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbf5d88e5;
+module bindings.groovy.generated.mbf5d88e5;
 
 binding networkSend1 {
   requires {

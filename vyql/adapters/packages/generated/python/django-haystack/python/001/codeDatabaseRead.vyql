@@ -1,4 +1,4 @@
-module bindings.python.migration.m5879e2a2;
+module bindings.python.generated.m5879e2a2;
 
 binding databaseRead1 {
   requires {

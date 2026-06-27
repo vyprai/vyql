@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mac090037;
+module bindings.csharp.generated.mac090037;
 
 binding networkSend0 {
   requires {

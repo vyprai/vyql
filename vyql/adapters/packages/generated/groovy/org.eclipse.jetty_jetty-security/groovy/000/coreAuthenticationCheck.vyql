@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mac8a4365;
+module bindings.groovy.generated.mac8a4365;
 
 binding authenticationCheck0 {
   requires {

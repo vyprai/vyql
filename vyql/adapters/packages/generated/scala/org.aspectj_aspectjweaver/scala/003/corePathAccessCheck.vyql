@@ -1,4 +1,4 @@
-module bindings.scala.migration.md2c7e9d5;
+module bindings.scala.generated.md2c7e9d5;
 
 binding pathAccessCheck3 {
   requires {

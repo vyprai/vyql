@@ -1,4 +1,4 @@
-module bindings.go.migration.m6f17747c;
+module bindings.go.generated.m6f17747c;
 
 binding logOutput1 {
   requires {

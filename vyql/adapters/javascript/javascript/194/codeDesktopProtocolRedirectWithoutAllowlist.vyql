@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding desktopProtocolRedirectWithoutAllowlist194 {
   query pattern presenceNode where node.scope == "function" and containsAny(node.context.name, ["openDesktopIDE", "openExternal", "openDesktop", "redirectToDesktop"]) and node.context.callPath contains "URL" and node.context.callPath contains "window.location.href" and containsAny(node.context.identifier, ["url", "desktopLink", "redirect"]) and node.context.literal contains "http:" and node.context.literal contains "https:" and not (containsAny(node.context.callPath, ["trustedProtocols.includes", "allowedProtocols.includes"])) and not (containsAny(node.context.literal, ["vscode:", "vscode-insiders:", "jetbrains-gateway:"]))

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m9ccd4b53;
+module bindings.csharp.generated.m9ccd4b53;
 
 binding userControlledData0 {
   requires {

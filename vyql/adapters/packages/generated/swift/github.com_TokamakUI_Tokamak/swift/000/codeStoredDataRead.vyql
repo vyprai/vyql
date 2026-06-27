@@ -1,4 +1,4 @@
-module bindings.swift.migration.m634b2ae7;
+module bindings.swift.generated.m634b2ae7;
 
 binding storedDataRead0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding isolateLevelIncrementWithoutCap94 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "fribidi_get_par_embedding_levels_ex" and node.context.callPath contains "FRIBIDI_IS_ISOLATE" and node.context.assign contains "RL_ISOLATE_LEVEL=isolate_level++" and node.context.assign contains "base_level_per_iso_level[]=new_level" and node.context.index contains "run_per_isolate_level[]" and not (node.context.binary contains "isolate_level<FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1")

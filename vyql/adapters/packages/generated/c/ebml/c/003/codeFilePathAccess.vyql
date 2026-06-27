@@ -1,4 +1,4 @@
-module bindings.c.migration.m26a84cad;
+module bindings.c.generated.m26a84cad;
 
 binding filePathAccess3 {
   requires {

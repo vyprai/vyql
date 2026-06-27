@@ -1,4 +1,4 @@
-module bindings.scala.migration.m66149e43;
+module bindings.scala.generated.m66149e43;
 
 binding networkConnect2 {
   requires {

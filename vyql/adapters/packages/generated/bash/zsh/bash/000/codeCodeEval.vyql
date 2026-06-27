@@ -1,4 +1,4 @@
-module bindings.bash.migration.m7c05a0a5;
+module bindings.bash.generated.m7c05a0a5;
 
 binding codeEval0 {
   requires {

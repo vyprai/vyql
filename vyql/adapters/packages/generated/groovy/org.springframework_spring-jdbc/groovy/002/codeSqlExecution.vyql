@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m8ca7cd51;
+module bindings.groovy.generated.m8ca7cd51;
 
 binding sqlExecution2 {
   requires {

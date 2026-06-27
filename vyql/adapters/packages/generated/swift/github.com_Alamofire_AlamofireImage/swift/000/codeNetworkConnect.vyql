@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdbd80cdc;
+module bindings.swift.generated.mdbd80cdc;
 
 binding networkConnect0 {
   requires {

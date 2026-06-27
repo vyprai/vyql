@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m2b4a7232;
+module bindings.elixir.generated.m2b4a7232;
 
 binding networkData3 {
   requires {

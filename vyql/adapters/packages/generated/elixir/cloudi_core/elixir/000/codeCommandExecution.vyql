@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m82481b8b;
+module bindings.elixir.generated.m82481b8b;
 
 binding commandExecution0 {
   requires {

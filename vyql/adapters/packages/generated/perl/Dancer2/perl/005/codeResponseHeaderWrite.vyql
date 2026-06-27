@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc8fb1e7e;
+module bindings.perl.generated.mc8fb1e7e;
 
 binding responseHeaderWrite5 {
   requires {

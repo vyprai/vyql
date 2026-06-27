@@ -1,4 +1,4 @@
-module bindings.java.migration.mccf4aed2;
+module bindings.java.generated.mccf4aed2;
 
 binding commandExecution0 {
   requires {

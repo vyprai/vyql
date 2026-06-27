@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m2c78783d;
+module bindings.csharp.generated.m2c78783d;
 
 binding authenticationCheck2 {
   requires {

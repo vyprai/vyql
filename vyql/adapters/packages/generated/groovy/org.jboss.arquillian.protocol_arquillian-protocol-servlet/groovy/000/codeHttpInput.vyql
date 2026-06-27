@@ -1,4 +1,4 @@
-module bindings.groovy.migration.ma1c40bb3;
+module bindings.groovy.generated.ma1c40bb3;
 
 binding httpInput0 {
   requires {

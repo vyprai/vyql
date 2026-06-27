@@ -1,4 +1,4 @@
-module bindings.bash.migration.m64dc9b90;
+module bindings.bash.generated.m64dc9b90;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.dart.migration.mdc2dfabe;
+module bindings.dart.generated.mdc2dfabe;
 
 binding htmlEscape0 {
   requires {

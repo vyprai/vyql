@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5895bccf;
+module bindings.ruby.generated.m5895bccf;
 
 binding ldapEscape30 {
   requires {

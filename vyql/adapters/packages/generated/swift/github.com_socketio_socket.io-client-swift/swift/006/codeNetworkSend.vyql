@@ -1,4 +1,4 @@
-module bindings.swift.migration.mbcf7bc01;
+module bindings.swift.generated.mbcf7bc01;
 
 binding networkSend6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3a188064;
+module bindings.kotlin.generated.m3a188064;
 
 binding commandExecution0 {
   requires {

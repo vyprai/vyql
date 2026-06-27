@@ -1,4 +1,4 @@
-module bindings.c.migration.m216c127c;
+module bindings.c.generated.m216c127c;
 
 binding sqlExecution0 {
   requires {

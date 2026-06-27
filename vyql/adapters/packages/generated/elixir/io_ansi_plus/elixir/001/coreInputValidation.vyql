@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m89adb15e;
+module bindings.elixir.generated.m89adb15e;
 
 binding inputValidation1 {
   requires {

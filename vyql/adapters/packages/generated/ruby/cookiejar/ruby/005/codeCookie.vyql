@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m411e6779;
+module bindings.ruby.generated.m411e6779;
 
 binding cookie5 {
   requires {

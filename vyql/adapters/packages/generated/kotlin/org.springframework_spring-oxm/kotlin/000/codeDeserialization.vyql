@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.macb6fa6f;
+module bindings.kotlin.generated.macb6fa6f;
 
 binding deserialization0 {
   requires {

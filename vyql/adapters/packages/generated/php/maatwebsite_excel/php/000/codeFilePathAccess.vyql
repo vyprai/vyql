@@ -1,4 +1,4 @@
-module bindings.php.migration.m667d63fa;
+module bindings.php.generated.m667d63fa;
 
 binding filePathAccess0 {
   requires {

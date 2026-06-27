@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m59af96ee;
+module bindings.elixir.generated.m59af96ee;
 
 binding networkConnect2 {
   requires {

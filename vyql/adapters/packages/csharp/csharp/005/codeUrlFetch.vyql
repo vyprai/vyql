@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m2a0e231a;
+module bindings.csharp.generated.m2a0e231a;
 
 binding urlFetch5 {
   requires {

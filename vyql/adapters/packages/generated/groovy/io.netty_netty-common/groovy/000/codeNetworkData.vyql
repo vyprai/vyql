@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mcdce3135;
+module bindings.groovy.generated.mcdce3135;
 
 binding networkData0 {
   requires {

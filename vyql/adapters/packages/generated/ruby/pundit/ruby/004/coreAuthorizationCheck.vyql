@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m0455df5c;
+module bindings.ruby.generated.m0455df5c;
 
 binding authorizationCheck4 {
   requires {

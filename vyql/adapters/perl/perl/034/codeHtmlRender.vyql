@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding htmlRender34 {
   query pattern callExpr where callee.path ~= "printf"

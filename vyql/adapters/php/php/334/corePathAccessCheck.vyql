@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding pathAccessCheck334 {
   query pattern callExpr where callee.path ~= "in_array" and args.any.literal contains "$tpl" and args.any.literal contains "$templates"

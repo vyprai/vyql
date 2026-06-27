@@ -1,4 +1,4 @@
-module bindings.php.migration.ma507ad59;
+module bindings.php.generated.ma507ad59;
 
 binding logOutput0 {
   requires {

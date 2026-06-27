@@ -1,4 +1,4 @@
-module bindings.swift.migration.mf44cd728;
+module bindings.swift.generated.mf44cd728;
 
 binding archiveEntryWrite0 {
   requires {

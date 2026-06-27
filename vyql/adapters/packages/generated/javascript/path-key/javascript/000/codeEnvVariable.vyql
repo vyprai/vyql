@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m51e4ce40;
+module bindings.javascript.generated.m51e4ce40;
 
 binding envVariable0 {
   requires {

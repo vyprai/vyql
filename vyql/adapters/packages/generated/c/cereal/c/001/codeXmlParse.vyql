@@ -1,4 +1,4 @@
-module bindings.c.migration.mcff20ae3;
+module bindings.c.generated.mcff20ae3;
 
 binding xmlParse1 {
   requires {

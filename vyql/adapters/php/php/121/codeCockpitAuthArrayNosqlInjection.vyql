@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding cockpitAuthArrayNosqlInjection121 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "check" and node.token contains "$this->param('auth')" and node.token contains "$this->module('cockpit')->authenticate($data)" and not (node.token contains "is_string($data['user'])") and not (node.token contains "is_string($data['password'])")

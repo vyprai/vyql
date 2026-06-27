@@ -1,4 +1,4 @@
-module bindings.rust.migration.m480c6b70;
+module bindings.rust.generated.m480c6b70;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m60412f76;
+module bindings.kotlin.generated.m60412f76;
 
 binding storedDataRead2 {
   requires {

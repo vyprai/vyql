@@ -1,4 +1,4 @@
-module bindings.rust.migration.m35bdeb12;
+module bindings.rust.generated.m35bdeb12;
 
 binding stdinInput0 {
   requires {

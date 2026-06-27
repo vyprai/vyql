@@ -1,4 +1,4 @@
-module bindings.dart.migration.m7869fba5;
+module bindings.dart.generated.m7869fba5;
 
 binding filePathAccess0 {
   requires {

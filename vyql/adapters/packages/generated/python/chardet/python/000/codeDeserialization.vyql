@@ -1,4 +1,4 @@
-module bindings.python.migration.mdab890f9;
+module bindings.python.generated.mdab890f9;
 
 binding deserialization0 {
   requires {

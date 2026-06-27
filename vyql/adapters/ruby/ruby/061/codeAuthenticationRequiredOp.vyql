@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding authenticationRequiredOp61 {
   query pattern presenceNode where node.path ~= "transfer_funds"

@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdb125fb2;
+module bindings.swift.generated.mdb125fb2;
 
 binding userControlledData5 {
   requires {

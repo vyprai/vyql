@@ -1,4 +1,4 @@
-module bindings.javascript.migration.madf65cb8;
+module bindings.javascript.generated.madf65cb8;
 
 binding deserialization2 {
   requires {

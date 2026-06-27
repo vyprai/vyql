@@ -1,4 +1,4 @@
-module bindings.go.migration.m9a169bf5;
+module bindings.go.generated.m9a169bf5;
 
 binding inputValidation4 {
   requires {

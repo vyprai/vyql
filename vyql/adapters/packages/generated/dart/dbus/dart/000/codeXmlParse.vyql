@@ -1,4 +1,4 @@
-module bindings.dart.migration.mc960d37f;
+module bindings.dart.generated.mc960d37f;
 
 binding xmlParse0 {
   requires {

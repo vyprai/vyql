@@ -1,4 +1,4 @@
-module bindings.rust.migration.mc226c3b1;
+module bindings.rust.generated.mc226c3b1;
 
 binding stdinInput5 {
   requires {

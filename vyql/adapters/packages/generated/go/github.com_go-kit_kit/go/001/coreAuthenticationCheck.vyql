@@ -1,4 +1,4 @@
-module bindings.go.migration.m59d7be91;
+module bindings.go.generated.m59d7be91;
 
 binding authenticationCheck1 {
   requires {

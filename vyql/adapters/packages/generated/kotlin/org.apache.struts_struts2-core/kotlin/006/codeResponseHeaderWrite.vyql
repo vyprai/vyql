@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m089379ee;
+module bindings.kotlin.generated.m089379ee;
 
 binding responseHeaderWrite6 {
   requires {

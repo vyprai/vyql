@@ -1,4 +1,4 @@
-module bindings.go.migration.m5ad90ce2;
+module bindings.go.generated.m5ad90ce2;
 
 binding networkConnect7 {
   requires {

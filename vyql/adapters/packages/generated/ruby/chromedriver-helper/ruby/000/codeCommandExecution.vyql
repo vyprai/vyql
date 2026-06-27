@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mfcceef3d;
+module bindings.ruby.generated.mfcceef3d;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mdeee483b;
+module bindings.ruby.generated.mdeee483b;
 
 binding networkConnect2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfca40a44;
+module bindings.perl.generated.mfca40a44;
 
 binding deserialization73 {
   query pattern callExpr where callee.method == "thaw"

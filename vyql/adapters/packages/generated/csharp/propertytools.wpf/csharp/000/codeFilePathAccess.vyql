@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m7ad4061a;
+module bindings.csharp.generated.m7ad4061a;
 
 binding filePathAccess0 {
   requires {

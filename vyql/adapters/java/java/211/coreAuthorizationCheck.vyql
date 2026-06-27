@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding authorizationCheck211 {
   query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.call contains "canFlush" and args.any.context.call contains "ThriftSecurityException"

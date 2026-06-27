@@ -1,4 +1,4 @@
-module bindings.perl.migration.mf8d9c0b9;
+module bindings.perl.generated.mf8d9c0b9;
 
 binding regexCompile0 {
   requires {

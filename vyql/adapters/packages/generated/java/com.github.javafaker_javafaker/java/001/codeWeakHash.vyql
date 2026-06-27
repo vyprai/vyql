@@ -1,4 +1,4 @@
-module bindings.java.migration.me466df6d;
+module bindings.java.generated.me466df6d;
 
 binding weakHash1 {
   requires {

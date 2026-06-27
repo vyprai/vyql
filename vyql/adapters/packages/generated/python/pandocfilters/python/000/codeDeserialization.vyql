@@ -1,4 +1,4 @@
-module bindings.python.migration.m09861dfc;
+module bindings.python.generated.m09861dfc;
 
 binding deserialization0 {
   requires {

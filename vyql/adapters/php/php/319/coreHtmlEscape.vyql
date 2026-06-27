@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding htmlEscape319 {
   query pattern callExpr where callee.path ~= "preg_replace" and args.any.literal contains "[^a-zA-Z0-9"

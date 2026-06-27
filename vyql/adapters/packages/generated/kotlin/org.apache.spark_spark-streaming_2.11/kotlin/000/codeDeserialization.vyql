@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mace930c4;
+module bindings.kotlin.generated.mace930c4;
 
 binding deserialization0 {
   requires {

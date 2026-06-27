@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mb940cc6b;
+module bindings.kotlin.generated.mb940cc6b;
 
 binding authorizationCheck2 {
   requires {

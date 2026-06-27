@@ -1,4 +1,4 @@
-module bindings.go.migration.mcea9b916;
+module bindings.go.generated.mcea9b916;
 
 binding networkConnect5 {
   requires {

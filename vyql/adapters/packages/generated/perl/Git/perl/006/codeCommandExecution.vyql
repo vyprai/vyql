@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc4f12def;
+module bindings.perl.generated.mc4f12def;
 
 binding commandExecution6 {
   requires {

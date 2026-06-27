@@ -1,4 +1,4 @@
-module bindings.java.migration.m844dec46;
+module bindings.java.generated.m844dec46;
 
 binding networkConnect0 {
   requires {

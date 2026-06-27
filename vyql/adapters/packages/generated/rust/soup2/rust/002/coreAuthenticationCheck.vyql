@@ -1,4 +1,4 @@
-module bindings.rust.migration.m4593e3b3;
+module bindings.rust.generated.m4593e3b3;
 
 binding authenticationCheck2 {
   requires {

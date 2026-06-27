@@ -1,4 +1,4 @@
-module bindings.swift.migration.md8419421;
+module bindings.swift.generated.md8419421;
 
 binding weakRandomValue2 {
   requires {

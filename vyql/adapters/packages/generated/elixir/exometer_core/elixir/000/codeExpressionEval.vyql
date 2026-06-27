@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m19ced11c;
+module bindings.elixir.generated.m19ced11c;
 
 binding expressionEval0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding requestViewVariableHtmlEscapeMissing76 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "$internalname=get_input('internalname')" and node.token contains "'internalname'=>$internalname" and node.token contains "elgg_view(" and not (node.token contains "$internalname=htmlentities($internalname)") and not (node.token contains "$internalname=htmlspecialchars($internalname)") and not (node.token contains "$internalname=esc_html($internalname)")

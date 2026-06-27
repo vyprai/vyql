@@ -1,4 +1,4 @@
-module bindings.swift.migration.ma6ed7833;
+module bindings.swift.generated.ma6ed7833;
 
 binding deserialization0 {
   requires {

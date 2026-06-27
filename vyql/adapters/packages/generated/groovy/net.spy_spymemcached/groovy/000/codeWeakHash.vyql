@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m38517109;
+module bindings.groovy.generated.m38517109;
 
 binding weakHash0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m175dd295;
+module bindings.java.generated.m175dd295;
 
 binding databaseRead0 {
   requires {

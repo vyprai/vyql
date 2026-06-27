@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m3dbcad4c;
+module bindings.kotlin.generated.m3dbcad4c;
 
 binding deserialization1 {
   requires {

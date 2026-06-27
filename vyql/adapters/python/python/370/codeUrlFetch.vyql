@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding urlFetch370 {
   query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "forurlinurls:" and args.any.literal contains "requests.get(url" and not args.any.literal contains "validate_url(url" and not args.any.literal contains "_validate_url(url"

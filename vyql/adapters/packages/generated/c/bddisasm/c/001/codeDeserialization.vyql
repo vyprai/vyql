@@ -1,4 +1,4 @@
-module bindings.c.migration.mb980b818;
+module bindings.c.generated.mb980b818;
 
 binding deserialization1 {
   requires {

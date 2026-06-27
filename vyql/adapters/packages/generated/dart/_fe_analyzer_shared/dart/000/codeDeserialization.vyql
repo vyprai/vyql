@@ -1,4 +1,4 @@
-module bindings.dart.migration.macfed050;
+module bindings.dart.generated.macfed050;
 
 binding deserialization0 {
   requires {

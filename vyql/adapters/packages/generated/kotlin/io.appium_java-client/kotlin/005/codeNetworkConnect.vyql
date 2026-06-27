@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfab11f84;
+module bindings.kotlin.generated.mfab11f84;
 
 binding networkConnect5 {
   requires {

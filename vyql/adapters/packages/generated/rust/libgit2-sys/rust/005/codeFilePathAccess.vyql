@@ -1,4 +1,4 @@
-module bindings.rust.migration.m540f56d1;
+module bindings.rust.generated.m540f56d1;
 
 binding filePathAccess5 {
   requires {

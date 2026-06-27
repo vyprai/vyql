@@ -1,4 +1,4 @@
-module bindings.php.migration.mec5dfadc;
+module bindings.php.generated.mec5dfadc;
 
 binding networkData0 {
   requires {

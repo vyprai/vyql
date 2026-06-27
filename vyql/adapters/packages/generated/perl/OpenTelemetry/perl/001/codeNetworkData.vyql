@@ -1,4 +1,4 @@
-module bindings.perl.migration.m165bcce2;
+module bindings.perl.generated.m165bcce2;
 
 binding networkData1 {
   requires {

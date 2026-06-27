@@ -1,4 +1,4 @@
-module bindings.groovy.migration.md40e5fb5;
+module bindings.groovy.generated.md40e5fb5;
 
 binding deserialization2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.madfe6120;
+module bindings.elixir.generated.madfe6120;
 
 binding commandExecution0 {
   requires {

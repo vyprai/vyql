@@ -1,4 +1,4 @@
-module bindings.perl.migration.mb779165f;
+module bindings.perl.generated.mb779165f;
 
 binding cliArgument0 {
   requires {

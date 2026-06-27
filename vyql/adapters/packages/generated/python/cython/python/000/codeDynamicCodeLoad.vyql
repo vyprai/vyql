@@ -1,4 +1,4 @@
-module bindings.python.migration.m358e1fdd;
+module bindings.python.generated.m358e1fdd;
 
 binding dynamicCodeLoad0 {
   requires {

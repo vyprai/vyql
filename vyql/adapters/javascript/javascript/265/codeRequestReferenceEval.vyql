@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding requestReferenceEval265 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "eval" and node.token contains "ref." and node.token contains "parts"

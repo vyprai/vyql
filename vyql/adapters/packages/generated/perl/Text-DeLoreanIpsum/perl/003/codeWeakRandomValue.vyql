@@ -1,4 +1,4 @@
-module bindings.perl.migration.mcba1ed5b;
+module bindings.perl.generated.mcba1ed5b;
 
 binding weakRandomValue3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m8e471f5b;
+module bindings.ruby.generated.m8e471f5b;
 
 binding cliArgument1 {
   requires {

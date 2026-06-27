@@ -1,4 +1,4 @@
-module bindings.java.migration.m00e366aa;
+module bindings.java.generated.m00e366aa;
 
 binding responseHeaderWrite2 {
   requires {

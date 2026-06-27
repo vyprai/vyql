@@ -1,4 +1,4 @@
-module bindings.rust.migration.mf32ebf06;
+module bindings.rust.generated.mf32ebf06;
 
 binding deserialization4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m7532ca1b;
+module bindings.java.generated.m7532ca1b;
 
 binding sqlExecution3 {
   requires {

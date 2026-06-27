@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma393e52c;
+module bindings.elixir.generated.ma393e52c;
 
 binding sqlExecution1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding configExposureReview228 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "type.context" and node.context.field contains "Repositories" and node.context.field contains "Keyring" and not (node.token contains "method:MarshalYAML")

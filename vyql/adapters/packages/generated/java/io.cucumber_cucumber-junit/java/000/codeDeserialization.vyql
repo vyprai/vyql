@@ -1,4 +1,4 @@
-module bindings.java.migration.medb40676;
+module bindings.java.generated.medb40676;
 
 binding deserialization0 {
   requires {

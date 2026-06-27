@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5d33218c;
+module bindings.ruby.generated.m5d33218c;
 
 binding nosqlQuery0 {
   requires {

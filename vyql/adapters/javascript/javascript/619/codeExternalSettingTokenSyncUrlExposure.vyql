@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding externalSettingTokenSyncUrlExposure619 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "getExperimentalSetting" and containsAny(node.context.literal, ["authTokenSyncURL", "tokenSyncURL", "tokenSyncUrl", "sessionSyncURL", "sessionSyncUrl"]) and containsAny(node.context.callPath, ["mintCookieFactory", "syncToken", "syncSession", "tokenSync", "sessionSync"]) and not (node.context.callPath contains "startsWith")

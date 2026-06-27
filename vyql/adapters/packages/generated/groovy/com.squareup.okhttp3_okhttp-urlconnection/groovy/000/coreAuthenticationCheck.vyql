@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m904501d1;
+module bindings.groovy.generated.m904501d1;
 
 binding authenticationCheck0 {
   requires {

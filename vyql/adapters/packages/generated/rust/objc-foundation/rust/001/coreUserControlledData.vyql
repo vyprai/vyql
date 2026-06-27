@@ -1,4 +1,4 @@
-module bindings.rust.migration.m6d0ceb32;
+module bindings.rust.generated.m6d0ceb32;
 
 binding userControlledData1 {
   requires {

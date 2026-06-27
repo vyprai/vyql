@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m5c270092;
+module bindings.javascript.generated.m5c270092;
 
 binding pathCanonicalization55 {
   requires {

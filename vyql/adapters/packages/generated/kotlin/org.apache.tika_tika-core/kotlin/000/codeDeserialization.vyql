@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.md950cd2c;
+module bindings.kotlin.generated.md950cd2c;
 
 binding deserialization0 {
   requires {

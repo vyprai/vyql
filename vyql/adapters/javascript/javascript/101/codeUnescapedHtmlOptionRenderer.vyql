@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unescapedHtmlOptionRenderer101 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "getAttribute" and node.context.literal contains "data-content" and node.context.selector contains "optionContent" and node.context.selector contains "innerHTML" and node.context.callPath contains "appendChild" and not (node.context.callPath contains "sanitizeHtml") and not (node.context.callPath contains "DOMPurify") and not (node.context.literal contains "sanitize-html")

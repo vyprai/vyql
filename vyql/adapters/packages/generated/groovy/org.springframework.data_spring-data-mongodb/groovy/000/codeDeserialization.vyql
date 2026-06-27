@@ -1,4 +1,4 @@
-module bindings.groovy.migration.maacab1ff;
+module bindings.groovy.generated.maacab1ff;
 
 binding deserialization0 {
   requires {

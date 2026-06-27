@@ -1,4 +1,4 @@
-module bindings.dart.migration.m3a166e66;
+module bindings.dart.generated.m3a166e66;
 
 binding expressionEval1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m6666bade;
+module bindings.elixir.generated.m6666bade;
 
 binding httpInput2 {
   requires {

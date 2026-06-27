@@ -1,4 +1,4 @@
-module bindings.rust.migration.m21a9cbf5;
+module bindings.rust.generated.m21a9cbf5;
 
 binding logOutput0 {
   requires {

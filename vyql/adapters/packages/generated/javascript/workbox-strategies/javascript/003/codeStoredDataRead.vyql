@@ -1,4 +1,4 @@
-module bindings.javascript.migration.ma96665e3;
+module bindings.javascript.generated.ma96665e3;
 
 binding storedDataRead3 {
   requires {

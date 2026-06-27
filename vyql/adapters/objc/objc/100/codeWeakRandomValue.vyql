@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding weakRandomValue100 {
   query pattern presenceNode where node.path ~= "random"

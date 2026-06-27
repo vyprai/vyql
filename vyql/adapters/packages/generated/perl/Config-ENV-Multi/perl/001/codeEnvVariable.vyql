@@ -1,4 +1,4 @@
-module bindings.perl.migration.m75b3cf19;
+module bindings.perl.generated.m75b3cf19;
 
 binding envVariable1 {
   requires {

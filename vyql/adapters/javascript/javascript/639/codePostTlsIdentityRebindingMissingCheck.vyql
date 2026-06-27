@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding postTlsIdentityRebindingMissingCheck639 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "?.sendPacket" and node.context.callPath contains "?.readPacket" and node.context.selector contains "?.identity.body.protocolVersion" and node.context.selector contains "?.identity.body.deviceId" and node.context.assign contains "?.identity=awaitthis.readPacket()" and not (containsAny(node.context.binary, ["this.identity.body.protocolVersion!==identity.body.protocolVersion", "this.identity.body.deviceId!==identity.body.deviceId", "this.identity.body.protocolVersion!=identity.body.protocolVersion", "this.identity.body.deviceId!=identity.body.deviceId"]))

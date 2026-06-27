@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding reallocFailurePathInputFree45 {
   query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.realloc_failure_input_free" and node.token contains "allocator=realloc" and node.token contains "release=free" and node.token contains "return=null"

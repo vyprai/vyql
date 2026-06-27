@@ -1,4 +1,4 @@
-module bindings.elixir.migration.md3359d57;
+module bindings.elixir.generated.md3359d57;
 
 binding nosqlQuery11 {
   requires {

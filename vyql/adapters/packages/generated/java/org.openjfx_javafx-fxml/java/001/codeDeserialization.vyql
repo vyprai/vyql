@@ -1,4 +1,4 @@
-module bindings.java.migration.m4a40445f;
+module bindings.java.generated.m4a40445f;
 
 binding deserialization1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.m390a638f;
+module bindings.scala.generated.m390a638f;
 
 binding cliArgument0 {
   requires {

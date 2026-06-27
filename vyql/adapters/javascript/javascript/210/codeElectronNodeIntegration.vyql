@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding electronNodeIntegration210 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "will-attach-webview" and node.token contains "webPreferences.nodeIntegration=false" and not (node.token contains "webPreferences.contextIsolation=true")

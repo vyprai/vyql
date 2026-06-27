@@ -1,4 +1,4 @@
-module bindings.dart.migration.m56895ad0;
+module bindings.dart.generated.m56895ad0;
 
 binding piiValue1 {
   requires {

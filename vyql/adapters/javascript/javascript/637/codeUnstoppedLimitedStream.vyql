@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unstoppedLimitedStream637 {
   query pattern presenceNode where node.scope == "function" and node.token contains "maxContentLength" and node.token contains "Buffer.concat(responseBuffer).length>config.maxContentLength" and node.token contains "reject(createError" and not (node.token contains "stream.destroy")

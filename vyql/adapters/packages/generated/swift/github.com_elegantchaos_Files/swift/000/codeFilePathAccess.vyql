@@ -1,4 +1,4 @@
-module bindings.swift.migration.m24e2cc2e;
+module bindings.swift.generated.m24e2cc2e;
 
 binding filePathAccess0 {
   requires {

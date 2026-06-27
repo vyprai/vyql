@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mef5f9370;
+module bindings.ruby.generated.mef5f9370;
 
 binding authorizationCheck1 {
   requires {

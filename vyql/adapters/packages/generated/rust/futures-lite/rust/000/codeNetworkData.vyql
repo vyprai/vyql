@@ -1,4 +1,4 @@
-module bindings.rust.migration.ma1a9680b;
+module bindings.rust.generated.ma1a9680b;
 
 binding networkData0 {
   requires {

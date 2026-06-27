@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m1b890743;
+module bindings.kotlin.generated.m1b890743;
 
 binding networkSend0 {
   requires {

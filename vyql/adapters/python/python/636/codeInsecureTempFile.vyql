@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding insecureTempFile636 {
   query pattern callExpr where callee.path ~= "open" and args.any.literal contains "lxc-attach-script.log" and args.any.literal contains "a"

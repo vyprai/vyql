@@ -1,4 +1,4 @@
-module bindings.scala.migration.m89fbb3be;
+module bindings.scala.generated.m89fbb3be;
 
 binding filePathAccess3 {
   requires {

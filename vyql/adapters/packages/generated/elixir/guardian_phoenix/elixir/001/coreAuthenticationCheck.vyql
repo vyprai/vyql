@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m51dfefb6;
+module bindings.elixir.generated.m51dfefb6;
 
 binding authenticationCheck1 {
   requires {

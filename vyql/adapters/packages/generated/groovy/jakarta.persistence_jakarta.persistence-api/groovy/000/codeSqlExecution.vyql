@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mf3d33bf4;
+module bindings.groovy.generated.mf3d33bf4;
 
 binding sqlExecution0 {
   requires {

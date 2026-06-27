@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding publicUploadChunkPathTraversal452 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.name, ["Chunk", "chunk"]) and containsAny(node.context.literal, ["/api/uploadChunked/public", "/uploadChunked/public"]) and node.context.callPath contains "request.form.get" and node.context.literal contains "checkSum" and node.context.callPath contains "os.path.join" and node.context.callPath contains "open" and not (node.context.callPath contains "re.sub") and not (node.context.callPath contains "os.path.realpath.startswith")

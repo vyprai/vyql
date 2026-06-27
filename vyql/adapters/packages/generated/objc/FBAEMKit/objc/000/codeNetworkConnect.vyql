@@ -1,4 +1,4 @@
-module bindings.objc.migration.m8d5af79f;
+module bindings.objc.generated.m8d5af79f;
 
 binding networkConnect0 {
   requires {

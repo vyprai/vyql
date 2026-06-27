@@ -1,4 +1,4 @@
-module bindings.swift.migration.m388f23d0;
+module bindings.swift.generated.m388f23d0;
 
 binding webViewServerRedirectUrlValidationBypass30 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.callPath contains "RequestHandler.handle" and node.context.callPath contains "decisionHandler" and node.context.selector contains "navigationAction.request" and not (node.context.paramLabel contains "didReceiveServerRedirectForProvisionalNavigation")

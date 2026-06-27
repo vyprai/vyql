@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mace07d17;
+module bindings.javascript.generated.mace07d17;
 
 binding networkData1 {
   requires {

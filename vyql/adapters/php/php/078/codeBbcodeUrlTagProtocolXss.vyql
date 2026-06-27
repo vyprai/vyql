@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding bbcodeUrlTagProtocolXss78 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.call contains "preg_replace" and node.token contains "url" and node.token contains "img" and node.token contains "<a href=\"$1\"" and node.token contains "<img src=\"$1\"" and not (node.token contains "https?:")

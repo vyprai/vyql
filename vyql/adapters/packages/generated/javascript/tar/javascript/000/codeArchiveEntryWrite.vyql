@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mcbc58268;
+module bindings.javascript.generated.mcbc58268;
 
 binding archiveEntryWrite0 {
   requires {

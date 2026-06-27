@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m75dc409a;
+module bindings.javascript.generated.m75dc409a;
 
 binding stdinInput0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m3d9ccbad;
+module bindings.python.generated.m3d9ccbad;
 
 binding sqlExecution5 {
   requires {

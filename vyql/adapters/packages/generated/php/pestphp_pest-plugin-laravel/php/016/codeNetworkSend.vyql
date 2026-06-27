@@ -1,4 +1,4 @@
-module bindings.php.migration.m0f2ba173;
+module bindings.php.generated.m0f2ba173;
 
 binding networkSend16 {
   requires {

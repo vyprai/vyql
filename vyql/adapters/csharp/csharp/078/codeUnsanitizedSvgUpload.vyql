@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding unsanitizedSvgUpload78 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.paramType, ["Stream", "IFormFile", "IBrowserFile"]) and containsAny(node.context.callPath, ["Upload", "UploadAsync", "Save", "SaveAsync", "Write", "WriteAsync", "CopyTo"]) and containsAny(node.context.selector, [".Name", ".FileName", ".NormalizedName", ".ContentType", ".Extension"]) and containsAny(node.context.identifier, ["file", "stream", "content", "upload"]) and not (containsAny(node.context.callPath, ["SanitizeSvg", "sanitizeSvg", "svgSanitize", "XmlReader.Create", "XDocument.Load", "HtmlSanitizer"]))

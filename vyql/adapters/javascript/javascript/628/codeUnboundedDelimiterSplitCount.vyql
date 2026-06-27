@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding unboundedDelimiterSplitCount628 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "body.split('&').length" and node.token contains "len>limit?undefined:len-1" and not (node.token contains "indexOf('&'")

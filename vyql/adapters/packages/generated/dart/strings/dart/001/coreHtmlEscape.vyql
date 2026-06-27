@@ -1,4 +1,4 @@
-module bindings.dart.migration.m63949ee1;
+module bindings.dart.generated.m63949ee1;
 
 binding htmlEscape1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m6ed24eba;
+module bindings.javascript.generated.m6ed24eba;
 
 binding htmlEscape0 {
   requires {

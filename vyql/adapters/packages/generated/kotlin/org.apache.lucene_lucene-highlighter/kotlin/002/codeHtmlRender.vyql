@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma1ee5524;
+module bindings.kotlin.generated.ma1ee5524;
 
 binding htmlRender2 {
   requires {

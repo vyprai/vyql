@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbc25cade;
+module bindings.ruby.generated.mbc25cade;
 
 binding deserialization0 {
   requires {

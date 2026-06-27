@@ -1,4 +1,4 @@
-module bindings.c.migration.m7c6729a3;
+module bindings.c.generated.m7c6729a3;
 
 binding networkSend1 {
   requires {

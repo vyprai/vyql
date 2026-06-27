@@ -1,4 +1,4 @@
-module bindings.python.migration.mdadccbdc;
+module bindings.python.generated.mdadccbdc;
 
 binding commandExecution1 {
   requires {

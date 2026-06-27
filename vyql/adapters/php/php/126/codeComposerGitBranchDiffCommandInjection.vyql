@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding composerGitBranchDiffCommandInjection126 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getUnpushedChanges" and node.token contains "gitdiff--name-status%s...%s--" and node.token contains "$remoteBranch" and node.token contains "$branch" and node.token contains "$this->process->execute($command" and not (node.token contains "$command=['git','diff','--name-status'")

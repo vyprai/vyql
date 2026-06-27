@@ -1,4 +1,4 @@
-module bindings.ruby.migration.made672ab;
+module bindings.ruby.generated.made672ab;
 
 binding sqlExecution7 {
   requires {

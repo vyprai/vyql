@@ -1,4 +1,4 @@
-module bindings.swift.migration.mbb53f57a;
+module bindings.swift.generated.mbb53f57a;
 
 binding networkData2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4e783366;
+module bindings.cpp.generated.m4e783366;
 
 binding zeroValueExclusion99 {
   query pattern callExpr where callee.analysis ~= "guard.value_exclusion" and args.any.context.value contains "0"

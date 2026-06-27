@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding flarumTranslatorRawStringParameterXss125 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "preprocessParameters" and node.token contains "if('user'inparameters)" and node.token contains "extract(parameters,'user')" and node.token contains "parameters.username" and node.token contains "returnparameters;" and not (node.token contains "escapedParameters") and not (node.token contains "typeofparamValue==='string'") and not (node.token contains "<>{parameters[param]}</>")

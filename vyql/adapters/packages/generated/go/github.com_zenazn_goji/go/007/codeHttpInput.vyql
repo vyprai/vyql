@@ -1,4 +1,4 @@
-module bindings.go.migration.m5157d1e5;
+module bindings.go.generated.m5157d1e5;
 
 binding httpInput7 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m2be35fc0;
+module bindings.ruby.generated.m2be35fc0;
 
 binding deserialization0 {
   requires {

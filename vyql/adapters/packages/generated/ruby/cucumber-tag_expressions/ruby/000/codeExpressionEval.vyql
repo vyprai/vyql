@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m3d92d19b;
+module bindings.ruby.generated.m3d92d19b;
 
 binding expressionEval0 {
   requires {

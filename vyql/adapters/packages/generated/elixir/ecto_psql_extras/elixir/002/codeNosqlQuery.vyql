@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mb8c1157b;
+module bindings.elixir.generated.mb8c1157b;
 
 binding nosqlQuery2 {
   requires {

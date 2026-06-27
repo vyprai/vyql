@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m60f1cf91;
+module bindings.elixir.generated.m60f1cf91;
 
 binding redirectTarget0 {
   requires {

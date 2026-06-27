@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding zeroLengthRadiusAttributeValueParse130 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.name, ["rad_decode", "decode_radius", "radius_decode"]) and containsAny(node.context.callPath, ["debug_pair", "pairfree"]) and not (containsAny(node.prop.str_args, ["attrlen==0", "0==attrlen"]))

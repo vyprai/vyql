@@ -1,4 +1,4 @@
-module bindings.objc.migration.m57ebb34d;
+module bindings.objc.generated.m57ebb34d;
 
 binding networkConnect7 {
   requires {

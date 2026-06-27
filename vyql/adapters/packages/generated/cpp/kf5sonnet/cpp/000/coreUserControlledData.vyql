@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mdba66264;
+module bindings.cpp.generated.mdba66264;
 
 binding userControlledData0 {
   requires {

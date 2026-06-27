@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mcf94adcc;
+module bindings.kotlin.generated.mcf94adcc;
 
 binding codeEval2 {
   requires {

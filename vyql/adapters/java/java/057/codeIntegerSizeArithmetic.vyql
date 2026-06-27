@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding integerSizeArithmetic57 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "crypt_raw" and node.context.expr contains "1<<log_rounds" and not (node.context.scopeCall contains "roundsForLogRounds")

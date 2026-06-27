@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding emmettUnhandledCookieParseException51 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "cookies" and node.token contains "forcookieinself.headers.get(\"cookie\",\"\").split(\";\"):" and node.token contains "cookies.load(cookie)" and not (node.token contains "exceptException") and not (node.token contains "continue")

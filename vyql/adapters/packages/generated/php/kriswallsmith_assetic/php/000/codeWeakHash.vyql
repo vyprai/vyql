@@ -1,4 +1,4 @@
-module bindings.php.migration.m6bc6646f;
+module bindings.php.generated.m6bc6646f;
 
 binding weakHash0 {
   requires {

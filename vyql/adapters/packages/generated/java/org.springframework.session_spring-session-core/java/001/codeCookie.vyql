@@ -1,4 +1,4 @@
-module bindings.java.migration.mde08d6c2;
+module bindings.java.generated.mde08d6c2;
 
 binding cookie1 {
   requires {

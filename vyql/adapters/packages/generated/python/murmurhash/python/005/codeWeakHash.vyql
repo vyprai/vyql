@@ -1,4 +1,4 @@
-module bindings.python.migration.m92c9ed46;
+module bindings.python.generated.m92c9ed46;
 
 binding weakHash5 {
   requires {

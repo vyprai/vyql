@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding installerHiddenFieldXss143 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "show_next_step" and node.token contains "$uchidden" and node.token contains "<input type=" and node.token contains "hidden" and node.token contains "uchidden" and not (node.token contains "dhtmlspecialchars($uchidden)") and not (node.token contains "htmlspecialchars($uchidden") and not (node.token contains "htmlentities($uchidden")

@@ -1,4 +1,4 @@
-module bindings.csharp.migration.mae90240f;
+module bindings.csharp.generated.mae90240f;
 
 binding urlFetch0 {
   requires {

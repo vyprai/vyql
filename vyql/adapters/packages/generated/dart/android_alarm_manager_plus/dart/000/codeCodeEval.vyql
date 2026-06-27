@@ -1,4 +1,4 @@
-module bindings.dart.migration.m4b67a307;
+module bindings.dart.generated.m4b67a307;
 
 binding codeEval0 {
   requires {

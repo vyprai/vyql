@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding unrestrictedVariableVariableAssignment441 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "foreach" and node.token contains "$_GET" and node.token contains "$$" and not (node.token contains "preg_match") and not (node.token contains "in_array") and not (node.token contains "array_key_exists")

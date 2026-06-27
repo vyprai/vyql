@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m11ed67cf;
+module bindings.elixir.generated.m11ed67cf;
 
 binding networkBind1 {
   requires {

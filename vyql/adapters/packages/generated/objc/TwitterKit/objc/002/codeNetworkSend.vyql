@@ -1,4 +1,4 @@
-module bindings.objc.migration.mad0b6a3d;
+module bindings.objc.generated.mad0b6a3d;
 
 binding networkSend2 {
   requires {

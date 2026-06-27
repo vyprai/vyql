@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding sensitiveModelJsonSerializationExposure93 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "_handleSuccessfulLogin" and node.token contains "$this->request->getAcceptsJson()" and node.token contains "return$this->asModelSuccess($user,modelName:'user',data:$return)" and not (node.token contains "return$this->asSuccess(data:$return)")

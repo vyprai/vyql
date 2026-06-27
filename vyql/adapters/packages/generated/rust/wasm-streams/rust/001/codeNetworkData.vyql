@@ -1,4 +1,4 @@
-module bindings.rust.migration.me233ceca;
+module bindings.rust.generated.me233ceca;
 
 binding networkData1 {
   requires {

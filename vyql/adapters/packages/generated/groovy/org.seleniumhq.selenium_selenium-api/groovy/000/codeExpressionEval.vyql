@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m3b0c7751;
+module bindings.groovy.generated.m3b0c7751;
 
 binding expressionEval0 {
   requires {

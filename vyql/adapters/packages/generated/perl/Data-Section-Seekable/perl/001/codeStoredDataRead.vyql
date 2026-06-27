@@ -1,4 +1,4 @@
-module bindings.perl.migration.md08a3cdc;
+module bindings.perl.generated.md08a3cdc;
 
 binding storedDataRead1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.m95a22b16;
+module bindings.php.generated.m95a22b16;
 
 binding sessionId1 {
   requires {

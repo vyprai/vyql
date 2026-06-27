@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m3232053a;
+module bindings.ruby.generated.m3232053a;
 
 binding regexCompile1 {
   requires {

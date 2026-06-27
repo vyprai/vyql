@@ -1,4 +1,4 @@
-module bindings.objc.migration.m013e388a;
+module bindings.objc.generated.m013e388a;
 
 binding deserialization0 {
   requires {

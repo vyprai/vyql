@@ -1,4 +1,4 @@
-module bindings.php.migration.m98605052;
+module bindings.php.generated.m98605052;
 
 binding templateRender0 {
   requires {

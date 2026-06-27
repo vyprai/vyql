@@ -1,4 +1,4 @@
-module bindings.bash.migration.m2082a3cf;
+module bindings.bash.generated.m2082a3cf;
 
 binding httpInput0 {
   requires {

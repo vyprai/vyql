@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.meedcb198;
+module bindings.kotlin.generated.meedcb198;
 
 binding htmlEscape0 {
   requires {

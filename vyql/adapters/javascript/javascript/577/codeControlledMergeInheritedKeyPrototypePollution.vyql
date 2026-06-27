@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding controlledMergeInheritedKeyPrototypePollution577 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.index contains "base.__subscript" and node.context.index contains "obj.__subscript" and node.context.expr contains "typeofvalue==='object'" and node.context.callPath contains "Array.isArray" and not (node.context.literal contains "__proto__") and not (node.context.literal contains "constructor") and not (node.context.literal contains "prototype")

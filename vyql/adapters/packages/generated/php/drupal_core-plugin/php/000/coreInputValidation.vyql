@@ -1,4 +1,4 @@
-module bindings.php.migration.m95e1dc66;
+module bindings.php.generated.m95e1dc66;
 
 binding inputValidation0 {
   requires {

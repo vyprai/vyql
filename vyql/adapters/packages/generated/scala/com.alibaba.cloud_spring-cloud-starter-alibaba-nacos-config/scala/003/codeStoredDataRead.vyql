@@ -1,4 +1,4 @@
-module bindings.scala.migration.meeaa476d;
+module bindings.scala.generated.meeaa476d;
 
 binding storedDataRead3 {
   requires {

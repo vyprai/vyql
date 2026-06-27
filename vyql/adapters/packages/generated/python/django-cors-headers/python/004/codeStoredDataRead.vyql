@@ -1,4 +1,4 @@
-module bindings.python.migration.m3efd800e;
+module bindings.python.generated.m3efd800e;
 
 binding storedDataRead4 {
   requires {

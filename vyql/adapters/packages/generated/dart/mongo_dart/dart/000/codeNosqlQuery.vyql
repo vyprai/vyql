@@ -1,4 +1,4 @@
-module bindings.dart.migration.mab46ff19;
+module bindings.dart.generated.mab46ff19;
 
 binding nosqlQuery0 {
   requires {

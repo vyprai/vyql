@@ -1,4 +1,4 @@
-module bindings.go.migration.m8f12d5a0;
+module bindings.go.generated.m8f12d5a0;
 
 binding fileUse1 {
   requires {

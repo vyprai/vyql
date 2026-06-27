@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m7acc0143;
+module bindings.kotlin.generated.m7acc0143;
 
 binding networkData3 {
   requires {

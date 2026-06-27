@@ -1,4 +1,4 @@
-module bindings.java.migration.m36edbbf9;
+module bindings.java.generated.m36edbbf9;
 
 binding weakRandomValue0 {
   requires {

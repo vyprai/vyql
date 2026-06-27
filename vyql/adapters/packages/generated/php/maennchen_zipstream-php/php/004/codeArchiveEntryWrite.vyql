@@ -1,4 +1,4 @@
-module bindings.php.migration.mcf2cb2a6;
+module bindings.php.generated.mcf2cb2a6;
 
 binding archiveEntryWrite4 {
   requires {

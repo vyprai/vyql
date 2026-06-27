@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m3c38face;
+module bindings.javascript.generated.m3c38face;
 
 binding inputValidation2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m2a68de2a;
+module bindings.java.generated.m2a68de2a;
 
 binding networkConnect2 {
   requires {

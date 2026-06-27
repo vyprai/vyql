@@ -1,4 +1,4 @@
-module bindings.swift.migration.mf185a2af;
+module bindings.swift.generated.mf185a2af;
 
 binding codeEval2 {
   requires {

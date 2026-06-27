@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m391346ae;
+module bindings.cpp.generated.m391346ae;
 
 binding userControlledData0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.rust.migration.m48a9a836;
+module bindings.rust.generated.m48a9a836;
 
 binding fileUse1 {
   requires {

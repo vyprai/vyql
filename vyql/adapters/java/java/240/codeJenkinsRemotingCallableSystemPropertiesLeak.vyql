@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding jenkinsRemotingCallableSystemPropertiesLeak240 {
   query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Callable" and node.context.functionName contains "call" and node.context.functionName contains "checkRoles" and node.context.callPath contains "System.getProperties" and not (node.context.classBase contains "MasterToSlaveCallable") and not (node.context.scopeCall contains "Roles.SLAVE")

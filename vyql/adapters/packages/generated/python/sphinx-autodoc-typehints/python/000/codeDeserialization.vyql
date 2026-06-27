@@ -1,4 +1,4 @@
-module bindings.python.migration.mddc1ccdf;
+module bindings.python.generated.mddc1ccdf;
 
 binding deserialization0 {
   requires {

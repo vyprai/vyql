@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfcb30ccc;
+module bindings.kotlin.generated.mfcb30ccc;
 
 binding weakRandomValue0 {
   requires {

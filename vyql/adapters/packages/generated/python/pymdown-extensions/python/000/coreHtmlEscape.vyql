@@ -1,4 +1,4 @@
-module bindings.python.migration.mfbe3b3b7;
+module bindings.python.generated.mfbe3b3b7;
 
 binding htmlEscape0 {
   requires {

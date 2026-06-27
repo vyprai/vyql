@@ -1,4 +1,4 @@
-module bindings.java.migration.mbd28dfeb;
+module bindings.java.generated.mbd28dfeb;
 
 binding logOutput0 {
   requires {

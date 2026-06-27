@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mafc885b3;
+module bindings.elixir.generated.mafc885b3;
 
 binding deserialization0 {
   requires {

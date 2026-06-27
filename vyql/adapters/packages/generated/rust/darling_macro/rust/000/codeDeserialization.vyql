@@ -1,4 +1,4 @@
-module bindings.rust.migration.m65fd720a;
+module bindings.rust.generated.m65fd720a;
 
 binding deserialization0 {
   requires {

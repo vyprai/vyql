@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m32d2f6a0;
+module bindings.cpp.generated.m32d2f6a0;
 
 binding authenticationCheck0 {
   requires {

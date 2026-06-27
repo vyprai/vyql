@@ -1,4 +1,4 @@
-module bindings.dart.migration.m4e5c5d55;
+module bindings.dart.generated.m4e5c5d55;
 
 binding sqlExecution0 {
   requires {

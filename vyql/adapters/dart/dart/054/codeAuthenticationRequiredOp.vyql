@@ -1,4 +1,4 @@
-module bindings.dart.migration.m1c398214;
+module bindings.dart.generated.m1c398214;
 
 binding authenticationRequiredOp54 {
   query pattern presenceNode where node.path ~= "changeEmail"

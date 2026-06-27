@@ -1,4 +1,4 @@
-module bindings.java.migration.m84e17e3f;
+module bindings.java.generated.m84e17e3f;
 
 binding storedDataRead0 {
   requires {

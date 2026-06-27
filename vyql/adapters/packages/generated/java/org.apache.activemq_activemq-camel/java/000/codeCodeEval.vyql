@@ -1,4 +1,4 @@
-module bindings.java.migration.m10814ed2;
+module bindings.java.generated.m10814ed2;
 
 binding codeEval0 {
   requires {

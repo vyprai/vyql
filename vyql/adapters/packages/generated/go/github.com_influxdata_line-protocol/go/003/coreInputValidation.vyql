@@ -1,4 +1,4 @@
-module bindings.go.migration.m61133fb3;
+module bindings.go.generated.m61133fb3;
 
 binding inputValidation3 {
   requires {

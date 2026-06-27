@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mca980e10;
+module bindings.ruby.generated.mca980e10;
 
 binding networkData4 {
   requires {

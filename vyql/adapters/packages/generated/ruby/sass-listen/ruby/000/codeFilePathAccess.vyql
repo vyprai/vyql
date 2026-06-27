@@ -1,4 +1,4 @@
-module bindings.ruby.migration.meeac2e76;
+module bindings.ruby.generated.meeac2e76;
 
 binding filePathAccess0 {
   requires {

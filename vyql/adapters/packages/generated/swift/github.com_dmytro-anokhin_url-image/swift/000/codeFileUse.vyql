@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdd81cf06;
+module bindings.swift.generated.mdd81cf06;
 
 binding fileUse0 {
   requires {

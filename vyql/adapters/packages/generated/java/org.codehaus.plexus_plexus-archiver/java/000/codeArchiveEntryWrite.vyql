@@ -1,4 +1,4 @@
-module bindings.java.migration.m8f123f42;
+module bindings.java.generated.m8f123f42;
 
 binding archiveEntryWrite0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.dart.migration.m71c0189e;
+module bindings.dart.generated.m71c0189e;
 
 binding networkData4 {
   requires {

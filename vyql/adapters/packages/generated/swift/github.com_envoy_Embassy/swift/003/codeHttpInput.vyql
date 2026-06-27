@@ -1,4 +1,4 @@
-module bindings.swift.migration.m2b59743c;
+module bindings.swift.generated.m2b59743c;
 
 binding httpInput3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.me1a09cd2;
+module bindings.javascript.generated.me1a09cd2;
 
 binding htmlRender0 {
   requires {

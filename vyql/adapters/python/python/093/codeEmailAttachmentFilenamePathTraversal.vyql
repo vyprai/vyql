@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding emailAttachmentFilenamePathTraversal93 {
   query pattern presenceNode where node.scope == "function" and node.token contains "include_attachment_data=True" and node.token contains "for a in m['attachment']:" and node.token contains "out_path / a['filename']" and node.token contains "out_filepath.open('wb')" and node.token contains "base64.b64decode(a['raw'])" and not (node.token contains "pathlib.Path(a['filename']).name") and not (node.token contains "os.path.basename(a['filename'])")

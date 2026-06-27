@@ -1,4 +1,4 @@
-module bindings.php.migration.mba691072;
+module bindings.php.generated.mba691072;
 
 binding sqlExecution2 {
   requires {

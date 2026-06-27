@@ -1,4 +1,4 @@
-module bindings.java.migration.me360db91;
+module bindings.java.generated.me360db91;
 
 binding cliArgument0 {
   requires {

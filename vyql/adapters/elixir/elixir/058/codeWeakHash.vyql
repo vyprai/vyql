@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m728b8a72;
+module bindings.elixir.generated.m728b8a72;
 
 binding weakHash58 {
   query pattern presenceNode where node.kind == "any" and node.path ~= ":crypto.hash" and node.token contains ":sha" and not (node.token contains ":sha2") and not (node.token contains ":sha3") and not (node.token contains ":sha5")

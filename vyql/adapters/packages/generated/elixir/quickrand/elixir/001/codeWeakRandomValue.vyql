@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mb6e60529;
+module bindings.elixir.generated.mb6e60529;
 
 binding weakRandomValue1 {
   requires {

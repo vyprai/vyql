@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mfb6c2163;
+module bindings.kotlin.generated.mfb6c2163;
 
 binding networkConnect0 {
   requires {

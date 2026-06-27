@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding pathBasedSandboxExposeBindRace41 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "c" and node.context.callPath contains "g_variant_lookup" and node.context.literal contains "sandbox-expose" and node.context.callPath contains "filesystem_sandbox_arg" and node.context.callPath contains "get_path_for_fd" and node.context.callPath contains "filesystem_arg" and node.context.callPath contains "g_ptr_array_add" and not (node.context.callPath contains "fd_map_remap_fd") and not (node.context.callPath contains "validate_opath_fd") and not (node.context.callPath contains "glnx_chaseat") and not (node.context.literal contains "--bind-fd=%d") and not (node.context.literal contains "--ro-bind-fd=%d")

@@ -1,4 +1,4 @@
-module bindings.java.migration.m9ef49b0f;
+module bindings.java.generated.m9ef49b0f;
 
 binding htmlEscape48 {
   requires {

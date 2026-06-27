@@ -1,4 +1,4 @@
-module bindings.elixir.migration.meb41bfa2;
+module bindings.elixir.generated.meb41bfa2;
 
 binding networkData2 {
   requires {

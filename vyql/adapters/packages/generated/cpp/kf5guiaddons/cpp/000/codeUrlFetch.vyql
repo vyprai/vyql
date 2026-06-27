@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4a9c8177;
+module bindings.cpp.generated.m4a9c8177;
 
 binding urlFetch0 {
   requires {

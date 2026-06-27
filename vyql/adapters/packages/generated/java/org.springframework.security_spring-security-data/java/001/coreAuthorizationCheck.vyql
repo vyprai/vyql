@@ -1,4 +1,4 @@
-module bindings.java.migration.m180f0be1;
+module bindings.java.generated.m180f0be1;
 
 binding authorizationCheck1 {
   requires {

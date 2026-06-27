@@ -1,4 +1,4 @@
-module bindings.perl.migration.m3766ff8f;
+module bindings.perl.generated.m3766ff8f;
 
 binding codeEval3 {
   requires {

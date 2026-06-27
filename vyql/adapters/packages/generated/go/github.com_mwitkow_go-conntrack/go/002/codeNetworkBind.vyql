@@ -1,4 +1,4 @@
-module bindings.go.migration.m4ae48c60;
+module bindings.go.generated.m4ae48c60;
 
 binding networkBind2 {
   requires {

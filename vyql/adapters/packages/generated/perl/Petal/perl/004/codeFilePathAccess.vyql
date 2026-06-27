@@ -1,4 +1,4 @@
-module bindings.perl.migration.m3314d2bf;
+module bindings.perl.generated.m3314d2bf;
 
 binding filePathAccess4 {
   requires {

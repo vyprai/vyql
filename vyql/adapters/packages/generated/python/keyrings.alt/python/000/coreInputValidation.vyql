@@ -1,4 +1,4 @@
-module bindings.python.migration.maa639aaf;
+module bindings.python.generated.maa639aaf;
 
 binding inputValidation0 {
   requires {

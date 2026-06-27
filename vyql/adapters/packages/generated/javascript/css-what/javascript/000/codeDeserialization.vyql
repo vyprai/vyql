@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m6098e3db;
+module bindings.javascript.generated.m6098e3db;
 
 binding deserialization0 {
   requires {

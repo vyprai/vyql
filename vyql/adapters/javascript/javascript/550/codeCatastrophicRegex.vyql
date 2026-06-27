@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding catastrophicRegex550 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "varhwb=/^hwb\\(" and node.token contains "string.match(hwb)" and not (node.token contains "\\d{0,3}") and not (node.token contains "(?:\\.\\d+)?")

@@ -1,4 +1,4 @@
-module bindings.c.migration.m26defac4;
+module bindings.c.generated.m26defac4;
 
 binding deserialization0 {
   requires {

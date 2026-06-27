@@ -1,4 +1,4 @@
-module bindings.scala.migration.me749565f;
+module bindings.scala.generated.me749565f;
 
 binding cliArgument0 {
   requires {

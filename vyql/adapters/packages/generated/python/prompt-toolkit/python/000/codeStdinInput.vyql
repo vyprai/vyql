@@ -1,4 +1,4 @@
-module bindings.python.migration.mc46ebabd;
+module bindings.python.generated.mc46ebabd;
 
 binding stdinInput0 {
   requires {

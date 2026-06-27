@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding commentUpdateMissingOwnershipConstraint155 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "updateComment" and node.token contains "comment_comment" and node.token contains "comment_id" and node.token contains "$sql->update" and not (node.token contains "comment_author_id") and not (node.token contains "USERID")

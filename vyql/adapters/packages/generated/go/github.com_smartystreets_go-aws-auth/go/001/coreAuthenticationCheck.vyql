@@ -1,4 +1,4 @@
-module bindings.go.migration.mcd64fc1b;
+module bindings.go.generated.mcd64fc1b;
 
 binding authenticationCheck1 {
   requires {

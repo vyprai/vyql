@@ -1,4 +1,4 @@
-module bindings.csharp.migration.m1caa8bf2;
+module bindings.csharp.generated.m1caa8bf2;
 
 binding timeBoundAccessTokenReview169 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.token contains "BlobSasBuilder" and node.token contains "ExpiresOn" and node.token contains "AddHours(1)" and node.token contains "GenerateSasUri" and not (node.token contains "AddMinutes(tokenDuration)")

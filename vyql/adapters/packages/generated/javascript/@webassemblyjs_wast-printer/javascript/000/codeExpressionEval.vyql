@@ -1,4 +1,4 @@
-module bindings.javascript.migration.ma799b4c1;
+module bindings.javascript.generated.ma799b4c1;
 
 binding expressionEval0 {
   requires {

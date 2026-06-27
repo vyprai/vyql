@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mffe43f4d;
+module bindings.groovy.generated.mffe43f4d;
 
 binding httpInput0 {
   requires {

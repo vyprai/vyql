@@ -1,4 +1,4 @@
-module bindings.scala.migration.m64f44a79;
+module bindings.scala.generated.m64f44a79;
 
 binding weakRandomValue0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m17b161b2;
+module bindings.kotlin.generated.m17b161b2;
 
 binding authorizationCheck2 {
   requires {

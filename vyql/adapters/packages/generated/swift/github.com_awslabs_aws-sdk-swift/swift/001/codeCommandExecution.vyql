@@ -1,4 +1,4 @@
-module bindings.swift.migration.mb3d11b14;
+module bindings.swift.generated.mb3d11b14;
 
 binding commandExecution1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m1c8a913d;
+module bindings.python.generated.m1c8a913d;
 
 binding inputValidation2 {
   requires {

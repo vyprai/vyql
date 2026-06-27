@@ -1,4 +1,4 @@
-module bindings.rust.migration.m9256245f;
+module bindings.rust.generated.m9256245f;
 
 binding privilegedOp0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m34ad357f;
+module bindings.java.generated.m34ad357f;
 
 binding sqlExecution0 {
   requires {

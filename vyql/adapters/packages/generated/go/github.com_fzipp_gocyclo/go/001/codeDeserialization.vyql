@@ -1,4 +1,4 @@
-module bindings.go.migration.mdb7303fd;
+module bindings.go.generated.mdb7303fd;
 
 binding deserialization1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m77236a9a;
+module bindings.javascript.generated.m77236a9a;
 
 binding cookie3 {
   requires {

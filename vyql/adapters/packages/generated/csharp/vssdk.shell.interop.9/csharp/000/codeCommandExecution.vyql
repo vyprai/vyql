@@ -1,4 +1,4 @@
-module bindings.csharp.migration.me25c3980;
+module bindings.csharp.generated.me25c3980;
 
 binding commandExecution0 {
   requires {

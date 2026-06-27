@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m6154bf05;
+module bindings.kotlin.generated.m6154bf05;
 
 binding archiveEntryWrite1 {
   requires {

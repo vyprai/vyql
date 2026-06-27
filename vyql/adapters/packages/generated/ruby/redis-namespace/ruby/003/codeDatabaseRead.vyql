@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mf86738b3;
+module bindings.ruby.generated.mf86738b3;
 
 binding databaseRead3 {
   requires {

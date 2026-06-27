@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m7b89fa3c;
+module bindings.elixir.generated.m7b89fa3c;
 
 binding htmlRender0 {
   requires {

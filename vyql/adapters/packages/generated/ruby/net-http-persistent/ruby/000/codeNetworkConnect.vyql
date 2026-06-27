@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mbc64cf90;
+module bindings.ruby.generated.mbc64cf90;
 
 binding networkConnect0 {
   requires {

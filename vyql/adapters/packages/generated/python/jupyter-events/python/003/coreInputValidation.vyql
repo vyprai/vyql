@@ -1,4 +1,4 @@
-module bindings.python.migration.mbcc9422d;
+module bindings.python.generated.mbcc9422d;
 
 binding inputValidation3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m8bb3001f;
+module bindings.go.generated.m8bb3001f;
 
 binding inputValidation0 {
   requires {

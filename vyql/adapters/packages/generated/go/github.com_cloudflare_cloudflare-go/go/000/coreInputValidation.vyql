@@ -1,4 +1,4 @@
-module bindings.go.migration.meabec96d;
+module bindings.go.generated.meabec96d;
 
 binding inputValidation0 {
   requires {

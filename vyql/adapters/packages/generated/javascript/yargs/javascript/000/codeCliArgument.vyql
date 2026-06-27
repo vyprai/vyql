@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mbeef92ff;
+module bindings.javascript.generated.mbeef92ff;
 
 binding cliArgument0 {
   requires {

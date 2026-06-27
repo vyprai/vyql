@@ -1,4 +1,4 @@
-module bindings.dart.migration.m1e58aba2;
+module bindings.dart.generated.m1e58aba2;
 
 binding htmlRender2 {
   requires {

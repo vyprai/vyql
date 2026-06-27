@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mea741d2f;
+module bindings.javascript.generated.mea741d2f;
 
 binding codeEval0 {
   requires {

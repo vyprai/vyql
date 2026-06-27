@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m55cad7ce;
+module bindings.javascript.generated.m55cad7ce;
 
 binding networkData1 {
   requires {

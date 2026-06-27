@@ -1,4 +1,4 @@
-module bindings.python.migration.m84b4aed9;
+module bindings.python.generated.m84b4aed9;
 
 binding storedDataRead1 {
   requires {

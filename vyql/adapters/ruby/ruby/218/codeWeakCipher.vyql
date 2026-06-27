@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m5a48bf47;
+module bindings.ruby.generated.m5a48bf47;
 
 binding weakCipher218 {
   query pattern callExpr where callee.path ~= "OpenSSL.Cipher.new" and args.any.literal contains "ecb"

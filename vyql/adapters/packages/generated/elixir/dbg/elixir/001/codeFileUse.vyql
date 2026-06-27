@@ -1,4 +1,4 @@
-module bindings.elixir.migration.ma7786ba4;
+module bindings.elixir.generated.ma7786ba4;
 
 binding fileUse1 {
   requires {

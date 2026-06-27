@@ -1,4 +1,4 @@
-module bindings.php.migration.md8d663dc;
+module bindings.php.generated.md8d663dc;
 
 binding weakHash1 {
   requires {

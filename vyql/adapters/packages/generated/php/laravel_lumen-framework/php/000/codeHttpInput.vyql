@@ -1,4 +1,4 @@
-module bindings.php.migration.md1ea5684;
+module bindings.php.generated.md1ea5684;
 
 binding httpInput0 {
   requires {

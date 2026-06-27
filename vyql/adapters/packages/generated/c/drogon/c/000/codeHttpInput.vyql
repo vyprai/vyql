@@ -1,4 +1,4 @@
-module bindings.c.migration.ma76201f4;
+module bindings.c.generated.ma76201f4;
 
 binding httpInput0 {
   requires {

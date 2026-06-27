@@ -1,4 +1,4 @@
-module bindings.rust.migration.md821addd;
+module bindings.rust.generated.md821addd;
 
 binding deserialization0 {
   requires {

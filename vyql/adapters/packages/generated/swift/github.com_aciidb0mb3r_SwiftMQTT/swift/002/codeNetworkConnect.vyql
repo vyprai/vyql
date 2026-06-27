@@ -1,4 +1,4 @@
-module bindings.swift.migration.m6d1b67dc;
+module bindings.swift.generated.m6d1b67dc;
 
 binding networkConnect2 {
   requires {

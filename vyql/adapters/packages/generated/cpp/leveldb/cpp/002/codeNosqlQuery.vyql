@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m04d4f131;
+module bindings.cpp.generated.m04d4f131;
 
 binding nosqlQuery2 {
   requires {

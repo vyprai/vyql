@@ -1,4 +1,4 @@
-module bindings.powershell.migration.m1c4ae433;
+module bindings.powershell.generated.m1c4ae433;
 
 binding deserialization0 {
   requires {

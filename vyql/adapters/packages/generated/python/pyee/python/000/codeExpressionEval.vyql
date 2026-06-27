@@ -1,4 +1,4 @@
-module bindings.python.migration.mb0fe42bd;
+module bindings.python.generated.mb0fe42bd;
 
 binding expressionEval0 {
   requires {

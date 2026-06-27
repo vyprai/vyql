@@ -1,4 +1,4 @@
-module bindings.scala.migration.md4210067;
+module bindings.scala.generated.md4210067;
 
 binding databaseRead0 {
   requires {

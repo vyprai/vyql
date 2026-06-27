@@ -1,4 +1,4 @@
-module bindings.go.migration.m7b25c55c;
+module bindings.go.generated.m7b25c55c;
 
 binding databaseRead1 {
   requires {

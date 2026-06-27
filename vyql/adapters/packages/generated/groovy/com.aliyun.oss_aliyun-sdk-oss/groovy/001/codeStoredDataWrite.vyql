@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mbc89df60;
+module bindings.groovy.generated.mbc89df60;
 
 binding storedDataWrite1 {
   requires {

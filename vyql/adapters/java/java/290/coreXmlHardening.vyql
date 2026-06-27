@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding xmlHardening290 {
   query pattern callExpr where callee.path ~= "setAttribute" and args.any.literal contains "ACCESS_EXTERNAL_SCHEMA"

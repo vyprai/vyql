@@ -1,4 +1,4 @@
-module bindings.python.migration.m88423db9;
+module bindings.python.generated.m88423db9;
 
 binding pathCanonicalization0 {
   requires {

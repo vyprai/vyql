@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding unsignedOidcStateDestinationRedirect251 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.callPath contains "json.dumps" and node.context.callPath contains "json.loads" and containsAny(node.context.callPath, ["redirect", "flask.redirect"]) and node.context.attrPath contains "request.args" and node.context.subscript contains "state" and node.context.subscript contains "destination" and not (containsAny(node.context.callPath, ["destination_serializer.dumps", "destination_serializer.loads"])) and not (containsAny(node.identifier, [BadSignature, RedirectAllowlist]))

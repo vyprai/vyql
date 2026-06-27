@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m7352127e;
+module bindings.groovy.generated.m7352127e;
 
 binding inputValidation0 {
   requires {

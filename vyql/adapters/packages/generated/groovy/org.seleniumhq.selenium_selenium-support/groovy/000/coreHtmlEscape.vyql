@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mc0eb3488;
+module bindings.groovy.generated.mc0eb3488;
 
 binding htmlEscape0 {
   requires {

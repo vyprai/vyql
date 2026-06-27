@@ -1,4 +1,4 @@
-module bindings.perl.migration.ma7a4bbaa;
+module bindings.perl.generated.ma7a4bbaa;
 
 binding htmlRender0 {
   requires {

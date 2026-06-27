@@ -1,4 +1,4 @@
-module bindings.java.migration.mbbc78ebf;
+module bindings.java.generated.mbbc78ebf;
 
 binding authenticationCheck6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.mccadd221;
+module bindings.objc.generated.mccadd221;
 
 binding cleartextChannel95 {
   query pattern callExpr where callee.path ~= "NSURL" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

@@ -1,4 +1,4 @@
-module bindings.python.migration.mebe518cb;
+module bindings.python.generated.mebe518cb;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.mf3f003c2;
+module bindings.python.generated.mf3f003c2;
 
 binding sqlExecution0 {
   requires {

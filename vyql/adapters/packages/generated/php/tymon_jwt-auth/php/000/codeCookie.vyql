@@ -1,4 +1,4 @@
-module bindings.php.migration.me57e5a18;
+module bindings.php.generated.me57e5a18;
 
 binding cookie0 {
   requires {

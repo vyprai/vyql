@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m2d3794a1;
+module bindings.kotlin.generated.m2d3794a1;
 
 binding urlFetch2 {
   requires {

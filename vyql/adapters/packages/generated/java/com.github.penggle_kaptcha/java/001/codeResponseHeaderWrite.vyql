@@ -1,4 +1,4 @@
-module bindings.java.migration.mb82bf2ed;
+module bindings.java.generated.mb82bf2ed;
 
 binding responseHeaderWrite1 {
   requires {

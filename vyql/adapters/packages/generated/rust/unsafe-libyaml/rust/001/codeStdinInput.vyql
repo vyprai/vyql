@@ -1,4 +1,4 @@
-module bindings.rust.migration.mf4b97603;
+module bindings.rust.generated.mf4b97603;
 
 binding stdinInput1 {
   requires {

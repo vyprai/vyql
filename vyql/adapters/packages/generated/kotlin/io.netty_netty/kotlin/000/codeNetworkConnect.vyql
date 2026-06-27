@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m13a09ce6;
+module bindings.kotlin.generated.m13a09ce6;
 
 binding networkConnect0 {
   requires {

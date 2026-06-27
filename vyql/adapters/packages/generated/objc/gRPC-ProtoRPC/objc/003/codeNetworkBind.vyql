@@ -1,4 +1,4 @@
-module bindings.objc.migration.m4b3b1680;
+module bindings.objc.generated.m4b3b1680;
 
 binding networkBind3 {
   requires {

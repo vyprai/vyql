@@ -1,4 +1,4 @@
-module bindings.cryptoreview.migration.m4f475b34;
+module bindings.cryptoreview.generated.m4f475b34;
 
 pattern adapterMetadata {
   adapter: {

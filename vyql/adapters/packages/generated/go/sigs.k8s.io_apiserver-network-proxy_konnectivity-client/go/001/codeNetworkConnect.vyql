@@ -1,4 +1,4 @@
-module bindings.go.migration.mcd5dd770;
+module bindings.go.generated.mcd5dd770;
 
 binding networkConnect1 {
   requires {

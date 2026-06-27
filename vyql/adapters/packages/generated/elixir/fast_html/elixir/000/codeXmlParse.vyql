@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mcff52bc3;
+module bindings.elixir.generated.mcff52bc3;
 
 binding xmlParse0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.java.migration.m8599cd06;
+module bindings.java.generated.m8599cd06;
 
 binding networkData4 {
   requires {

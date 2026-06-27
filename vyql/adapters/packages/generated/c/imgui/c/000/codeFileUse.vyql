@@ -1,4 +1,4 @@
-module bindings.c.migration.m690a0f7e;
+module bindings.c.generated.m690a0f7e;
 
 binding fileUse0 {
   requires {

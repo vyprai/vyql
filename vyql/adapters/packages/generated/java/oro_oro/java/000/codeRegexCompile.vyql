@@ -1,4 +1,4 @@
-module bindings.java.migration.mdc69555d;
+module bindings.java.generated.mdc69555d;
 
 binding regexCompile0 {
   requires {

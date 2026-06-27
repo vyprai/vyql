@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfedaba2c;
+module bindings.perl.generated.mfedaba2c;
 
 binding commandExecution0 {
   requires {

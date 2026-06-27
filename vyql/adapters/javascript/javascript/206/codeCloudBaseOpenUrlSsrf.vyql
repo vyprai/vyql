@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding cloudBaseOpenUrlSsrf206 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "/api/open-url" and node.token contains "req.body" and node.token contains "awaitopenUrl(url,undefined,this._mcpServer);" and not (node.token contains "isUrlSafeToOpen(url)") and not (node.token contains "validation.safe")

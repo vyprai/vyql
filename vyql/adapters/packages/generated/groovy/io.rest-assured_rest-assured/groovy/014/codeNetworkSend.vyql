@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m9ceef9fb;
+module bindings.groovy.generated.m9ceef9fb;
 
 binding networkSend14 {
   requires {

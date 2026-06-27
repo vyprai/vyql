@@ -1,4 +1,4 @@
-module bindings.perl.migration.mb0e9f9cf;
+module bindings.perl.generated.mb0e9f9cf;
 
 binding weakHash1 {
   requires {

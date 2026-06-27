@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m388c9efd;
+module bindings.kotlin.generated.m388c9efd;
 
 binding userControlledData3 {
   requires {

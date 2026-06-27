@@ -1,4 +1,4 @@
-module bindings.dart.migration.m4eda000d;
+module bindings.dart.generated.m4eda000d;
 
 binding htmlEscape0 {
   requires {

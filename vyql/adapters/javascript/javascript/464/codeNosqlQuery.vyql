@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding nosqlQuery464 {
   query pattern callExpr where callee.path ~= "Model.find"

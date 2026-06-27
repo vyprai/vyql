@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding fieldDerivedIndexAccess268 {
   query pattern presenceNode where node.scope == "function" and node.context.call contains "ReadString" and node.context.call contains "BytesNtohs" and node.context.binary contains "len(buf)<=off" and not (node.context.binary contains "len(buf)<off+2")

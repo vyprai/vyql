@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mfaab5061;
+module bindings.ruby.generated.mfaab5061;
 
 binding inputValidation2 {
   requires {

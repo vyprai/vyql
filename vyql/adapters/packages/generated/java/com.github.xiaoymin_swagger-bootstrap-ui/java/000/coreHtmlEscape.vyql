@@ -1,4 +1,4 @@
-module bindings.java.migration.m0b663345;
+module bindings.java.generated.m0b663345;
 
 binding htmlEscape0 {
   requires {

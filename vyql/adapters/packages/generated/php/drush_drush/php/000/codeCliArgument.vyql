@@ -1,4 +1,4 @@
-module bindings.php.migration.m19a16bff;
+module bindings.php.generated.m19a16bff;
 
 binding cliArgument0 {
   requires {

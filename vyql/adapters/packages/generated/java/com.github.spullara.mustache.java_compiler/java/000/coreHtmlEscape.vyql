@@ -1,4 +1,4 @@
-module bindings.java.migration.mf78cb5fa;
+module bindings.java.generated.mf78cb5fa;
 
 binding htmlEscape0 {
   requires {

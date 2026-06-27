@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding jmxRmiRegistryExposure77 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createJMXServer" and node.token contains "RMIExporter.EXPORTER_ATTRIBUTE" and node.token contains "configureRMIRegistry" and node.token contains "JMXConnectorServerFactory.newJMXConnectorServer" and not (node.token contains "LocateRegistry.createRegistry") and not (node.token contains "RMIJRMPServerImpl")

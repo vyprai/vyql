@@ -1,4 +1,4 @@
-module bindings.python.migration.mdf918831;
+module bindings.python.generated.mdf918831;
 
 binding htmlEscape0 {
   requires {

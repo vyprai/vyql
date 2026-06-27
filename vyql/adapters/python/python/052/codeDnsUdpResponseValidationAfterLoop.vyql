@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding dnsUdpResponseValidationAfterLoop52 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "udp" and node.token contains ".recvfrom" and node.token contains "dns.message.from_wire" and node.token contains "q.is_response" and node.token contains "from_address==destination" and node.token contains "break" and not (node.token contains "ignore_errors") and not (node.token contains "exceptdns.message.Truncated")

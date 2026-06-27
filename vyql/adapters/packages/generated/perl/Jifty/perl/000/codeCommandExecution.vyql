@@ -1,4 +1,4 @@
-module bindings.perl.migration.mfa74235d;
+module bindings.perl.generated.mfa74235d;
 
 binding commandExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding cookiexDeepPrototypePollution581 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "Object.keys(b).forEach(key=>" and node.token contains "a[key]=b[key]" and node.token contains "delegate.call(this,a[key],b[key])" and not (node.token contains "invalids.includes(key)") and not (node.token contains "'__proto__'")

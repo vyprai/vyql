@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m308cb3d5;
+module bindings.ruby.generated.m308cb3d5;
 
 binding networkData2 {
   requires {

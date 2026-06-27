@@ -1,4 +1,4 @@
-module bindings.elixir.migration.md3302f2a;
+module bindings.elixir.generated.md3302f2a;
 
 binding storedDataWrite1 {
   requires {

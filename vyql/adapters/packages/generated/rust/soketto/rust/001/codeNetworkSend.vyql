@@ -1,4 +1,4 @@
-module bindings.rust.migration.m3b4b7843;
+module bindings.rust.generated.m3b4b7843;
 
 binding networkSend1 {
   requires {

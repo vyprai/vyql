@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding clientAuthFailureResponseReview648 {
   query pattern presenceNode where node.scope == "function" and node.context.name contains "<lambda>" and node.token contains "callbackData.hasOwnProperty(\"status\")" and node.token contains "data.status==-1" and node.token contains "callbackFun(callbackData)" and not (node.token contains "callbackData.status==-1")

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m06f34b81;
+module bindings.elixir.generated.m06f34b81;
 
 binding weakHash0 {
   requires {

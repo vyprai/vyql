@@ -1,4 +1,4 @@
-module bindings.dart.migration.m9cedd304;
+module bindings.dart.generated.m9cedd304;
 
 binding authorizationCheck4 {
   requires {

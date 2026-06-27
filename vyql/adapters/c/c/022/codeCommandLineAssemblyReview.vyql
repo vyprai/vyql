@@ -1,4 +1,4 @@
-module bindings.c.migration.mce54b166;
+module bindings.c.generated.mce54b166;
 
 binding commandLineAssemblyReview22 {
   query pattern presenceNode where node.scope == "function" and node.token contains "g_app_info_create_from_commandline(cmdline" and node.token contains "g_string_append_printf(cmd,\"--find=%s\",search_string)" and not (node.token contains "g_shell_quote")

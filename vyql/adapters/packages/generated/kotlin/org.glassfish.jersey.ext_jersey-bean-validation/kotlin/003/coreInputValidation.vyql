@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.ma751c030;
+module bindings.kotlin.generated.ma751c030;
 
 binding inputValidation3 {
   requires {

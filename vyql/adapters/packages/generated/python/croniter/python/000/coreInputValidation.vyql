@@ -1,4 +1,4 @@
-module bindings.python.migration.m9300b80c;
+module bindings.python.generated.m9300b80c;
 
 binding inputValidation0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7296bd49;
+module bindings.scala.generated.m7296bd49;
 
 binding redirectTarget1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding missingFrameProtection667 {
   query pattern callExpr where callee.path ~= "res.setHeader" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"

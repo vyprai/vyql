@@ -1,4 +1,4 @@
-module bindings.php.migration.m190c713b;
+module bindings.php.generated.m190c713b;
 
 binding authenticationCheck1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.m973e7708;
+module bindings.python.generated.m973e7708;
 
 binding pathAccessCheck0 {
   requires {

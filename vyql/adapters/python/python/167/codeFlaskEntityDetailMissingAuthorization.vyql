@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding flaskEntityDetailMissingAuthorization167 {
   query pattern presenceNode where node.scope == "function" and node.context.decoratorMethod contains "route" and node.token contains ".query.get_or_404" and node.token contains "jsonify" and node.token contains "permissions" and not (node.token contains "current_user.admin") and not (node.token contains "has_permission") and not (node.token contains "permission_required")

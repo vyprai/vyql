@@ -1,4 +1,4 @@
-module bindings.php.migration.mb634193a;
+module bindings.php.generated.mb634193a;
 
 binding responseHeaderWrite1 {
   requires {

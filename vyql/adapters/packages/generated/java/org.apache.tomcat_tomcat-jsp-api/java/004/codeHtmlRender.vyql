@@ -1,4 +1,4 @@
-module bindings.java.migration.m97f81708;
+module bindings.java.generated.m97f81708;
 
 binding htmlRender4 {
   requires {

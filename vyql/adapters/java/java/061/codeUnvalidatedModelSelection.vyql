@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding unvalidatedModelSelection61 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "addResults" and node.context.callPath contains "request.getParameter" and node.context.literal contains "classifier" and node.context.callPath contains "response.addHeader" and node.context.callPath contains "ners.get.classifyToString" and not (node.context.identifier contains "nerModel")

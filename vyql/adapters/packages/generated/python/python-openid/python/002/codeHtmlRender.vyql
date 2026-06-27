@@ -1,4 +1,4 @@
-module bindings.python.migration.m64dfebba;
+module bindings.python.generated.m64dfebba;
 
 binding htmlRender2 {
   requires {

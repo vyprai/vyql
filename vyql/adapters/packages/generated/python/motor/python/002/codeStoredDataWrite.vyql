@@ -1,4 +1,4 @@
-module bindings.python.migration.mdb720e11;
+module bindings.python.generated.mdb720e11;
 
 binding storedDataWrite2 {
   requires {

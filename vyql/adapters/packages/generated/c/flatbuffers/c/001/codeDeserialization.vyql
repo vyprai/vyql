@@ -1,4 +1,4 @@
-module bindings.c.migration.mdac0adaf;
+module bindings.c.generated.mdac0adaf;
 
 binding deserialization1 {
   requires {

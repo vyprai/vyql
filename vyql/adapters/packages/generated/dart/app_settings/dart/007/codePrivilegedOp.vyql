@@ -1,4 +1,4 @@
-module bindings.dart.migration.mc2ae0e2a;
+module bindings.dart.generated.mc2ae0e2a;
 
 binding privilegedOp7 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding samlXmlRoundtripValidationBypass314 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "HandlePOST" and node.context.callPath contains "base64.StdEncoding.DecodeString" and node.context.callPath contains "verifyResponseSig" and node.context.callPath contains "xml.Unmarshal" and node.context.callPath contains "p.validateSubject" and not (node.context.callPath contains "xrv.Validate")

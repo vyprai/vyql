@@ -1,4 +1,4 @@
-module bindings.rust.migration.mf899fc3d;
+module bindings.rust.generated.mf899fc3d;
 
 binding networkSend2 {
   requires {

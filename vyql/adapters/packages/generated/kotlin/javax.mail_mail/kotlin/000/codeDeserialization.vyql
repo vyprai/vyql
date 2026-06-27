@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mafdf2c10;
+module bindings.kotlin.generated.mafdf2c10;
 
 binding deserialization0 {
   requires {

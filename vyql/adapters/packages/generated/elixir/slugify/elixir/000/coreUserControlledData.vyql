@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mac4db144;
+module bindings.elixir.generated.mac4db144;
 
 binding userControlledData0 {
   requires {

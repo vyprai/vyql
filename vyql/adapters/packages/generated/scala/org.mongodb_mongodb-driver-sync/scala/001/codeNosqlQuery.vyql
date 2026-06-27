@@ -1,4 +1,4 @@
-module bindings.scala.migration.m286d78bc;
+module bindings.scala.generated.m286d78bc;
 
 binding nosqlQuery1 {
   requires {

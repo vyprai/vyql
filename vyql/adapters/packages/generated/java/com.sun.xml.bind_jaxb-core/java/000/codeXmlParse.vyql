@@ -1,4 +1,4 @@
-module bindings.java.migration.m4f920ed3;
+module bindings.java.generated.m4f920ed3;
 
 binding xmlParse0 {
   requires {

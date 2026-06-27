@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding collectivesPublicTrashMissingEditPermission170 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "index" and node.token contains "$this->handleErrorResponse(function():array{" and node.token contains "$this->getCollectiveShare()->getOwner()" and node.token contains "$this->service->findAllTrash($collectiveId,$owner)" and node.token contains "$pageInfo->setShareToken($this->getToken())" and not (node.token contains "$this->checkEditPermissions()")

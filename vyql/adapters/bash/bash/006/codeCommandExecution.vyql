@@ -1,4 +1,4 @@
-module bindings.bash.migration.m59952d5d;
+module bindings.bash.generated.m59952d5d;
 
 binding commandExecution6 {
   query pattern callExpr where callee.path ~= "ksh"

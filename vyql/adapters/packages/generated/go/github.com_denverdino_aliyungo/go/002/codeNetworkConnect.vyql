@@ -1,4 +1,4 @@
-module bindings.go.migration.m90588d16;
+module bindings.go.generated.m90588d16;
 
 binding networkConnect2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.md6a20ec1;
+module bindings.scala.generated.md6a20ec1;
 
 binding authorizationCheck0 {
   requires {

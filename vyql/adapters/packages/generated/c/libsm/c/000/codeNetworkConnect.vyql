@@ -1,4 +1,4 @@
-module bindings.c.migration.m93743400;
+module bindings.c.generated.m93743400;
 
 binding networkConnect0 {
   requires {

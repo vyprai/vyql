@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mab3c1daa;
+module bindings.ruby.generated.mab3c1daa;
 
 binding fileUse4 {
   requires {

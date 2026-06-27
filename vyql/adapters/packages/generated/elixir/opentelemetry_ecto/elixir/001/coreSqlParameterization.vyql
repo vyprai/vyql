@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m20fb16e8;
+module bindings.elixir.generated.m20fb16e8;
 
 binding sqlParameterization1 {
   requires {

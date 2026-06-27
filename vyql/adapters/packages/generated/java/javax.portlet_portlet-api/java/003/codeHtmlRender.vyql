@@ -1,4 +1,4 @@
-module bindings.java.migration.m563eb794;
+module bindings.java.generated.m563eb794;
 
 binding htmlRender3 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.dart.migration.mc7775f4f;
+module bindings.dart.generated.mc7775f4f;
 
 binding fileUse0 {
   requires {

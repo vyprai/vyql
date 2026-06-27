@@ -1,4 +1,4 @@
-module bindings.python.migration.m21017d75;
+module bindings.python.generated.m21017d75;
 
 binding cleartextChannel652 {
   query pattern callExpr where callee.path ~= "urllib.request.urlopen" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

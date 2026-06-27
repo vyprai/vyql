@@ -1,4 +1,4 @@
-module bindings.swift.migration.m88ea3d50;
+module bindings.swift.generated.m88ea3d50;
 
 binding networkSend9 {
   requires {

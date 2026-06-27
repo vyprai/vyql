@@ -1,4 +1,4 @@
-module bindings.python.migration.mc03bc546;
+module bindings.python.generated.mc03bc546;
 
 binding userControlledData0 {
   requires {

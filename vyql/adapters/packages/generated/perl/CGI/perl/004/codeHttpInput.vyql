@@ -1,4 +1,4 @@
-module bindings.perl.migration.m3762fed4;
+module bindings.perl.generated.m3762fed4;
 
 binding httpInput4 {
   requires {

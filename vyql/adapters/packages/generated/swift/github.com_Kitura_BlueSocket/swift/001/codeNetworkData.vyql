@@ -1,4 +1,4 @@
-module bindings.swift.migration.m3aedab92;
+module bindings.swift.generated.m3aedab92;
 
 binding networkData1 {
   requires {

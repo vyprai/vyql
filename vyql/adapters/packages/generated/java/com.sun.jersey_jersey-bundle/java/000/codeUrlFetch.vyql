@@ -1,4 +1,4 @@
-module bindings.java.migration.m3af20d0f;
+module bindings.java.generated.m3af20d0f;
 
 binding urlFetch0 {
   requires {

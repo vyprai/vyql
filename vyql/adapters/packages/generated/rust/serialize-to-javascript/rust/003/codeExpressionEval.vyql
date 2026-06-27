@@ -1,4 +1,4 @@
-module bindings.rust.migration.m4659c23e;
+module bindings.rust.generated.m4659c23e;
 
 binding expressionEval3 {
   requires {

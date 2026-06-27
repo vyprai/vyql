@@ -1,4 +1,4 @@
-module bindings.rust.migration.mbd07b293;
+module bindings.rust.generated.mbd07b293;
 
 binding httpInput1 {
   requires {

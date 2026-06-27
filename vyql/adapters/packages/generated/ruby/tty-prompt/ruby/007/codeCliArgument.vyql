@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mc80df900;
+module bindings.ruby.generated.mc80df900;
 
 binding cliArgument7 {
   requires {

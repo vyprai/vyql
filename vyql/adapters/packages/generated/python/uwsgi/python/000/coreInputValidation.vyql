@@ -1,4 +1,4 @@
-module bindings.python.migration.mac87cf21;
+module bindings.python.generated.mac87cf21;
 
 binding inputValidation0 {
   requires {

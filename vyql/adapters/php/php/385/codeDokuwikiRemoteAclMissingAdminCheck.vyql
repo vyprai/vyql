@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding dokuwikiRemoteAclMissingAdminCheck385 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "plugin_load('admin','acl')" and node.token contains "$apa->_acl_add" and not (node.token contains "auth_isadmin") and not (node.token contains "RemoteAccessDeniedException")

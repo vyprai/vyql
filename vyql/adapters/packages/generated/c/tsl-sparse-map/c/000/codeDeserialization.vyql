@@ -1,4 +1,4 @@
-module bindings.c.migration.m24f1ac9c;
+module bindings.c.generated.m24f1ac9c;
 
 binding deserialization0 {
   requires {

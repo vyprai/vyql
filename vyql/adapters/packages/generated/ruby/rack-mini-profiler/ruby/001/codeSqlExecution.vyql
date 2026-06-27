@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mab7c94f7;
+module bindings.ruby.generated.mab7c94f7;
 
 binding sqlExecution1 {
   requires {

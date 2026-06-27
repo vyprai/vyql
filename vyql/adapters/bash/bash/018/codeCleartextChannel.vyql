@@ -1,4 +1,4 @@
-module bindings.bash.migration.m59952d5d;
+module bindings.bash.generated.m59952d5d;
 
 binding cleartextChannel18 {
   query pattern callExpr where callee.path ~= "wget" and args.any.literal contains "http://" and not args.any.literal contains "127.0"

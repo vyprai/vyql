@@ -1,4 +1,4 @@
-module bindings.swift.migration.m388f23d0;
+module bindings.swift.generated.m388f23d0;
 
 binding pathCanonicalization77 {
   query pattern callExpr where callee.path ~= "safePath"

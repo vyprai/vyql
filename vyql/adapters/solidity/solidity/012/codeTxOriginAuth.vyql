@@ -1,4 +1,4 @@
-module bindings.solidity.migration.m88e544d8;
+module bindings.solidity.generated.m88e544d8;
 
 binding txOriginAuth12 {
   query pattern presenceNode where node.path ~= "tx.origin"

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfed5d684;
+module bindings.javascript.generated.mfed5d684;
 
 binding deserialization0 {
   requires {

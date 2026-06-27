@@ -1,4 +1,4 @@
-module bindings.dart.migration.m5bb49bc4;
+module bindings.dart.generated.m5bb49bc4;
 
 binding httpInput2 {
   requires {

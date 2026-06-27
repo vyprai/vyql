@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding charmRouteFileStorePathAccess280 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "handleDeleteFile" and node.context.callPath contains "pattern.Path" and node.context.callPath contains "s.cfg.FileStore.Delete" and not (node.context.callPath contains "filepath.Clean")

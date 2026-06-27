@@ -1,4 +1,4 @@
-module bindings.rust.migration.mdc4f74cd;
+module bindings.rust.generated.mdc4f74cd;
 
 binding conduitHyperUnboundedBodyToBytes31 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "blocking_handler" and node.token contains "request.into_parts()" and node.token contains "hyper::body::to_bytes(body).await?" and node.token contains "Request::from_parts(parts, full_body)" and not (node.token contains "check_content_length") and not (node.token contains "size_hint")

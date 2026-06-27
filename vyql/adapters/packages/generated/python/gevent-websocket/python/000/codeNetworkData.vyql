@@ -1,4 +1,4 @@
-module bindings.python.migration.m2e706cc9;
+module bindings.python.generated.m2e706cc9;
 
 binding networkData0 {
   requires {

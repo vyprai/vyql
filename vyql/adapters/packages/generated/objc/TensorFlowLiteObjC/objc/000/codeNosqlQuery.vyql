@@ -1,4 +1,4 @@
-module bindings.objc.migration.m99062b4b;
+module bindings.objc.generated.m99062b4b;
 
 binding nosqlQuery0 {
   requires {

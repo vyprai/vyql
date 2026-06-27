@@ -1,4 +1,4 @@
-module bindings.c.migration.me6cbb240;
+module bindings.c.generated.me6cbb240;
 
 binding networkData2 {
   requires {

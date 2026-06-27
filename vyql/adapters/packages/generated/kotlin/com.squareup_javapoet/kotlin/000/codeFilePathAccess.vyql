@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m0d5b4a27;
+module bindings.kotlin.generated.m0d5b4a27;
 
 binding filePathAccess0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.swift.migration.m723c980b;
+module bindings.swift.generated.m723c980b;
 
 binding expressionEval0 {
   requires {

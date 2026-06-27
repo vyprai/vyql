@@ -1,4 +1,4 @@
-module bindings.go.migration.m8b54f450;
+module bindings.go.generated.m8b54f450;
 
 binding networkSend1 {
   requires {

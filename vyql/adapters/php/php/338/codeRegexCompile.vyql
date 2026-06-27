@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding regexCompile338 {
   query pattern callExpr where callee.path ~= "preg_match_all"

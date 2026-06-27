@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding xmlParserCreate149 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "SAXReader" and node.context.callPath contains "reader.read" and not (node.context.literal contains "http://apache.org/xml/features/nonvalidating/load-external-dtd") and not (node.context.literal contains "http://xml.org/sax/features/external-general-entities") and not (node.context.literal contains "http://xml.org/sax/features/external-parameter-entities")

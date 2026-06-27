@@ -1,4 +1,4 @@
-module bindings.go.migration.mde69e382;
+module bindings.go.generated.mde69e382;
 
 binding filePathAccess8 {
   requires {

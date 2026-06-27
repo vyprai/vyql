@@ -1,4 +1,4 @@
-module bindings.perl.migration.m84e43ec5;
+module bindings.perl.generated.m84e43ec5;
 
 binding stdinInput0 {
   requires {

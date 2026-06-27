@@ -1,4 +1,4 @@
-module bindings.perl.migration.mf804badd;
+module bindings.perl.generated.mf804badd;
 
 binding deserialization0 {
   requires {

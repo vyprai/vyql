@@ -1,4 +1,4 @@
-module bindings.java.migration.mab1966f5;
+module bindings.java.generated.mab1966f5;
 
 binding fileUse0 {
   requires {

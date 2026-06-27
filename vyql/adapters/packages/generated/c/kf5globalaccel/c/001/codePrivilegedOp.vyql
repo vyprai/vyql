@@ -1,4 +1,4 @@
-module bindings.c.migration.mdfc1c7c8;
+module bindings.c.generated.mdfc1c7c8;
 
 binding privilegedOp1 {
   requires {

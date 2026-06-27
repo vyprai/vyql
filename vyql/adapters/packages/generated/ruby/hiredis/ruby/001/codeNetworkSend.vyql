@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mfcdfa016;
+module bindings.ruby.generated.mfcdfa016;
 
 binding networkSend1 {
   requires {

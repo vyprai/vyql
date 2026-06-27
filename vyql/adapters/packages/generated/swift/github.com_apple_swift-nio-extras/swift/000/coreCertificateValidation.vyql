@@ -1,4 +1,4 @@
-module bindings.swift.migration.mdf0ffcaf;
+module bindings.swift.generated.mdf0ffcaf;
 
 binding certificateValidation0 {
   requires {

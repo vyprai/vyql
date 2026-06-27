@@ -1,4 +1,4 @@
-module bindings.c.migration.m08cf8d34;
+module bindings.c.generated.m08cf8d34;
 
 binding formatString0 {
   requires {

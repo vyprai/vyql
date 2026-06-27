@@ -1,4 +1,4 @@
-module bindings.elixir.migration.me81221c0;
+module bindings.elixir.generated.me81221c0;
 
 binding authenticationCheck0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.python.migration.mf032363d;
+module bindings.python.generated.mf032363d;
 
 binding xmlParse0 {
   requires {

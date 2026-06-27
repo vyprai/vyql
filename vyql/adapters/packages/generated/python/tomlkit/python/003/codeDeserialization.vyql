@@ -1,4 +1,4 @@
-module bindings.python.migration.mcd43ef2a;
+module bindings.python.generated.mcd43ef2a;
 
 binding deserialization3 {
   requires {

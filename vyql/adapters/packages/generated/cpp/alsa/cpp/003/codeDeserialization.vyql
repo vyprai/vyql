@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m6b02cad0;
+module bindings.cpp.generated.m6b02cad0;
 
 binding deserialization3 {
   requires {

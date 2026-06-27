@@ -1,4 +1,4 @@
-module bindings.c.migration.mea21ddc8;
+module bindings.c.generated.mea21ddc8;
 
 binding xmlParse1 {
   requires {

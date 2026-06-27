@@ -1,4 +1,4 @@
-module bindings.java.migration.m3a2a5a26;
+module bindings.java.generated.m3a2a5a26;
 
 binding authorizationCheck5 {
   requires {

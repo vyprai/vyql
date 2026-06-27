@@ -1,4 +1,4 @@
-module bindings.go.migration.maab03f2b;
+module bindings.go.generated.maab03f2b;
 
 binding userControlledData4 {
   requires {

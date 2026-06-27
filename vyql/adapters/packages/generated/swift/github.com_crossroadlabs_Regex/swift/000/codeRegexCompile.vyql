@@ -1,4 +1,4 @@
-module bindings.swift.migration.m24b0008a;
+module bindings.swift.generated.m24b0008a;
 
 binding regexCompile0 {
   requires {

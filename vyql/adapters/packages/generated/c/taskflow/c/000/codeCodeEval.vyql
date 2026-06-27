@@ -1,4 +1,4 @@
-module bindings.c.migration.m20618f6c;
+module bindings.c.generated.m20618f6c;
 
 binding codeEval0 {
   requires {

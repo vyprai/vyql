@@ -1,4 +1,4 @@
-module bindings.c.migration.m6e12301c;
+module bindings.c.generated.m6e12301c;
 
 binding httpInput1 {
   requires {

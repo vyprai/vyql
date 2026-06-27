@@ -1,4 +1,4 @@
-module bindings.dart.migration.medf6299a;
+module bindings.dart.generated.medf6299a;
 
 binding filePathAccess6 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mcf414805;
+module bindings.elixir.generated.mcf414805;
 
 binding fileUse0 {
   requires {

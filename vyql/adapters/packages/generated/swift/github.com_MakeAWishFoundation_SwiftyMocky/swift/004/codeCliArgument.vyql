@@ -1,4 +1,4 @@
-module bindings.swift.migration.mb190fccd;
+module bindings.swift.generated.mb190fccd;
 
 binding cliArgument4 {
   requires {

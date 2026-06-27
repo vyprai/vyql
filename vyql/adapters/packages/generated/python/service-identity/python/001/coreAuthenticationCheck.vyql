@@ -1,4 +1,4 @@
-module bindings.python.migration.m8682123e;
+module bindings.python.generated.m8682123e;
 
 binding authenticationCheck1 {
   requires {

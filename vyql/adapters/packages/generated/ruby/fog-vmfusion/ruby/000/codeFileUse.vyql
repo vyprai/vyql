@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mb5ef8e2a;
+module bindings.ruby.generated.mb5ef8e2a;
 
 binding fileUse0 {
   requires {

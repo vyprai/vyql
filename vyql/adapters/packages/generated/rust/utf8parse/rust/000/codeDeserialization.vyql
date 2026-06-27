@@ -1,4 +1,4 @@
-module bindings.rust.migration.m10e9e6cc;
+module bindings.rust.generated.m10e9e6cc;
 
 binding deserialization0 {
   requires {

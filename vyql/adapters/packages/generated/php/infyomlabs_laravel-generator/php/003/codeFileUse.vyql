@@ -1,4 +1,4 @@
-module bindings.php.migration.mc68437fe;
+module bindings.php.generated.mc68437fe;
 
 binding fileUse3 {
   requires {

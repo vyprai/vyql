@@ -1,4 +1,4 @@
-module bindings.groovy.migration.maf61e7f1;
+module bindings.groovy.generated.maf61e7f1;
 
 binding databaseRead0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.library.migration.m699b14a0;
+module bindings.library.generated.m699b14a0;
 
 pattern adapterMetadata {
   adapter: {

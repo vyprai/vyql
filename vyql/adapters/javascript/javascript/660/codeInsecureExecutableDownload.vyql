@@ -1,4 +1,4 @@
-module bindings.javascript.migration.mfb63017a;
+module bindings.javascript.generated.mfb63017a;
 
 binding insecureExecutableDownload660 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "jrePrefix" and node.token contains "OpenJDK-JRE" and node.token contains "http://bundled-openjdk-jre" and node.token contains "download(jreUrl,jreTempFile" and node.token contains "http.request" and not (node.token contains "https://storage.googleapis.com")

@@ -1,4 +1,4 @@
-module bindings.go.migration.m2fb4adf2;
+module bindings.go.generated.m2fb4adf2;
 
 binding cliArgument0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.elixir.migration.mfd21df81;
+module bindings.elixir.generated.mfd21df81;
 
 binding inputValidation0 {
   requires {

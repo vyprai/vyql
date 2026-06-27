@@ -1,4 +1,4 @@
-module bindings.scala.migration.m06d0685b;
+module bindings.scala.generated.m06d0685b;
 
 binding staticIv38 {
   query pattern callExpr where callee.path ~= "IvParameterSpec" and args.any.literal contains "0000000000000000"

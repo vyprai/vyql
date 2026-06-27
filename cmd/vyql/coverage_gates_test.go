@@ -750,6 +750,7 @@ func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
 		regexp.MustCompile(`^\s*mark\s+`),
 		regexp.MustCompile(`^\s*match\s+[A-Za-z0-9_.]+\s+as\b`),
 		regexp.MustCompile(`^\s*package\s+"`),
+		regexp.MustCompile(`^\s*module\s+bindings\.[A-Za-z0-9_.-]+\.migration(?:\.|;)`),
 		regexp.MustCompile(`^\s*analysis_role\s*:`),
 		regexp.MustCompile(`^\s*assume(?:MinLevel|_min_level)\s*:`),
 		regexp.MustCompile(`\bunless\s+(?:sanitized_by|guarded_by|closed_by)\b`),

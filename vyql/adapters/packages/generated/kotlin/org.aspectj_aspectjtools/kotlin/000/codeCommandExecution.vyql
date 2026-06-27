@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mce527aa3;
+module bindings.kotlin.generated.mce527aa3;
 
 binding commandExecution0 {
   requires {

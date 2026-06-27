@@ -1,4 +1,4 @@
-module bindings.rust.migration.m9e0a6676;
+module bindings.rust.generated.m9e0a6676;
 
 binding shellEscape0 {
   requires {

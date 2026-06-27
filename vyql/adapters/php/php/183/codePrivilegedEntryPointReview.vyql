@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding privilegedEntryPointReview183 {
   query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "$_POST['systemRootPath']" and node.token contains "videos/configuration.php" and node.token contains "fopen" and not (node.token contains "../videos/configuration.php")

@@ -1,4 +1,4 @@
-module bindings.java.migration.m4093815c;
+module bindings.java.generated.m4093815c;
 
 binding authorizationCheck3 {
   requires {

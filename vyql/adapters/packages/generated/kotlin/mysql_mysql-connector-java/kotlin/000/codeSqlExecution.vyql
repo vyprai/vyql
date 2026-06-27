@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.mceaeda8d;
+module bindings.kotlin.generated.mceaeda8d;
 
 binding sqlExecution0 {
   requires {

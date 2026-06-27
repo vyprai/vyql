@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m57a73f60;
+module bindings.groovy.generated.m57a73f60;
 
 binding filePathAccess0 {
   requires {

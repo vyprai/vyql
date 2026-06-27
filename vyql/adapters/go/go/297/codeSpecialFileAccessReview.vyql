@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding specialFileAccessReview297 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "os.OpenFile" and node.context.literal contains "/proc/self/attr/exec" and not (node.context.scopeCall contains "OpenProcRoot") and not (node.context.scopeCall contains "OpenThreadSelf") and not (node.context.callPath contains "pathrs.Reopen")

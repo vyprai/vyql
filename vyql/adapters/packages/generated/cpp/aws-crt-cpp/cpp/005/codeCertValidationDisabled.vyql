@@ -1,4 +1,4 @@
-module bindings.cpp.migration.m4fa6ca30;
+module bindings.cpp.generated.m4fa6ca30;
 
 binding certValidationDisabled5 {
   requires {

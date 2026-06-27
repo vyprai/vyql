@@ -1,4 +1,4 @@
-module bindings.ruby.migration.mcbce2962;
+module bindings.ruby.generated.mcbce2962;
 
 binding cliArgument0 {
   requires {

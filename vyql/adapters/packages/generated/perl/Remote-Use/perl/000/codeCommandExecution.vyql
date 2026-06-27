@@ -1,4 +1,4 @@
-module bindings.perl.migration.mbcbed08d;
+module bindings.perl.generated.mbcbed08d;
 
 binding commandExecution0 {
   requires {

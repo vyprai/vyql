@@ -1,4 +1,4 @@
-module bindings.python.migration.m365db6d5;
+module bindings.python.generated.m365db6d5;
 
 binding sqlExecution0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.objc.migration.m92b3816a;
+module bindings.objc.generated.m92b3816a;
 
 binding fileUse0 {
   requires {

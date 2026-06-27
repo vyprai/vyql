@@ -1,4 +1,4 @@
-module bindings.ruby.migration.md7f97319;
+module bindings.ruby.generated.md7f97319;
 
 binding htmlRender2 {
   requires {

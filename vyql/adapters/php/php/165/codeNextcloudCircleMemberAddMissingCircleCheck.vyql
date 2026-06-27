@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding nextcloudCircleMemberAddMissingCircleCheck165 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "memberAdd" and node.token contains "generateFederatedUser($userId,$type)" and node.token contains "addMember($circleId,$federatedUser)" and not (node.token contains "Member::TYPE_CIRCLE") and not (node.token contains "circleService->getCircle($userId)")

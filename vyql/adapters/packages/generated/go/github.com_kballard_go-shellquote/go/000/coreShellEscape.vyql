@@ -1,4 +1,4 @@
-module bindings.go.migration.m69685fd2;
+module bindings.go.generated.m69685fd2;
 
 binding shellEscape0 {
   requires {

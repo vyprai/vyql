@@ -1,4 +1,4 @@
-module bindings.java.migration.m299dbf4d;
+module bindings.java.generated.m299dbf4d;
 
 binding authorizationCheck2 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.php.migration.mfbe84119;
+module bindings.php.generated.mfbe84119;
 
 binding multipleDropdownScalarFallbackMissing174 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "prepareHtmlFields" and node.context.callArg contains "json_decode:(string)$value" and node.context.subscript contains "$field['multiple']" and node.context.subscript contains "$field['default_value']" and not (node.context.callArg contains "json_decode:true") and not (node.context.identifier contains "$decoded")

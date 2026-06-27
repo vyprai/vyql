@@ -1,4 +1,4 @@
-module bindings.java.migration.me25e9eed;
+module bindings.java.generated.me25e9eed;
 
 binding databaseRead3 {
   requires {

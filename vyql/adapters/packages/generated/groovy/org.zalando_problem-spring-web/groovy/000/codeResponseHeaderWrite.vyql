@@ -1,4 +1,4 @@
-module bindings.groovy.migration.m8c0000bc;
+module bindings.groovy.generated.m8c0000bc;
 
 binding responseHeaderWrite0 {
   requires {

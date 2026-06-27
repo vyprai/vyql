@@ -1,4 +1,4 @@
-module bindings.elixir.migration.m728b8a72;
+module bindings.elixir.generated.m728b8a72;
 
 binding filePathAccess43 {
   query pattern callExpr where callee.path ~= "File.open!"

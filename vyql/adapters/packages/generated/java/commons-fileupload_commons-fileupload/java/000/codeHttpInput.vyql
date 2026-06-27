@@ -1,4 +1,4 @@
-module bindings.java.migration.mdb6a1a73;
+module bindings.java.generated.mdb6a1a73;
 
 binding httpInput0 {
   requires {

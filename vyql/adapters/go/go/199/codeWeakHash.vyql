@@ -1,4 +1,4 @@
-module bindings.go.migration.m48a985c1;
+module bindings.go.generated.m48a985c1;
 
 binding weakHash199 {
   query pattern presenceNode where node.path ~= "md5.Sum"

@@ -1,4 +1,4 @@
-module bindings.rust.migration.mfc2a02cb;
+module bindings.rust.generated.mfc2a02cb;
 
 binding filePathAccess0 {
   requires {

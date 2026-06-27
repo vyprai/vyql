@@ -1,4 +1,4 @@
-module bindings.kotlin.migration.m0e2c1d1b;
+module bindings.kotlin.generated.m0e2c1d1b;
 
 binding envVariable0 {
   requires {

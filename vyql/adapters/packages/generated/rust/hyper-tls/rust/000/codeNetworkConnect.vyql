@@ -1,4 +1,4 @@
-module bindings.rust.migration.m96d022c4;
+module bindings.rust.generated.m96d022c4;
 
 binding networkConnect0 {
   requires {

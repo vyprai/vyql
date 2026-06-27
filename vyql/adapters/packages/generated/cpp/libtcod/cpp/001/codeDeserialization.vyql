@@ -1,4 +1,4 @@
-module bindings.cpp.migration.mbe49191a;
+module bindings.cpp.generated.mbe49191a;
 
 binding deserialization1 {
   requires {

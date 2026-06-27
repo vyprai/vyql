@@ -1,4 +1,4 @@
-module bindings.ruby.migration.m90b9fe8b;
+module bindings.ruby.generated.m90b9fe8b;
 
 binding storedDataWrite1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.perl.migration.mc61d3835;
+module bindings.perl.generated.mc61d3835;
 
 binding htmlRender2 {
   requires {

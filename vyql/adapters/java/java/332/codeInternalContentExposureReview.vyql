@@ -1,4 +1,4 @@
-module bindings.java.migration.m420f6b67;
+module bindings.java.generated.m420f6b67;
 
 binding internalContentExposureReview332 {
   query pattern presenceNode where node.scope == "function" and node.context.call contains "setContent" and node.context.call contains "toJson" and node.context.call contains "saveDocument" and not (node.context.scopeCall contains "setHidden")

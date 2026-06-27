@@ -1,4 +1,4 @@
-module bindings.dart.migration.medf72a0e;
+module bindings.dart.generated.medf72a0e;
 
 binding networkData0 {
   requires {

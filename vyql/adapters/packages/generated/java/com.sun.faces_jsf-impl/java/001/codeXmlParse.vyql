@@ -1,4 +1,4 @@
-module bindings.java.migration.m208cab76;
+module bindings.java.generated.m208cab76;
 
 binding xmlParse1 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.scala.migration.m0779b6f2;
+module bindings.scala.generated.m0779b6f2;
 
 binding httpInput2 {
   requires {

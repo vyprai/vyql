@@ -1,4 +1,4 @@
-module bindings.objc.migration.m76c30cad;
+module bindings.objc.generated.m76c30cad;
 
 binding deserialization4 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m1b4617e3;
+module bindings.javascript.generated.m1b4617e3;
 
 binding inputValidation1 {
   requires {

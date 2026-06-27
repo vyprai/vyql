@@ -1,4 +1,4 @@
-module bindings.groovy.migration.maf32f765;
+module bindings.groovy.generated.maf32f765;
 
 binding networkData5 {
   requires {

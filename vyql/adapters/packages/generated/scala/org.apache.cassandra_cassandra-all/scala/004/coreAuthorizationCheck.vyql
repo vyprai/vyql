@@ -1,4 +1,4 @@
-module bindings.scala.migration.m7a1a871f;
+module bindings.scala.generated.m7a1a871f;
 
 binding authorizationCheck4 {
   requires {

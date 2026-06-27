@@ -1,4 +1,4 @@
-module bindings.javascript.migration.m6036082e;
+module bindings.javascript.generated.m6036082e;
 
 binding deserialization0 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.c.migration.mfd531f33;
+module bindings.c.generated.mfd531f33;
 
 binding deserialization1 {
   requires {

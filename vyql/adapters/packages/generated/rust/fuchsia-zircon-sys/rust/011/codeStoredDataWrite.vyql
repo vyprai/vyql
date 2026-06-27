@@ -1,4 +1,4 @@
-module bindings.rust.migration.m52982397;
+module bindings.rust.generated.m52982397;
 
 binding storedDataWrite11 {
   requires {

@@ -1,4 +1,4 @@
-module bindings.groovy.migration.mb6511e87;
+module bindings.groovy.generated.mb6511e87;
 
 binding userControlledData1 {
   requires {
