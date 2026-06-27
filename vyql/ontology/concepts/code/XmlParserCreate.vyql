@@ -1,7 +1,7 @@
 module code;
 
 concept XmlParserCreate : issue {
-  analysis_role: same_receiver_guard_target
+  analysisRole: same_receiver_guard_target
   cwe: [CWE_611]
   vulnerableTo: [deserialization.XxeUnhardened]
 }

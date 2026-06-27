@@ -490,7 +490,7 @@ func lowerV2FieldName(name string) string {
 		return "source_assumption"
 	case "sourceConfidence":
 		return "source_confidence"
-	case "assumeMinLevel":
+	case "grantMinLevel":
 		return "assume_min_level"
 	case "analysisRole":
 		return "analysis_role"
@@ -652,7 +652,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 				})
 				out = append(out, m)
 			case action.Kind == "emit check":
-				if action.Concept == "core.Assumption" {
+				if isV2InternalAssumptionCheck(action) {
 					m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs, req)
 					if err != nil {
 						return nil, err
@@ -737,6 +737,19 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 
 func isV2GlobalCheck(action V2BindingOutput) bool {
 	return len(action.Covers) == 1 && action.Covers[0].Mode == "global"
+}
+
+func isV2InternalAssumptionCheck(action V2BindingOutput) bool {
+	advisory := action.Advisory != nil && *action.Advisory
+	if !advisory || action.About == "" || len(action.Covers) != 1 {
+		return false
+	}
+	switch action.Covers[0].Mode {
+	case "dominates", "path":
+		return true
+	default:
+		return false
+	}
 }
 
 func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {

@@ -149,7 +149,7 @@ READ < WRITE < ADMIN < SUPER_ADMIN        (per resource family)
 Principals: `EXTERNAL_PRINCIPAL`, `AUTHENTICATED_USER`, `INTERNAL_SERVICE`,
 `CI_PRINCIPAL`, `HUMAN_ADMIN`, `WORKLOAD_IDENTITY`, `ANONYMOUS`.
 
-The `assume` solver consumes this order: `assume X -> ADMIN_PRIVILEGE`
+The privilege-closure solver consumes this order: `grant X -> ADMIN_PRIVILEGE`
 matches reaching any privilege ≥ ADMIN in the relevant family
 ([09](09-domain-cloud-identity.md)).
 

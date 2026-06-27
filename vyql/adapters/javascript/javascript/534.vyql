@@ -2,7 +2,7 @@ module bindings.javascript.migration.mfb63017a;
 
 binding binding534 {
   query pattern callExpr where callee.method == "encodeXPath"
-  emit check core.Assumption at call {
+  emit check core.XpathEscape at call {
     advisory: true
     about: code.XpathQuery
     covers path {

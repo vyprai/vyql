@@ -1,5 +1,5 @@
 module identity;
 
 concept SuperAdminPrivilege : privilege {
-  assume_min_level: SUPERADMIN
+  grantMinLevel: SUPERADMIN
 }

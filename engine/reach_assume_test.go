@@ -111,12 +111,12 @@ rule ActorToCapability {
 	}
 }
 
-func TestAssumeMinLevelComesFromOntology(t *testing.T) {
+func TestGrantMinLevelComesFromOntology(t *testing.T) {
 	concepts := `
 module custom;
 concept External : principal { }
 concept Elevated : privilege {
-  assume_min_level: ADMIN
+  grantMinLevel: ADMIN
 }
 `
 	onto := ontology.New()

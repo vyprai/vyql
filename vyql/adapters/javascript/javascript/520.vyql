@@ -2,7 +2,7 @@ module bindings.javascript.migration.mfb63017a;
 
 binding binding520 {
   query pattern callExpr where callee.method == "endsWith"
-  emit check core.Assumption at call {
+  emit check core.InputValidation at call {
     advisory: true
     about: code.FilePathAccess
     covers dominates {

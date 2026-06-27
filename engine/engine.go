@@ -453,11 +453,10 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 // suppressed (vyql cannot prove the neutralizer sound), but is flagged as a false positive
 // IF it works. This generalizes the regex-CharFilter mechanism (charFilterAssumption) to arbitrary
 // neutralizers: the confident bucket (findings with no assumption note) is near-zero-FP, and
-// the noted bucket is the human review queue. Which calls are unsound neutralizers is data
-// (the `assume` adapter directive); this engine logic is threat-agnostic.
+// the noted bucket is the human review queue. Which calls are unsound neutralizers comes from
+// v2 advisory check bindings; the mechanic itself is Go-owned and threat-agnostic.
 func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
 	var out []findings.NegationEvidence
-	assumptions := e.conceptsWithAnalysisRole(ontology.AnalysisRoleNeutralizerAssumption)
 	seen := map[string]bool{}
 	add := func(mode, pat string) {
 		key := mode + "|" + pat
@@ -471,10 +470,10 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 		}
 		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
 	}
-	// sanitizer-style: an assumption-role label lying ON the taint path.
+	// sanitizer-style: an internal assumption label lying ON the taint path.
 	for _, id := range path {
 		for _, l := range e.labels(id) {
-			if assumptions[l.Concept] && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
+			if l.Concept == ontology.InternalNeutralizerAssumptionConcept && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
 				add("sanitizer", l.Detail["pattern"])
 			}
 		}
@@ -495,7 +494,7 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 				}
 				guarded[gid] = true
 				for _, l := range e.labels(gid) {
-					if !assumptions[l.Concept] || l.Detail["mode"] != "guard" {
+					if l.Concept != ontology.InternalNeutralizerAssumptionConcept || l.Detail["mode"] != "guard" {
 						continue
 					}
 					// about=="*" is a structural guard (a `<const> in tainted` blocklist) that

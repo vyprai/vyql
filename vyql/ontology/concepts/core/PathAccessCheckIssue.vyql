@@ -1,7 +1,7 @@
 module core;
 
 concept PathAccessCheckIssue : issue {
-  analysis_role: path_access_check
+  analysisRole: path_access_check
   applies: endpoint
   cwe: [CWE_22, CWE_98]
   neutralizes: [path.PathTraversal, path.FileInclusion]

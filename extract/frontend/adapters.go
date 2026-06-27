@@ -870,17 +870,15 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	return out
 }
 
-// assumeAdapter labels unsound-neutralizer calls (guards/transforms that cannot be proven
-// sound) with the ontology role concept that the engine can surface as review context.
+// assumeAdapter labels unsound-neutralizer calls (guards/transforms that cannot be
+// proven sound) with a Go-owned internal concept that the engine can surface as
+// review context.
 func (spec adapterSpec) assumeAdapter() adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRoleNeutralizerAssumption)
+	concept := ontology.InternalNeutralizerAssumptionConcept
 	return adapters.Adapter{
 		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "syntactic", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
-			if concept == "" {
-				return nil
-			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)

@@ -1,7 +1,7 @@
 module code;
 
 concept ProtoPollute : sink {
-  analysis_role: attribute_sink
+  analysisRole: attribute_sink
   cwe: [CWE_1321]
   enabledBy: [taint.UntrustedData]
   vulnerableTo: [injection.PrototypePollution]

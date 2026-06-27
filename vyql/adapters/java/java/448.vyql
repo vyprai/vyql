@@ -2,7 +2,7 @@ module bindings.java.migration.m420f6b67;
 
 binding binding448 {
   query pattern callExpr where callee.analysis == "guard.containment_check"
-  emit check core.Assumption at call {
+  emit check core.InputValidation at call {
     advisory: true
     about: code.FilePathAccess
     covers dominates {

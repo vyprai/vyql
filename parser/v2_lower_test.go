@@ -1033,7 +1033,7 @@ func TestV2AssumptionCheckLowering(t *testing.T) {
 module bindings.python.migration;
 binding startsWithGuard {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
-  emit check core.Assumption at call {
+  emit check core.InputValidation at call {
     advisory: true
     about: code.FilePathAccess
     covers dominates {
@@ -1044,7 +1044,7 @@ binding startsWithGuard {
 }
 binding normpathSanitizer {
   query pattern callExpr where callee.path ~= "os.path.normpath"
-  emit check core.Assumption at call {
+  emit check core.PathCanonicalization at call {
     advisory: true
     about: code.FilePathAccess
     covers path {
@@ -1225,7 +1225,7 @@ binding containmentCheck {
     reason: "obsolete private query family should not lower"
   }
   query unstable.analysisAssumeGuard as call where call.path == "analysis.guard.containment_check"
-  emit check core.Assumption at call {
+  emit check core.InputValidation at call {
     advisory: true
     about: code.FilePathAccess
     covers dominates {
@@ -2018,7 +2018,7 @@ func TestV2ScannerIRSupportsGrantRulesAndObservationConcepts(t *testing.T) {
 module custom;
 concept External : principal {}
 concept Elevated : privilege {
-  assumeMinLevel: ADMIN
+  grantMinLevel: ADMIN
 }
 concept PublicEdgeObservation : observation {
   contextConfirmFlagValue: true
@@ -2091,21 +2091,24 @@ func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 }
 
 func parseV2DefinitionsForTest(src string) ([]Decl, error) {
-	sources := []V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForLoweringTest}}
-	sources = append(sources, V2DefinitionSourcesFromText("test.vyql", src)...)
-	return parseV2DefinitionSourcesForTest(sources)
+	return parseV2DefinitionSourcesForTest(V2DefinitionSourcesFromText("test.vyql", src))
 }
 
 func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, error) {
 	allSources := make([]V2DefinitionSource, 0, len(sources)+1)
+	keep := make([]bool, 0, len(sources)+1)
 	hasPolicies := false
 	for _, source := range sources {
 		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
 	}
 	if !hasPolicies {
 		allSources = append(allSources, V2DefinitionSource{Name: "policies/core.vyql", Source: v2CorePoliciesForLoweringTest})
+		keep = append(keep, false)
 	}
 	allSources = append(allSources, sources...)
+	for range sources {
+		keep = append(keep, true)
+	}
 	parsed := make([]V2Source, 0, len(allSources))
 	for _, source := range allSources {
 		prog, err := ParseV2(source.Source)
@@ -2114,7 +2117,7 @@ func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, erro
 		}
 		parsed = append(parsed, V2Source{Name: source.Name, Program: prog})
 	}
-	decls, err := LowerV2DefinitionSources(parsed)
+	decls, err := lowerV2DefinitionSourcesSelected(parsed, keep)
 	if err != nil {
 		return nil, err
 	}

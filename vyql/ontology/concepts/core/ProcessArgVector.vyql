@@ -1,7 +1,7 @@
 module core;
 
 concept ProcessArgVector : check {
-  analysis_role: process_arg_vector
+  analysisRole: process_arg_vector
   applies: path
   neutralizes: [injection.CommandInjection]
   refines: core.ShellEscape

@@ -2,6 +2,6 @@ module core;
 
 concept InputValidation : check {
   applies: path
-  covers: [path]
+  covers: [dominates, path]
   neutralizes: [validation.TrustBoundary, validation.ImproperInputValidation]
 }

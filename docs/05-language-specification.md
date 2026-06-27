@@ -66,7 +66,7 @@ exception   = "sanitized_by" concept_ref
 | `taint A -> B` | can attacker-controlled data from A reach B? | on-demand dataflow ([08](08-dataflow-and-taint.md)) | dataflow path |
 | `flow A -> B` | does a value from A reach B (taint-agnostic)? | dataflow | dataflow path |
 | `reach A -> B` | is there a network path from A to B? | reachability | network hop path |
-| `assume A -> B` | can principal A obtain the privileges of B? | privilege closure | grant/trust chain |
+| `grant A -> B` | can principal A obtain the privileges of B? | privilege closure | grant/trust chain |
 
 The verb selects the solver. `require reachability`-style clauses from the
 v0.1 draft are **removed**: the flow kind is never a bolt-on.
@@ -112,7 +112,7 @@ rule vypr.cloud.public_database {
 // Identity
 rule vypr.identity.external_to_admin {
   meta { id: "VYQL-IDN-002", severity: critical, attack: ["TA0004"] }
-  assume EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
+  grant EXTERNAL_PRINCIPAL -> ADMIN_PRIVILEGE
 }
 
 // Runtime

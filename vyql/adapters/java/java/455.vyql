@@ -2,7 +2,7 @@ module bindings.java.migration.m420f6b67;
 
 binding binding455 {
   query pattern callExpr where callee.method == "encodeForXPath"
-  emit check core.Assumption at call {
+  emit check core.XpathEscape at call {
     advisory: true
     about: code.XpathQuery
     covers path {
