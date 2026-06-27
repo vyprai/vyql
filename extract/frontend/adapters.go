@@ -24,6 +24,7 @@ import (
 
 type inputSpec struct {
 	Concept     string
+	NodeType    string
 	Paths       []string
 	Methods     []string // receiver-agnostic: match the call's `method` prop (last segment)
 	Match       string   // "prefix" (default) | "contains"
@@ -40,6 +41,7 @@ type inputSpec struct {
 
 type sinkSpec struct {
 	Concept         string
+	NodeType        string
 	Pattern         string
 	ByMethod        bool     // match the bare method name vs the dotted callee path
 	Exact           bool     // exact path match instead of segment-prefix path matching
@@ -60,6 +62,7 @@ type sinkSpec struct {
 
 type controlSpec struct {
 	Concept     string
+	NodeType    string
 	Pattern     string
 	ByMethod    bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
 	Receiver    bool     // label the call receiver node instead of the call result
@@ -190,6 +193,10 @@ func lowerStrings(values []string) []string {
 		out[i] = strings.ToLower(v)
 	}
 	return out
+}
+
+func nodeTypeAllowed(want, got string) bool {
+	return want == "" || got == want
 }
 
 func newFlagPredicate(subject, property, op string, values []string, exact, negative bool) flagPredicate {
@@ -1097,29 +1104,29 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "source":
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
-				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
 			if !ok {
-				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode})
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode})
 				i = len(s.Inputs) - 1
 				srcByConcept[mp.Concept] = i
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
-				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
 			if !ok {
-				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode})
+				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode})
 				i = len(s.Inputs) - 1
 				srcByConcept[mp.Concept] = i
 			}
@@ -1127,34 +1134,34 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "source_param":
 			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "source_receiver":
-			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
+			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "control":
-			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "control_method":
-			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "control_receiver_method":
-			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "mark_method":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "flag":
@@ -1250,6 +1257,9 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				}
 				for _, ci := range inIdx.candidates(method, path) {
 					in := spec.Inputs[ci]
+					if !nodeTypeAllowed(in.NodeType, n.Type) {
+						continue
+					}
 					if !effects[ci].Allowed {
 						continue
 					}
@@ -1338,6 +1348,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				bestByConcept := map[string]int{}
 				for _, i := range cand {
 					sk := spec.Sinks[i]
+					if !nodeTypeAllowed(sk.NodeType, n.Type) {
+						continue
+					}
 					if !effects[i].Allowed {
 						continue
 					}
@@ -1523,6 +1536,9 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				for _, ci := range ctrlIdx.candidates(method, path) {
 					c := spec.Controls[ci]
+					if !nodeTypeAllowed(c.NodeType, n.Type) {
+						continue
+					}
 					if !effects[ci].Allowed {
 						continue
 					}
@@ -3303,6 +3319,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 					seenConcept := map[string]bool{}
 					for _, mi := range markIdx.candidates(method, path) {
 						m := spec.Marks[mi]
+						if !nodeTypeAllowed(m.NodeType, n.Type) {
+							continue
+						}
 						if !effects[mi].Allowed {
 							continue
 						}

@@ -114,8 +114,8 @@ rule SqlInjection {
 	}
 }
 
-func TestCompileUsesAuthoredRuleVerbEndpointKinds(t *testing.T) {
-	decls := parseV2DefinitionSourcesForCompileTest(t, []parser.V2DefinitionSource{
+func TestLowerRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
+	sources := parseV2SourcesForCompileTest(t, []parser.V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb taint {
@@ -125,59 +125,35 @@ mechanic ruleVerb taint {
   allowedClauses: [where, coveredBy, confidence]
 }
 `},
-		{Name: "concepts.vyql", Source: `
-module custom;
-concept Input : source {}
-concept Asset : asset {}
-`},
-		{Name: "rules.vyql", Source: `
-module rules.test;
-rule SourceToAsset {
-  taint custom.Input -> custom.Asset
-}
-`},
 	})
-	onto := ontology.New()
-	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
-	onto.Add(ontology.Concept{Name: "Asset", Package: "custom", Kind: "asset"})
-	compiled, errs := CompileRules(decls, onto)
-	if len(errs) != 0 {
-		t.Fatalf("CompileRules errors: %+v", errs)
-	}
-	if len(compiled) != 1 {
-		t.Fatalf("compiled = %d, want 1", len(compiled))
+	_, err := parser.LowerV2DefinitionSources(sources)
+	if err == nil || !strings.Contains(err.Error(), "duplicate v2 mechanic ruleVerb.taint") {
+		t.Fatalf("LowerV2DefinitionSources error = %v, want built-in mechanic rejection", err)
 	}
 }
 
-func TestCompileRejectsEndpointKindsFromAuthoredRuleVerbMechanic(t *testing.T) {
-	decls := parseV2DefinitionSourcesForCompileTest(t, []parser.V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
-module mechanics.test;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [asset]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy, confidence]
-}
-`},
-		{Name: "concepts.vyql", Source: `
-module custom;
-concept Input : source {}
-concept Sink : sink {}
-`},
-		{Name: "rules.vyql", Source: `
-module rules.test;
-rule SourceToSink {
-  taint custom.Input -> custom.Sink
-}
-`},
-	})
+func TestCompileKeepsGoRuleVerbEndpointKindsWhenDeclTriesToOverride(t *testing.T) {
+	decls := []parser.Decl{
+		&parser.V2MechanicDecl{Kind: "ruleVerb", Name: "taint", Items: []parser.V2BlockItem{
+			{Key: []string{"fromKinds"}, Value: []any{"source"}},
+			{Key: []string{"toKinds"}, Value: []any{"asset"}},
+		}},
+		&parser.Rule{
+			Name:    "SourceToAsset",
+			Package: "rules.test",
+			Body: &parser.FlowStmt{
+				Verb: "taint",
+				Src:  parser.Endpoint{Concept: "custom.Input"},
+				Dst:  parser.Endpoint{Concept: "custom.Asset"},
+			},
+		},
+	}
 	onto := ontology.New()
 	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
-	onto.Add(ontology.Concept{Name: "Sink", Package: "custom", Kind: "sink"})
+	onto.Add(ontology.Concept{Name: "Asset", Package: "custom", Kind: "asset"})
 	_, errs := CompileRules(decls, onto)
-	if len(errs) != 1 || !strings.Contains(errs[0].Msg, "expected one of") || !strings.Contains(errs[0].Msg, "asset") {
-		t.Fatalf("CompileRules errors = %+v, want authored endpoint kind rejection", errs)
+	if len(errs) != 1 || !strings.Contains(errs[0].Msg, "expected one of") || !strings.Contains(errs[0].Msg, "sink") {
+		t.Fatalf("CompileRules errors = %+v, want Go-owned endpoint kind rejection", errs)
 	}
 }
 
@@ -243,6 +219,16 @@ rule SourceToSink {
 
 func parseV2DefinitionSourcesForCompileTest(t *testing.T, raw []parser.V2DefinitionSource) []parser.Decl {
 	t.Helper()
+	sources := parseV2SourcesForCompileTest(t, raw)
+	decls, err := parser.LowerV2DefinitionSources(sources)
+	if err != nil {
+		t.Fatalf("LowerV2DefinitionSources: %v", err)
+	}
+	return decls
+}
+
+func parseV2SourcesForCompileTest(t *testing.T, raw []parser.V2DefinitionSource) []parser.V2Source {
+	t.Helper()
 	sources := make([]parser.V2Source, 0, len(raw))
 	for _, src := range raw {
 		prog, err := parser.ParseV2(src.Source)
@@ -251,11 +237,7 @@ func parseV2DefinitionSourcesForCompileTest(t *testing.T, raw []parser.V2Definit
 		}
 		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
 	}
-	decls, err := parser.LowerV2DefinitionSources(sources)
-	if err != nil {
-		t.Fatalf("LowerV2DefinitionSources: %v", err)
-	}
-	return decls
+	return sources
 }
 
 func loadV2FingerprintGraph(t *testing.T, store usg.Store) {

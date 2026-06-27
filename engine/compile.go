@@ -78,6 +78,9 @@ func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
 		if !ok || m.Kind != "ruleVerb" {
 			continue
 		}
+		if _, builtin := out.verbs[m.Name]; builtin {
+			continue
+		}
 		out.present = true
 		out.verbs[m.Name] = ruleVerbMechanic{
 			FromKinds: v2MechanicStringSet(m.Items, "fromKinds"),

@@ -780,6 +780,37 @@ binding controllerParam {
 	}
 }
 
+func TestV2MemberAccessPatternLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.dom;
+pattern domValue as member {
+  node: memberAccess
+  where member.property == "value"
+}
+binding domValueSource {
+  query pattern domValue
+  emit source code.DomInput at member
+}
+binding secretAttr {
+  query memberAccess as attr where attr.path ~= "config.secret"
+  emit issue code.SecretValue at attr
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "source_method" || got.Pattern != "value" || got.NodeType != "code.Attr" {
+		t.Fatalf("memberAccess property lowering wrong: %+v", got)
+	}
+	if got := adapter.Mappings[1]; got.Kind != "mark" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
+		t.Fatalf("memberAccess path lowering wrong: %+v", got)
+	}
+}
+
 func TestV2CollectionSinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;

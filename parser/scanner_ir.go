@@ -72,6 +72,7 @@ func (*BindingSet) isDecl() {}
 // BindingAction is one compiled action produced from a v2 binding.
 type BindingAction struct {
 	Kind             string   // compiled v2 action family consumed by the graph labeler
+	NodeType         string   // optional USG node type filter, e.g. code.Attr for memberAccess
 	Pattern          string   // the callee path / method token (a string literal or dotted name)
 	Concept          string   // the concept it maps to (qualified); for "type", the type name
 	Constraint       string   // optional `on <type>` receiver-type constraint for sinks

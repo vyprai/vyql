@@ -2181,6 +2181,37 @@ func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	}
 }
 
+func TestV2MemberAccessPatternOnlyLabelsAttrs(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.dom;
+pattern domValue as member {
+  node: memberAccess
+  where member.property == "value"
+}
+binding domValueSource {
+  query pattern domValue
+  emit source custom.DomValue at member
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "attr", Type: "code.Attr", Props: map[string]string{
+		"loc": "sample.js:1", "callee_path": "input.value", "method": "value",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:2", "callee_path": "input.value", "method": "value",
+	}})
+
+	got := spec.inputAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "attr" || got[0].Concept != "custom.DomValue" {
+		t.Fatalf("memberAccess pattern matched wrong nodes: %+v", got)
+	}
+}
+
 func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
