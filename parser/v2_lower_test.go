@@ -2832,6 +2832,18 @@ func TestLowerV2DefinitionSourcesRejectsParsedGoOwnedMechanic(t *testing.T) {
 	}
 }
 
+func TestLowerV2ProgramRejectsParsedGoOwnedMechanic(t *testing.T) {
+	_, err := lowerV2ProgramToDeclarations(&V2Program{
+		Module: "mechanics.bad",
+		Decls: []V2Decl{
+			&V2MechanicDecl{Kind: "ruleVerb", Name: "assume"},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "mechanic ruleVerb.assume is Go-owned") {
+		t.Fatalf("lowerV2ProgramToDeclarations error = %v, want Go-owned mechanic diagnostic", err)
+	}
+}
+
 const v2CorePoliciesForLoweringTest = `
 module policies.core;
 policy resultLifecycle default {

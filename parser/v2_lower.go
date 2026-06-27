@@ -51,6 +51,9 @@ func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2Defi
 
 // lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.
 func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
+	if err := validateV2ProgramMechanicBoundary("<inline>", prog); err != nil {
+		return nil, err
+	}
 	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers(), coverageModes: builtinV2CoverageModes()}
 	mechanics.merge(v2MechanicsFromProgram(prog))
 	return lowerV2ProgramToDeclarationsWithMechanics(prog, mechanics)
@@ -64,24 +67,30 @@ func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
 }
 
 func validateV2ParsedSourceMechanicBoundary(sources []V2Source) error {
-	builtins := builtinV2MechanicSources()
 	var errs []error
 	for _, src := range sources {
-		if src.Program == nil {
+		errs = append(errs, validateV2ProgramMechanicBoundary(src.Name, src.Program))
+	}
+	return errors.Join(errs...)
+}
+
+func validateV2ProgramMechanicBoundary(sourceName string, prog *V2Program) error {
+	if prog == nil {
+		return nil
+	}
+	builtins := builtinV2MechanicSources()
+	var errs []error
+	for _, decl := range prog.Decls {
+		m, ok := decl.(*V2MechanicDecl)
+		if !ok {
 			continue
 		}
-		for _, decl := range src.Program.Decls {
-			m, ok := decl.(*V2MechanicDecl)
-			if !ok {
-				continue
-			}
-			if v2GoOwnedMechanicNames[m.Name] {
-				errs = append(errs, fmt.Errorf("%s: mechanic %s.%s is Go-owned and must not be authored", src.Name, m.Kind, m.Name))
-			}
-			key := v2MechanicID{Kind: m.Kind, Name: m.Name}
-			if builtins[key] != "" {
-				errs = append(errs, fmt.Errorf("%s: duplicate v2 mechanic %s.%s; first declared in <builtin>", src.Name, m.Kind, m.Name))
-			}
+		if v2GoOwnedMechanicNames[m.Name] {
+			errs = append(errs, fmt.Errorf("%s: mechanic %s.%s is Go-owned and must not be authored", sourceName, m.Kind, m.Name))
+		}
+		key := v2MechanicID{Kind: m.Kind, Name: m.Name}
+		if builtins[key] != "" {
+			errs = append(errs, fmt.Errorf("%s: duplicate v2 mechanic %s.%s; first declared in <builtin>", sourceName, m.Kind, m.Name))
 		}
 	}
 	return errors.Join(errs...)
