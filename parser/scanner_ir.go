@@ -174,7 +174,7 @@ type Endpoint struct {
 	Binding string // "" = none
 }
 
-// FlowStmt invokes a two-endpoint solver capability such as taint, flow,
+// FlowStmt invokes a two-endpoint solver capability such as taint,
 // reachability, grant, or assume.
 type FlowStmt struct {
 	Verb string
@@ -308,5 +308,5 @@ func (Cmp) isExpr()            {}
 func (NotIn) isExpr()          {}
 
 // FlowVerbs / SolverVerbs (docs/05).
-var FlowVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "grant": true, "assume": true}
-var SolverVerbs = map[string]bool{"taint": true, "flow": true, "reach": true, "grant": true, "assume": true, "can_access": true, "dominates": true}
+var FlowVerbs = map[string]bool{"taint": true, "reach": true, "grant": true, "assume": true}
+var SolverVerbs = map[string]bool{"taint": true, "reach": true, "grant": true, "assume": true, "can_access": true, "dominates": true}

@@ -75,39 +75,15 @@ rule SqlInjection {
 	}
 }
 
-func TestV2LoweringUsesAuthoredRuleVerbSolver(t *testing.T) {
-	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
-		{Name: "mechanics/test.vyql", Source: `
-module mechanics.test;
-mechanic ruleVerb flow {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy]
-}
-`},
-		{Name: "rules/test.vyql", Source: `
+func TestParseV2DefinitionsRejectsAuthoredFlowRuleVerb(t *testing.T) {
+	_, err := ParseV2Definitions(`
 module rules.test;
 rule CustomFlow {
   flow code.HttpInput -> code.SqlExecution
 }
-`},
-	})
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
-	var rule *Rule
-	for _, d := range decls {
-		if r, ok := d.(*Rule); ok {
-			rule = r
-		}
-	}
-	if rule == nil {
-		t.Fatalf("lowered decls missing rule: %+v", decls)
-	}
-	body, ok := rule.Body.(*FlowStmt)
-	if !ok || body.Verb != "taint" {
-		t.Fatalf("authored solver did not drive scanner IR flow verb: %+v", rule.Body)
+`)
+	if err == nil || !strings.Contains(err.Error(), `unknown v2 rule verb "flow"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want authored flow rejection", err)
 	}
 }
 
@@ -200,15 +176,6 @@ rule BadCoverage {
 
 func TestParseV2DefinitionSourcesSelectedLowersOnlySelectedSources(t *testing.T) {
 	decls, err := ParseV2DefinitionSourcesSelected([]V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
-module mechanics.test;
-mechanic ruleVerb flow {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [coveredBy]
-}
-`},
 		{Name: "code.vyql", Source: `
 module code;
 concept HttpInput : source {}
@@ -217,7 +184,7 @@ concept SqlExecution : sink {}
 		{Name: "rules.vyql", Source: `
 module rules.test;
 rule SelectedOnly {
-  flow code.HttpInput -> code.SqlExecution
+  taint code.HttpInput -> code.SqlExecution
 }
 `},
 	}, func(src V2DefinitionSource) bool {

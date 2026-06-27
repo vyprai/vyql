@@ -66,7 +66,7 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	switch body := cr.Rule.Body.(type) {
 	case *parser.FlowStmt:
 		switch body.Verb {
-		case "taint", "flow":
+		case "taint":
 			return e.evalTaint(cr)
 		case "reach":
 			return e.evalReach(cr)

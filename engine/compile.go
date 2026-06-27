@@ -92,7 +92,6 @@ func builtinRuleVerbMechanics() ruleVerbMechanicPolicy {
 		present: true,
 		verbs: map[string]ruleVerbMechanic{
 			"taint":  {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
-			"flow":   {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
 			"reach":  {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
 			"grant":  {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
 			"assume": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
@@ -149,7 +148,7 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 		if err := checkEndpointKinds(onto, body, r.QualifiedName(), ruleVerbs); err != nil {
 			return nil, err
 		}
-		if body.Verb == "taint" || body.Verb == "flow" {
+		if body.Verb == "taint" {
 			cr.SourceConcepts = onto.Descendants(body.Src.Concept)
 			cr.SinkConcepts = onto.Descendants(body.Dst.Concept)
 			cr.TaintKinds = taintKindsFor(onto, cr.SourceConcepts)

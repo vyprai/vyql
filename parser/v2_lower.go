@@ -184,7 +184,6 @@ func v2MatcherSpecFromDecl(m *V2MatcherDecl) v2MatcherSpec {
 func builtinV2RuleSolvers() map[string]string {
 	return map[string]string{
 		"taint": "dataflow.taint",
-		"flow":  "dataflow.flow",
 		"reach": "graph.reach",
 		"grant": "graph.grant",
 		"issue": "fact.exists",
@@ -2208,7 +2207,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2Mechanics) (*R
 		return nil, fmt.Errorf("rule %s: no built-in solver for rule verb %q", r.Name, r.Body.Verb)
 	}
 	switch solver {
-	case "dataflow.taint", "dataflow.flow", "graph.reach":
+	case "dataflow.taint", "graph.reach":
 		if r.Body.From.Concept == "" || r.Body.To.Concept == "" {
 			return nil, fmt.Errorf("rule %s: solver capability %q requires from/to endpoints", r.Name, solver)
 		}
@@ -2316,8 +2315,6 @@ func v2IRFlowVerbForSolver(solver string) (string, error) {
 	switch solver {
 	case "dataflow.taint":
 		return "taint", nil
-	case "dataflow.flow":
-		return "flow", nil
 	case "graph.reach":
 		return "reach", nil
 	default:

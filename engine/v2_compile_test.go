@@ -206,11 +206,10 @@ func TestPartialAuthoredRuleVerbMechanicsDoNotDisableBuiltIns(t *testing.T) {
 	raw := []parser.V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
-mechanic ruleVerb flow {
-  solver: dataflow.flow
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy, confidence]
+mechanic ruleVerb observe {
+  solver: fact.exists
+  fromKinds: [issue]
+  allowedClauses: [where, confidence]
 }
 `},
 		{Name: "concepts.vyql", Source: `

@@ -195,6 +195,7 @@ func TestParseV2RejectsV1Syntax(t *testing.T) {
 		`import code.HttpInput;`,
 		`module rules.old; rule OldUnless { taint code.HttpInput -> code.SqlExecution unless sanitized_by core.SqlParameterization }`,
 		`module rules.old; rule OldMatch { match code.XmlParserCreate as parser }`,
+		`module rules.old; rule OldFlow { flow code.HttpInput -> code.SqlExecution }`,
 	}
 	for _, src := range bad {
 		_, err := ParseV2(src)
