@@ -9,27 +9,6 @@ import (
 // ParseV2Definitions parses authored VyQL v2 definition modules and compiles
 // them into the scanner IR.
 func ParseV2Definitions(src string) ([]Decl, error) {
-	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
-		programs := make([]*V2Program, 0, len(chunks))
-		mechanics := runtimeMechanics{}
-		for _, chunk := range chunks {
-			prog, err := ParseV2(chunk)
-			if err != nil {
-				return nil, err
-			}
-			programs = append(programs, prog)
-			mechanics.merge(runtimeMechanicsFromProgram(prog))
-		}
-		var out []Decl
-		for _, prog := range programs {
-			decls, err := lowerV2ProgramToDeclarationsWithMechanics(prog, mechanics)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, decls...)
-		}
-		return out, nil
-	}
 	prog, err := ParseV2(src)
 	if err != nil {
 		return nil, err

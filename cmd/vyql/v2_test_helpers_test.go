@@ -31,9 +31,15 @@ policy confidence default {
 `
 
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
-	decls, err := parser.ParseV2Definitions(v2CoreMechanicsForCmdTest + "\n" + src)
-	if err != nil {
-		return nil, err
+	sources := []parser.V2DefinitionSource{{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForCmdTest}}
+	sources = append(sources, parser.V2DefinitionSourcesFromText("test.vyql", src)...)
+	parsed := make([]parser.V2Source, 0, len(sources))
+	for _, source := range sources {
+		prog, err := parser.ParseV2(source.Source)
+		if err != nil {
+			return nil, err
+		}
+		parsed = append(parsed, parser.V2Source{Name: source.Name, Program: prog})
 	}
-	return decls, nil
+	return parser.LowerV2DefinitionSources(parsed)
 }

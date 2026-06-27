@@ -513,16 +513,17 @@ rule SameReceiverCoverage {
 }
 
 func TestV2LoweringRequiresLoadedCoverageMechanicForCoveredBy(t *testing.T) {
-	_, err := ParseV2Definitions(`
-module mechanics.test;
+	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "mechanics/test.vyql", Source: `module mechanics.test;
 mechanic ruleVerb issue { solver: fact.exists }
-
-module rules.review;
+`},
+		{Name: "rules/review.vyql", Source: `module rules.review;
 rule GuardedIssue {
   issue code.Problem as p
   unless p.path coveredBy core.Guard
 }
-`)
+`},
+	})
 	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic coverage "path"`) {
 		t.Fatalf("ParseV2Definitions error = %v, want missing coverage mechanic", err)
 	}
@@ -566,7 +567,7 @@ binding cursorExecuteQuery {
 	}
 }
 
-func TestParseV2DefinitionsRejectsV1FallbackAndAllowsV2Modules(t *testing.T) {
+func TestParseV2DefinitionsRejectsV1FallbackAndMultipleModules(t *testing.T) {
 	if _, err := ParseV2Definitions(`
 adapter javascript {
   source "req.body" -> code.HttpInput
@@ -575,7 +576,7 @@ adapter javascript {
 		t.Fatalf("ParseV2Definitions accepted legacy adapter syntax")
 	}
 
-	decls, err := parseV2DefinitionsForTest(`
+	if _, err := ParseV2Definitions(`
 module code;
 concept HttpInput : source {}
 
@@ -584,9 +585,23 @@ binding requestBody {
   query pattern callExpr where callee.path ~= "req.body"
   emit source code.HttpInput at call.result
 }
-`)
+`); err == nil || !strings.Contains(err.Error(), "module declaration must appear once") {
+		t.Fatalf("ParseV2Definitions multi-module error = %v, want one-module rejection", err)
+	}
+
+	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "code.vyql", Source: `module code;
+concept HttpInput : source {}
+`},
+		{Name: "bindings/javascript/express.vyql", Source: `module bindings.javascript.express;
+binding requestBody {
+  query pattern callExpr where callee.path ~= "req.body"
+  emit source code.HttpInput at call.result
+}
+`},
+	})
 	if err != nil {
-		t.Fatalf("ParseV2Definitions concatenated v2 modules: %v", err)
+		t.Fatalf("ParseV2DefinitionSources: %v", err)
 	}
 	if len(decls) != 2 {
 		t.Fatalf("decls = %d, want concept + adapter mapping", len(decls))
@@ -709,8 +724,8 @@ binding requestBody {
 	}
 }
 
-func TestParseV2DefinitionsSplitsConcatenatedV2Modules(t *testing.T) {
-	decls := parseV2DefinitionsWithCoreMechanics(t, `
+func TestParseV2DefinitionsRejectsConcatenatedV2Modules(t *testing.T) {
+	_, err := ParseV2Definitions(`
 module rules.one;
 rule One {
   issue code.First as first
@@ -721,11 +736,8 @@ rule Two {
   issue code.Second as second
 }
 `)
-	if len(decls) != 2 {
-		t.Fatalf("decls = %d, want 2: %+v", len(decls), decls)
-	}
-	if decls[0].(*Rule).QualifiedName() != "rules.one.One" || decls[1].(*Rule).QualifiedName() != "rules.two.Two" {
-		t.Fatalf("rules lowered wrong: %+v", decls)
+	if err == nil || !strings.Contains(err.Error(), "module declaration must appear once") {
+		t.Fatalf("ParseV2Definitions multi-module error = %v, want one-module rejection", err)
 	}
 }
 
@@ -1502,15 +1514,17 @@ rule HighConfidenceReview {
 }
 
 func TestV2RuleConfidenceClauseRequiresLoadedConfidencePolicy(t *testing.T) {
-	_, err := ParseV2Definitions(`
-module mechanics.core;
+	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "mechanics/core.vyql", Source: `module mechanics.core;
 mechanic ruleVerb issue { solver: fact.exists }
-module rules.review;
+`},
+		{Name: "rules/review.vyql", Source: `module rules.review;
 rule HighConfidenceReview {
   issue code.Review as r
   with confidence >= high
 }
-`)
+`},
+	})
 	if err == nil {
 		t.Fatal("ParseV2Definitions succeeded, want missing confidence policy diagnostic")
 	}
@@ -1520,15 +1534,17 @@ rule HighConfidenceReview {
 }
 
 func TestV2RuleConfidenceMetadataRequiresLoadedConfidencePolicy(t *testing.T) {
-	_, err := ParseV2Definitions(`
-module mechanics.core;
+	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "mechanics/core.vyql", Source: `module mechanics.core;
 mechanic ruleVerb issue { solver: fact.exists }
-module rules.review;
+`},
+		{Name: "rules/review.vyql", Source: `module rules.review;
 rule HighConfidenceReview {
   meta { confidenceFloor: high }
   issue code.Review as r
 }
-`)
+`},
+	})
 	if err == nil {
 		t.Fatal("ParseV2Definitions succeeded, want missing confidence policy diagnostic")
 	}
@@ -1931,7 +1947,30 @@ func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 }
 
 func parseV2DefinitionsForTest(src string) ([]Decl, error) {
-	decls, err := ParseV2Definitions(v2CoreMechanicsForLoweringTest + "\n" + src)
+	sources := []V2DefinitionSource{{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForLoweringTest}}
+	sources = append(sources, V2DefinitionSourcesFromText("test.vyql", src)...)
+	return parseV2DefinitionSourcesForTest(sources)
+}
+
+func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, error) {
+	allSources := make([]V2DefinitionSource, 0, len(sources)+1)
+	hasMechanics := false
+	for _, source := range sources {
+		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+	}
+	if !hasMechanics {
+		allSources = append(allSources, V2DefinitionSource{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForLoweringTest})
+	}
+	allSources = append(allSources, sources...)
+	parsed := make([]V2Source, 0, len(allSources))
+	for _, source := range allSources {
+		prog, err := ParseV2(source.Source)
+		if err != nil {
+			return nil, err
+		}
+		parsed = append(parsed, V2Source{Name: source.Name, Program: prog})
+	}
+	decls, err := LowerV2DefinitionSources(parsed)
 	if err != nil {
 		return nil, err
 	}
