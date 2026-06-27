@@ -815,6 +815,25 @@ rule Bad {
 			want: "not allowed in semantic-tier query",
 		},
 		{
+			name: "binding query relation steps not implemented",
+			src: `module bindings.javascript.composed;
+binding bad {
+  query call as c where c.callee.method == "danger" references call as other where other.callee.method == "safe"
+  emit sink code.CommandExecution at args[0]
+}`,
+			want: "query relation steps need native production v2 lowering",
+		},
+		{
+			name: "composed pattern use not implemented",
+			src: `module patterns.javascript.composed;
+pattern base { node: call }
+pattern composed {
+  use base as b
+  node: call
+}`,
+			want: "composed pattern use needs native production v2 lowering",
+		},
+		{
 			name: "unknown requirement",
 			src: `module bindings.javascript.express;
 binding bad {

@@ -1207,6 +1207,8 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 			if calls := v2RequirementCallsInExpr(item.Expr); len(calls) > 0 {
 				errs = append(errs, fmt.Errorf("pattern %s: project prerequisites %s belong in requires, not where", pat.Name, strings.Join(calls, ", ")))
 			}
+		case "use":
+			errs = append(errs, fmt.Errorf("pattern %s: composed pattern use needs native production v2 lowering", pat.Name))
 		}
 	}
 	return errs
@@ -1225,6 +1227,9 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 			errs = append(errs, fmt.Errorf("binding %s: unstable query family %q requires owner and reason metadata", b.Name, b.Query.Expr.Family))
 		}
 		errs = append(errs, validateV2QueryFamilies("binding "+b.Name, *b.Query.Expr, "recognition")...)
+		if len(b.Query.Expr.Steps) > 0 {
+			errs = append(errs, fmt.Errorf("binding %s: query relation steps need native production v2 lowering", b.Name))
+		}
 		if calls := v2RequirementCallsInExpr(b.Query.Expr.Where); len(calls) > 0 {
 			errs = append(errs, fmt.Errorf("binding %s: project prerequisites %s belong in requires, not query where", b.Name, strings.Join(calls, ", ")))
 		}
