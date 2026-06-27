@@ -606,7 +606,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "guard dominates sink"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range postDominanceGuards {
@@ -615,7 +615,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "check post-dominates sink"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "post_dominates_covered_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameReceiverGuards {
@@ -624,7 +624,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "same-receiver guard covers sink"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "same_receiver_covered_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameScopeGuards {
@@ -633,7 +633,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "same-scope guard covers sink"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "same_scope_covered_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range globalGuards {
@@ -642,7 +642,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "global guard exists"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "global_covered_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		if suppressed {

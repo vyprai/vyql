@@ -1,8 +1,10 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/usg"
 )
@@ -51,6 +53,27 @@ func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
 		counts = append(counts, len(fs))
 	}
 	return counts
+}
+
+func compileFindingsV2(t *testing.T, src string, s usg.Store) []*findings.Finding {
+	t.Helper()
+	onto := solverContractOntology()
+	decls, err := parseV2DefinitionsForTest(src)
+	if err != nil {
+		t.Fatalf("parse v2: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	if len(compiled) != 1 {
+		t.Fatalf("compiled rules = %d, want 1", len(compiled))
+	}
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	return fs
 }
 
 func coverageLabel(concept, coverage string) usg.Label {
@@ -260,6 +283,42 @@ rule GlobalAction {
 
 	if c := compileEvalV2(t, rule, g); c[0] != 1 {
 		t.Fatalf("ordinary guard evidence should not satisfy global coverage, got %d", c[0])
+	}
+}
+
+func TestMatchCoverageEvidenceUsesV2ClauseSpelling(t *testing.T) {
+	rule := `
+module test;
+rule CoveredAction {
+  issue custom.Action as a
+  unless a.sameReceiver coveredBy custom.Transform
+  unless a.postDominates coveredBy custom.Transform
+  unless a.global coveredBy custom.Transform
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20"})
+	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
+
+	fs := compileFindingsV2(t, rule, g)
+	if len(fs) != 1 {
+		t.Fatalf("expected unsuppressed finding, got %d", len(fs))
+	}
+	got := map[string]bool{}
+	for _, ne := range fs[0].NegationEvidence {
+		got[ne.Clause] = true
+		if strings.Contains(ne.Clause, "_covered_by") {
+			t.Fatalf("coverage clause used legacy spelling: %+v", ne)
+		}
+	}
+	for _, want := range []string{
+		"sameReceiver coveredBy custom.Transform",
+		"postDominates coveredBy custom.Transform",
+		"global coveredBy custom.Transform",
+	} {
+		if !got[want] {
+			t.Fatalf("missing coverage evidence clause %q in %+v", want, fs[0].NegationEvidence)
+		}
 	}
 }
 

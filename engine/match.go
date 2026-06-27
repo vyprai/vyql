@@ -62,27 +62,27 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		for _, g := range dominanceGuards {
 			ok := e.dominatesGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("dominates", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, g := range postDominanceGuards {
 			ok := e.postDominatesCovered(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "post_dominates_covered_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("postDominates", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameReceiverGuards {
 			ok := e.sameReceiverGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "same_receiver_covered_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameReceiver", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameScopeGuards {
 			ok := e.sameScopeGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "same_scope_covered_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("sameScope", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, g := range globalGuards {
 			ok := e.globalGuarded(g)
-			ne = append(ne, findings.NegationEvidence{Clause: "global_covered_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: v2CoverageClause("global", g), Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		if suppressed {
@@ -98,6 +98,10 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		})
 	}
 	return out, nil
+}
+
+func v2CoverageClause(part, concept string) string {
+	return part + " coveredBy " + concept
 }
 
 func (e *Engine) matchRelationSatisfied(body *parser.MatchStmt, node string) bool {
