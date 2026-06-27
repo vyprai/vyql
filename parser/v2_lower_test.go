@@ -1879,6 +1879,12 @@ rule InvalidRefundTransition {
   query state as t where t.machine == Order and t.from == "*" and t.to == Refunded select t
 }
 
+rule StateReachability {
+  query state as start where start.concept == workflow.Open
+    reaches state as done where done.concept == workflow.Closed
+    select done
+}
+
 rule ReachableVulnerableDependency {
   query concept as p where p.concept == sbom.VulnerableDependency
     labeledAs concept as reachable where reachable.concept == sbom.ReachableSymbol
@@ -1903,11 +1909,15 @@ rule CryptoMiningEgress {
 	if transition.TargetKind != "transition" || transition.Binding != "t" || transition.Machine != "Order" || transition.FromState != "*" || transition.ToState != "Refunded" {
 		t.Fatalf("transition lowering wrong: %+v", transition)
 	}
-	labeled := decls[3].(*Rule).Body.(*MatchStmt)
+	stateReach := decls[3].(*Rule).Body.(*OrderStmt)
+	if stateReach.First.Concept != "workflow.Open" || stateReach.First.Binding != "start" || stateReach.Second.Concept != "workflow.Closed" || stateReach.Second.Binding != "done" {
+		t.Fatalf("state reach lowering wrong: %+v", stateReach)
+	}
+	labeled := decls[4].(*Rule).Body.(*MatchStmt)
 	if labeled.TargetKind != "concept" || labeled.Concept != "sbom.VulnerableDependency" || labeled.Binding != "p" || labeled.Relation != "labeledAs" || labeled.RelatedConcept != "sbom.ReachableSymbol" {
 		t.Fatalf("labeledAs lowering wrong: %+v", labeled)
 	}
-	reference := decls[4].(*Rule).Body.(*MatchStmt)
+	reference := decls[5].(*Rule).Body.(*MatchStmt)
 	if reference.TargetKind != "concept" || reference.Concept != "runtime.Connection" || reference.Binding != "c" || reference.Relation != "references" || reference.RelationProp != "dst" || reference.RelatedConcept != "threat.MiningPool" {
 		t.Fatalf("references lowering wrong: %+v", reference)
 	}

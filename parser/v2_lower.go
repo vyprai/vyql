@@ -2659,7 +2659,7 @@ func lowerV2OrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) 
 
 func v2SemanticConceptFamily(family string) bool {
 	switch family {
-	case "concept", "fact", "asset", "exposure", "principal", "privilege", "observation":
+	case "concept", "fact", "asset", "exposure", "principal", "privilege", "state", "observation":
 		return true
 	default:
 		return false
