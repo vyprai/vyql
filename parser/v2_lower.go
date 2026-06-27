@@ -607,9 +607,6 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	queryAlias := ""
 	queryNodeType := ""
 	if b.Query.Expr != nil {
-		if len(b.Query.Expr.Steps) != 0 {
-			return nil, fmt.Errorf("binding %s: query relation steps need native production v2 lowering", b.Name)
-		}
 		switch b.Query.Expr.Family {
 		case "call":
 		case "memberAccess":
@@ -619,7 +616,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		default:
 			return nil, fmt.Errorf("binding %s: inline query lowering is only implemented for single call, memberAccess, or binaryExpr queries", b.Name)
 		}
-		queryWhere = b.Query.Expr.Where
+		var err error
+		queryWhere, err = lowerV2BindingQueryRelations(b.Name, *b.Query.Expr)
+		if err != nil {
+			return nil, err
+		}
 		queryAlias = b.Query.Expr.Alias
 	} else if b.Query.Pattern == "" {
 		return nil, fmt.Errorf("binding %s: missing query", b.Name)
@@ -775,6 +776,93 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		}
 	}
 	return out, nil
+}
+
+func lowerV2BindingQueryRelations(binding string, q V2QueryExpr) (V2Expr, error) {
+	where := q.Where
+	for _, step := range q.Steps {
+		rewritten, err := lowerV2BindingQueryRelation(binding, step)
+		if err != nil {
+			return nil, err
+		}
+		where = andV2Expr(where, rewritten)
+	}
+	return where, nil
+}
+
+func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
+	if (step.Relation != "encloses" && step.Relation != "contains") || step.Family != "literal" || step.Alias == "" || step.Where == nil {
+		return nil, fmt.Errorf("binding %s: query relation step %s %s needs native production v2 lowering", binding, step.Relation, step.Family)
+	}
+	rewritten, err := rewriteV2BindingRelationRefs(step.Where, step.Alias)
+	if err != nil {
+		return nil, fmt.Errorf("binding %s: %w", binding, err)
+	}
+	return rewritten, nil
+}
+
+func rewriteV2BindingRelationRefs(expr V2Expr, alias string) (V2Expr, error) {
+	switch x := expr.(type) {
+	case nil:
+		return nil, nil
+	case V2RefExpr:
+		head, rest, ok := strings.Cut(x.Name, ".")
+		if ok && head == alias {
+			switch rest {
+			case "value", "raw", "literal":
+				return V2RefExpr{Name: "args.any.literal"}, nil
+			default:
+				return nil, fmt.Errorf("literal relation field %q needs native production v2 lowering", rest)
+			}
+		}
+		return x, nil
+	case V2UnaryExpr:
+		rewritten, err := rewriteV2BindingRelationRefs(x.X, alias)
+		if err != nil {
+			return nil, err
+		}
+		x.X = rewritten
+		return x, nil
+	case V2BinaryExpr:
+		left, err := rewriteV2BindingRelationRefs(x.Left, alias)
+		if err != nil {
+			return nil, err
+		}
+		right, err := rewriteV2BindingRelationRefs(x.Right, alias)
+		if err != nil {
+			return nil, err
+		}
+		x.Left = left
+		x.Right = right
+		return x, nil
+	case V2CallExpr:
+		for i := range x.Args {
+			rewritten, err := rewriteV2BindingRelationRefs(x.Args[i], alias)
+			if err != nil {
+				return nil, err
+			}
+			x.Args[i] = rewritten
+		}
+		for i := range x.NamedArgs {
+			rewritten, err := rewriteV2BindingRelationRefs(x.NamedArgs[i].Expr, alias)
+			if err != nil {
+				return nil, err
+			}
+			x.NamedArgs[i].Expr = rewritten
+		}
+		return x, nil
+	case V2SequenceExpr:
+		for i := range x.Items {
+			rewritten, err := rewriteV2BindingRelationRefs(x.Items[i], alias)
+			if err != nil {
+				return nil, err
+			}
+			x.Items[i] = rewritten
+		}
+		return x, nil
+	default:
+		return x, nil
+	}
 }
 
 func lowerV2FactEmit(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {

@@ -1476,13 +1476,13 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		}
 		errs = append(errs, validateV2QueryFamilies("binding "+b.Name, *b.Query.Expr, "recognition")...)
 		errs = append(errs, validateV2SchemaGatedQueryFamilies("binding "+b.Name, *b.Query.Expr, v2RequirementsHaveHardSchema(b.Requirements, "nir", "2.0"))...)
-		if len(b.Query.Expr.Steps) > 0 {
-			errs = append(errs, fmt.Errorf("binding %s: query relation steps need native production v2 lowering", b.Name))
-		}
 		if calls := v2RequirementCallsInExpr(b.Query.Expr.Where); len(calls) > 0 {
 			errs = append(errs, fmt.Errorf("binding %s: project prerequisites %s belong in requires, not query where", b.Name, strings.Join(calls, ", ")))
 		}
 		for _, step := range b.Query.Expr.Steps {
+			if !v2SupportedBindingQueryRelationStep(*b.Query.Expr, step) {
+				errs = append(errs, fmt.Errorf("binding %s: query relation step %s %s needs native production v2 lowering", b.Name, step.Relation, step.Family))
+			}
 			if calls := v2RequirementCallsInExpr(step.Where); len(calls) > 0 {
 				errs = append(errs, fmt.Errorf("binding %s: project prerequisites %s belong in requires, not query where", b.Name, strings.Join(calls, ", ")))
 			}
@@ -1524,6 +1524,14 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		}
 	}
 	return errs
+}
+
+func v2SupportedBindingQueryRelationStep(q V2QueryExpr, step V2QueryStep) bool {
+	return q.Family == "call" &&
+		(step.Relation == "encloses" || step.Relation == "contains") &&
+		step.Family == "literal" &&
+		step.Alias != "" &&
+		step.Where != nil
 }
 
 func isV2PresenceNodeBinding(b *V2BindingDecl) bool {

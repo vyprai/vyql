@@ -2108,6 +2108,47 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 	}
 }
 
+func TestV2BindingQueryEnclosesLiteralLabelsMatchedCall(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.sql;
+concept SqlExecution : sink {}
+binding sqlLiteralQuery {
+  query call as c where c.callee.method == "query"
+    encloses literal as lit where lit.value contains "SELECT" and not lit.raw contains "SafeQuery"
+  emit sink SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "matchedArg", Type: "code.Arg", Props: map[string]string{
+		"loc": "app.js:7", "vkind": "String",
+	}})
+	store.AddNode(usg.Node{ID: "matchedCall", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "db.query", "method": "query", "arg0": "matchedArg", "str_args": "SELECT * FROM users",
+	}})
+	store.AddNode(usg.Node{ID: "safeArg", Type: "code.Arg", Props: map[string]string{
+		"loc": "app.js:8", "vkind": "String",
+	}})
+	store.AddNode(usg.Node{ID: "safeCall", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:8", "callee_path": "db.query", "method": "query", "arg0": "safeArg", "str_args": "SELECT SafeQuery",
+	}})
+	store.AddNode(usg.Node{ID: "otherArg", Type: "code.Arg", Props: map[string]string{
+		"loc": "app.js:9", "vkind": "String",
+	}})
+	store.AddNode(usg.Node{ID: "otherCall", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:9", "callee_path": "db.query", "method": "query", "arg0": "otherArg", "str_args": "UPDATE users",
+	}})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "matchedArg" || got[0].Concept != "bindings.javascript.sql.SqlExecution" {
+		t.Fatalf("literal relation sink labels = %+v, want only matchedArg", got)
+	}
+}
+
 func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
 	want := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
 	if want == "" {

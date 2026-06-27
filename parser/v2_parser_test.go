@@ -1029,7 +1029,7 @@ binding bad {
   query call as c where c.callee.method == "danger" references call as other where other.callee.method == "safe"
   emit sink code.CommandExecution at args[0]
 }`,
-			want: "query relation steps need native production v2 lowering",
+			want: "query relation step references call needs native production v2 lowering",
 		},
 		{
 			name: "composed pattern use plus node not implemented",

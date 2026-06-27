@@ -1010,6 +1010,50 @@ binding sqlExecMethods {
 	}
 }
 
+func TestV2BindingQueryEnclosesLiteralLowersToValueMatch(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding sqlLiteralQuery {
+  query call as c where c.callee.method == "query"
+    encloses literal as lit where lit.value contains "SELECT" and not lit.raw contains "SafeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "sink_method" || got.Pattern != "query" {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	if len(got.ValMatches) != 1 || got.ValMatches[0] != "SELECT" {
+		t.Fatalf("ValMatches = %+v, want SELECT", got.ValMatches)
+	}
+	if len(got.ValAbsents) != 1 || got.ValAbsents[0] != "SafeQuery" {
+		t.Fatalf("ValAbsents = %+v, want SafeQuery", got.ValAbsents)
+	}
+}
+
+func TestV2BindingQueryRejectsUnsupportedRelationStep(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module bindings.javascript.composed;
+binding bad {
+  query call as c where c.callee.method == "danger" references call as other where other.callee.method == "safe"
+  emit sink code.CommandExecution at args[0]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions succeeded, want unsupported relation diagnostic")
+	}
+	if !strings.Contains(err.Error(), "query relation step references call needs native production v2 lowering") {
+		t.Fatalf("error = %v, want relation diagnostic", err)
+	}
+}
+
 func TestV2CallPredicateOrExpandsWithSharedConstraints(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.web;
