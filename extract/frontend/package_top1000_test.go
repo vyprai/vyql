@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,7 +155,7 @@ func supportedPackageCatalogLanguages(t *testing.T) []string {
 		t.Fatalf("supported package catalogs = %d (%v), want 22", len(out), out)
 	}
 	for _, lang := range out {
-		if _, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join("adapters", "packages", fmt.Sprintf("%s.vyql", lang)))); err != nil {
+		if _, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("adapters", "packages", lang))); err != nil {
 			t.Fatalf("missing catalog for %s: %v", lang, err)
 		}
 	}

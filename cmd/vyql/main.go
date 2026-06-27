@@ -502,7 +502,7 @@ func sourceNameForPath(path string) string {
 
 func v2DefinitionSourcesForRules(ruleSources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
 	var out []parser.V2DefinitionSource
-	if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+	if files, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
 		for _, file := range files {
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}

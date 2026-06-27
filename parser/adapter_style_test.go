@@ -163,7 +163,7 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 }
 
 func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
-	sources, err := datadir.ReadVYQL("adapters/javascript.vyql")
+	sources, err := datadir.ReadVYQLDir("adapters/javascript")
 	if err != nil {
 		t.Fatal(err)
 	}

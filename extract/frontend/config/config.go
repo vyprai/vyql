@@ -599,9 +599,9 @@ var (
 
 func loadProfile() configProfile {
 	configProfileOnce.Do(func() {
-		files, err := datadir.ReadVYQL("adapters/config.vyql")
+		files, err := datadir.ReadVYQLDir("adapters/config")
 		if err != nil {
-			panic("config: read adapters/config.vyql: " + err.Error())
+			panic("config: read adapters/config: " + err.Error())
 		}
 		selected := map[string]bool{}
 		for _, file := range files {
@@ -1197,7 +1197,7 @@ func metaList(meta map[string]any, key string) []string {
 
 func v2DefinitionSourcesForProfile(files []datadir.Source) []parser.V2DefinitionSource {
 	out := make([]parser.V2DefinitionSource, 0, len(files)+32)
-	if core, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+	if core, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
 		for _, file := range core {
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}

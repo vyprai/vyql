@@ -3,8 +3,9 @@ package frontend
 // Dynamic, dependency-gated package-adapter loading.
 //
 // The vyrun batch generates one package-aware adapter per (language, top-1000 package)
-// under <data root>/adapters/packages/generated/<lang>/<pkg>.vyql — ~9k mapped catalogs.
-// Loading all of them on every scan would parse thousands of files and build a spec with
+// under <data root>/adapters/packages/generated/<lang>/<pkg>/ or
+// <data root>/adapters/packages/generated/<lang>/<pkg>.vyql — ~9k mapped
+// catalogs. Loading all of them on every scan would parse thousands of files and build a spec with
 // tens of thousands of mappings for packages a project never touches. Instead this layer
 // loads ONLY the per-package adapters whose package is present in the project's dependency
 // evidence (imported modules + SBOM/manifest packages). That is the "dynamic import":
@@ -27,8 +28,7 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// generatedRoot is the directory holding the generated per-package adapter corpus,
-// laid out as <root>/<lang>/<pkg>.vyql.
+// generatedRoot is the directory holding the generated per-package adapter corpus.
 func generatedRoot() string {
 	return filepath.Join(datadir.Root(), "adapters", "packages", "generated")
 }
@@ -68,7 +68,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 		if !ok {
 			continue
 		}
-		sources, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join("adapters", "packages", "generated", tech, actual+".vyql")))
+		sources, err := readGeneratedPackageAdapterSources(tech, actual)
 		if err != nil {
 			panic(fmt.Sprintf("frontend: read generated package adapter %s/%s: %v", tech, actual, err))
 		}
@@ -90,6 +90,16 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 		return nil
 	}
 	return adaptersFromSpec(specFromBindingSet(merged))
+}
+
+func readGeneratedPackageAdapterSources(tech, pkg string) ([]datadir.Source, error) {
+	dirRel := filepath.ToSlash(filepath.Join("adapters", "packages", "generated", tech, pkg))
+	if info, err := os.Stat(filepath.Join(datadir.Root(), dirRel)); err == nil && info.IsDir() {
+		return datadir.ReadVYQLDir(dirRel)
+	} else if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	return datadir.ReadVYQL(dirRel + ".vyql")
 }
 
 func parseGeneratedPackageAdapterSource(source datadir.Source) ([]parser.Decl, error) {

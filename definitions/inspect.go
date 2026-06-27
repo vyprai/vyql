@@ -200,7 +200,7 @@ func v2DefinitionSourcesWithCore(sources []parser.V2DefinitionSource) []parser.V
 	}
 	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
 	if !hasOntology {
-		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+		if files, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}

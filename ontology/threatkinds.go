@@ -58,9 +58,9 @@ func (t ThreatKind) CAPEC(cat *taxonomy.Catalog) []string {
 // weakness families.
 func ThreatKinds() []ThreatKind {
 	tkOnce.Do(func() {
-		files, err := datadir.ReadVYQL("ontology/threatkinds.vyql")
+		files, err := datadir.ReadVYQLDir("ontology/threatkinds")
 		if err != nil {
-			panic("ontology: read ontology/threatkinds.vyql: " + err.Error())
+			panic("ontology: read ontology/threatkinds: " + err.Error())
 		}
 		decls, err := parser.ParseV2DefinitionSources(v2DefinitionSources(files))
 		if err != nil {

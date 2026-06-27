@@ -1069,11 +1069,11 @@ func loadBindingSet(tech string) *parser.BindingSet {
 	if cached, ok := bindingSetCache.Load(key); ok {
 		return cached.(*parser.BindingSet)
 	}
-	sources, err := datadir.ReadVYQL("adapters/" + tech + ".vyql")
+	sources, err := datadir.ReadVYQLDir("adapters/" + tech)
 	if err != nil {
-		panic("frontend: read adapters/" + tech + ".vyql: " + err.Error())
+		panic("frontend: read adapters/" + tech + ": " + err.Error())
 	}
-	if extra, err := datadir.ReadVYQL("adapters/packages/" + tech + ".vyql"); err == nil {
+	if extra, err := datadir.ReadVYQLDir("adapters/packages/" + tech); err == nil {
 		sources = append(sources, extra...)
 	}
 	decls, err := parseV2AdapterSources(sources)
@@ -1099,7 +1099,7 @@ func loadBindingSet(tech string) *parser.BindingSet {
 		actual, _ := bindingSetCache.LoadOrStore(key, merged)
 		return actual.(*parser.BindingSet)
 	}
-	panic("frontend: no v2 binding set in adapters/" + tech + ".vyql")
+	panic("frontend: no v2 binding set in adapters/" + tech)
 }
 
 type bindingSetCacheKey struct {
@@ -1114,7 +1114,7 @@ func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2Definiti
 		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
 	}
 	if !hasOntology {
-		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+		if files, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
@@ -3800,7 +3800,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 	return false
 }
 
-// Per-language adapter sets (loaded from vyql/adapters/*.vyql).
+// Per-language adapter sets (loaded from vyql/adapters/<tech>/).
 func ConfigAdapters() []adapters.Adapter      { return AdaptersFor("config") }
 func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern") }
 

@@ -33,7 +33,7 @@ func Root() string {
 	once.Do(func() { cached = resolve() })
 	if cached == "" {
 		panic("could not locate the data directory; set $VYQL_HOME to the path of your `vyql/` dir " +
-			"(containing ontology/concepts.vyql or ontology/concepts/, plus taxonomy/ and packs/)")
+			"(containing ontology/concepts/, plus taxonomy/ and packs/)")
 	}
 	return cached
 }
@@ -59,10 +59,7 @@ type Source struct {
 	Data []byte
 }
 
-// ReadVYQL reads a logical VyQL file. In the legacy layout this is an exact
-// file such as adapters/javascript.vyql. In the v2 migration layout that same
-// logical file may be split under adapters/javascript/, so this falls back to
-// reading that directory recursively when the exact file is absent.
+// ReadVYQL reads one exact VyQL file relative to the data root.
 func ReadVYQL(rel string) ([]Source, error) {
 	root := Root()
 	rel = filepath.ToSlash(rel)
@@ -70,18 +67,11 @@ func ReadVYQL(rel string) ([]Source, error) {
 	if cached, ok := vyqlSourceCache.Load(key); ok {
 		return cloneSourceHeaders(cached.([]Source)), nil
 	}
-	if b, err := os.ReadFile(filepath.Join(root, rel)); err == nil {
-		sources := []Source{{Name: rel, Data: b}}
-		actual, _ := vyqlSourceCache.LoadOrStore(key, sources)
-		return cloneSourceHeaders(actual.([]Source)), nil
-	} else if !os.IsNotExist(err) {
-		return nil, err
-	}
-	dirRel := strings.TrimSuffix(rel, filepath.Ext(rel))
-	sources, err := ReadVYQLDir(dirRel)
+	b, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
 		return nil, err
 	}
+	sources := []Source{{Name: rel, Data: b}}
 	actual, _ := vyqlSourceCache.LoadOrStore(key, sources)
 	return cloneSourceHeaders(actual.([]Source)), nil
 }
@@ -219,18 +209,10 @@ func isDataRoot(dir string) bool {
 	if !isDir(filepath.Join(dir, "taxonomy")) || !isDir(filepath.Join(dir, "packs")) {
 		return false
 	}
-	if isFile(filepath.Join(dir, "ontology", "concepts.vyql")) {
-		return true
-	}
 	return isDir(filepath.Join(dir, "ontology", "concepts"))
 }
 
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-func isFile(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }

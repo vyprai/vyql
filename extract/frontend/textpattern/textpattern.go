@@ -189,9 +189,9 @@ func charClasses(s string) int {
 
 func loadProfile() textPatternProfile {
 	profileOnce.Do(func() {
-		files, err := datadir.ReadVYQL("adapters/textpattern.vyql")
+		files, err := datadir.ReadVYQLDir("adapters/textpattern")
 		if err != nil {
-			panic("textpattern: read adapters/textpattern.vyql: " + err.Error())
+			panic("textpattern: read adapters/textpattern: " + err.Error())
 		}
 		selected := map[string]bool{}
 		for _, file := range files {
@@ -244,7 +244,7 @@ func loadProfile() textPatternProfile {
 
 func v2DefinitionSourcesForProfile(files []datadir.Source) []parser.V2DefinitionSource {
 	out := make([]parser.V2DefinitionSource, 0, len(files)+32)
-	if core, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
+	if core, err := datadir.ReadVYQLDir("ontology/concepts"); err == nil {
 		for _, file := range core {
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}

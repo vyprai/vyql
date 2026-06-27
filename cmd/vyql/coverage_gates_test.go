@@ -47,8 +47,8 @@ func readDataFiles(t *testing.T, sub, suffix string) map[string]string {
 func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	t.Helper()
 	out := map[string][]parser.Decl{}
-	if strings.HasSuffix(suffix, ".vyql") && !strings.HasPrefix(suffix, ".") {
-		sources, err := datadir.ReadVYQL(filepath.ToSlash(filepath.Join(sub, suffix)))
+	if !strings.HasPrefix(suffix, ".") {
+		sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join(sub, strings.TrimSuffix(suffix, ".vyql"))))
 		if err != nil {
 			t.Fatalf("read %s/%s: %v", sub, suffix, err)
 		}
@@ -147,7 +147,7 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 // (e.g. the Python `code` stdlib module) are not mistaken for concept refs.
 func TestConceptRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			if cd, ok := decl.(*parser.ConceptDecl); ok {
 				defined[cd.Name] = true
@@ -162,7 +162,7 @@ func TestConceptRefsResolveGate(t *testing.T) {
 			}
 			for ref := range refs {
 				if !defined[ref] && !defined[shortConceptName(ref)] {
-					t.Errorf("%s references concept %q which is not defined in concepts.vyql", filepath.Base(f), ref)
+					t.Errorf("%s references concept %q which is not defined in ontology/concepts", filepath.Base(f), ref)
 				}
 			}
 		}
@@ -178,7 +178,7 @@ func TestConceptRefsResolveGate(t *testing.T) {
 		}
 		for ref := range refs {
 			if !defined[ref] && !defined[shortConceptName(ref)] {
-				t.Errorf("generated adapter %s references concept %q not defined in concepts.vyql", f, ref)
+				t.Errorf("generated adapter %s references concept %q not defined in ontology/concepts", f, ref)
 			}
 		}
 	}
@@ -359,7 +359,7 @@ func countWired(sinks, wired map[string]bool) int {
 // conceptsByKind returns the set of concept names of the given kind (sink/source/control).
 func conceptsByKind(t *testing.T, kind string) map[string]bool {
 	out := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if ok && cd.Kind == kind {
@@ -372,7 +372,7 @@ func conceptsByKind(t *testing.T, kind string) map[string]bool {
 
 func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 	out := map[string]bool{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if !ok || cd.Kind != kind {
@@ -496,14 +496,14 @@ func TestEveryLanguageHasATest(t *testing.T) {
 // correct package.
 func TestThreatRefsResolveGate(t *testing.T) {
 	defined := map[string]bool{} // "pkg.Threat"
-	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds") {
 		for _, decl := range decls {
 			if td, ok := decl.(*parser.ThreatDecl); ok {
 				defined[td.QualifiedName()] = true
 			}
 		}
 	}
-	for f, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for f, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			cd, ok := decl.(*parser.ConceptDecl)
 			if !ok {
@@ -512,7 +512,7 @@ func TestThreatRefsResolveGate(t *testing.T) {
 			for _, key := range []string{"vulnerable_to", "neutralizes"} {
 				for _, ref := range fieldStringList(cd.Fields, key) {
 					if !defined[ref] {
-						t.Errorf("%s references threat %q which is not defined in threatkinds.vyql", filepath.Base(f), ref)
+						t.Errorf("%s references threat %q which is not defined in ontology/threatkinds", filepath.Base(f), ref)
 					}
 				}
 			}
@@ -524,7 +524,7 @@ func TestThreatRefsResolveGate(t *testing.T) {
 // T0.4 — no duplicate concept names, rule ids, or (package-qualified) threat names.
 func TestNoDuplicateNamesGate(t *testing.T) {
 	seen := map[string]int{}
-	for _, decls := range parseDataDecls(t, "ontology", "concepts.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "concepts") {
 		for _, decl := range decls {
 			if cd, ok := decl.(*parser.ConceptDecl); ok {
 				seen[cd.QualifiedName()]++
@@ -554,7 +554,7 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 		}
 	}
 	thr := map[string]int{}
-	for _, decls := range parseDataDecls(t, "ontology", "threatkinds.vyql") {
+	for _, decls := range parseDataDecls(t, "ontology", "threatkinds") {
 		for _, decl := range decls {
 			if td, ok := decl.(*parser.ThreatDecl); ok {
 				thr[td.QualifiedName()]++

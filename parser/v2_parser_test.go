@@ -1605,7 +1605,7 @@ concept SqlParameterization : check { covers: [path] }
 	if err != nil {
 		t.Fatalf("ParseV2 concepts: %v", err)
 	}
-	sources = append(sources, V2Source{Name: "concepts.vyql", Program: prog})
+	sources = append(sources, V2Source{Name: "ontology/concepts/generated.vyql", Program: prog})
 	for i := 0; i < n; i++ {
 		src := fmt.Sprintf(`
 module rules.generated%d;

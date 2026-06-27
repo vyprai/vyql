@@ -268,11 +268,11 @@ func adapterFingerprint(deps map[string]bool) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// statAdapterData folds the identity (path+size+mtime) of the adapter data that actually loads
-// into h: static adapters in both the flat v1-era layout and split v2 layout, plus the generated
-// per-package files for packages in deps. It deliberately avoids stat-walking the full generated
-// corpus — only the matched generated files matter, and walking all of them every scan would cost
-// what this cache saves.
+// statAdapterData folds the identity (path+size+mtime) of the adapter data that
+// actually loads into h: split v2 static adapters plus the generated per-package
+// files for packages in deps. It deliberately avoids stat-walking the full
+// generated corpus — only the matched generated files matter, and walking all of
+// them every scan would cost what this cache saves.
 func statAdapterData(h hash.Hash, deps map[string]bool) {
 	root := filepath.Join(datadir.Root(), "adapters")
 	statStaticAdapterData(h, root)
@@ -289,9 +289,15 @@ func statAdapterData(h hash.Hash, deps map[string]bool) {
 	sort.Strings(langs)
 	for _, langDir := range langs {
 		for _, p := range pkgs {
-			statFile(h, filepath.Join(langDir, p+".vyql"))
+			statGeneratedPackageAdapter(h, langDir, p)
 		}
 	}
+}
+
+func statGeneratedPackageAdapter(h hash.Hash, langDir, pkg string) {
+	dir := filepath.Join(langDir, pkg)
+	statVYQLTreeExcept(h, dir, nil)
+	statFile(h, dir+".vyql")
 }
 
 func statStaticAdapterData(h hash.Hash, root string) {
