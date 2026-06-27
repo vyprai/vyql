@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding reactNativeCliOpenUrlMiddlewareCommandExecution205 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=openURLMiddleware" and node.token contains "req.body" and node.token contains "awaitopen(url);" and not (node.token contains "newURL(url)") and not (node.token contains "parsedUrl.protocol")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "openURLMiddleware" and node.token contains "req.body" and node.token contains "awaitopen(url);" and not (node.token contains "newURL(url)") and not (node.token contains "parsedUrl.protocol")
   emit issue code.ReactNativeCliOpenUrlMiddlewareCommandExecution at node
 }

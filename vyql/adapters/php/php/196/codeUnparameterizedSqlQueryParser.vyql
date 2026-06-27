@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unparameterizedSqlQueryParser196 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=get" and node.token contains "$where_conditions['exclude']=\"a.idNOTIN({$exclude})\"" and node.token contains "$where_sql='WHERE'.join" and node.token contains "$wpdb->get_results" and not (node.token contains "array_map('absint',$exclude)") and not (node.token contains "wp_parse_id_list($exclude)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "get" and node.token contains "$where_conditions['exclude']=\"a.idNOTIN({$exclude})\"" and node.token contains "$where_sql='WHERE'.join" and node.token contains "$wpdb->get_results" and not (node.token contains "array_map('absint',$exclude)") and not (node.token contains "wp_parse_id_list($exclude)")
   emit issue code.UnparameterizedSqlQueryParser at node
 }

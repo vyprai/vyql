@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding grpcGatewayCommonNameAuthenticationBypass312 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:peer.FromContext" and node.token contains "selector:tlsInfo.State.VerifiedChains" and node.token contains "selector:chains.Subject.CommonName" and not (node.token contains "literal:grpcgateway-accept")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "peer.FromContext" and node.context.selector contains "tlsInfo.State.VerifiedChains" and node.context.selector contains "chains.Subject.CommonName" and not (node.context.literal contains "grpcgateway-accept")
   emit issue code.GrpcGatewayCommonNameAuthenticationBypass at node
 }

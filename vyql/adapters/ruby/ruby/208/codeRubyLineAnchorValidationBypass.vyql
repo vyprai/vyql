@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding rubyLineAnchorValidationBypass208 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=legal?" and node.token contains "string.to_s" and node.token contains "/^[0-9a-f]{24}$/i"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.name contains "legal?" and node.token contains "string.to_s" and node.token contains "/^[0-9a-f]{24}$/i"
   emit issue code.RubyLineAnchorValidationBypass at node
 }

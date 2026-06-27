@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding fileCheck346 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:fs.lstat" and node.token contains "call_path:fs.chown" and not (node.token contains "call_path:fs.lchown")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "fs.lstat" and node.context.callPath contains "fs.chown" and not (node.context.callPath contains "fs.lchown")
   emit issue code.FileCheck at node
 }

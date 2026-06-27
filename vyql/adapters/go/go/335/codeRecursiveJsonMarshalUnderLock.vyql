@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding recursiveJsonMarshalUnderLock335 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:MarshalJSON" and node.token contains "call_path:ps.mtx.Lock" and node.token contains "call_path:cmtjson.Marshal" and node.token contains "selector:ps" and not (node.token contains "jsonPeerState") and not (node.token contains "call_path:ps.Count") and not (node.token contains "call_path:ps.Total")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "MarshalJSON" and node.context.callPath contains "ps.mtx.Lock" and node.context.callPath contains "cmtjson.Marshal" and node.context.selector contains "ps" and not (node.token contains "jsonPeerState") and not (node.context.callPath contains "ps.Count") and not (node.context.callPath contains "ps.Total")
   emit issue code.RecursiveJsonMarshalUnderLock at node
 }

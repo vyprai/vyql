@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding escapedTerminatorWrite114 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "unescapeChar(*readPtr++);}*writePtr++=c;"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "unescapeChar(*readPtr++);}*writePtr++=c;"
   emit issue code.EscapedTerminatorWrite at node
 }

@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding configExposureReview649 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=to_dict" and node.token contains "self.__dict__.items" and node.token contains "storage[k] = v" and not (node.token contains "api")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "to_dict" and node.token contains "self.__dict__.items" and node.token contains "storage[k] = v" and not (node.token contains "api")
   emit issue code.ConfigExposureReview at node
 }

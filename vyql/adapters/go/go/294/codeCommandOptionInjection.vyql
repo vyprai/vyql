@@ -1,7 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding commandOptionInjection294 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:NodePublishVolume" and node.token contains "call:GetVolumeContext" and node.token contains "call:append" and node.token contains "call:Mount" and not (node.scopeCall.any contains "ParseIP")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "NodePublishVolume" and node.context.call contains "GetVolumeContext" and node.context.call contains "append" and node.context.call contains "Mount" and not (node.scopeCall.any contains "ParseIP")
   emit issue code.CommandOptionInjection at node
   emit sink code.CommandOptionInjectionSink at node
 }

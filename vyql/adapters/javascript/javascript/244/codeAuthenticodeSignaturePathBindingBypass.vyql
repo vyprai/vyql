@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding authenticodeSignaturePathBindingBypass244 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=verifySignature" and node.token contains "Get-AuthenticodeSignature" and node.token contains "LiteralPath" and node.token contains "call_path:parseOut" and node.token contains "selector:data.SignerCertificate.Subject" and node.token contains "publisherNames" and not (node.token contains "selector:data.Path") and not (node.token contains "call_path:path.normalize")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "verifySignature" and node.token contains "Get-AuthenticodeSignature" and node.token contains "LiteralPath" and node.context.callPath contains "parseOut" and node.context.selector contains "data.SignerCertificate.Subject" and node.token contains "publisherNames" and not (node.context.selector contains "data.Path") and not (node.context.callPath contains "path.normalize")
   emit issue code.AuthenticodeSignaturePathBindingBypass at node
 }

@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding manualZipEntryFileWrite274 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:UnzipDirectory" and node.token contains "call_path:zip.OpenReader" and node.token contains "call_path:filepath.Join" and node.token contains "selector:f.Name" and node.token contains "call_path:os.OpenFile" and node.token contains "call_arg:os.OpenFile:filePath" and node.token contains "selector:os.O_TRUNC" and not (node.token contains "call_path:os.Stat") and not (node.token contains "call_path:GetInput")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "UnzipDirectory" and node.context.callPath contains "zip.OpenReader" and node.context.callPath contains "filepath.Join" and node.context.selector contains "f.Name" and node.context.callPath contains "os.OpenFile" and node.context.callArg contains "os.OpenFile:filePath" and node.context.selector contains "os.O_TRUNC" and not (node.context.callPath contains "os.Stat") and not (node.context.callPath contains "GetInput")
   emit issue code.ManualZipEntryFileWrite at node
 }

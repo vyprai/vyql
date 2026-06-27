@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsDescriptorConfigEnumerationMissingPermission219 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doFillConnectionIdItems" and node.token contains "call:getHostConnections" and not (node.scopeCall.any contains "hasPermission") and not (node.scopeCall.any contains "checkPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillConnectionIdItems" and node.context.call contains "getHostConnections" and not (node.scopeCall.any contains "hasPermission") and not (node.scopeCall.any contains "checkPermission")
   emit issue code.JenkinsDescriptorConfigEnumerationMissingPermission at node
 }

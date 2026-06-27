@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding nestedPathInheritedPropertyPrototypePollution586 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "index:keys.__subscript" and node.token contains "index:object.__subscript" and node.token contains "expr:nextinobject" and node.token contains "call_path:__js_dynamic_property_write" and not (node.token contains "literal:__proto__") and not (node.token contains "literal:constructor") and not (node.token contains "literal:prototype")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.index contains "keys.__subscript" and node.context.index contains "object.__subscript" and node.context.expr contains "nextinobject" and node.context.callPath contains "__js_dynamic_property_write" and not (node.context.literal contains "__proto__") and not (node.context.literal contains "constructor") and not (node.context.literal contains "prototype")
   emit issue code.NestedPathInheritedPropertyPrototypePollution at node
 }

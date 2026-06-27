@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding externalResourceNamespaceControl244 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:getBuilderPod" and node.token contains "call_path:build.BuilderPodNamespace"
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getBuilderPod" and node.context.callPath contains "build.BuilderPodNamespace"
   emit issue code.ExternalResourceNamespaceControl at node
 }

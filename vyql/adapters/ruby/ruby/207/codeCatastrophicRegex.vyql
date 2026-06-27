@@ -1,7 +1,7 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding catastrophicRegex207 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=ruby" and containsAny(node.token, ["literal:\\A/([^/]+)/?([^/]+)?\\z", "literal:^/([^/]+)/?([^/]+)?$"]) and containsAny(node.token, ["call_path:path.match", "call_path:path.match.to_a"]) and not (node.token contains "call_path:path.split") and not (containsAny(node.token, ["call_path:model_id.include", "call_path:model_id.include?"]))
+  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and containsAny(node.token, ["literal:\\A/([^/]+)/?([^/]+)?\\z", "literal:^/([^/]+)/?([^/]+)?$"]) and containsAny(node.token, ["call_path:path.match", "call_path:path.match.to_a"]) and not (node.context.callPath contains "path.split") and not (containsAny(node.token, ["call_path:model_id.include", "call_path:model_id.include?"]))
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

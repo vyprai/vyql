@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding forOwnRecursiveDefaultsPrototypePollution582 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=copy" and node.token contains "call_path:lazy.forOwn" and node.token contains "subscript:target[key]" and node.token contains "call_path:defaultsDeep" and not (node.token contains "expr:key==='__proto__'")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "copy" and node.context.callPath contains "lazy.forOwn" and node.context.subscript contains "target[key]" and node.context.callPath contains "defaultsDeep" and not (node.context.expr contains "key==='__proto__'")
   emit issue code.ForOwnRecursiveDefaultsPrototypePollution at node
 }

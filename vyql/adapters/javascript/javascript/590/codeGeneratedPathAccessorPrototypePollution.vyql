@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding generatedPathAccessorPrototypePollution590 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:parsepath" and node.token contains "call_path:builder.push" and node.token contains "call_path:Function" and containsAny(node.token, ["literal:__proto__", "literal:constructor", "literal:prototype"]) and not (containsAny(node.token, ["call_path:Object.hasOwn", "call_path:hasOwnProperty"])) and not (containsAny(node.token, ["literal:removed method"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "parsepath" and node.context.callPath contains "builder.push" and node.context.callPath contains "Function" and containsAny(node.token, ["literal:__proto__", "literal:constructor", "literal:prototype"]) and not (containsAny(node.token, ["call_path:Object.hasOwn", "call_path:hasOwnProperty"])) and not (containsAny(node.token, ["literal:removed method"]))
   emit issue code.GeneratedPathAccessorPrototypePollution at node
 }

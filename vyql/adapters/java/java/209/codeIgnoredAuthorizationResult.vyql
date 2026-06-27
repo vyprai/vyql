@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding ignoredAuthorizationResult209 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call:canAlterTable" and not (node.token contains "call_path:ThriftSecurityException")
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "canAlterTable" and not (node.context.callPath contains "ThriftSecurityException")
   emit issue code.IgnoredAuthorizationResult at node
 }

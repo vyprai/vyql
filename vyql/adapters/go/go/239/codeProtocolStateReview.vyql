@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding protocolStateReview239 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "PrevATXID" and node.token contains "call:GetLastIDByNodeID"
+  query pattern presenceNode where node.scope == "function" and node.token contains "PrevATXID" and node.context.call contains "GetLastIDByNodeID"
   emit issue code.ProtocolStateReview at node
 }

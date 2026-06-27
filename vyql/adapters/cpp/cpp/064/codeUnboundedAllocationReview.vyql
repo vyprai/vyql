@@ -1,6 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding unboundedAllocationReview64 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "count_vertices+=*itf;" and node.token contains "newaiVector3D[count_vertices]" and not (node.token contains "AI_MAX_FACE_INDICES") and not (node.token contains "count_vertices>vertices.size()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "count_vertices+=*itf;" and node.token contains "newaiVector3D[count_vertices]" and not (node.token contains "AI_MAX_FACE_INDICES") and not (node.token contains "count_vertices>vertices.size()")
   emit issue code.UnboundedAllocationReview at node
 }

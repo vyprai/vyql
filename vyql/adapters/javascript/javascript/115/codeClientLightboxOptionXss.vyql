@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding clientLightboxOptionXss115 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "setVideoContent" and node.token contains "options.videoParams" and node.token contains "$('<video>',videoParams)" and not (node.token contains "startsWith('on')") and not (node.token contains "startsWith(\"on\")") and not (node.token contains "deletevideoParams[key]")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "setVideoContent" and node.token contains "options.videoParams" and node.token contains "$('<video>',videoParams)" and not (node.token contains "startsWith('on')") and not (node.token contains "startsWith(\"on\")") and not (node.token contains "deletevideoParams[key]")
   emit issue code.ClientLightboxOptionXss at node
 }

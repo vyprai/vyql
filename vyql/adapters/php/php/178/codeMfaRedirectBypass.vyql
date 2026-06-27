@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding mfaRedirectBypass178 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "MfaRequiredException" and node.token contains "redirectToMfaEndpoint" and node.token contains "!$mfaRequested" and node.token contains "!$this->isLoggedInBackendUserRequired"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "MfaRequiredException" and node.token contains "redirectToMfaEndpoint" and node.token contains "!$mfaRequested" and node.token contains "!$this->isLoggedInBackendUserRequired"
   emit issue code.MfaRedirectBypass at node
 }

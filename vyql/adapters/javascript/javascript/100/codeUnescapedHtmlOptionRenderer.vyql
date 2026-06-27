@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedHtmlOptionRenderer100 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:TomSelect" and node.token contains "selector:directoryName" and node.token contains "literal:<" and not (node.token contains "call_path:sanitizeDirectoryName") and not (node.token contains "selector:textContent") and not (node.token contains "selector:innerHTML")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "TomSelect" and node.context.selector contains "directoryName" and node.context.literal contains "<" and not (node.context.callPath contains "sanitizeDirectoryName") and not (node.context.selector contains "textContent") and not (node.context.selector contains "innerHTML")
   emit issue code.UnescapedHtmlOptionRenderer at node
 }

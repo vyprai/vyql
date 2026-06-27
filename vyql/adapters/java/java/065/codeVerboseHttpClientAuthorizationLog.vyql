@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding verboseHttpClientAuthorizationLog65 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:RestAdapter.Builder" and node.token contains "call:setLogLevel" and node.token contains "call:setLog" and node.token contains "selector:RestAdapter.LogLevel.FULL" and not (node.token contains "selector:RestAdapter.LogLevel.BASIC") and not (node.token contains "selector:RestAdapter.LogLevel.NONE")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "RestAdapter.Builder" and node.context.call contains "setLogLevel" and node.context.call contains "setLog" and node.context.selector contains "RestAdapter.LogLevel.FULL" and not (node.context.selector contains "RestAdapter.LogLevel.BASIC") and not (node.context.selector contains "RestAdapter.LogLevel.NONE")
   emit issue code.VerboseHttpClientAuthorizationLog at node
 }

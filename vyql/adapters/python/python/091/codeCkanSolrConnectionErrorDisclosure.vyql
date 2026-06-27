@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding ckanSolrConnectionErrorDisclosure91 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=run" and node.token contains "conn.search(**query)" and node.token contains "pysolr.SolrError" and node.token contains "raise SearchError" and node.token contains "SOLR returned an error running query" and node.token contains "query, e" and not (node.token contains "SolrConnectionError") and not (node.token contains "Failed to connect to server")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "run" and node.token contains "conn.search(**query)" and node.token contains "pysolr.SolrError" and node.token contains "raise SearchError" and node.token contains "SOLR returned an error running query" and node.token contains "query, e" and not (node.token contains "SolrConnectionError") and not (node.token contains "Failed to connect to server")
   emit issue code.CkanSolrConnectionErrorDisclosure at node
 }

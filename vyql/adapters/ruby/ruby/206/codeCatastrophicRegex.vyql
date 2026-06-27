@@ -1,7 +1,7 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding catastrophicRegex206 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=ruby" and containsAny(node.token, ["literal:(?:[^\\\"]|\\\\.)*?", "literal:(?:[^\\\"]|\\\\.)*)"]) and not (containsAny(node.token, ["literal:(?:[^\\\"]|\\\\\")*?", "literal:(?:[^\\\"]|\\\\\")*)"]))
+  query pattern presenceNode where node.scope == "module" and node.context.language == "ruby" and containsAny(node.token, ["literal:(?:[^\\\"]|\\\\.)*?", "literal:(?:[^\\\"]|\\\\.)*)"]) and not (containsAny(node.token, ["literal:(?:[^\\\"]|\\\\\")*?", "literal:(?:[^\\\"]|\\\\\")*)"]))
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

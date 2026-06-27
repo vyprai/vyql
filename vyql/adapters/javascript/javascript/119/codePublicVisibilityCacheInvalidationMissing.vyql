@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding publicVisibilityCacheInvalidationMissing119 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "ProxyCacheInvalidationService" and node.token contains "RUNNER_INFO_CACHE_PREFIX" and node.token contains "SandboxEvents.ARCHIVED" and node.token contains "redis.del" and not (node.token contains "SandboxEvents.PUBLIC_STATUS_UPDATED") and not (node.token contains "PUBLIC_CACHE_PREFIX")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "ProxyCacheInvalidationService" and node.token contains "RUNNER_INFO_CACHE_PREFIX" and node.token contains "SandboxEvents.ARCHIVED" and node.token contains "redis.del" and not (node.token contains "SandboxEvents.PUBLIC_STATUS_UPDATED") and not (node.token contains "PUBLIC_CACHE_PREFIX")
   emit issue code.PublicVisibilityCacheInvalidationMissing at node
 }

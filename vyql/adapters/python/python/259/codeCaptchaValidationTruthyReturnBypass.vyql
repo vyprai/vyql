@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding captchaValidationTruthyReturnBypass259 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["function_name:validate", "function_name:verify", "function_name:check"]) and node.token contains "call_path:session.get" and node.token contains "call_path:session.__setitem__" and containsAny(node.token, ["call_path:request.form[].strip", "call_path:request.form.get"]) and node.token contains "call_arg:session.get:captcha_answer" and containsAny(node.token, ["binary:__binop.and"]) and containsAny(node.token, ["binary:__binop.eq"]) and not (containsAny(node.token, ["binary:__binop.is not", "binary:value != None", "binary:answer != None"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.token, ["function_name:validate", "function_name:verify", "function_name:check"]) and node.context.callPath contains "session.get" and node.context.callPath contains "session.__setitem__" and containsAny(node.token, ["call_path:request.form[].strip", "call_path:request.form.get"]) and node.context.callArg contains "session.get:captcha_answer" and containsAny(node.token, ["binary:__binop.and"]) and containsAny(node.token, ["binary:__binop.eq"]) and not (containsAny(node.token, ["binary:__binop.is not", "binary:value != None", "binary:answer != None"]))
   emit issue code.CaptchaValidationTruthyReturnBypass at node
 }

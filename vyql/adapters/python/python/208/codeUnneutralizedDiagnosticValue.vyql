@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding unneutralizedDiagnosticValue208 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=parsedkim" and node.token contains "_warnmsg" and node.token contains "Unknown DKIM key type" and node.token contains "dkim['k']" and not (node.token contains "_warnmsg(\"Unknown DKIM key type\")")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "parsedkim" and node.token contains "_warnmsg" and node.token contains "Unknown DKIM key type" and node.token contains "dkim['k']" and not (node.token contains "_warnmsg(\"Unknown DKIM key type\")")
   emit issue code.UnneutralizedDiagnosticValue at node
 }

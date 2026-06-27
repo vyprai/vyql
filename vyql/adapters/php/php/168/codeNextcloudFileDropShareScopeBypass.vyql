@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding nextcloudFileDropShareScopeBypass168 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=getOwnerId" and node.token contains "$this->shareManager->getShareByToken($shareToken)" and node.token contains "$share->getPermissions()&\\OCP\\Constants::PERMISSION_CREATE" and node.token contains "$share->getShareOwner()" and not (node.token contains "$share->getNode()") and not (node.token contains "getFirstNodeById") and not (node.token contains "isEncrypted()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getOwnerId" and node.token contains "$this->shareManager->getShareByToken($shareToken)" and node.token contains "$share->getPermissions()&\\OCP\\Constants::PERMISSION_CREATE" and node.token contains "$share->getShareOwner()" and not (node.token contains "$share->getNode()") and not (node.token contains "getFirstNodeById") and not (node.token contains "isEncrypted()")
   emit issue code.NextcloudFileDropShareScopeBypass at node
 }

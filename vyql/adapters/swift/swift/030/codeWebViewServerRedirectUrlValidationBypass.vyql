@@ -1,6 +1,6 @@
 module bindings.swift.migration.m388f23d0;
 
 binding webViewServerRedirectUrlValidationBypass30 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=swift" and node.token contains "call_path:RequestHandler.handle" and node.token contains "call_path:decisionHandler" and node.token contains "selector:navigationAction.request" and not (node.token contains "param_label:didReceiveServerRedirectForProvisionalNavigation")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.callPath contains "RequestHandler.handle" and node.context.callPath contains "decisionHandler" and node.context.selector contains "navigationAction.request" and not (node.token contains "param_label:didReceiveServerRedirectForProvisionalNavigation")
   emit issue code.WebViewServerRedirectUrlValidationBypass at node
 }

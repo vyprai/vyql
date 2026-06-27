@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding codiadFilemanagerSearchCommandInjection100 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=Filemanager" and node.token contains "$this->query=$get['query']" and node.token contains "$this->search_string=$post['search_string']" and node.token contains "$this->search_file_type=$post['search_file_type']" and node.token contains "shell_exec" and node.token contains "find -L" and not (node.token contains "$this->query=escapeshellarg($get['query'])") and not (node.token contains "$this->search_string=escapeshellarg($post['search_string'])") and not (node.token contains "$this->search_file_type=escapeshellarg($post['search_file_type'])")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "Filemanager" and node.token contains "$this->query=$get['query']" and node.token contains "$this->search_string=$post['search_string']" and node.token contains "$this->search_file_type=$post['search_file_type']" and node.token contains "shell_exec" and node.token contains "find -L" and not (node.token contains "$this->query=escapeshellarg($get['query'])") and not (node.token contains "$this->search_string=escapeshellarg($post['search_string'])") and not (node.token contains "$this->search_file_type=escapeshellarg($post['search_file_type'])")
   emit issue code.CodiadFilemanagerSearchCommandInjection at node
 }

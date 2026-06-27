@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding storedHtmlWrite99 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and containsAny(node.token, ["call_path:copyIn", "call_path:Promise.promisify"]) and node.token contains "call_path:path.extname" and node.token contains "selector:file.path" and node.token contains "selector:info.extension" and not (node.token contains "call_path:sanitizeSvg") and not (node.token contains "call_path:DOMPurify")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.token, ["call_path:copyIn", "call_path:Promise.promisify"]) and node.context.callPath contains "path.extname" and node.context.selector contains "file.path" and node.context.selector contains "info.extension" and not (node.context.callPath contains "sanitizeSvg") and not (node.context.callPath contains "DOMPurify")
   emit issue code.StoredHtmlWrite at node
 }

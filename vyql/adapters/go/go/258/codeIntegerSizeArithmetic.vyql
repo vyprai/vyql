@@ -1,7 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding integerSizeArithmetic258 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:readBytes" and node.token contains "call:ReadLong" and node.token contains "call:int" and node.token contains "call:make" and not (node.token contains "selector:math.MaxInt")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readBytes" and node.context.call contains "ReadLong" and node.context.call contains "int" and node.context.call contains "make" and not (node.context.selector contains "math.MaxInt")
   emit issue code.IntegerSizeArithmetic at node
   emit sink code.IntegerSizeArithmeticSink at node
 }

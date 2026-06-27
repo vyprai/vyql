@@ -1,7 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex551 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "literal:[0-9]*\\.?[0-9]*" and node.token contains "call_path:current.match" and not (node.token contains "literal:(\\.[0-9]*)?")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "[0-9]*\\.?[0-9]*" and node.context.callPath contains "current.match" and not (node.context.literal contains "(\\.[0-9]*)?")
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

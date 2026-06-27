@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding certValidationDisabled626 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "this.rejectUnauthorized=opts.rejectUnauthorized===undefined?null:opts.rejectUnauthorized" and node.token contains "rejectUnauthorized:this.rejectUnauthorized" and not (node.token contains "opts.rejectUnauthorized===undefined?true:opts.rejectUnauthorized")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "this.rejectUnauthorized=opts.rejectUnauthorized===undefined?null:opts.rejectUnauthorized" and node.token contains "rejectUnauthorized:this.rejectUnauthorized" and not (node.token contains "opts.rejectUnauthorized===undefined?true:opts.rejectUnauthorized")
   emit issue code.CertValidationDisabled at node
 }

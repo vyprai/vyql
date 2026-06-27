@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding incompleteGeneratedJsIdentifierReservedWords268 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "JS_RESERVED_WORDS" and node.token contains "isValidJsIdentifier" and node.token contains "compileShellApiFunctionName" and node.token contains "dbgateApi.${functionName}" and node.token contains "'enum'" and not (node.token contains "'eval'") and not (node.token contains "'arguments'")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "JS_RESERVED_WORDS" and node.token contains "isValidJsIdentifier" and node.token contains "compileShellApiFunctionName" and node.token contains "dbgateApi.${functionName}" and node.token contains "'enum'" and not (node.token contains "'eval'") and not (node.token contains "'arguments'")
   emit issue code.IncompleteGeneratedJsIdentifierReservedWords at node
 }

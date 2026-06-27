@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding prefixWildcardKeyEnumeration144 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "db.findKeys(\"pad:\"+padId+\"*\"" and node.token contains "db.get(records[key]" and not (node.token contains "\"pad:\"+padId+\":*\"")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "db.findKeys(\"pad:\"+padId+\"*\"" and node.token contains "db.get(records[key]" and not (node.token contains "\"pad:\"+padId+\":*\"")
   emit issue code.PrefixWildcardKeyEnumeration at node
 }

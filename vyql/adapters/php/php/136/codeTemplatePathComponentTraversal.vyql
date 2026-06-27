@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding templatePathComponentTraversal136 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "templates/{$type}/{$language}" and node.token contains "{$name}.tpl" and not (node.token contains "basename($type)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "templates/{$type}/{$language}" and node.token contains "{$name}.tpl" and not (node.token contains "basename($type)")
   emit issue code.TemplatePathComponentTraversal at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unrestrictedRequestParamDeserialization65 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "param('params'" and node.token contains "unserialize($params" and not (node.token contains "substr") and not (node.token contains "a:")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "param('params'" and node.token contains "unserialize($params" and not (node.token contains "substr") and not (node.token contains "a:")
   emit issue code.UnrestrictedRequestParamDeserialization at node
 }

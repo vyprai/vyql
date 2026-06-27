@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding callerControlledFilenameComponentPathTraversal234 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:buildFilename", "function_name:buildFileName", "function_name:makeFilename", "function_name:makeFileName"]) and node.token contains "identifier:appName" and node.token contains "identifier:appVersion" and containsAny(node.token, ["identifier:filename", "identifier:fileName"]) and not (containsAny(node.token, ["call_path:Util.rawEncode", "call_path:URLEncoder.encode", "call_path:encodeURIComponent", "call_path:FilenameUtils.getName", "call_path:Paths.get"]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:buildFilename", "function_name:buildFileName", "function_name:makeFilename", "function_name:makeFileName"]) and node.context.identifier contains "appName" and node.context.identifier contains "appVersion" and containsAny(node.token, ["identifier:filename", "identifier:fileName"]) and not (containsAny(node.token, ["call_path:Util.rawEncode", "call_path:URLEncoder.encode", "call_path:encodeURIComponent", "call_path:FilenameUtils.getName", "call_path:Paths.get"]))
   emit issue code.CallerControlledFilenameComponentPathTraversal at node
 }

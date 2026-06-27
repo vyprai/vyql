@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding gsonObjectTypeAdapterRecursiveRead137 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "selector:ObjectTypeAdapter.FACTORY" and node.token contains "identifier:read" and node.token contains "call:read" and node.token contains "call_path:list.add" and node.token contains "call_path:map.put" and not (node.scopeCall.any contains "tryBeginNesting") and not (node.scopeCall.any contains "readTerminal")
+  query pattern presenceNode where node.scope == "function" and node.context.selector contains "ObjectTypeAdapter.FACTORY" and node.context.identifier contains "read" and node.context.call contains "read" and node.context.callPath contains "list.add" and node.context.callPath contains "map.put" and not (node.scopeCall.any contains "tryBeginNesting") and not (node.scopeCall.any contains "readTerminal")
   emit issue code.GsonObjectTypeAdapterRecursiveRead at node
 }

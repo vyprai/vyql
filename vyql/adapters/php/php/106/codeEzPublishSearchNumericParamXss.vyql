@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding ezPublishSearchNumericParamXss106 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "call_path:eZSearch.search" and node.token contains "call_path:$tpl.setVariable" and node.token contains "assign_call:$searchSectionID:$http.variable" and node.token contains "assign_literal:$searchSectionID:SectionID" and node.token contains "call_arg:eZSearch.search:array" and node.token contains "call_arg:$tpl.setVariable:$searchSectionID" and not (node.token contains "cast_call_literal:int:$http.variable:SectionID")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "eZSearch.search" and node.context.callPath contains "$tpl.setVariable" and node.token contains "assign_call:$searchSectionID:$http.variable" and node.token contains "assign_literal:$searchSectionID:SectionID" and node.context.callArg contains "eZSearch.search:array" and node.context.callArg contains "$tpl.setVariable:$searchSectionID" and not (node.token contains "cast_call_literal:int:$http.variable:SectionID")
   emit issue code.EzPublishSearchNumericParamXss at node
 }

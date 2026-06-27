@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding autoActiveSignupAccount111 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=signup" and node.token contains "UserStatus.ACTIVE" and node.token contains "UserRole.USER" and node.token contains "generate_keypair" and node.token contains "create_user_with_keypair" and not (node.token contains "UserStatus.INACTIVE")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "signup" and node.token contains "UserStatus.ACTIVE" and node.token contains "UserRole.USER" and node.token contains "generate_keypair" and node.token contains "create_user_with_keypair" and not (node.token contains "UserStatus.INACTIVE")
   emit issue code.AutoActiveSignupAccount at node
 }

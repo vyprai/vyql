@@ -1,7 +1,7 @@
 module bindings.php.migration.mfbe84119;
 
 binding commandOptionInjection129 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "escapeshellarg($fingerprint)" and node.token contains "$operation='--delete-secret-key'.escapeshellarg($fingerprint)" and not (node.token contains "$operation='--delete-secret-key--'.escapeshellarg($fingerprint)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "escapeshellarg($fingerprint)" and node.token contains "$operation='--delete-secret-key'.escapeshellarg($fingerprint)" and not (node.token contains "$operation='--delete-secret-key--'.escapeshellarg($fingerprint)")
   emit issue code.CommandOptionInjection at node
   emit sink code.CommandOptionInjectionSink at node
 }

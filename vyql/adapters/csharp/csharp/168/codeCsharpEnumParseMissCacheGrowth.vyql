@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding csharpEnumParseMissCacheGrowth168 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "ConcurrentDictionary<string,Enum>" and node.token contains "GetOrAdd(lowerStringValue" and node.token contains "TryParseStringValueToEnum_Uncached" and node.token contains "returnparseSucceededForDictionary?(Enum)parsedValueForDictionary:null;" and not (node.token contains "BuildCacheDictionaryForParseStringValue") and not (node.token contains "TryGetValue(lowerStringValue")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.token contains "ConcurrentDictionary<string,Enum>" and node.token contains "GetOrAdd(lowerStringValue" and node.token contains "TryParseStringValueToEnum_Uncached" and node.token contains "returnparseSucceededForDictionary?(Enum)parsedValueForDictionary:null;" and not (node.token contains "BuildCacheDictionaryForParseStringValue") and not (node.token contains "TryGetValue(lowerStringValue")
   emit issue code.CsharpEnumParseMissCacheGrowth at node
 }

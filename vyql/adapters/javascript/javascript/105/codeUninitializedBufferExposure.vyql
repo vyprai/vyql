@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding uninitializedBufferExposure105 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "selector:name.encode" and node.token contains "call_path:Buffer.allocUnsafe" and node.token contains "call_path:name.encodingLength" and node.token contains "call_path:str.replace" and node.token contains "selector:name.encodingLength" and node.token contains "call_path:Buffer.byteLength" and not (node.token contains "call_arg:Buffer.byteLength:n.replace")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.selector contains "name.encode" and node.context.callPath contains "Buffer.allocUnsafe" and node.context.callPath contains "name.encodingLength" and node.context.callPath contains "str.replace" and node.context.selector contains "name.encodingLength" and node.context.callPath contains "Buffer.byteLength" and not (node.context.callArg contains "Buffer.byteLength:n.replace")
   emit issue code.UninitializedBufferExposure at node
 }

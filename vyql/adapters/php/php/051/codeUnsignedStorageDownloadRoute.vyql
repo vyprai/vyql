@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unsignedStorageDownloadRoute51 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "call_path:Route.get" and node.token contains "call_path:Route.get.where" and node.token contains "call_arg:Route.get.where:.*" and node.token contains "call_path:Storage.disk.path" and node.token contains "call_path:response.download" and node.token contains "call_path:response.download.deleteFileAfterSend" and containsAny(node.token, ["literal:{path}", "literal:{file}", "literal:{filename}"]) and not (node.token contains "call_path:Route.get.middleware") and not (containsAny(node.token, ["literal:signed", "literal:auth", "literal:can:"]))
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "Route.get" and node.context.callPath contains "Route.get.where" and node.context.callArg contains "Route.get.where:.*" and node.context.callPath contains "Storage.disk.path" and node.context.callPath contains "response.download" and node.context.callPath contains "response.download.deleteFileAfterSend" and containsAny(node.token, ["literal:{path}", "literal:{file}", "literal:{filename}"]) and not (node.context.callPath contains "Route.get.middleware") and not (containsAny(node.token, ["literal:signed", "literal:auth", "literal:can:"]))
   emit issue code.UnsignedStorageDownloadRoute at node
 }

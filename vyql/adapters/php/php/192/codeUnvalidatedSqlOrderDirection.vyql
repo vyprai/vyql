@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unvalidatedSqlOrderDirection192 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=processOrderBy" and node.token contains "ORDERBY" and node.token contains "$orderBy['direction']" and not (node.token contains "QUERY_ORDER_DESC") and not (node.token contains "QUERY_ORDER_ASC")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "processOrderBy" and node.token contains "ORDERBY" and node.token contains "$orderBy['direction']" and not (node.token contains "QUERY_ORDER_DESC") and not (node.token contains "QUERY_ORDER_ASC")
   emit issue code.UnvalidatedSqlOrderDirection at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding quickAppsUserRealNameStoredXss98 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=User" and node.token contains "StaticCacheTrait" and node.token contains "TableRegistry::get('User.Users')->updateToken($this)" and node.token contains "ROLE_ID_ADMINISTRATOR" and node.token contains "Security::hash($password,'md5',true)" and not (node.token contains "returnh($name)")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "User" and node.token contains "StaticCacheTrait" and node.token contains "TableRegistry::get('User.Users')->updateToken($this)" and node.token contains "ROLE_ID_ADMINISTRATOR" and node.token contains "Security::hash($password,'md5',true)" and not (node.token contains "returnh($name)")
   emit issue code.QuickAppsUserRealNameStoredXss at node
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unvalidatedRatingRange58 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:rateTopic" and node.token contains "call_path:registry.rateResource" and node.token contains "call_path:genericArtifact.getPath" and not (node.token contains "MAX_RATE") and not (node.token contains "MIN_RATE")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "rateTopic" and node.context.callPath contains "registry.rateResource" and node.context.callPath contains "genericArtifact.getPath" and not (node.token contains "MAX_RATE") and not (node.token contains "MIN_RATE")
   emit issue code.UnvalidatedRatingRange at node
 }

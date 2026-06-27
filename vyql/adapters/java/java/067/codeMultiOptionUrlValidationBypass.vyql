@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding multiOptionUrlValidationBypass67 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:isValidURL" and node.token contains "call_path:isURLRelative" and node.token contains "call_path:buildAbsoluteURL" and not (node.token contains "call_path:validateCallbackURL")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "isValidURL" and node.context.callPath contains "isURLRelative" and node.context.callPath contains "buildAbsoluteURL" and not (node.context.callPath contains "validateCallbackURL")
   emit issue code.MultiOptionUrlValidationBypass at node
 }

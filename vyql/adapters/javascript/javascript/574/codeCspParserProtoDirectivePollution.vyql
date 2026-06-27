@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding cspParserProtoDirectivePollution574 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "constresult:PolicyResult={}" and node.token contains "directiveKey===\"__proto__\"" and node.token contains "Object.defineProperty(result,directiveKey" and node.token contains "value:directiveValue" and not (node.token contains "newMap()") and not (node.token contains "result.set(directiveKey,directiveValue)")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "constresult:PolicyResult={}" and node.token contains "directiveKey===\"__proto__\"" and node.token contains "Object.defineProperty(result,directiveKey" and node.token contains "value:directiveValue" and not (node.token contains "newMap()") and not (node.token contains "result.set(directiveKey,directiveValue)")
   emit issue code.CspParserProtoDirectivePollution at node
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding dropdownEntryLabelInnerHtmlXss108 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=addDropDownEntry" and node.token contains "selector:li.innerHTML" and node.token contains "literal:dropdown-item" and node.token contains "identifier:label" and not (node.token contains "call_arg:sanitizeHTML:label") and not (node.token contains "selector:textContent")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "addDropDownEntry" and node.context.selector contains "li.innerHTML" and node.context.literal contains "dropdown-item" and node.context.identifier contains "label" and not (node.context.callArg contains "sanitizeHTML:label") and not (node.context.selector contains "textContent")
   emit issue code.DropdownEntryLabelInnerHtmlXss at node
 }

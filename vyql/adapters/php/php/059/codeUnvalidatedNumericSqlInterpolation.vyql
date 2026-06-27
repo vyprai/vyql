@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation59 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "getMessageParam('iid'" and node.token contains "item_id=$this->iid" and node.token contains "db_query(" and not (node.token contains "is_numeric($this->iid)")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.token contains "getMessageParam('iid'" and node.token contains "item_id=$this->iid" and node.token contains "db_query(" and not (node.token contains "is_numeric($this->iid)")
   emit issue code.UnvalidatedNumericSqlInterpolation at node
 }

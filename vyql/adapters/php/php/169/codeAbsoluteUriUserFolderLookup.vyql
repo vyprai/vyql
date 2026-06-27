@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding absoluteUriUserFolderLookup169 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=AbsoluteUri", "name=AbsoluteURI", "name=AbsolutePath"]) and node.token contains "call_path:explode" and node.token contains "call_path:$this.rootFolder.getUserFolder" and not (node.token contains "call_path:$this.userSession.getUser") and not (node.token contains "call_path:$user.getUID")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["name=AbsoluteUri", "name=AbsoluteURI", "name=AbsolutePath"]) and node.context.callPath contains "explode" and node.context.callPath contains "$this.rootFolder.getUserFolder" and not (node.context.callPath contains "$this.userSession.getUser") and not (node.context.callPath contains "$user.getUID")
   emit issue code.AbsoluteUriUserFolderLookup at node
 }

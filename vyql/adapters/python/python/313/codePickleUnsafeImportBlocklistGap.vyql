@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding pickleUnsafeImportBlocklistGap313 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:unsafe_imports" and containsAny(node.token, ["literal:runpy", "literal:cProfile", "literal:marshal", "literal:types", "literal:subprocess", "literal:os"]) and not (node.token contains "literal:pydoc")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "unsafe_imports" and containsAny(node.token, ["literal:runpy", "literal:cProfile", "literal:marshal", "literal:types", "literal:subprocess", "literal:os"]) and not (node.context.literal contains "pydoc")
   emit issue code.PickleUnsafeImportBlocklistGap at node
 }

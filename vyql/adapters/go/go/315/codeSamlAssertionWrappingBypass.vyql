@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding samlAssertionWrappingBypass315 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:etreeutils.NSDetatch" and node.token contains "call_path:v.context.Validate" and node.token contains "call_path:elt.RemoveChild" and node.token contains "call_path:elt.AddChild" and not (node.token contains "call_path:elt.ChildElements") and not (node.token contains "call_path:child.NamespaceURI") and not (node.token contains "var_name:errMultipleAssertions")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "etreeutils.NSDetatch" and node.context.callPath contains "v.context.Validate" and node.context.callPath contains "elt.RemoveChild" and node.context.callPath contains "elt.AddChild" and not (node.context.callPath contains "elt.ChildElements") and not (node.context.callPath contains "child.NamespaceURI") and not (node.token contains "var_name:errMultipleAssertions")
   emit issue code.SamlAssertionWrappingBypass at node
 }

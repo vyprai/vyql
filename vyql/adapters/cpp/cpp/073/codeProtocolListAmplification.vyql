@@ -1,6 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding protocolListAmplification73 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "elementSize" and node.token contains "ElementSize::VOID" and node.token contains "ListReader" and not (node.token contains "amplifiedRead")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "elementSize" and node.token contains "ElementSize::VOID" and node.token contains "ListReader" and not (node.token contains "amplifiedRead")
   emit issue code.ProtocolListAmplification at node
 }

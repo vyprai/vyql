@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding shellTruePackageManagerProbe245 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=check_for_libaio_pkg" and node.token contains "call_path:distutils.spawn.find_executable" and node.token contains "call_path:subprocess.Popen" and node.token contains "identifier:shell" and node.token contains "literal:True" and node.token contains "identifier:pkgmgr" and node.token contains "identifier:lib"
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "check_for_libaio_pkg" and node.context.callPath contains "distutils.spawn.find_executable" and node.context.callPath contains "subprocess.Popen" and node.context.identifier contains "shell" and node.context.literal contains "True" and node.context.identifier contains "pkgmgr" and node.context.identifier contains "lib"
   emit issue code.ShellTruePackageManagerProbe at node
 }

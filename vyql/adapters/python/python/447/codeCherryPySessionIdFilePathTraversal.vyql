@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding cherryPySessionIdFilePathTraversal447 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_name=FileSession" and node.token contains "name=_get_file_path" and node.token contains "os.path.join(self.storage_path,self.SESSION_PREFIX+self.id)" and not (node.token contains "os.path.normpath(f).startswith(self.storage_path)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "class_name=FileSession" and node.context.name contains "_get_file_path" and node.token contains "os.path.join(self.storage_path,self.SESSION_PREFIX+self.id)" and not (node.token contains "os.path.normpath(f).startswith(self.storage_path)")
   emit issue code.CherryPySessionIdFilePathTraversal at node
 }

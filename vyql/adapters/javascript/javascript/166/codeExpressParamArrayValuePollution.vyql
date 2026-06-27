@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding expressParamArrayValuePollution166 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "selector:req.params" and node.token contains "selector:req.body" and node.token contains "selector:req.query" and not (node.token contains "call_path:Array.isArray")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "req.params" and node.context.selector contains "req.body" and node.context.selector contains "req.query" and not (node.context.callPath contains "Array.isArray")
   emit issue code.ExpressParamArrayValuePollution at node
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding privilegedContainer109 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and containsAny(node.token, ["literal:docker run -dt", "literal:dockerrun-dt"]) and containsAny(node.token, ["literal:--privileged=true", "literal:--cap-add SYS_ADMIN", "literal:--cap-addSYS_ADMIN", "literal:--device /dev/fuse", "literal:--device/dev/fuse"]) and node.token contains "call_path:exec" and not (node.token contains "selector:appConfig.capabilities") and not (node.token contains "literal:--privileged=false")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.token, ["literal:docker run -dt", "literal:dockerrun-dt"]) and containsAny(node.token, ["literal:--privileged=true", "literal:--cap-add SYS_ADMIN", "literal:--cap-addSYS_ADMIN", "literal:--device /dev/fuse", "literal:--device/dev/fuse"]) and node.context.callPath contains "exec" and not (node.context.selector contains "appConfig.capabilities") and not (node.context.literal contains "--privileged=false")
   emit issue code.PrivilegedContainer at node
 }

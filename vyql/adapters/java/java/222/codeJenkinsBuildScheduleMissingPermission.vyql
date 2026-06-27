@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsBuildScheduleMissingPermission222 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doBuild" and node.token contains "call_path:Jenkins.get.getQueue.schedule" and node.token contains "identifier:project" and not (node.scopeCall.any contains "hasPermission") and not (node.scopeCall.any contains "checkPermission") and not (node.token contains "selector:Item.BUILD")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doBuild" and node.context.callPath contains "Jenkins.get.getQueue.schedule" and node.context.identifier contains "project" and not (node.scopeCall.any contains "hasPermission") and not (node.scopeCall.any contains "checkPermission") and not (node.context.selector contains "Item.BUILD")
   emit issue code.JenkinsBuildScheduleMissingPermission at node
 }

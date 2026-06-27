@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding uncheckedEncodedLengthArithmetic162 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "input.SkipBytes(count*sizeof(" and not (node.token contains "checked(count*sizeof(")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.token contains "input.SkipBytes(count*sizeof(" and not (node.token contains "checked(count*sizeof(")
   emit issue code.UncheckedEncodedLengthArithmetic at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unescapedDiagnosticHtml140 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "$this->last_headers" and node.token contains "$log.=$this->last_headers" and node.token contains "$result['log']=$log" and not (node.token contains "$log.=htmlentities($this->last_headers")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "$this->last_headers" and node.token contains "$log.=$this->last_headers" and node.token contains "$result['log']=$log" and not (node.token contains "$log.=htmlentities($this->last_headers")
   emit issue code.UnescapedDiagnosticHtml at node
 }

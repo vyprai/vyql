@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding absolutePathDisclosure388 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "getAbsolutePath" and node.token contains "move_uploaded_file(" and not (node.token contains "@move_uploaded_file(")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "getAbsolutePath" and node.token contains "move_uploaded_file(" and not (node.token contains "@move_uploaded_file(")
   emit issue code.AbsolutePathDisclosure at node
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding commandStringWrapperExecution79 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "literal:/bin/sh" and node.token contains "literal:-c" and node.token contains "identifier:scriptPath" and node.token contains "expr:scriptPath+ALERT_TITLE_OPTION" and node.token contains "call_path:ProcessUtils.executeScript" and not (node.token contains "call_path:File") and not (node.scopeCall.any contains "exists") and not (node.scopeCall.any contains "isFile")
+  query pattern presenceNode where node.scope == "function" and node.context.literal contains "/bin/sh" and node.context.literal contains "-c" and node.context.identifier contains "scriptPath" and node.context.expr contains "scriptPath+ALERT_TITLE_OPTION" and node.context.callPath contains "ProcessUtils.executeScript" and not (node.context.callPath contains "File") and not (node.scopeCall.any contains "exists") and not (node.scopeCall.any contains "isFile")
   emit issue code.CommandStringWrapperExecution at node
 }

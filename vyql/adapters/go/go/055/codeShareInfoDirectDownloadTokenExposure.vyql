@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding shareInfoDirectDownloadTokenExposure55 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "function_name:shareInfoHandler" and node.token contains "call_path:store.Share.GetByHash" and node.token contains "selector:commonShare.DownloadURL" and node.token contains "selector:shareLink.Token" and node.token contains "call_arg:getShareURL:true" and node.token contains "call_arg:getShareURL:shareLink.Token" and node.token contains "call_path:renderJSON"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.functionName contains "shareInfoHandler" and node.context.callPath contains "store.Share.GetByHash" and node.context.selector contains "commonShare.DownloadURL" and node.context.selector contains "shareLink.Token" and node.context.callArg contains "getShareURL:true" and node.context.callArg contains "getShareURL:shareLink.Token" and node.context.callPath contains "renderJSON"
   emit issue code.ShareInfoDirectDownloadTokenExposure at node
 }

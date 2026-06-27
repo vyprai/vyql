@@ -1252,16 +1252,26 @@ func v2PresenceValuePrefix(field string) string {
 	switch field {
 	case "language":
 		return "lang="
+	case "name":
+		return "name="
 	case "callPath":
 		return "call_path:"
 	case "call":
 		return "call:"
+	case "callArg":
+		return "call_arg:"
+	case "callOrder":
+		return "call_order:"
 	case "functionName":
 		return "function_name:"
 	case "className":
 		return "class_name:"
 	case "classBase":
 		return "class_base:"
+	case "classAttribute":
+		return "class_attribute:"
+	case "methodAttribute":
+		return "method_attribute:"
 	case "selector":
 		return "selector:"
 	case "literal":
@@ -1272,10 +1282,38 @@ func v2PresenceValuePrefix(field string) string {
 		return "expr:"
 	case "annotation":
 		return "annotation:"
+	case "attrPath":
+		return "attr_path:"
+	case "paramName":
+		return "param_name:"
+	case "paramType":
+		return "param_type:"
+	case "binary":
+		return "binary:"
+	case "assign":
+		return "assign:"
+	case "subscript":
+		return "subscript:"
+	case "field":
+		return "field:"
+	case "macroName":
+		return "macro_name:"
+	case "macroBody":
+		return "macro_body:"
+	case "catchType":
+		return "catch_type:"
 	case "prop":
 		return "prop:"
 	case "index":
 		return "index:"
+	case "indexKey":
+		return "index_key:"
+	case "return":
+		return "return:"
+	case "returnCallPath":
+		return "return_call_path:"
+	case "returnIdentifier":
+		return "return_identifier:"
 	default:
 		return ""
 	}

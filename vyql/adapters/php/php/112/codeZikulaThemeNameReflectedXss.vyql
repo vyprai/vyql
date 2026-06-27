@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding zikulaThemeNameReflectedXss112 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=setasdefault" and node.token contains "FormUtil::getPassedValue('themename'" and node.token contains "$this->view->assign('themename',$themename)" and node.token contains "theme_admin_setasdefault.tpl" and not (node.token contains "FILTER_SANITIZE_STRING")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "setasdefault" and node.token contains "FormUtil::getPassedValue('themename'" and node.token contains "$this->view->assign('themename',$themename)" and node.token contains "theme_admin_setasdefault.tpl" and not (node.token contains "FILTER_SANITIZE_STRING")
   emit issue code.ZikulaThemeNameReflectedXss at node
 }

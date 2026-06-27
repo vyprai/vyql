@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding dtlsEpochZeroApplicationData311 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:handleIncomingPacket" and node.token contains "call_path:h.Unmarshal" and node.token contains "selector:h.epoch" and node.token contains "call_path:c.state.cipherSuite.decrypt" and node.token contains "call_path:r.Unmarshal" and node.token contains "selector:c.decrypted" and not (node.token contains "binary:h.epoch==0") and not (node.token contains "binary:0==h.epoch")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "handleIncomingPacket" and node.context.callPath contains "h.Unmarshal" and node.context.selector contains "h.epoch" and node.context.callPath contains "c.state.cipherSuite.decrypt" and node.context.callPath contains "r.Unmarshal" and node.context.selector contains "c.decrypted" and not (node.context.binary contains "h.epoch==0") and not (node.context.binary contains "0==h.epoch")
   emit issue code.DtlsEpochZeroApplicationData at node
 }

@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding serverSideBrowserActiveHtmlRendering314 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=_render_with_browser" and node.token contains "sync_playwright" and node.token contains "chromium.launch" and node.token contains "browser.new_context(" and node.token contains "render_html=self._get_render_html_text()" and node.token contains "page.set_content(render_html" and not (node.token contains "java_script_enabled=False")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "_render_with_browser" and node.token contains "sync_playwright" and node.token contains "chromium.launch" and node.token contains "browser.new_context(" and node.token contains "render_html=self._get_render_html_text()" and node.token contains "page.set_content(render_html" and not (node.token contains "java_script_enabled=False")
   emit issue code.ServerSideBrowserActiveHtmlRendering at node
 }

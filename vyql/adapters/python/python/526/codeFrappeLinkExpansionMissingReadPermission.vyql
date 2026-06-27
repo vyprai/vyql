@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding frappeLinkExpansionMissingReadPermission526 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=python" and node.token contains "name=get_values_for_link_and_dynamic_link_fields" and node.token contains "call_path:meta.get_link_fields" and node.token contains "call_path:meta.get_dynamic_link_fields" and node.token contains "call_path:frappe.get_doc" and node.token contains "call_path:doc_dict.update" and not (node.token contains "call_path:link_doc.apply_fieldlevel_read_permissions")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.name contains "get_values_for_link_and_dynamic_link_fields" and node.context.callPath contains "meta.get_link_fields" and node.context.callPath contains "meta.get_dynamic_link_fields" and node.context.callPath contains "frappe.get_doc" and node.context.callPath contains "doc_dict.update" and not (node.context.callPath contains "link_doc.apply_fieldlevel_read_permissions")
   emit issue code.FrappeLinkExpansionMissingReadPermission at node
 }

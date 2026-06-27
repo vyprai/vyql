@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsStaplerStateChangeMissingPost238 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:doSave", "function_name:doSubmit", "function_name:doConfigure"]) and containsAny(node.token, ["call:bindJSON", "call:save", "call:configure"]) and node.token contains "call:checkPermission" and not (node.token contains "annotation:RequirePOST") and not (node.token contains "annotation:POST")
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:doSave", "function_name:doSubmit", "function_name:doConfigure"]) and containsAny(node.token, ["call:bindJSON", "call:save", "call:configure"]) and node.context.call contains "checkPermission" and not (node.context.annotation contains "RequirePOST") and not (node.context.annotation contains "POST")
   emit issue code.JenkinsStaplerStateChangeMissingPost at node
 }

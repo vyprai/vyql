@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding certValidationDisabled232 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "call_path:Fog.Kubevirt.Compute.new" and node.token contains "field:kubevirt_verify_ssl=ca_cert.present?" and not (node.token contains "field:kubevirt_verify_ssl=true")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.callPath contains "Fog.Kubevirt.Compute.new" and node.context.field contains "kubevirt_verify_ssl=ca_cert.present?" and not (node.context.field contains "kubevirt_verify_ssl=true")
   emit issue code.CertValidationDisabled at node
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedChartTooltipDataName107 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=formatTooltip" and node.token contains "call_arg:itemModel.get:name" and node.token contains "identifier:name" and node.token contains "call_arg:createTooltipMarkup:nameValue" and not (node.token contains "prop:name=itemName") and not (node.token contains "call_arg:encodeHTML:name") and not (node.token contains "call_arg:escapeHTML:name") and not (node.token contains "call_arg:escapeHtml:name")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "formatTooltip" and node.context.callArg contains "itemModel.get:name" and node.context.identifier contains "name" and node.context.callArg contains "createTooltipMarkup:nameValue" and not (node.context.prop contains "name=itemName") and not (node.context.callArg contains "encodeHTML:name") and not (node.context.callArg contains "escapeHTML:name") and not (node.context.callArg contains "escapeHtml:name")
   emit issue code.UnescapedChartTooltipDataName at node
 }

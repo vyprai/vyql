@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding uncheckedNullableResultDeref131 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "px->ft=imcb_file_send_start" and node.token contains "px->ft->data=px" and not (node.token contains "if(!px->ft)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "px->ft=imcb_file_send_start" and node.token contains "px->ft->data=px" and not (node.token contains "if(!px->ft)")
   emit issue code.UncheckedNullableResultDeref at node
 }

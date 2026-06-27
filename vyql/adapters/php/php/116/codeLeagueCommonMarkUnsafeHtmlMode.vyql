@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding leagueCommonMarkUnsafeHtmlMode116 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "call_path:Environment" and node.token contains "call_path:MarkdownConverter" and node.token contains "call_path:CommonMarkCoreExtension" and not (node.token contains "literal:html_input") and not (node.token contains "call_path:DisallowedRawHtmlExtension") and not (node.token contains "call_path:HTMLPurifier") and not (node.token contains "call_path:HtmlSanitizer") and not (node.token contains "call_path:sanitizeHtml")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "Environment" and node.context.callPath contains "MarkdownConverter" and node.context.callPath contains "CommonMarkCoreExtension" and not (node.context.literal contains "html_input") and not (node.context.callPath contains "DisallowedRawHtmlExtension") and not (node.context.callPath contains "HTMLPurifier") and not (node.context.callPath contains "HtmlSanitizer") and not (node.context.callPath contains "sanitizeHtml")
   emit issue code.LeagueCommonMarkUnsafeHtmlMode at node
 }

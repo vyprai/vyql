@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding protocolStateReview638 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=processMessage" and node.token contains "protocolMsg" and node.token contains "HISTORY_SYNC_NOTIFICATION" and node.token contains "APP_STATE_SYNC_KEY_SHARE" and node.token contains "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" and not (node.token contains "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "processMessage" and node.token contains "protocolMsg" and node.token contains "HISTORY_SYNC_NOTIFICATION" and node.token contains "APP_STATE_SYNC_KEY_SHARE" and node.token contains "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" and not (node.token contains "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe")
   emit issue code.ProtocolStateReview at node
 }

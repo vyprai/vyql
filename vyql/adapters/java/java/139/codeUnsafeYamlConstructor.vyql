@@ -4,6 +4,6 @@ binding unsafeYamlConstructor139 {
   requires {
     dependency("org.yaml.snakeyaml")
   }
-  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:Constructor"
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Constructor"
   emit issue code.UnsafeYamlConstructor at node
 }

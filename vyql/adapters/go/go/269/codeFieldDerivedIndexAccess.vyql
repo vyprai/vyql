@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding fieldDerivedIndexAccess269 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:readObject" and node.token contains "index:ber:offset" and node.token contains "binary:contentEnd>len(ber)" and node.token contains "literal:ber2der: BER tag length is more than available data" and not (node.token contains "binary:len(ber)<=offset")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "readObject" and node.context.index contains "ber:offset" and node.context.binary contains "contentEnd>len(ber)" and node.context.literal contains "ber2der: BER tag length is more than available data" and not (node.context.binary contains "len(ber)<=offset")
   emit issue code.FieldDerivedIndexAccess at node
 }

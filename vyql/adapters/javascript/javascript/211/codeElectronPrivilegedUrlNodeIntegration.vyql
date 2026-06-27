@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding electronPrivilegedUrlNodeIntegration211 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "expr:window.location.protocol==='chrome-devtools:'" and node.token contains "assign:nodeIntegration=true"
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.expr contains "window.location.protocol==='chrome-devtools:'" and node.context.assign contains "nodeIntegration=true"
   emit issue code.ElectronPrivilegedUrlNodeIntegration at node
 }

@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding lengthDerivedAllocation100 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "read_and_decode_block_header" and node.token contains "blockSize" and node.token contains "malloc_from_callbacks(blockSize" and node.token contains "onRead(pUserData,pRawData,blockSize)" and not (node.token contains "hasKnownFileSize") and not (node.token contains "fileSize-runningFilePos")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "read_and_decode_block_header" and node.token contains "blockSize" and node.token contains "malloc_from_callbacks(blockSize" and node.token contains "onRead(pUserData,pRawData,blockSize)" and not (node.token contains "hasKnownFileSize") and not (node.token contains "fileSize-runningFilePos")
   emit issue code.LengthDerivedAllocation at node
 }

@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding constellationLuks2AttachedHeaderActivation215 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:initByDevicePath" and node.token contains "call_path:cryptsetup.Init" and not (node.token contains "call_path:detachHeader") and not (node.token contains "call_path:cryptsetup.InitDataDevice")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "initByDevicePath" and node.context.callPath contains "cryptsetup.Init" and not (node.context.callPath contains "detachHeader") and not (node.context.callPath contains "cryptsetup.InitDataDevice")
   emit issue code.ConstellationLuks2AttachedHeaderActivation at node
 }

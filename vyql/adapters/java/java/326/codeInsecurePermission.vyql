@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding insecurePermission326 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:createTempFile" and node.token contains "call_path:File.createTempFile" and not (node.token contains "call_path:setReadable") and not (node.token contains "call_path:Files.setPosixFilePermissions")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createTempFile" and node.context.callPath contains "File.createTempFile" and not (node.context.callPath contains "setReadable") and not (node.context.callPath contains "Files.setPosixFilePermissions")
   emit issue code.InsecurePermission at node
 }

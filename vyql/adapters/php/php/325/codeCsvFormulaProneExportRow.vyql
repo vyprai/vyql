@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding csvFormulaProneExportRow325 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "getForCsvExport" and node.token contains "self::COLUMNS" and node.token contains "$row[self::COLUMNS][]=" and node.token contains "$rows[]=$row" and not (node.token contains "escapeCsvRecord") and not (node.token contains "esc_csv")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "getForCsvExport" and node.token contains "self::COLUMNS" and node.token contains "$row[self::COLUMNS][]=" and node.token contains "$rows[]=$row" and not (node.token contains "escapeCsvRecord") and not (node.token contains "esc_csv")
   emit issue code.CsvFormulaProneExportRow at node
 }

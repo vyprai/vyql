@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding verboseHttpErrorObjectDisclosure56 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:fmt.Errorf" and node.token contains "literal:%+v" and node.token contains "selector:.Request" and node.token contains "selector:.Body" and node.token contains "selector:.TLS"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "fmt.Errorf" and node.context.literal contains "%+v" and node.context.selector contains ".Request" and node.context.selector contains ".Body" and node.context.selector contains ".TLS"
   emit issue code.VerboseHttpErrorObjectDisclosure at node
 }

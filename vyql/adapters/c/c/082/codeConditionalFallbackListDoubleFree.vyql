@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding conditionalFallbackListDoubleFree82 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "call_path:CommandLineParseCommaSeparatedValuesEx" and node.token contains "call_path:open_port" and node.token contains "call_path:free" and node.token contains "free(list)" and node.token contains "server->ipcSocket==NULL" and node.token contains "open_port(server,NULL)" and node.token contains "return-1" and not (node.token contains "if(!open_port(server,NULL)){free(list);return-1;}")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "CommandLineParseCommaSeparatedValuesEx" and node.context.callPath contains "open_port" and node.context.callPath contains "free" and node.token contains "free(list)" and node.token contains "server->ipcSocket==NULL" and node.token contains "open_port(server,NULL)" and node.token contains "return-1" and not (node.token contains "if(!open_port(server,NULL)){free(list);return-1;}")
   emit issue code.ConditionalFallbackListDoubleFree at node
 }

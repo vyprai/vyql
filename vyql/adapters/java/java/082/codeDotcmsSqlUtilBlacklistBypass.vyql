@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding dotcmsSqlUtilBlacklistBypass82 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:sanitizeParameter" and node.token contains "call_path:StringEscapeUtils.escapeSql" and node.token contains "identifier:EVIL_SQL_WORDS" and node.token contains "call:isValidSQLCharacter" and not (node.scopeCall.any contains "sanitizeSQL") and not (node.token contains "identifier:EVIL_SQL_CONDITION_WORDS")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "sanitizeParameter" and node.context.callPath contains "StringEscapeUtils.escapeSql" and node.context.identifier contains "EVIL_SQL_WORDS" and node.context.call contains "isValidSQLCharacter" and not (node.scopeCall.any contains "sanitizeSQL") and not (node.context.identifier contains "EVIL_SQL_CONDITION_WORDS")
   emit issue code.DotcmsSqlUtilBlacklistBypass at node
 }

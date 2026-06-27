@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding connectCmsCodestudiesPluginCodeExecution101 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=CodestudiesPlugin" and node.token contains "$functions['post']" and node.token contains "run" and node.token contains "role_reporter" and node.token contains "$codestudies.code_text" and node.token contains "Storage.put" and node.token contains "$this.runCheck" and node.token contains "exec" and node.token contains "php " and node.token contains "javac -encoding UTF-8" and node.token contains "java -Dfile.encoding=UTF-8"
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "CodestudiesPlugin" and node.token contains "$functions['post']" and node.token contains "run" and node.token contains "role_reporter" and node.token contains "$codestudies.code_text" and node.token contains "Storage.put" and node.token contains "$this.runCheck" and node.token contains "exec" and node.token contains "php " and node.token contains "javac -encoding UTF-8" and node.token contains "java -Dfile.encoding=UTF-8"
   emit issue code.ConnectCmsCodestudiesPluginCodeExecution at node
 }

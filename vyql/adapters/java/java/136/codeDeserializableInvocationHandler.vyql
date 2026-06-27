@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding deserializableInvocationHandler136 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:InvocationHandler" and node.token contains "call:getMethod" and node.token contains "call:invokeMethod" and not (node.token contains "function_name:readResolve") and not (node.token contains "function_name:readObject") and not (node.scopeCall.any contains "NotSerializableException")
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "InvocationHandler" and node.context.call contains "getMethod" and node.context.call contains "invokeMethod" and not (node.context.functionName contains "readResolve") and not (node.context.functionName contains "readObject") and not (node.scopeCall.any contains "NotSerializableException")
   emit issue code.DeserializableInvocationHandler at node
 }

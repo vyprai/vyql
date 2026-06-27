@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding phpMyAdminSetupRedirectorOpenRedirect125 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=PMA_linkURL" and node.token contains "url.php" and node.token contains "PMA_generate_common_url" and node.token contains "$params['url']=$url" and node.token contains "defined('PMA_SETUP')" and node.token contains "'../'.$goto" and not (node.token contains "defined('PMA_SETUP')){return$url")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "PMA_linkURL" and node.token contains "url.php" and node.token contains "PMA_generate_common_url" and node.token contains "$params['url']=$url" and node.token contains "defined('PMA_SETUP')" and node.token contains "'../'.$goto" and not (node.token contains "defined('PMA_SETUP')){return$url")
   emit issue code.PhpMyAdminSetupRedirectorOpenRedirect at node
 }

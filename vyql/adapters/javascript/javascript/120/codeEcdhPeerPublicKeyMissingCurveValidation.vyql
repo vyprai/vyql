@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding ecdhPeerPublicKeyMissingCurveValidation120 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=deriveSharedSecret" and node.token contains "publicKey.Q.multiply(this.d)" and node.token contains "zeroBuffer(S.getX().toBigInteger().toString(16),this._size)" and not (node.token contains "onCurve(publicKey)") and not (node.token contains "validatePublicKey(publicKey)") and not (node.token contains "isOnCurve(publicKey)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "deriveSharedSecret" and node.token contains "publicKey.Q.multiply(this.d)" and node.token contains "zeroBuffer(S.getX().toBigInteger().toString(16),this._size)" and not (node.token contains "onCurve(publicKey)") and not (node.token contains "validatePublicKey(publicKey)") and not (node.token contains "isOnCurve(publicKey)")
   emit issue code.EcdhPeerPublicKeyMissingCurveValidation at node
 }

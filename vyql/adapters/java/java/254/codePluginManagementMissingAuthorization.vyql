@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding pluginManagementMissingAuthorization254 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "annotation:PostMapping" and node.token contains "call_path:pluginService.uninstall" and not (node.token contains "annotation:RequiresPermissions") and not (node.token contains "annotation:PreAuthorize") and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.annotation contains "PostMapping" and node.context.callPath contains "pluginService.uninstall" and not (node.context.annotation contains "RequiresPermissions") and not (node.context.annotation contains "PreAuthorize") and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
   emit issue code.PluginManagementMissingAuthorization at node
 }

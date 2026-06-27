@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsRemoteValidationMissingPermission227 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doCheck" and node.token contains "annotation:RequirePOST" and node.token contains "call:DynatraceClient" and node.token contains "call:getSystemProfiles" and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doCheck" and node.context.annotation contains "RequirePOST" and node.context.call contains "DynatraceClient" and node.context.call contains "getSystemProfiles" and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
   emit issue code.JenkinsRemoteValidationMissingPermission at node
 }

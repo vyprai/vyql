@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding boundRequestPathDeleteTraversal281 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:Delete" and node.token contains "call_path:self.Validate" and node.token contains "selector:params.Path" and node.token contains "call_path:GetSaveRealPath" and node.token contains "call_path:os.Remove" and not (node.token contains "call_path:filepath.IsLocal") and not (node.token contains "call_path:filepath.Clean")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Delete" and node.context.callPath contains "self.Validate" and node.context.selector contains "params.Path" and node.context.callPath contains "GetSaveRealPath" and node.context.callPath contains "os.Remove" and not (node.context.callPath contains "filepath.IsLocal") and not (node.context.callPath contains "filepath.Clean")
   emit issue code.BoundRequestPathDeleteTraversal at node
 }

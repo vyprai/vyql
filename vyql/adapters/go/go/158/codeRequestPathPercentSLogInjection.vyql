@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding requestPathPercentSLogInjection158 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:fmt.Sprintf" and node.token contains "selector:.Path" and node.token contains "selector:.ErrorMessage" and node.token contains "literal:%s %s\n%s" and not (node.token contains "literal:%#v")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "fmt.Sprintf" and node.context.selector contains ".Path" and node.context.selector contains ".ErrorMessage" and node.context.literal contains "%s %s\n%s" and not (node.context.literal contains "%#v")
   emit issue code.RequestPathPercentSLogInjection at node
 }

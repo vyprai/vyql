@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding claspRemoteFilePathTraversal643 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=fetchRemote" and node.token contains "script.projects.getContent" and node.token contains "response.data.files" and node.token contains "f.name" and node.token contains "path.resolve(contentDir" and not (node.token contains "isInside")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "fetchRemote" and node.token contains "script.projects.getContent" and node.token contains "response.data.files" and node.token contains "f.name" and node.token contains "path.resolve(contentDir" and not (node.token contains "isInside")
   emit issue code.ClaspRemoteFilePathTraversal at node
 }

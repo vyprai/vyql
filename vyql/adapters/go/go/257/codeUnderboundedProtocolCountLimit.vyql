@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding underboundedProtocolCountLimit257 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:BtcDecode" and node.token contains "call:ReadVarInt" and node.token contains "selector:txin.Witness" and node.token contains "const:maxWitnessItemsPerInput=500000"
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "BtcDecode" and node.context.call contains "ReadVarInt" and node.context.selector contains "txin.Witness" and node.token contains "const:maxWitnessItemsPerInput=500000"
   emit issue code.UnderboundedProtocolCountLimit at node
 }

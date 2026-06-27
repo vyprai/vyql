@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding bufReadDiscardLoopWithoutEofGuard27 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "whilelen>0" and node.token contains "self.fill_buf()" and node.token contains "buf.len().min(len)" and node.token contains "self.consume(consume_len)" and node.token contains "len-=consume_len" and not (node.token contains "buf.is_empty()") and not (node.token contains "UnexpectedEof")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "whilelen>0" and node.token contains "self.fill_buf()" and node.token contains "buf.len().min(len)" and node.token contains "self.consume(consume_len)" and node.token contains "len-=consume_len" and not (node.token contains "buf.is_empty()") and not (node.token contains "UnexpectedEof")
   emit issue code.BufReadDiscardLoopWithoutEofGuard at node
 }

@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding underallocatedFormattedAddressList91 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=option_to_env" and node.token contains "D6_OPT_DNS_SERVERS" and node.token contains "xmalloc(4+addrs*40-1)" and node.token contains "sprint_nip6(dlist,option+4+option_offset)" and node.token contains "dlist+=39" and not (node.token contains "xmalloc(4+addrs*40+1)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "option_to_env" and node.token contains "D6_OPT_DNS_SERVERS" and node.token contains "xmalloc(4+addrs*40-1)" and node.token contains "sprint_nip6(dlist,option+4+option_offset)" and node.token contains "dlist+=39" and not (node.token contains "xmalloc(4+addrs*40+1)")
   emit issue code.UnderallocatedFormattedAddressList at node
 }

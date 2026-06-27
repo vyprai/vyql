@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding nextcloudCircleMemberAddMissingCircleCheck166 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=membersAdd" and node.token contains "generateFederatedUser($this->get('id',$member),$this->getInt('type',$member))" and node.token contains "addMembers($circleId,$federatedUsers)" and not (node.token contains "Member::TYPE_CIRCLE") and not (node.token contains "circleService->getCircle($userId)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "membersAdd" and node.token contains "generateFederatedUser($this->get('id',$member),$this->getInt('type',$member))" and node.token contains "addMembers($circleId,$federatedUsers)" and not (node.token contains "Member::TYPE_CIRCLE") and not (node.token contains "circleService->getCircle($userId)")
   emit issue code.NextcloudCircleMemberAddMissingCircleCheck at node
 }

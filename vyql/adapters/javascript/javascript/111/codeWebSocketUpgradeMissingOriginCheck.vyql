@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding webSocketUpgradeMissingOriginCheck111 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=javascript" and node.token contains "prop:noServer=true" and node.token contains "call:handleUpgrade" and node.token contains "call:bind" and node.token contains "literal:sec-websocket-protocol" and not (containsAny(node.token, ["selector:headers.origin", "selector:.origin"])) and not (containsAny(node.token, ["literal:origin", "literal:Origin"]))
+  query pattern presenceNode where node.scope == "class" and node.context.language == "javascript" and node.context.prop contains "noServer=true" and node.context.call contains "handleUpgrade" and node.context.call contains "bind" and node.context.literal contains "sec-websocket-protocol" and not (containsAny(node.token, ["selector:headers.origin", "selector:.origin"])) and not (containsAny(node.token, ["literal:origin", "literal:Origin"]))
   emit issue code.WebSocketUpgradeMissingOriginCheck at node
 }

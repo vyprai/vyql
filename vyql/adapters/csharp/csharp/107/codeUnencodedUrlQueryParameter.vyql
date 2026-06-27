@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding unencodedUrlQueryParameter107 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:ConstructValidateUrl" and node.token contains "QueryItems.Add" and node.token contains "ArtifactParameterName" and node.token contains "serviceTicket" and not (node.token contains "HttpUtility.UrlEncode(serviceTicket)")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "ConstructValidateUrl" and node.token contains "QueryItems.Add" and node.token contains "ArtifactParameterName" and node.token contains "serviceTicket" and not (node.token contains "HttpUtility.UrlEncode(serviceTicket)")
   emit issue code.UnencodedUrlQueryParameter at node
 }

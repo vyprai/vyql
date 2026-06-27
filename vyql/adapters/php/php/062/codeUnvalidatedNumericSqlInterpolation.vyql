@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation62 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "subscript:$HTTP_GET_VARS['lid']" and node.token contains "call_path:$xoopsDB.query" and node.token contains "literal: where " and not (node.token contains "call_arg:is_numeric:$lid")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.subscript contains "$HTTP_GET_VARS['lid']" and node.context.callPath contains "$xoopsDB.query" and node.context.literal contains " where " and not (node.context.callArg contains "is_numeric:$lid")
   emit issue code.UnvalidatedNumericSqlInterpolation at node
 }

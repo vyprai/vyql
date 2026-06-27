@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding requestViewVariableHtmlEscapeMissing76 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "$internalname=get_input('internalname')" and node.token contains "'internalname'=>$internalname" and node.token contains "elgg_view(" and not (node.token contains "$internalname=htmlentities($internalname)") and not (node.token contains "$internalname=htmlspecialchars($internalname)") and not (node.token contains "$internalname=esc_html($internalname)")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "$internalname=get_input('internalname')" and node.token contains "'internalname'=>$internalname" and node.token contains "elgg_view(" and not (node.token contains "$internalname=htmlentities($internalname)") and not (node.token contains "$internalname=htmlspecialchars($internalname)") and not (node.token contains "$internalname=esc_html($internalname)")
   emit issue code.RequestViewVariableHtmlEscapeMissing at node
 }

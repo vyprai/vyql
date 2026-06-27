@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedHtmlPresenter104 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "assign:presentType=html" and node.token contains "identifier:present" and node.token contains "identifier:encodings" and node.token contains "call_path:Utils.printable" and node.token contains "literal:<td>${value}</td>" and not (node.token contains "call_path:Utils.escapeHtml") and not (node.token contains "call_path:DOMPurify")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.assign contains "presentType=html" and node.context.identifier contains "present" and node.context.identifier contains "encodings" and node.context.callPath contains "Utils.printable" and node.context.literal contains "<td>${value}</td>" and not (node.context.callPath contains "Utils.escapeHtml") and not (node.context.callPath contains "DOMPurify")
   emit issue code.UnescapedHtmlPresenter at node
 }

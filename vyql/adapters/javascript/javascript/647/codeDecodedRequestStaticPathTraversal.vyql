@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding decodedRequestStaticPathTraversal647 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "attr_path:config.staticFilePath" and node.token contains "call_path:decodeURIComponent" and node.token contains "call_path:utils.file.existsSync" and node.token contains "call_path:handleStaticFile" and not (node.token contains "call_path:indexOf") and not (node.token contains "call_path:startsWith") and not (node.token contains "call_path:path.relative")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.attrPath contains "config.staticFilePath" and node.context.callPath contains "decodeURIComponent" and node.context.callPath contains "utils.file.existsSync" and node.context.callPath contains "handleStaticFile" and not (node.context.callPath contains "indexOf") and not (node.context.callPath contains "startsWith") and not (node.context.callPath contains "path.relative")
   emit issue code.DecodedRequestStaticPathTraversal at node
 }

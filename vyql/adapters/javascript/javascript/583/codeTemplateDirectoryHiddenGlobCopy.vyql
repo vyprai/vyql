@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding templateDirectoryHiddenGlobCopy583 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=downloadTemplate" and node.token contains "call_path:fs.statSync" and node.token contains "call_path:d.copy" and not (node.token contains "prop:hide=false")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "downloadTemplate" and node.context.callPath contains "fs.statSync" and node.context.callPath contains "d.copy" and not (node.context.prop contains "hide=false")
   emit issue code.TemplateDirectoryHiddenGlobCopy at node
 }

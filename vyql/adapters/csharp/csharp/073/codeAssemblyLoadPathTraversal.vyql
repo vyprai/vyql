@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding assemblyLoadPathTraversal73 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:GetType" and node.token contains "AssemblyLoadContext.Default.LoadFromAssemblyPath" and node.token contains "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\"" and not (node.token contains "path.Contains(\"..\")") and not (node.token contains "path.Contains(':')")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "GetType" and node.token contains "AssemblyLoadContext.Default.LoadFromAssemblyPath" and node.token contains "AppContext.BaseDirectory+splitName[1].Trim()+\".dll\"" and not (node.token contains "path.Contains(\"..\")") and not (node.token contains "path.Contains(':')")
   emit issue code.AssemblyLoadPathTraversal at node
 }

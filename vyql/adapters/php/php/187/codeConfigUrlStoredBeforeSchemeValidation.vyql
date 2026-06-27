@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding configUrlStoredBeforeSchemeValidation187 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=configureJob", "name=store", "name=update"]) and node.token contains "subscript:$data['fints_url']" and node.token contains "subscript:$config['fints_url']" and node.token contains "call_path:$this.repository.setConfiguration" and node.token contains "call_path:$finTS.checkConnection" and not (node.token contains "call_path:$this.validURI") and not (node.token contains "call_path:filter_var") and not (node.token contains "call_path:parse_url")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["name=configureJob", "name=store", "name=update"]) and node.context.subscript contains "$data['fints_url']" and node.context.subscript contains "$config['fints_url']" and node.context.callPath contains "$this.repository.setConfiguration" and node.context.callPath contains "$finTS.checkConnection" and not (node.context.callPath contains "$this.validURI") and not (node.context.callPath contains "filter_var") and not (node.context.callPath contains "parse_url")
   emit issue code.ConfigUrlStoredBeforeSchemeValidation at node
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding clusterDeployFunctionMissingPermission237 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:Function" and containsAny(node.token, ["class_name:DeployFunction", "class_name:InstallFunction", "class_name:UploadFunction"]) and containsAny(node.token, ["call_path:getJarDeployer.deploy", "call_path:ClassPathLoader.getLatest.getJarDeployer.deploy"]) and containsAny(node.token, ["call_path:stageJarContent", "call_path:RemoteInputStreamClient.wrap", "call_path:IOUtils.copyLarge"]) and not (node.token contains "function_name:getRequiredPermissions") and not (node.token contains "class_base:InternalFunction")
+  query pattern presenceNode where node.scope == "class" and node.context.classBase contains "Function" and containsAny(node.token, ["class_name:DeployFunction", "class_name:InstallFunction", "class_name:UploadFunction"]) and containsAny(node.token, ["call_path:getJarDeployer.deploy", "call_path:ClassPathLoader.getLatest.getJarDeployer.deploy"]) and containsAny(node.token, ["call_path:stageJarContent", "call_path:RemoteInputStreamClient.wrap", "call_path:IOUtils.copyLarge"]) and not (node.context.functionName contains "getRequiredPermissions") and not (node.context.classBase contains "InternalFunction")
   emit issue code.ClusterDeployFunctionMissingPermission at node
 }

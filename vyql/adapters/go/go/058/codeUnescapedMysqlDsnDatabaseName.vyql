@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unescapedMysqlDsnDatabaseName58 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:sql.NewParserFromAlterStatement" and node.token contains "selector:migrationContext.DatabaseName" and not (node.token contains "call_path:url.QueryEscape")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "sql.NewParserFromAlterStatement" and node.context.selector contains "migrationContext.DatabaseName" and not (node.context.callPath contains "url.QueryEscape")
   emit issue code.UnescapedMysqlDsnDatabaseName at node
 }

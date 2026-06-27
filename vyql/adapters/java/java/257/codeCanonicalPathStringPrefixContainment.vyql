@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding canonicalPathStringPrefixContainment257 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:getValidDirectoryPath" and node.token contains "call:getCanonicalPath" and node.token contains "call:startsWith" and not (node.scopeCall.any contains "toPath")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "getValidDirectoryPath" and node.context.call contains "getCanonicalPath" and node.context.call contains "startsWith" and not (node.scopeCall.any contains "toPath")
   emit issue code.CanonicalPathStringPrefixContainment at node
 }

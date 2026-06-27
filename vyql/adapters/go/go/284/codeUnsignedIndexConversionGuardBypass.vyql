@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unsignedIndexConversionGuardBypass284 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:checkTopicRegister" and node.token contains "selector:data.Idx" and node.token contains "selector:data.Topics" and node.token contains "call:int" and node.token contains "call:len" and node.token contains "binary:data.Idx<0" and not (node.token contains "binary:int(data.Idx)<0")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "checkTopicRegister" and node.context.selector contains "data.Idx" and node.context.selector contains "data.Topics" and node.context.call contains "int" and node.context.call contains "len" and node.context.binary contains "data.Idx<0" and not (node.context.binary contains "int(data.Idx)<0")
   emit issue code.UnsignedIndexConversionGuardBypass at node
 }

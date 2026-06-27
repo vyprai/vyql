@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding controlledMergeInheritedKeyPrototypePollution575 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=iterateAndMerge" and node.token contains "for(varattrinobj2)" and node.token contains "result[attr]=clone(obj2[attr])" and node.token contains "result[attr]=iterateAndMerge(obj1[attr],obj2[attr])" and not (node.token contains "Object.getOwnPropertyNames(obj2)") and not (node.token contains "allowedAttrs.includes(attr)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "iterateAndMerge" and node.token contains "for(varattrinobj2)" and node.token contains "result[attr]=clone(obj2[attr])" and node.token contains "result[attr]=iterateAndMerge(obj1[attr],obj2[attr])" and not (node.token contains "Object.getOwnPropertyNames(obj2)") and not (node.token contains "allowedAttrs.includes(attr)")
   emit issue code.ControlledMergeInheritedKeyPrototypePollution at node
 }

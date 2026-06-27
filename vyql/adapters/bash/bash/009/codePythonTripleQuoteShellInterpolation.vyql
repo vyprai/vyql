@@ -1,6 +1,6 @@
 module bindings.bash.migration.m59952d5d;
 
 binding pythonTripleQuoteShellInterpolation9 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=bash" and node.token contains "input=$(cat)" and node.token contains "python3-c\"" and node.token contains "json.loads('''$input''')" and not (node.token contains "<<'PYEOF'") and not (node.token contains "os.environ.get('CC_INPUT')")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "bash" and node.token contains "input=$(cat)" and node.token contains "python3-c\"" and node.token contains "json.loads('''$input''')" and not (node.token contains "<<'PYEOF'") and not (node.token contains "os.environ.get('CC_INPUT')")
   emit issue code.PythonTripleQuoteShellInterpolation at node
 }

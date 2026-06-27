@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding compileSassCleanupShellCommandWithoutPathCheck247 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=setupCleanupOnExit" and node.token contains "exec" and node.token contains "rm-r" and node.token contains "cssPath" and not (node.token contains "fs.lstat")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "setupCleanupOnExit" and node.token contains "exec" and node.token contains "rm-r" and node.token contains "cssPath" and not (node.token contains "fs.lstat")
   emit issue code.CompileSassCleanupShellCommandWithoutPathCheck at node
 }

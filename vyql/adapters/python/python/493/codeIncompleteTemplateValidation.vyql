@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding incompleteTemplateValidation493 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=get_jinja_env" and node.token contains "Environment(extensions=" and node.token contains "filters.update(get_jinja_filters())" and node.token contains "returnjinja_env" and not (node.token contains "SandboxedEnvironment") and not (node.token contains "ImmutableSandboxedEnvironment")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "get_jinja_env" and node.token contains "Environment(extensions=" and node.token contains "filters.update(get_jinja_filters())" and node.token contains "returnjinja_env" and not (node.token contains "SandboxedEnvironment") and not (node.token contains "ImmutableSandboxedEnvironment")
   emit issue code.IncompleteTemplateValidation at node
 }

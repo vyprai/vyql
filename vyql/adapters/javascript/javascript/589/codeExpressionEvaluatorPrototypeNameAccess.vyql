@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding expressionEvaluatorPrototypeNameAccess589 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "expr:type===IVAR" and node.token contains "expr:type===IMEMBER" and node.token contains "expr:item.valueinexpr.functions" and node.token contains "selector:item.value" and node.token contains "selector:expr.functions" and node.token contains "index_base:values" and node.token contains "index_key:item.value" and not (node.token contains "prototype_name_guard=true")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.expr contains "type===IVAR" and node.context.expr contains "type===IMEMBER" and node.context.expr contains "item.valueinexpr.functions" and node.context.selector contains "item.value" and node.context.selector contains "expr.functions" and node.token contains "index_base:values" and node.context.indexKey contains "item.value" and not (node.token contains "prototype_name_guard=true")
   emit issue code.ExpressionEvaluatorPrototypeNameAccess at node
 }

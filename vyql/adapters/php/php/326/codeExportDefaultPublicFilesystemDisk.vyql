@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding exportDefaultPublicFilesystemDisk326 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=getFileDisk" and node.token contains "call_path:config" and node.token contains "literal:filament.default_filesystem_disk" and not (node.token contains "literal:local") and not (node.token contains "call_path:array_key_exists")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getFileDisk" and node.context.callPath contains "config" and node.context.literal contains "filament.default_filesystem_disk" and not (node.context.literal contains "local") and not (node.context.callPath contains "array_key_exists")
   emit issue code.ExportDefaultPublicFilesystemDisk at node
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unescapedDiagnosticHtml85 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:IOUtils.toString" and node.token contains "literal:text/html" and node.token contains "call_path:Fault" and not (node.token contains "call_path:MessageUtils.isRequestor") and not (node.token contains "call_path:StringEscapeUtils.escapeHtml") and not (node.token contains "call_path:HtmlUtils.htmlEscape")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "IOUtils.toString" and node.context.literal contains "text/html" and node.context.callPath contains "Fault" and not (node.context.callPath contains "MessageUtils.isRequestor") and not (node.context.callPath contains "StringEscapeUtils.escapeHtml") and not (node.context.callPath contains "HtmlUtils.htmlEscape")
   emit issue code.UnescapedDiagnosticHtml at node
 }

@@ -1,7 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding stateChangingOp255 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doFill" and not (node.scopeCall.any contains "checkPermission") and not (node.token contains "annotation:POST") and not (node.token contains "annotation:RequirePOST")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFill" and not (node.scopeCall.any contains "checkPermission") and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
   emit issue code.StateChangingOp at node
   emit sink code.StateChangingOpSink at node
 }

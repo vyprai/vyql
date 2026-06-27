@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding accessPolicyReview159 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=catch_page_load" and node.token contains "$_POST['doc-edit-submit']" and node.token contains "check_admin_referer('bp_docs_save')" and node.token contains "BP_Docs_Query" and node.token contains "save()" and not (node.token contains "$doc=bp_docs_get_current_doc();if($doc&&!current_user_can('bp_docs_edit',$doc->ID))") and not (node.token contains "elseif(!$doc&&!current_user_can('bp_docs_create'))")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "catch_page_load" and node.token contains "$_POST['doc-edit-submit']" and node.token contains "check_admin_referer('bp_docs_save')" and node.token contains "BP_Docs_Query" and node.token contains "save()" and not (node.token contains "$doc=bp_docs_get_current_doc();if($doc&&!current_user_can('bp_docs_edit',$doc->ID))") and not (node.token contains "elseif(!$doc&&!current_user_can('bp_docs_create'))")
   emit issue code.AccessPolicyReview at node
 }

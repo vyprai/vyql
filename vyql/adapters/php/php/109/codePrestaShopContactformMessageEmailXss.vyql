@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding prestaShopContactformMessageEmailXss109 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=sendMessage" and node.token contains "Tools::nl2br" and node.token contains "Tools::stripslashes" and node.token contains "Mail::Send" and not (node.token contains "htmlentitiesUTF8")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "sendMessage" and node.token contains "Tools::nl2br" and node.token contains "Tools::stripslashes" and node.token contains "Mail::Send" and not (node.token contains "htmlentitiesUTF8")
   emit issue code.PrestaShopContactformMessageEmailXss at node
 }

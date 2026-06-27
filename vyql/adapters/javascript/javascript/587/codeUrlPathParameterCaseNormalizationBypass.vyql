@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding urlPathParameterCaseNormalizationBypass587 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=getUrlParams" and node.token contains "call_path:nodeUrl.parse" and node.token contains "call_path:parsed.pathname.split" and node.token contains "call_path:_.tail" and node.token contains "index:parts.__subscript" and node.token contains "call_path:__js_dynamic_property_write" and not (node.token contains "call_path:parts[].toLowerCase")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "getUrlParams" and node.context.callPath contains "nodeUrl.parse" and node.context.callPath contains "parsed.pathname.split" and node.context.callPath contains "_.tail" and node.context.index contains "parts.__subscript" and node.context.callPath contains "__js_dynamic_property_write" and not (node.context.callPath contains "parts[].toLowerCase")
   emit issue code.UrlPathParameterCaseNormalizationBypass at node
 }

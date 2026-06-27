@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding cinnyServiceWorkerMediaAuthLeak188 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:event.respondWith" and node.token contains "call_path:askForAccessToken" and node.token contains "call_path:fetchConfig" and node.token contains "literal:/_matrix/client/v1/media/download" and node.token contains "literal:/_matrix/client/v1/media/thumbnail" and not (node.token contains "call_path:validMediaRequest")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "event.respondWith" and node.context.callPath contains "askForAccessToken" and node.context.callPath contains "fetchConfig" and node.context.literal contains "/_matrix/client/v1/media/download" and node.context.literal contains "/_matrix/client/v1/media/thumbnail" and not (node.context.callPath contains "validMediaRequest")
   emit issue code.CinnyServiceWorkerMediaAuthLeak at node
 }

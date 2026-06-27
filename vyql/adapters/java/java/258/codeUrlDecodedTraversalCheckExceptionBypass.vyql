@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding urlDecodedTraversalCheckExceptionBypass258 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:URLDecoder.decode" and node.token contains "call_path:PARENT_DIRECTORY_REGEX.matcher" and node.token contains "call_path:PARENT_DIRECTORY_REGEX.matcher.find" and node.token contains "catch_type:UnsupportedEncodingException" and not (node.token contains "catch_type:IllegalArgumentException")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "URLDecoder.decode" and node.context.callPath contains "PARENT_DIRECTORY_REGEX.matcher" and node.context.callPath contains "PARENT_DIRECTORY_REGEX.matcher.find" and node.context.catchType contains "UnsupportedEncodingException" and not (node.context.catchType contains "IllegalArgumentException")
   emit issue code.UrlDecodedTraversalCheckExceptionBypass at node
 }

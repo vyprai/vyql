@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding inheritedProcessEnvironmentLeak229 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:unshare.Command" and node.token contains "selector:cmd.Env" and node.token contains "call_path:os.Environ" and node.token contains "literal:LOGLEVEL=%d"
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "unshare.Command" and node.context.selector contains "cmd.Env" and node.context.callPath contains "os.Environ" and node.context.literal contains "LOGLEVEL=%d"
   emit issue code.InheritedProcessEnvironmentLeak at node
 }

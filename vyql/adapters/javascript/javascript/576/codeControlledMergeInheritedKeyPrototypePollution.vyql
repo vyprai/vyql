@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding controlledMergeInheritedKeyPrototypePollution576 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "for(varxinprops)" and node.token contains "obj[x]=props[x]" and node.token contains "obj[x]=jqMix(obj[x],props[x])" and not (node.token contains "__proto__") and not (node.token contains "constructor") and not (node.token contains "Object.keys(props)") and not (node.token contains "Object.getOwnPropertyNames(props)") and not (node.token contains "hasOwnProperty.call(props,x)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "for(varxinprops)" and node.token contains "obj[x]=props[x]" and node.token contains "obj[x]=jqMix(obj[x],props[x])" and not (node.token contains "__proto__") and not (node.token contains "constructor") and not (node.token contains "Object.keys(props)") and not (node.token contains "Object.getOwnPropertyNames(props)") and not (node.token contains "hasOwnProperty.call(props,x)")
   emit issue code.ControlledMergeInheritedKeyPrototypePollution at node
 }

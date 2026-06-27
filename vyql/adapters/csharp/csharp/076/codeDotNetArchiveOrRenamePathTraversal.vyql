@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding dotNetArchiveOrRenamePathTraversal76 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=RenameAsync" and node.token contains "Path.Combine(path.File.DirectoryName,name)" and node.token contains "File.Move(path.File.FullName,newPath.FullName)" and not (node.token contains "Path.GetFullPath(newPath.FullName)") and not (node.token contains "StartsWith(path.RootVolume.RootDirectory")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "RenameAsync" and node.token contains "Path.Combine(path.File.DirectoryName,name)" and node.token contains "File.Move(path.File.FullName,newPath.FullName)" and not (node.token contains "Path.GetFullPath(newPath.FullName)") and not (node.token contains "StartsWith(path.RootVolume.RootDirectory")
   emit issue code.DotNetArchiveOrRenamePathTraversal at node
 }

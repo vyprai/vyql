@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding statamicAssetUploadPhpExtensionValidationBypass89 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=extraRules" and node.token contains "$field->fieldtype()->handle()==='assets'" and node.token contains "$field->handle().'.*'=>'file'" and not (node.token contains "getClientOriginalExtension") and not (node.token contains "php3") and not (node.token contains "phtml")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "extraRules" and node.token contains "$field->fieldtype()->handle()==='assets'" and node.token contains "$field->handle().'.*'=>'file'" and not (node.token contains "getClientOriginalExtension") and not (node.token contains "php3") and not (node.token contains "phtml")
   emit issue code.StatamicAssetUploadPhpExtensionValidationBypass at node
 }

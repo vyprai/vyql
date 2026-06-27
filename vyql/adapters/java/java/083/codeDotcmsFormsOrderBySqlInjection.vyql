@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding dotcmsFormsOrderBySqlInjection83 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_name:ViewFormHandlerAction" and node.token contains "function_name:_loadStructures" and node.token contains "call_path:req.getParameter" and node.token contains "call_path:StructureFactory.getStructuresByUser" and not (node.token contains "call_path:SQLUtil.sanitizeSortBy")
+  query pattern presenceNode where node.scope == "function" and node.context.className contains "ViewFormHandlerAction" and node.context.functionName contains "_loadStructures" and node.context.callPath contains "req.getParameter" and node.context.callPath contains "StructureFactory.getStructuresByUser" and not (node.context.callPath contains "SQLUtil.sanitizeSortBy")
   emit issue code.DotcmsFormsOrderBySqlInjection at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding sensitiveModelJsonSerializationExposure94 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=UpdateUserController" and node.token contains "CurrentUserSerializer::class" and node.token contains "call_path:$request.getQueryParams" and node.token contains "call_path:$request.getAttribute" and node.token contains "call_path:EditUser" and not (node.token contains "call_path:$this.serializer")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "UpdateUserController" and node.token contains "CurrentUserSerializer::class" and node.context.callPath contains "$request.getQueryParams" and node.context.callPath contains "$request.getAttribute" and node.context.callPath contains "EditUser" and not (node.context.callPath contains "$this.serializer")
   emit issue code.SensitiveModelJsonSerializationExposure at node
 }

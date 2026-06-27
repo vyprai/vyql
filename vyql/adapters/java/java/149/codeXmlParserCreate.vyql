@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding xmlParserCreate149 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:SAXReader" and node.token contains "call_path:reader.read" and not (node.token contains "literal:http://apache.org/xml/features/nonvalidating/load-external-dtd") and not (node.token contains "literal:http://xml.org/sax/features/external-general-entities") and not (node.token contains "literal:http://xml.org/sax/features/external-parameter-entities")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "SAXReader" and node.context.callPath contains "reader.read" and not (node.context.literal contains "http://apache.org/xml/features/nonvalidating/load-external-dtd") and not (node.context.literal contains "http://xml.org/sax/features/external-general-entities") and not (node.context.literal contains "http://xml.org/sax/features/external-parameter-entities")
   emit issue code.XmlParserCreate at node
 }

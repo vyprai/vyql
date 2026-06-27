@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding absolutePathDisclosure256 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "selector:Constants.MC_REALPATH" and node.token contains "selector:Constants.MC_RELATIVE_PATH" and node.token contains "call:FileReader" and not (node.token contains "call:FileNotFoundException")
+  query pattern presenceNode where node.scope == "function" and node.context.selector contains "Constants.MC_REALPATH" and node.context.selector contains "Constants.MC_RELATIVE_PATH" and node.context.call contains "FileReader" and not (node.context.call contains "FileNotFoundException")
   emit issue code.AbsolutePathDisclosure at node
 }

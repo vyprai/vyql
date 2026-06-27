@@ -1,7 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex545 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "literal:[\\{\\[].*[\\/]*.*[\\}\\]]$" and node.token contains "call_path:enclosure.test" and not (node.token contains "literal:[\\{\\[].*[\\}\\]]$")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "[\\{\\[].*[\\/]*.*[\\}\\]]$" and node.context.callPath contains "enclosure.test" and not (node.context.literal contains "[\\{\\[].*[\\}\\]]$")
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

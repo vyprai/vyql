@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding parsedUserIdDefaultRootPrivilegeEscalation121 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "strtoll(userspec,&endptr,10)" and node.token contains "if(*endptr=='\\0')returnu" and node.token contains "u->gid=(int)l" and not (node.token contains "u->uid=(int)l;if(*endptr=='\\0')returnu")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "strtoll(userspec,&endptr,10)" and node.token contains "if(*endptr=='\\0')returnu" and node.token contains "u->gid=(int)l" and not (node.token contains "u->uid=(int)l;if(*endptr=='\\0')returnu")
   emit issue code.ParsedUserIdDefaultRootPrivilegeEscalation at node
 }

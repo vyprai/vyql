@@ -1,7 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding integerSizeArithmetic56 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "expr:offset+length>b.length" and node.token contains "call_path:write" and not (node.token contains "expr:offset>b.length-length")
+  query pattern presenceNode where node.scope == "function" and node.context.expr contains "offset+length>b.length" and node.context.callPath contains "write" and not (node.context.expr contains "offset>b.length-length")
   emit issue code.IntegerSizeArithmetic at node
   emit sink code.IntegerSizeArithmeticSink at node
 }

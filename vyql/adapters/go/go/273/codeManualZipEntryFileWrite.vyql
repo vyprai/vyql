@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding manualZipEntryFileWrite273 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:Decode" and node.token contains "call_path:zip.NewReader" and node.token contains "call_path:filepath.Join" and node.token contains "selector:f.Name" and node.token contains "call_path:copy" and not (node.token contains "call_path:sanitizeArchivePath") and not (node.token contains "call_path:strings.HasPrefix")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "Decode" and node.context.callPath contains "zip.NewReader" and node.context.callPath contains "filepath.Join" and node.context.selector contains "f.Name" and node.context.callPath contains "copy" and not (node.context.callPath contains "sanitizeArchivePath") and not (node.context.callPath contains "strings.HasPrefix")
   emit issue code.ManualZipEntryFileWrite at node
 }

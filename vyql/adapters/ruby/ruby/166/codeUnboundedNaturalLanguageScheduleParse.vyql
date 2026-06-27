@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding unboundedNaturalLanguageScheduleParse166 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token == "function_name:parse" and node.token contains "call_path:s.strip" and node.token contains "call_path:Parser.parse" and node.token contains "call_path:opts.merge" and node.token contains "call_path:slots.to_crons" and not (node.token contains "call_path:s.length")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "parse" and node.context.callPath contains "s.strip" and node.context.callPath contains "Parser.parse" and node.context.callPath contains "opts.merge" and node.context.callPath contains "slots.to_crons" and not (node.context.callPath contains "s.length")
   emit issue code.UnboundedNaturalLanguageScheduleParse at node
 }

@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unverifiedFederationMissingEvents313 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:missingResp.Events.UntrustedEvents" and node.token contains "call_path:t.cacheAndReturn" and not (node.token contains "call_path:ev.VerifyEventSignatures")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "missingResp.Events.UntrustedEvents" and node.context.callPath contains "t.cacheAndReturn" and not (node.context.callPath contains "ev.VerifyEventSignatures")
   emit issue code.UnverifiedFederationMissingEvents at node
 }

@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding containerdCriImageEnvAliasLeak230 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "assign:env=imageConfig.Env" and node.token contains "call_path:config.GetEnvs" and node.token contains "call_path:oci.WithEnv" and not (node.token contains "append_copy:imageConfig.Env")
+  query pattern presenceNode where node.scope == "function" and node.context.assign contains "env=imageConfig.Env" and node.context.callPath contains "config.GetEnvs" and node.context.callPath contains "oci.WithEnv" and not (node.token contains "append_copy:imageConfig.Env")
   emit issue code.ContainerdCriImageEnvAliasLeak at node
 }

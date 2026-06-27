@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding protocolStateReview502 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=_recv_packet" and node.token contains "MSG_USERAUTH_LAST" and node.token contains "process_packet(pkttype,seq,packet" and not (node.token contains "Invalid request received before")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "_recv_packet" and node.token contains "MSG_USERAUTH_LAST" and node.token contains "process_packet(pkttype,seq,packet" and not (node.token contains "Invalid request received before")
   emit issue code.ProtocolStateReview at node
 }

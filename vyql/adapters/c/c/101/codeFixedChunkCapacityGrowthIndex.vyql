@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding fixedChunkCapacityGrowthIndex101 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and containsAny(node.token, ["binary:level>=ms->c.len", "binary:level>=ctx->c.len", "binary:level>=state->c.len", "binary:idx>=capacity", "binary:index>=capacity", "binary:level>=capacity"]) and containsAny(node.token, ["assign:.len=20", "assign:capacity=16", "assign:capacity=32", "assign:capacity=64"]) and node.token contains "call_path:realloc" and containsAny(node.token, ["index_key:level", "index_key:idx", "index_key:index"]) and not (containsAny(node.token, ["assign:.len=20+level", "assign:.len=level+20", "assign:capacity=idx+1", "assign:capacity=index+1", "assign:capacity=level+1"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.token, ["binary:level>=ms->c.len", "binary:level>=ctx->c.len", "binary:level>=state->c.len", "binary:idx>=capacity", "binary:index>=capacity", "binary:level>=capacity"]) and containsAny(node.token, ["assign:.len=20", "assign:capacity=16", "assign:capacity=32", "assign:capacity=64"]) and node.context.callPath contains "realloc" and containsAny(node.token, ["index_key:level", "index_key:idx", "index_key:index"]) and not (containsAny(node.token, ["assign:.len=20+level", "assign:.len=level+20", "assign:capacity=idx+1", "assign:capacity=index+1", "assign:capacity=level+1"]))
   emit issue code.FixedChunkCapacityGrowthIndex at node
 }

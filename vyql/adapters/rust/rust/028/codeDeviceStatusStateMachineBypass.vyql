@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding deviceStatusStateMachineBypass28 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and containsAny(node.token, ["name=write_common_config", "name=write_device_status", "name=write_config_byte"]) and node.token contains "match_arm:DEVICE_STATUS" and node.token contains "assign:self.driver_status=value" and not (node.token contains "call_path:self.set_device_status")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, ["name=write_common_config", "name=write_device_status", "name=write_config_byte"]) and node.token contains "match_arm:DEVICE_STATUS" and node.context.assign contains "self.driver_status=value" and not (node.context.callPath contains "self.set_device_status")
   emit issue code.DeviceStatusStateMachineBypass at node
 }

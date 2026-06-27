@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding unboundedStateGrowthReview166 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=GetOrAddNode" and node.token contains "GetOrAddNode(subKey)" and not (node.token contains "MaxStateDepth")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "GetOrAddNode" and node.token contains "GetOrAddNode(subKey)" and not (node.token contains "MaxStateDepth")
   emit issue code.UnboundedStateGrowthReview at node
 }

@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding configExposureReview228 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.type.context" and node.token contains "field:Repositories" and node.token contains "field:Keyring" and not (node.token contains "method:MarshalYAML")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.type.context" and node.context.field contains "Repositories" and node.context.field contains "Keyring" and not (node.token contains "method:MarshalYAML")
   emit issue code.ConfigExposureReview at node
 }

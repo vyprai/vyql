@@ -1,7 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex544 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" and not (node.token contains "[^]*?(?:\\*\\/|$)")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g" and not (node.token contains "[^]*?(?:\\*\\/|$)")
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

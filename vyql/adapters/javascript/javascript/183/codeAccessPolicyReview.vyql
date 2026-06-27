@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding accessPolicyReview183 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "authorized_keys?.includes(data.pubkey)" and node.token contains "private_keys[data.pubkey]" and node.token contains "!noscraper" and not (node.token contains "pubkeyInConfig") and not (node.token contains "authorized_keys?.length&&!pubkeyInConfig")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "authorized_keys?.includes(data.pubkey)" and node.token contains "private_keys[data.pubkey]" and node.token contains "!noscraper" and not (node.token contains "pubkeyInConfig") and not (node.token contains "authorized_keys?.length&&!pubkeyInConfig")
   emit issue code.AccessPolicyReview at node
 }

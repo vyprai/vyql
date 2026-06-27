@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding internalServiceUrlPathTraversal453 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=_prepare_request" and node.token contains "plugin_daemon_inner_api_baseurl" and node.token contains "path" and node.token contains "url=plugin_daemon_inner_api_baseurl/path" and node.token contains "prepared_headers[\"X-Api-Key\"]" and node.token contains "PLUGIN_DAEMON_KEY" and node.token contains "returnstr(url)" and not (node.token contains "unquote(path)") and not (node.token contains "decoded_path.split(\"/\")") and not (node.token contains "\"..\"")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "_prepare_request" and node.token contains "plugin_daemon_inner_api_baseurl" and node.token contains "path" and node.token contains "url=plugin_daemon_inner_api_baseurl/path" and node.token contains "prepared_headers[\"X-Api-Key\"]" and node.token contains "PLUGIN_DAEMON_KEY" and node.token contains "returnstr(url)" and not (node.token contains "unquote(path)") and not (node.token contains "decoded_path.split(\"/\")") and not (node.token contains "\"..\"")
   emit issue code.InternalServiceUrlPathTraversal at node
 }

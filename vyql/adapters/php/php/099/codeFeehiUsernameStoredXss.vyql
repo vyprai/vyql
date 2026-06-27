@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding feehiUsernameStoredXss99 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=User" and node.token contains "username" and node.token contains "attributeLabels" and node.token contains "beforeSave($insert)" and node.token contains "setPassword($this->password)" and not (node.token contains "$this->username=Html::encode($this->username)")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "User" and node.token contains "username" and node.token contains "attributeLabels" and node.token contains "beforeSave($insert)" and node.token contains "setPassword($this->password)" and not (node.token contains "$this->username=Html::encode($this->username)")
   emit issue code.FeehiUsernameStoredXss at node
 }

@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding certValidationDisabled231 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "function_name:create_client_from_token" and node.token contains "selector:@opts" and node.token contains "field:verify_ssl=OpenSSL::SSL::VERIFY_NONE" and node.token contains "call_path:detect_version" and node.token contains "call_path:Kubeclient.Client.new"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName contains "create_client_from_token" and node.context.selector contains "@opts" and node.context.field contains "verify_ssl=OpenSSL::SSL::VERIFY_NONE" and node.context.callPath contains "detect_version" and node.context.callPath contains "Kubeclient.Client.new"
   emit issue code.CertValidationDisabled at node
 }

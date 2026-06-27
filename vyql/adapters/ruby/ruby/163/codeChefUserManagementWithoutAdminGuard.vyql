@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding chefUserManagementWithoutAdminGuard163 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=ruby" and node.token contains "name=Users" and node.token contains "Chef::WebUIUser.cdb_load" and node.token contains "@user.cdb_save" and node.token contains "@user.cdb_destroy" and not (node.token contains "before :is_admin")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.name contains "Users" and node.token contains "Chef::WebUIUser.cdb_load" and node.token contains "@user.cdb_save" and node.token contains "@user.cdb_destroy" and not (node.token contains "before :is_admin")
   emit issue code.ChefUserManagementWithoutAdminGuard at node
 }

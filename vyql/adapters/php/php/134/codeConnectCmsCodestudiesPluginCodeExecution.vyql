@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding connectCmsCodestudiesPluginCodeExecution134 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=CodestudiesPlugin" and node.token contains "$functions['post']=['savecode','run','deletecode']" and node.token contains "$role_ckeck_table[\"run\"]=array('role_reporter')" and node.token contains "$codestudies->code_text=$request->code_text" and node.token contains "Storage::put('codestudy/'" and node.token contains "$codestudy->code_text" and node.token contains "exec(\"$cmd2>&1\",$result)"
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "CodestudiesPlugin" and node.token contains "$functions['post']=['savecode','run','deletecode']" and node.token contains "$role_ckeck_table[\"run\"]=array('role_reporter')" and node.token contains "$codestudies->code_text=$request->code_text" and node.token contains "Storage::put('codestudy/'" and node.token contains "$codestudy->code_text" and node.token contains "exec(\"$cmd2>&1\",$result)"
   emit issue code.ConnectCmsCodestudiesPluginCodeExecution at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding idorPolicyReview156 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "audioigniter_playlist_id" and node.token contains "get_post(" and node.token contains "get_post_meta(" and node.token contains "wp_send_json(" and not (node.token contains "post_status") and not (node.token contains "current_user_can")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "audioigniter_playlist_id" and node.token contains "get_post(" and node.token contains "get_post_meta(" and node.token contains "wp_send_json(" and not (node.token contains "post_status") and not (node.token contains "current_user_can")
   emit issue code.IdorPolicyReview at node
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding swaggerParserExternalRefDereference302 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:yaml.safeLoad" and node.token contains "call_path:swaggerParser.validate" and node.token contains "identifier:loaded" and not (node.token contains "prop:external=false")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "yaml.safeLoad" and node.context.callPath contains "swaggerParser.validate" and node.context.identifier contains "loaded" and not (node.context.prop contains "external=false")
   emit issue code.SwaggerParserExternalRefDereference at node
 }

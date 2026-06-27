@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding unparameterizedSqlQueryParser162 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "find_by(params" and not (node.token contains "find_by(email:")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.token contains "find_by(params" and not (node.token contains "find_by(email:")
   emit issue code.UnparameterizedSqlQueryParser at node
 }

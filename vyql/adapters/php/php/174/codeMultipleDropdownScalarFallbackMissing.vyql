@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding multipleDropdownScalarFallbackMissing174 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=prepareHtmlFields" and node.token contains "call_arg:json_decode:(string)$value" and node.token contains "subscript:$field['multiple']" and node.token contains "subscript:$field['default_value']" and not (node.token contains "call_arg:json_decode:true") and not (node.token contains "identifier:$decoded")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "prepareHtmlFields" and node.context.callArg contains "json_decode:(string)$value" and node.context.subscript contains "$field['multiple']" and node.context.subscript contains "$field['default_value']" and not (node.context.callArg contains "json_decode:true") and not (node.context.identifier contains "$decoded")
   emit issue code.MultipleDropdownScalarFallbackMissing at node
 }

@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding templateInstallScriptHostExecution14 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "installScript" and node.token contains "final_script" and not (node.token contains "spawn_installer_container")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "installScript" and node.token contains "final_script" and not (node.token contains "spawn_installer_container")
   emit issue code.TemplateInstallScriptHostExecution at node
 }

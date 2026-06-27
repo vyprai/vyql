@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding desktopProtocolRedirectWithoutAllowlist194 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["name=openDesktopIDE", "name=openExternal", "name=openDesktop", "name=redirectToDesktop"]) and node.token contains "call_path:URL" and node.token contains "call_path:window.location.href" and containsAny(node.token, ["identifier:url", "identifier:desktopLink", "identifier:redirect"]) and node.token contains "literal:http:" and node.token contains "literal:https:" and not (containsAny(node.token, ["call_path:trustedProtocols.includes", "call_path:allowedProtocols.includes"])) and not (containsAny(node.token, ["literal:vscode:", "literal:vscode-insiders:", "literal:jetbrains-gateway:"]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["name=openDesktopIDE", "name=openExternal", "name=openDesktop", "name=redirectToDesktop"]) and node.context.callPath contains "URL" and node.context.callPath contains "window.location.href" and containsAny(node.token, ["identifier:url", "identifier:desktopLink", "identifier:redirect"]) and node.context.literal contains "http:" and node.context.literal contains "https:" and not (containsAny(node.token, ["call_path:trustedProtocols.includes", "call_path:allowedProtocols.includes"])) and not (containsAny(node.token, ["literal:vscode:", "literal:vscode-insiders:", "literal:jetbrains-gateway:"]))
   emit issue code.DesktopProtocolRedirectWithoutAllowlist at node
 }

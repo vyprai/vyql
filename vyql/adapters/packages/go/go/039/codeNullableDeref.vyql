@@ -4,6 +4,6 @@ binding nullableDeref39 {
   requires {
     dependency("github.com/free5gc/ausf/internal/context")
   }
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:UeAuthPostRequestProcedure" and node.token contains "selector:updateAuthenticationInfo.ResynchronizationInfo" and node.token contains "call:GetSupiFromSuciSupiMap" and node.token contains "call:GetAusfUeContext" and node.token contains "selector:ausfCurrentContext.Rand" and not (node.scopeCall.any contains "CheckIfSuciSupiPairExists") and not (node.scopeCall.any contains "CheckIfAusfUeContextExists")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "UeAuthPostRequestProcedure" and node.context.selector contains "updateAuthenticationInfo.ResynchronizationInfo" and node.context.call contains "GetSupiFromSuciSupiMap" and node.context.call contains "GetAusfUeContext" and node.context.selector contains "ausfCurrentContext.Rand" and not (node.scopeCall.any contains "CheckIfSuciSupiPairExists") and not (node.scopeCall.any contains "CheckIfAusfUeContextExists")
   emit issue code.NullableDeref at node
 }

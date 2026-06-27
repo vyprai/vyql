@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding codeServerPathProxyPortConfusedProxy192 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=getProxyTarget" and node.token contains "req.params.port" and node.token contains "0.0.0.0:" and node.token contains "req.originalUrl.slice(base.length)" and not (node.token contains "parseInt(req.params.port,10)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "getProxyTarget" and node.token contains "req.params.port" and node.token contains "0.0.0.0:" and node.token contains "req.originalUrl.slice(base.length)" and not (node.token contains "parseInt(req.params.port,10)")
   emit issue code.CodeServerPathProxyPortConfusedProxy at node
 }

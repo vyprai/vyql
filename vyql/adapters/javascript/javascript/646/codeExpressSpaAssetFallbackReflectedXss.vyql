@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding expressSpaAssetFallbackReflectedXss646 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "call_path:express.static" and node.token contains "literal:/*" and containsAny(node.token, ["literal:./build/index.html", "literal:./src/client/index.html"]) and not (node.token contains "literal:/js/*") and not (node.token contains "literal:/images/*") and not (node.token contains "literal:/styles/*")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "express.static" and node.context.literal contains "/*" and containsAny(node.token, ["literal:./build/index.html", "literal:./src/client/index.html"]) and not (node.context.literal contains "/js/*") and not (node.context.literal contains "/images/*") and not (node.context.literal contains "/styles/*")
   emit issue code.ExpressSpaAssetFallbackReflectedXss at node
 }

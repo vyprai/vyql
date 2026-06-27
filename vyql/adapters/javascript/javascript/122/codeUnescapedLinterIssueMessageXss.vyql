@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedLinterIssueMessageXss122 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=renderIssue" and node.token contains "issueTemplate({" and node.token contains "message:message.message" and not (node.token contains "message:_.escape(message.message)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "renderIssue" and node.token contains "issueTemplate({" and node.token contains "message:message.message" and not (node.token contains "message:_.escape(message.message)")
   emit issue code.UnescapedLinterIssueMessageXss at node
 }

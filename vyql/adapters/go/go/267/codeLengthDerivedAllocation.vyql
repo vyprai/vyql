@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding lengthDerivedAllocation267 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "selector:r.ContentLength" and node.token contains "call:make" and node.token contains "call_path:io.ReadFull" and not (node.token contains "call_path:io.LimitReader") and not (node.token contains "call_path:http.MaxBytesReader")
+  query pattern presenceNode where node.scope == "function" and node.context.selector contains "r.ContentLength" and node.context.call contains "make" and node.context.callPath contains "io.ReadFull" and not (node.context.callPath contains "io.LimitReader") and not (node.context.callPath contains "http.MaxBytesReader")
   emit issue code.LengthDerivedAllocation at node
 }

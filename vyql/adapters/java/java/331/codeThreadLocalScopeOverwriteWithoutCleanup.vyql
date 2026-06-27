@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding threadLocalScopeOverwriteWithoutCleanup331 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_name:RequestScopedCache" and node.token contains "function_name:beginRequest" and node.token contains "call_path:CACHE.set" and not (node.scopeCall.any contains "endRequest") and not (node.token contains "call_path:CACHE.remove")
+  query pattern presenceNode where node.scope == "function" and node.context.className contains "RequestScopedCache" and node.context.functionName contains "beginRequest" and node.context.callPath contains "CACHE.set" and not (node.scopeCall.any contains "endRequest") and not (node.context.callPath contains "CACHE.remove")
   emit issue code.ThreadLocalScopeOverwriteWithoutCleanup at node
 }

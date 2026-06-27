@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding incompleteServerPortValidation50 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "connect(" and node.token contains "is_numeric($port)" and node.token contains "explode(" and node.token contains "server" and node.token contains "1024>$port"
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "connect(" and node.token contains "is_numeric($port)" and node.token contains "explode(" and node.token contains "server" and node.token contains "1024>$port"
   emit issue code.IncompleteServerPortValidation at node
 }

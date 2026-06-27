@@ -4,6 +4,6 @@ binding unescapedExceptionMessageMarkup49 {
   requires {
     dependency("org.kohsuke.stapler")
   }
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:Pattern.compile" and node.token contains "call_path:FormValidation.errorWithMarkup" and node.token contains "call:getMessage" and not (node.token contains "call_path:Util.escape")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "Pattern.compile" and node.context.callPath contains "FormValidation.errorWithMarkup" and node.context.call contains "getMessage" and not (node.context.callPath contains "Util.escape")
   emit issue code.UnescapedExceptionMessageMarkup at node
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsDescriptorPropertyFileValidationMissingPost233 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_base:ParameterDescriptor" and containsAny(node.token, ["function_name:doCheckPropertyKey", "function_name:doCheckDefaultPropertyFile", "function_name:doCheckDefaultPropertyKey"]) and node.token contains "identifier:QueryParameter" and node.token contains "call_path:doCheckPropertyFile" and not (node.token contains "annotation:POST") and not (node.token contains "annotation:RequirePOST")
+  query pattern presenceNode where node.scope == "function" and node.context.classBase contains "ParameterDescriptor" and containsAny(node.token, ["function_name:doCheckPropertyKey", "function_name:doCheckDefaultPropertyFile", "function_name:doCheckDefaultPropertyKey"]) and node.context.identifier contains "QueryParameter" and node.context.callPath contains "doCheckPropertyFile" and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
   emit issue code.JenkinsDescriptorPropertyFileValidationMissingPost at node
 }

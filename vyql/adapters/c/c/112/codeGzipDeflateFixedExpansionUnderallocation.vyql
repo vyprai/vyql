@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding gzipDeflateFixedExpansionUnderallocation112 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "call_path:deflateInit2" and node.token contains "call_path:deflate" and containsAny(node.token, ["call_path:malloc", "call_path:flb_malloc"]) and containsAny(node.token, ["assign:out_size=in_len+", "assign:out_size=input_len+", "assign:out_size=source_len+", "assign:out_size=src_len+"]) and not (containsAny(node.token, ["assign:max_input_expansion", "assign:compressBound", "assign:deflateBound"])) and not (containsAny(node.token, ["call_path:compressBound", "call_path:deflateBound"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "deflateInit2" and node.context.callPath contains "deflate" and containsAny(node.token, ["call_path:malloc", "call_path:flb_malloc"]) and containsAny(node.token, ["assign:out_size=in_len+", "assign:out_size=input_len+", "assign:out_size=source_len+", "assign:out_size=src_len+"]) and not (containsAny(node.token, ["assign:max_input_expansion", "assign:compressBound", "assign:deflateBound"])) and not (containsAny(node.token, ["call_path:compressBound", "call_path:deflateBound"]))
   emit issue code.GzipDeflateFixedExpansionUnderallocation at node
 }

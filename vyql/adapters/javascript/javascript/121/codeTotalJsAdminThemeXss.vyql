@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding totalJsAdminThemeXss121 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "COMPONENT('grid'" and node.token contains "column.format" and node.token contains "m.value=column.template?column.template(items[i],column):column.render?column.render(val,column,items[i]):val==null?'':(column.format?val.format(column.format):val)" and node.token contains "builder.push(self.template(m,column))" and not (node.token contains "Thelpers.encode((column.format?val.format(column.format):val))")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "COMPONENT('grid'" and node.token contains "column.format" and node.token contains "m.value=column.template?column.template(items[i],column):column.render?column.render(val,column,items[i]):val==null?'':(column.format?val.format(column.format):val)" and node.token contains "builder.push(self.template(m,column))" and not (node.token contains "Thelpers.encode((column.format?val.format(column.format):val))")
   emit issue code.TotalJsAdminThemeXss at node
 }

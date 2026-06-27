@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedChartTooltipHtml106 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "selector:tooltipModel.body" and node.token contains "selector:tooltipModel.labelColors" and node.token contains "call_path:generateTooltipContent" and node.token contains "selector:innerHTML" and not (node.token contains "call_path:replaceChildren") and not (node.token contains "selector:textContent")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "tooltipModel.body" and node.context.selector contains "tooltipModel.labelColors" and node.context.callPath contains "generateTooltipContent" and node.context.selector contains "innerHTML" and not (node.context.callPath contains "replaceChildren") and not (node.context.selector contains "textContent")
   emit issue code.UnescapedChartTooltipHtml at node
 }

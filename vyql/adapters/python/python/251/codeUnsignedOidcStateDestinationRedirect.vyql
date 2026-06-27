@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding unsignedOidcStateDestinationRedirect251 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=python" and node.token contains "call_path:json.dumps" and node.token contains "call_path:json.loads" and containsAny(node.token, ["call_path:redirect", "call_path:flask.redirect"]) and node.token contains "attr_path:request.args" and node.token contains "subscript:state" and node.token contains "subscript:destination" and not (containsAny(node.token, ["call_path:destination_serializer.dumps", "call_path:destination_serializer.loads"])) and not (containsAny(node.identifier, [BadSignature, RedirectAllowlist]))
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.callPath contains "json.dumps" and node.context.callPath contains "json.loads" and containsAny(node.token, ["call_path:redirect", "call_path:flask.redirect"]) and node.context.attrPath contains "request.args" and node.context.subscript contains "state" and node.context.subscript contains "destination" and not (containsAny(node.token, ["call_path:destination_serializer.dumps", "call_path:destination_serializer.loads"])) and not (containsAny(node.identifier, [BadSignature, RedirectAllowlist]))
   emit issue code.UnsignedOidcStateDestinationRedirect at node
 }

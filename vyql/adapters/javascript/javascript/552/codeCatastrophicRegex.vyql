@@ -1,7 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex552 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "String(validFunction(this)).match(re)" and node.token contains "([\\0-')-\\uffff]+)*" and node.token contains "([\\0-(*-\\uffff]*)" and not (node.token contains "this.name||\"\"") and not (node.token contains "args.join(\",\")") and not (node.token contains "args.join(\", \")")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "String(validFunction(this)).match(re)" and node.token contains "([\\0-')-\\uffff]+)*" and node.token contains "([\\0-(*-\\uffff]*)" and not (node.token contains "this.name||\"\"") and not (node.token contains "args.join(\",\")") and not (node.token contains "args.join(\", \")")
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

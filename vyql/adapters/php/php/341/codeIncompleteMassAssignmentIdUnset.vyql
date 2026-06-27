@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding incompleteMassAssignmentIdUnset341 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "functionadd(" and node.token contains "$patchEntityParams=['associated'=>[],'accessibleFields'=>$data->getAccessibleFieldForNew(),];" and node.token contains "unset($params['id']);" and node.token contains "$input=$this->__massageInput($params);" and node.token contains "$data=$this->Table->patchEntity($data,$input,$patchEntityParams);" and not (node.token contains "unset($input['id']);")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "functionadd(" and node.token contains "$patchEntityParams=['associated'=>[],'accessibleFields'=>$data->getAccessibleFieldForNew(),];" and node.token contains "unset($params['id']);" and node.token contains "$input=$this->__massageInput($params);" and node.token contains "$data=$this->Table->patchEntity($data,$input,$patchEntityParams);" and not (node.token contains "unset($input['id']);")
   emit issue code.IncompleteMassAssignmentIdUnset at node
 }

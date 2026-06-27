@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding leadingDotSegmentOnlyRouteFilter147 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.function.context" and node.token contains "call_path:strings.HasPrefix" and node.token contains "literal:/." and node.token contains "selector:ctx.R.URL.Path" and not (node.token contains "call_path:strings.Contains")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.function.context" and node.context.callPath contains "strings.HasPrefix" and node.context.literal contains "/." and node.context.selector contains "ctx.R.URL.Path" and not (node.context.callPath contains "strings.Contains")
   emit issue code.LeadingDotSegmentOnlyRouteFilter at node
 }

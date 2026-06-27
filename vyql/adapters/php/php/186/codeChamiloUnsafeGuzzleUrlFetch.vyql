@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding chamiloUnsafeGuzzleUrlFetch186 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=verifyUrl" and node.token contains "$client->request('GET',$uri" and not (node.token contains "self::isUrlSafe($uri)") and not (node.token contains "FILTER_FLAG_NO_PRIV_RANGE") and not (node.token contains "FILTER_FLAG_NO_RES_RANGE")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "verifyUrl" and node.token contains "$client->request('GET',$uri" and not (node.token contains "self::isUrlSafe($uri)") and not (node.token contains "FILTER_FLAG_NO_PRIV_RANGE") and not (node.token contains "FILTER_FLAG_NO_RES_RANGE")
   emit issue code.ChamiloUnsafeGuzzleUrlFetch at node
 }

@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding docutilsRestUnsafeDirectiveRendering262 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=render_rest" and node.token contains "publish_parts" and node.token contains "source=markup" and node.token contains "writer_name=\"html4css1\"" and node.token contains "settings_overrides=overrides" and node.token contains "return parts[\"fragment\"]" and not (node.token contains "'raw_enabled': False") and not (node.token contains "\"raw_enabled\": False") and not (node.token contains "'file_insertion_enabled': False") and not (node.token contains "\"file_insertion_enabled\": False")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "render_rest" and node.token contains "publish_parts" and node.token contains "source=markup" and node.token contains "writer_name=\"html4css1\"" and node.token contains "settings_overrides=overrides" and node.token contains "return parts[\"fragment\"]" and not (node.token contains "'raw_enabled': False") and not (node.token contains "\"raw_enabled\": False") and not (node.token contains "'file_insertion_enabled': False") and not (node.token contains "\"file_insertion_enabled\": False")
   emit issue code.DocutilsRestUnsafeDirectiveRendering at node
 }

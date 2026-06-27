@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding attestationPredicateVerificationBypass252 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:policy.AttestationToPayloadJSON" and node.token contains "selector:c.PredicateType" and node.token contains "binary:len(payload)==0" and node.token contains "call_path:PrintVerification" and node.token contains "call_arg:PrintVerification:verified" and not (node.token contains "call_arg:PrintVerification:checked") and not (node.token contains "binary:len(checked)==0")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "policy.AttestationToPayloadJSON" and node.context.selector contains "c.PredicateType" and node.context.binary contains "len(payload)==0" and node.context.callPath contains "PrintVerification" and node.context.callArg contains "PrintVerification:verified" and not (node.context.callArg contains "PrintVerification:checked") and not (node.context.binary contains "len(checked)==0")
   emit issue code.AttestationPredicateVerificationBypass at node
 }

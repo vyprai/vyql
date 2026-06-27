@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding browserPostExportMissingOriginGuard167 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=<lambda>" and node.token contains "call_path:app.post" and node.token contains "selector:req.body.path" and node.token contains "call_path:exportAll" and not (node.token contains "selector:req.headers.origin") and not (containsAny(node.scopeCall.any, [verifyCsrfToken, validateCsrfToken, checkCsrf, csrf]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "<lambda>" and node.context.callPath contains "app.post" and node.context.selector contains "req.body.path" and node.context.callPath contains "exportAll" and not (node.context.selector contains "req.headers.origin") and not (containsAny(node.scopeCall.any, [verifyCsrfToken, validateCsrfToken, checkCsrf, csrf]))
   emit issue code.BrowserPostExportMissingOriginGuard at node
 }

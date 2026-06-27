@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding missingSessionRotationAfterAuthentication69 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "call:setAuthentication" and node.token contains "call:getSession" and not (node.scopeCall.any contains "invalidate")
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "setAuthentication" and node.context.call contains "getSession" and not (node.scopeCall.any contains "invalidate")
   emit issue code.MissingSessionRotationAfterAuthentication at node
 }

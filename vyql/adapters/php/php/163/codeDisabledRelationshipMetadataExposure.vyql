@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding disabledRelationshipMetadataExposure163 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=getRelatableResourceTypes" and node.token contains "$fieldinstanceofResourceTypeRelationship" and node.token contains "$field->getRelatableResourceTypes()" and not (node.token contains "$field->isFieldEnabled()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getRelatableResourceTypes" and node.token contains "$fieldinstanceofResourceTypeRelationship" and node.token contains "$field->getRelatableResourceTypes()" and not (node.token contains "$field->isFieldEnabled()")
   emit issue code.DisabledRelationshipMetadataExposure at node
 }

@@ -4,6 +4,6 @@ binding protocolStateReview8 {
   requires {
     dependency("next")
   }
-  query pattern presenceNode where node.scope == "function" and node.token contains "name=updateSession" and node.token contains "request.headers" and node.token contains "getSessionFromCookie" and node.token contains "verifyAccessToken" and node.token contains "newRequestHeaders.set(sessionHeaderName" and node.token contains "NextResponse.next" and not (node.token contains "newRequestHeaders.delete(sessionHeaderName)")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "updateSession" and node.token contains "request.headers" and node.token contains "getSessionFromCookie" and node.token contains "verifyAccessToken" and node.token contains "newRequestHeaders.set(sessionHeaderName" and node.token contains "NextResponse.next" and not (node.token contains "newRequestHeaders.delete(sessionHeaderName)")
   emit issue code.ProtocolStateReview at node
 }

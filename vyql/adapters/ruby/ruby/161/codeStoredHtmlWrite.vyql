@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding storedHtmlWrite161 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=cama_comments_render_html" and node.token contains "#{comment.content}" and not (node.token contains "sanitize comment.content")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.name contains "cama_comments_render_html" and node.token contains "#{comment.content}" and not (node.token contains "sanitize comment.content")
   emit issue code.StoredHtmlWrite at node
 }

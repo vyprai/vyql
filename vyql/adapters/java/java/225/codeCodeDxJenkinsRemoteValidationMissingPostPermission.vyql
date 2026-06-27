@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding codeDxJenkinsRemoteValidationMissingPostPermission225 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doFillProjectIdItems" and node.token contains "call:buildClient" and node.token contains "call:getProjects" and not (node.token contains "annotation:POST") and not (node.scopeCall.any contains "checkPermissionForRemoteRequests")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doFillProjectIdItems" and node.context.call contains "buildClient" and node.context.call contains "getProjects" and not (node.context.annotation contains "POST") and not (node.scopeCall.any contains "checkPermissionForRemoteRequests")
   emit issue code.CodeDxJenkinsRemoteValidationMissingPostPermission at node
 }

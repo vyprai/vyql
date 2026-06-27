@@ -1,7 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding integerSizeArithmetic57 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:crypt_raw" and node.token contains "expr:1<<log_rounds" and not (node.scopeCall.any contains "roundsForLogRounds")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "crypt_raw" and node.context.expr contains "1<<log_rounds" and not (node.scopeCall.any contains "roundsForLogRounds")
   emit issue code.IntegerSizeArithmetic at node
   emit sink code.IntegerSizeArithmeticSink at node
 }
