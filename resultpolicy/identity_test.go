@@ -85,6 +85,37 @@ policy confidence default {
 	}
 }
 
+func TestLifecyclePolicyFromV2Decl(t *testing.T) {
+	prog, err := parser.ParseV2(`
+module policies.core;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	policy, err := LifecyclePolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	if err != nil {
+		t.Fatalf("LifecyclePolicyFromDecl: %v", err)
+	}
+	if !policy.FlagWhenIssue(true) || policy.FlagWhenIssue(false) {
+		t.Fatalf("flag lifecycle predicate mismatch")
+	}
+	if !policy.CandidateWhenMatchedRule(true) || policy.CandidateWhenMatchedRule(false) {
+		t.Fatalf("candidate lifecycle predicate mismatch")
+	}
+	if !policy.FindingWhen(true, false) || policy.FindingWhen(true, true) || policy.FindingWhen(false, false) {
+		t.Fatalf("finding lifecycle predicate mismatch")
+	}
+	if !policy.CheckWhen(true, false) || !policy.CheckWhen(false, true) || policy.CheckWhen(false, false) {
+		t.Fatalf("check lifecycle predicate mismatch")
+	}
+}
+
 func TestIdentityPolicyDedupUsesFindingKey(t *testing.T) {
 	policy := IdentityPolicy{
 		FindingKey:  []string{"rule.id", "primaryTarget.location", "primaryTarget.concept"},

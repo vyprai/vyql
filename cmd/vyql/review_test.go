@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -23,7 +24,7 @@ func TestCollectReviewItemsDeduplicatesSameCallSite(t *testing.T) {
 		},
 	}
 
-	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}})
+	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract())
 	if len(got) != 1 {
 		t.Fatalf("review items = %d, want 1", len(got))
 	}
@@ -38,7 +39,7 @@ func TestCollectReviewItemsHandlesNilStore(t *testing.T) {
 		},
 	}
 
-	if got := collectReviewItemsWithPolicy(nil, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}}); len(got) != 0 {
+	if got := collectReviewItemsWithPolicy(nil, reviewConcepts, reviewDisplayPolicy{flagSort: []string{"location"}}, resultpolicy.DefaultLifecycleContract()); len(got) != 0 {
 		t.Fatalf("review items = %d, want 0", len(got))
 	}
 }
@@ -56,7 +57,7 @@ func TestCollectReviewItemsUsesDisplayPolicyFlagSort(t *testing.T) {
 
 	got := collectReviewItemsWithPolicy(store, reviewConcepts, reviewDisplayPolicy{
 		flagSort: []string{"concept"},
-	})
+	}, resultpolicy.DefaultLifecycleContract())
 	if len(got) != 2 {
 		t.Fatalf("review items = %d, want 2", len(got))
 	}
@@ -83,7 +84,7 @@ func TestCollectReviewItemsUsesDisplayPolicyNearbyCheckLimit(t *testing.T) {
 		flagSort:            []string{"location"},
 		includeNearbyChecks: true,
 		nearbyCheckLimit:    2,
-	})
+	}, resultpolicy.DefaultLifecycleContract())
 	var target *reviewItem
 	for i := range got {
 		if got[i].Concept == "code.TargetReview" {
