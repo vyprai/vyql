@@ -757,8 +757,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			case action.Kind == "emit issue":
 				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = appendV2BindingAction(out, m, b.Attrs)
-			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
-				m := shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+			case action.Kind == "emit fact":
+				m, err := lowerV2FactEmit(b.Name, shape, action, pkgs, req)
+				if err != nil {
+					return nil, err
+				}
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case strings.HasPrefix(action.Kind, "propagate "):
 				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs, req)
@@ -772,6 +775,19 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		}
 	}
 	return out, nil
+}
+
+func lowerV2FactEmit(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
+	if action.Location == "call.result" && action.About != "" {
+		return shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}), nil
+	}
+	if action.About != "" {
+		return BindingAction{}, fmt.Errorf("binding %s: emit fact about metadata is only supported for call.result receiver-type facts", binding)
+	}
+	if action.Location != "call" && action.Location != "node" {
+		return BindingAction{}, fmt.Errorf("binding %s: emit fact currently lowers at call/node only", binding)
+	}
+	return shape.mapping(BindingAction{Kind: shape.factKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}), nil
 }
 
 func appendV2BindingAction(out []BindingAction, m BindingAction, attrs map[string]string) []BindingAction {
@@ -1763,6 +1779,13 @@ func (s v2CallShape) markKind() string {
 		return "mark_method"
 	}
 	return "mark"
+}
+
+func (s v2CallShape) factKind() string {
+	if s.Field == "callee.method" {
+		return "fact_method"
+	}
+	return "fact"
 }
 
 func lowerV2CallShapes(binding string, expr V2Expr) ([]v2CallShape, error) {

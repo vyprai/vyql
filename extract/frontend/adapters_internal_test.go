@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
@@ -2240,6 +2241,66 @@ binding secretComparison {
 	got := spec.markAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
 		t.Fatalf("binaryExpr pattern matched wrong nodes: %+v", got)
+	}
+}
+
+func TestV2FactEmitLabelsMatchedCall(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.facts;
+concept PublicEndpoint : fact {}
+binding expressRoute {
+  query pattern callExpr where callee.method == "get"
+  emit fact PublicEndpoint at call
+  fidelity: resolved
+  confidence: high
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "route", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "app.get", "method": "get", "tech": "javascript",
+	}})
+	store.AddNode(usg.Node{ID: "post", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:8", "callee_path": "app.post", "method": "post", "tech": "javascript",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "route" || got[0].Concept != "bindings.javascript.facts.PublicEndpoint" {
+		t.Fatalf("fact emit labeled wrong nodes: %+v", got)
+	}
+	if got[0].Fidelity != "resolved" || got[0].Confidence != "high" {
+		t.Fatalf("fact emit provenance = fidelity %q confidence %q, want resolved/high", got[0].Fidelity, got[0].Confidence)
+	}
+
+	applied := usg.NewInMemStore()
+	applied.AddNode(usg.Node{ID: "route", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "app.get", "method": "get", "tech": "javascript",
+	}})
+	applied.AddNode(usg.Node{ID: "post", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:8", "callee_path": "app.post", "method": "post", "tech": "javascript",
+	}})
+	if _, suppressed, err := adapters.Apply(applied, []adapters.Adapter{spec.markAdapter()}, nil); err != nil {
+		t.Fatalf("apply fact adapter: %v", err)
+	} else if len(suppressed) != 0 {
+		t.Fatalf("suppressed fact mappings: %+v", suppressed)
+	}
+	labels, err := applied.Labels("route")
+	if err != nil {
+		t.Fatalf("route labels: %v", err)
+	}
+	if len(labels) != 1 || labels[0].Concept != "bindings.javascript.facts.PublicEndpoint" {
+		t.Fatalf("route labels = %+v, want PublicEndpoint", labels)
+	}
+	postLabels, err := applied.Labels("post")
+	if err != nil {
+		t.Fatalf("post labels: %v", err)
+	}
+	if len(postLabels) != 0 {
+		t.Fatalf("post labels = %+v, want none", postLabels)
 	}
 }
 

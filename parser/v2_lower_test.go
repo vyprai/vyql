@@ -1195,6 +1195,50 @@ binding sqlOpenType {
 	}
 }
 
+func TestV2FactEmitLowersToPresenceLabel(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.facts;
+concept PublicEndpoint : fact {}
+binding expressRoute {
+  query pattern callExpr where callee.method == "get"
+  emit fact PublicEndpoint at call
+}
+binding routerUse {
+  query pattern callExpr where callee.path ~= "router.use"
+  emit fact PublicEndpoint at call
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[1].(*BindingSet)
+	if len(adapter.Mappings) != 2 {
+		t.Fatalf("mappings = %d, want 2: %+v", len(adapter.Mappings), adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "fact_method" || got.Pattern != "get" || got.Concept != "bindings.javascript.facts.PublicEndpoint" {
+		t.Fatalf("method fact lowering wrong: %+v", got)
+	}
+	if got := adapter.Mappings[1]; got.Kind != "fact" || got.Pattern != "router.use" || got.Concept != "bindings.javascript.facts.PublicEndpoint" {
+		t.Fatalf("path fact lowering wrong: %+v", got)
+	}
+}
+
+func TestV2FactEmitRejectsUnsupportedLocations(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module bindings.javascript.facts;
+binding routeArg {
+  query pattern callExpr where callee.method == "get"
+  emit fact code.Route at args[0]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions succeeded, want unsupported fact location diagnostic")
+	}
+	if !strings.Contains(err.Error(), "emit fact currently lowers at call/node only") {
+		t.Fatalf("error = %v, want fact location diagnostic", err)
+	}
+}
+
 func TestV2ValueGuardLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
