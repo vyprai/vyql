@@ -1799,6 +1799,7 @@ func packageInEvidence(want string, have map[string]bool) bool {
 type requirementGate struct {
 	packages   *packageGate
 	imports    *packageGate
+	versions   map[string][]string
 	languages  map[string]bool
 	files      map[string]bool
 	filesBuilt bool
@@ -1823,6 +1824,7 @@ func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[s
 	return &requirementGate{
 		packages:  newPackageGate(packages),
 		imports:   newPackageGate(importEvidence(s, tech, crossLang)),
+		versions:  dependencyVersionEvidence(s),
 		languages: langs,
 		store:     s,
 		tech:      tech,
@@ -1842,6 +1844,9 @@ func (g *requirementGate) eval(req parser.BindingRequirement) bool {
 	case "":
 		return true
 	case "dependency", "framework":
+		if req.Range != "" {
+			return g.dependencyVersionSatisfies(req.Value, req.Range)
+		}
 		return g.packages.inEvidence(req.Value)
 	case "import":
 		return g.imports.inEvidence(req.Value)
@@ -1876,6 +1881,162 @@ func (g *requirementGate) eval(req parser.BindingRequirement) bool {
 	default:
 		return false
 	}
+}
+
+func dependencyVersionEvidence(s usg.Store) map[string][]string {
+	out := map[string][]string{}
+	sbomIDs, _ := s.NodesOfType("sbom.PackageVersion")
+	for _, id := range sbomIDs {
+		n, ok, _ := s.GetNode(id)
+		if !ok {
+			continue
+		}
+		version := strings.TrimSpace(n.Prop("version"))
+		if version == "" {
+			continue
+		}
+		addPackageVersionEvidence(out, n.Prop("name"), version)
+	}
+	return out
+}
+
+func addPackageVersionEvidence(out map[string][]string, raw, version string) {
+	name := sca.NormalizePackageName(raw)
+	if name == "" {
+		return
+	}
+	add := func(key string) {
+		if key != "" {
+			out[key] = append(out[key], version)
+		}
+	}
+	add(name)
+	add(sca.PackageRoot(name))
+	for _, alias := range sca.ImportAliases(name) {
+		add(alias)
+	}
+}
+
+func (g *requirementGate) dependencyVersionSatisfies(pkg, expr string) bool {
+	for _, key := range packageEvidenceKeys(pkg) {
+		for _, version := range g.versions[key] {
+			if versionSatisfiesRange(version, expr) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func packageEvidenceKeys(raw string) []string {
+	name := sca.NormalizePackageName(raw)
+	if name == "" {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(key string) {
+		if key != "" && !seen[key] {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	add(name)
+	add(sca.PackageRoot(name))
+	for _, alias := range sca.ImportAliases(name) {
+		add(alias)
+	}
+	return out
+}
+
+func versionSatisfiesRange(version, expr string) bool {
+	for _, part := range strings.Fields(expr) {
+		if !versionSatisfiesComparator(version, part) {
+			return false
+		}
+	}
+	return strings.TrimSpace(expr) != ""
+}
+
+func versionSatisfiesComparator(version, cmp string) bool {
+	op := "="
+	value := cmp
+	for _, prefix := range []string{">=", "<=", ">", "<", "==", "="} {
+		if strings.HasPrefix(cmp, prefix) {
+			op = prefix
+			value = strings.TrimSpace(strings.TrimPrefix(cmp, prefix))
+			break
+		}
+	}
+	order, ok := compareVersions(version, value)
+	if !ok {
+		return false
+	}
+	switch op {
+	case "=", "==":
+		return order == 0
+	case ">=":
+		return order >= 0
+	case "<=":
+		return order <= 0
+	case ">":
+		return order > 0
+	case "<":
+		return order < 0
+	default:
+		return false
+	}
+}
+
+func compareVersions(a, b string) (int, bool) {
+	av, okA := parseVersionParts(a)
+	bv, okB := parseVersionParts(b)
+	if !okA || !okB {
+		return 0, false
+	}
+	n := len(av)
+	if len(bv) > n {
+		n = len(bv)
+	}
+	for i := 0; i < n; i++ {
+		var ai, bi int
+		if i < len(av) {
+			ai = av[i]
+		}
+		if i < len(bv) {
+			bi = bv[i]
+		}
+		if ai < bi {
+			return -1, true
+		}
+		if ai > bi {
+			return 1, true
+		}
+	}
+	return 0, true
+}
+
+func parseVersionParts(v string) ([]int, bool) {
+	v = strings.TrimSpace(strings.TrimPrefix(v, "v"))
+	if i := strings.IndexAny(v, "+-"); i >= 0 {
+		v = v[:i]
+	}
+	if v == "" {
+		return nil, false
+	}
+	raw := strings.Split(v, ".")
+	out := make([]int, 0, len(raw))
+	for _, part := range raw {
+		if part == "" {
+			return nil, false
+		}
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, false
+		}
+		out = append(out, n)
+	}
+	return out, true
 }
 
 func (g *requirementGate) ensureFiles() {

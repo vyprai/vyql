@@ -638,6 +638,12 @@ func TestV2RequirementLowersToPackageHintsAndRequirementTree(t *testing.T) {
 			wantOp:   "all",
 		},
 		{
+			name:     "dependency range",
+			req:      `dependency("express", range: ">=4 <6")`,
+			wantPkgs: []string{"express"},
+			wantOp:   "dependency",
+		},
+		{
 			name:     "import",
 			req:      `import("express")`,
 			wantPkgs: []string{"express"},
@@ -679,21 +685,19 @@ binding requestBody {
 			if got.Requirement == nil || got.Requirement.Op != tc.wantOp {
 				t.Fatalf("requirement = %#v, want op %q", got.Requirement, tc.wantOp)
 			}
+			if tc.name == "dependency range" && got.Requirement.Range != ">=4 <6" {
+				t.Fatalf("requirement range = %q, want >=4 <6", got.Requirement.Range)
+			}
 		})
 	}
 }
 
-func TestV2RequirementLoweringRejectsRangesAndMalformedCombinators(t *testing.T) {
+func TestV2RequirementLoweringRejectsMalformedCombinators(t *testing.T) {
 	cases := []struct {
 		name string
 		req  string
 		want string
 	}{
-		{
-			name: "version range",
-			req:  `dependency("express", range: ">=4 <6")`,
-			want: "version ranges",
-		},
 		{
 			name: "empty any",
 			req:  `any()`,

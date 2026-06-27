@@ -332,6 +332,9 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 	g.AddNode(usg.Node{ID: "pkg:generic/koa@1.0", Type: "sbom.PackageVersion", Props: map[string]string{
 		"name": "koa", "version": "1.0",
 	}})
+	g.AddNode(usg.Node{ID: "pkg:npm/express@4.18.2", Type: "sbom.PackageVersion", Props: map[string]string{
+		"name": "express", "version": "4.18.2",
+	}})
 	g.AddNode(usg.Node{ID: "call", Type: "code.Call", Loc: "app.js:3", Props: map[string]string{
 		"callee_path": "handler", "method": "handler",
 	}})
@@ -344,6 +347,8 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 	}{
 		{name: "dependency uses sbom evidence", req: parser.BindingRequirement{Op: "dependency", Value: "koa"}, want: true},
 		{name: "dependency preserves package evidence from imports", req: parser.BindingRequirement{Op: "dependency", Value: "express"}, want: true},
+		{name: "dependency range accepts matching version", req: parser.BindingRequirement{Op: "dependency", Value: "express", Range: ">=4 <6"}, want: true},
+		{name: "dependency range rejects nonmatching version", req: parser.BindingRequirement{Op: "dependency", Value: "koa", Range: ">=4 <6"}, want: false},
 		{name: "import uses import evidence", req: parser.BindingRequirement{Op: "import", Value: "express"}, want: true},
 		{name: "language uses scan technology evidence", req: parser.BindingRequirement{Op: "language", Value: "javascript"}, want: true},
 		{name: "file uses lazy file evidence", req: parser.BindingRequirement{Op: "file", Value: "app.js"}, want: true},

@@ -1704,6 +1704,7 @@ func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 
 func lowerV2PrimitiveRequirement(req V2Requirement) (BindingRequirement, error) {
 	values := make([]string, 0, len(req.Args))
+	rangeValue := ""
 	for _, raw := range req.Args {
 		switch arg := raw.(type) {
 		case string:
@@ -1712,7 +1713,12 @@ func lowerV2PrimitiveRequirement(req V2Requirement) (BindingRequirement, error) 
 			}
 		case V2NamedArg:
 			if req.Name == "dependency" && arg.Name == "range" {
-				return BindingRequirement{}, fmt.Errorf("dependency version ranges need native v2 version requirement evaluation")
+				s, ok := arg.Value.(string)
+				if !ok || strings.TrimSpace(s) == "" {
+					return BindingRequirement{}, fmt.Errorf("dependency range requires a non-empty string")
+				}
+				rangeValue = strings.TrimSpace(s)
+				continue
 			}
 			return BindingRequirement{}, fmt.Errorf("%s requirement named arg %q needs native v2 requirement evaluation", req.Name, arg.Name)
 		default:
@@ -1725,7 +1731,7 @@ func lowerV2PrimitiveRequirement(req V2Requirement) (BindingRequirement, error) 
 	if req.Name != "schema" && len(values) != 1 {
 		return BindingRequirement{}, fmt.Errorf("%s requirement requires exactly one string argument", req.Name)
 	}
-	return BindingRequirement{Op: req.Name, Value: strings.Join(values, "\x00")}, nil
+	return BindingRequirement{Op: req.Name, Value: strings.Join(values, "\x00"), Range: rangeValue}, nil
 }
 
 func v2RequirementPackageHints(req BindingRequirement) []string {

@@ -102,6 +102,7 @@ type BindingAction struct {
 type BindingRequirement struct {
 	Op    string // dependency, import, language, file, framework, schema, project.has, all, any, not, soft
 	Value string
+	Range string
 	Args  []BindingRequirement
 }
 
