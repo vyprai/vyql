@@ -1552,6 +1552,15 @@ type v2CallShape struct {
 	ValAbsents  []string
 }
 
+const maxV2CallShapeExpansion = 256
+
+func checkV2CallShapeExpansion(binding, op string, n int) error {
+	if n <= maxV2CallShapeExpansion {
+		return nil
+	}
+	return fmt.Errorf("binding %s: query predicate expansion for %s produced %d call shapes, limit %d", binding, op, n, maxV2CallShapeExpansion)
+}
+
 func (s v2CallShape) mapping(m BindingAction) BindingAction {
 	if s.ArgCountSet {
 		m.ArgCountSet = true
@@ -1638,6 +1647,9 @@ func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool) ([]v2Call
 	if err != nil {
 		return nil, err
 	}
+	if err := checkV2CallShapeExpansion(binding, "and", len(leftShapes)*len(rightShapes)); err != nil {
+		return nil, err
+	}
 	out := make([]v2CallShape, 0, len(leftShapes)*len(rightShapes))
 	for _, l := range leftShapes {
 		for _, r := range rightShapes {
@@ -1658,6 +1670,9 @@ func lowerV2CallShapeOr(binding string, left, right V2Expr, neg bool) ([]v2CallS
 	}
 	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkV2CallShapeExpansion(binding, "or", len(leftShapes)+len(rightShapes)); err != nil {
 		return nil, err
 	}
 	return append(leftShapes, rightShapes...), nil
@@ -1720,6 +1735,9 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		shapes, ok := lowerV2ArgsCountShapes(cmp, cmpNeg)
 		if !ok {
 			return nil, fmt.Errorf("binding %s: args.count predicate must compare to a non-negative integer or integer list", binding)
+		}
+		if err := checkV2CallShapeExpansion(binding, field, len(shapes)); err != nil {
+			return nil, err
 		}
 		return shapes, nil
 	case "call.filter.global", "filter.global":
@@ -1798,6 +1816,9 @@ func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v
 		}
 	default:
 		return nil, fmt.Errorf("binding %s: callee predicate operator %q is not implemented in scanner IR lowering", binding, cmp.Op)
+	}
+	if err := checkV2CallShapeExpansion(binding, field, len(values)); err != nil {
+		return nil, err
 	}
 	out := make([]v2CallShape, 0, len(values))
 	for _, value := range values {

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -917,6 +918,45 @@ binding requestBodies {
 		if got.Kind != "source" || got.Pattern != want || len(got.ValAbsents) != 1 || got.ValAbsents[0] != "safe" {
 			t.Fatalf("mapping %d = %+v, want source %s with nval safe", i, got, want)
 		}
+	}
+}
+
+func TestV2CallPredicateExpansionBudget(t *testing.T) {
+	longList := func(prefix string, n int) string {
+		values := make([]string, 0, n)
+		for i := 0; i < n; i++ {
+			values = append(values, fmt.Sprintf("%q", fmt.Sprintf("%s%d", prefix, i)))
+		}
+		return "[" + strings.Join(values, ", ") + "]"
+	}
+	intList := func(n int) string {
+		values := make([]string, 0, n)
+		for i := 0; i < n; i++ {
+			values = append(values, fmt.Sprintf("%d", i))
+		}
+		return "[" + strings.Join(values, ", ") + "]"
+	}
+	manyMethods := longList("method", maxV2CallShapeExpansion+1)
+	if _, err := ParseV2Definitions(`
+module bindings.javascript.generated;
+binding tooManyMethods {
+  query pattern callExpr where callee.method in ` + manyMethods + `
+  emit sink code.CommandExecution at args[0]
+}
+`); err == nil || !strings.Contains(err.Error(), "query predicate expansion for callee.method produced 257 call shapes, limit 256") {
+		t.Fatalf("oversized callee list error = %v", err)
+	}
+
+	seventeenMethods := longList("m", 17)
+	seventeenCounts := intList(17)
+	if _, err := ParseV2Definitions(`
+module bindings.javascript.generated;
+binding cartesian {
+  query pattern callExpr where callee.method in ` + seventeenMethods + ` and args.count in ` + seventeenCounts + `
+  emit sink code.CommandExecution at args[0]
+}
+`); err == nil || !strings.Contains(err.Error(), "query predicate expansion for and produced 289 call shapes, limit 256") {
+		t.Fatalf("cartesian expansion error = %v", err)
 	}
 }
 
