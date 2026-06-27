@@ -12,6 +12,12 @@ mechanic ruleVerb assume { solver: graph.assume }
 mechanic ruleVerb issue { solver: fact.exists }
 mechanic ruleVerb fact { solver: fact.exists }
 mechanic ruleVerb query { solver: query.semantic }
+mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
+mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
+mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
+mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
+mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
+mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
 `
 
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {

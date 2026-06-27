@@ -146,33 +146,42 @@ func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, 
 }
 
 type runtimeMechanics struct {
-	ruleSolvers map[string]string
+	ruleSolvers   map[string]string
+	coverageModes map[string]bool
 }
 
 func (m *runtimeMechanics) merge(other runtimeMechanics) {
-	if len(other.ruleSolvers) == 0 {
-		return
-	}
-	if m.ruleSolvers == nil {
+	if len(other.ruleSolvers) != 0 && m.ruleSolvers == nil {
 		m.ruleSolvers = make(map[string]string, len(other.ruleSolvers))
 	}
 	for verb, solver := range other.ruleSolvers {
 		m.ruleSolvers[verb] = solver
 	}
+	if len(other.coverageModes) != 0 && m.coverageModes == nil {
+		m.coverageModes = make(map[string]bool, len(other.coverageModes))
+	}
+	for mode := range other.coverageModes {
+		m.coverageModes[mode] = true
+	}
 }
 
 func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
-	out := runtimeMechanics{ruleSolvers: map[string]string{}}
+	out := runtimeMechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}}
 	if prog == nil {
 		return out
 	}
 	for _, d := range prog.Decls {
 		m, ok := d.(*V2MechanicDecl)
-		if !ok || m.Kind != "ruleVerb" {
+		if !ok {
 			continue
 		}
-		if solver := v2BlockItemString(m.Items, "solver"); solver != "" {
-			out.ruleSolvers[m.Name] = solver
+		switch m.Kind {
+		case "ruleVerb":
+			if solver := v2BlockItemString(m.Items, "solver"); solver != "" {
+				out.ruleSolvers[m.Name] = solver
+			}
+		case "coverage":
+			out.coverageModes[m.Name] = true
 		}
 	}
 	return out
@@ -222,7 +231,7 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtim
 				return nil, fmt.Errorf("binding %s: cannot infer technology from module %q", x.Name, x.Module)
 			}
 			ad := adapterFor(tech)
-			maps, err := lowerV2Binding(x, names, patterns)
+			maps, err := lowerV2Binding(x, names, patterns, mechanics)
 			if err != nil {
 				return nil, err
 			}
@@ -482,7 +491,7 @@ func v2BindingTechnology(module string) string {
 	return ""
 }
 
-func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver) ([]AdapterMapping, error) {
+func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics runtimeMechanics) ([]AdapterMapping, error) {
 	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
 		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
@@ -507,7 +516,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		}
 	}
 	if queryAlias == "node" {
-		if out, ok, err := lowerV2PresenceBinding(b, names, queryWhere, queryAlias); ok || err != nil {
+		if out, ok, err := lowerV2PresenceBinding(b, names, queryWhere, queryAlias, mechanics); ok || err != nil {
 			return out, err
 		}
 	}
@@ -524,6 +533,9 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		for _, action := range b.Outputs {
 			action.Concept = names.concept(action.Concept)
 			action.About = names.concept(action.About)
+			if err := validateV2OutputCoverageMechanics(b.Name, action, mechanics); err != nil {
+				return nil, err
+			}
 			switch {
 			case action.Kind == "emit source":
 				m := shape.mapping(AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
@@ -744,7 +756,7 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 	return where, alias, binds, nil
 }
 
-func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string) ([]AdapterMapping, bool, error) {
+func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics runtimeMechanics) ([]AdapterMapping, bool, error) {
 	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr)
 	if err != nil || !ok {
 		return nil, ok, err
@@ -768,6 +780,9 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 			return nil, true, fmt.Errorf("binding %s: presenceNode supports at most one coverage mode", b.Name)
 		}
 		if len(action.Covers) == 1 {
+			if err := validateV2OutputCoverageMechanics(b.Name, action, mechanics); err != nil {
+				return nil, true, err
+			}
 			coverage = action.Covers[0].Mode
 		}
 		flag := *fl
@@ -1150,6 +1165,18 @@ func validateV2ConcreteCheck(binding string, action V2BindingOutput) error {
 	default:
 		return fmt.Errorf("binding %s: coverage mode %q lowering is not implemented yet", binding, action.Covers[0].Mode)
 	}
+}
+
+func validateV2OutputCoverageMechanics(binding string, action V2BindingOutput, mechanics runtimeMechanics) error {
+	for _, cov := range action.Covers {
+		if cov.Mode == "" {
+			continue
+		}
+		if !mechanics.coverageModes[cov.Mode] {
+			return fmt.Errorf("binding %s: no loaded mechanic coverage %q", binding, cov.Mode)
+		}
+	}
+	return nil
 }
 
 func validateV2PathOnlyCheck(binding string, action V2BindingOutput) error {
@@ -1811,6 +1838,9 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 	for _, cl := range r.Clauses {
 		switch cl.Kind {
 		case "unless":
+			if !mechanics.coverageModes[cl.Coverage] {
+				return nil, fmt.Errorf("rule %s: no loaded mechanic coverage %q", r.Name, cl.Coverage)
+			}
 			switch cl.Coverage {
 			case "path":
 				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: PathCoveredBy{Concept: names.concept(cl.Concept)}})

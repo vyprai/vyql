@@ -76,7 +76,7 @@ rule SqlInjection {
 }
 
 func TestV2LoweringUsesAuthoredRuleVerbSolver(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module mechanics.test;
 mechanic ruleVerb flow {
   solver: dataflow.taint
@@ -512,8 +512,39 @@ rule SameReceiverCoverage {
 	}
 }
 
+func TestV2LoweringRequiresLoadedCoverageMechanicForCoveredBy(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module mechanics.test;
+mechanic ruleVerb issue { solver: fact.exists }
+
+module rules.review;
+rule GuardedIssue {
+  issue code.Problem as p
+  unless p.path coveredBy core.Guard
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic coverage "path"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want missing coverage mechanic", err)
+	}
+}
+
+func TestV2LoweringRequiresLoadedCoverageMechanicForCheckEmission(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module bindings.python.dbapi;
+binding parameterizedQuery {
+  query pattern callExpr where callee.method == "execute"
+  emit check core.SqlParameterization at args[0] {
+    covers path { from: args[0] to: call }
+  }
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic coverage "path"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want missing coverage mechanic", err)
+	}
+}
+
 func TestParseV2DefinitionsFallsThroughToV2Lowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.dbapi;
 binding cursorExecuteQuery {
   query pattern callExpr where callee.method == "execute"
@@ -544,7 +575,7 @@ adapter javascript {
 		t.Fatalf("ParseV2Definitions v1 error = %v, want v1 syntax rejection", err)
 	}
 
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module code;
 concept HttpInput : source {}
 
@@ -581,7 +612,7 @@ func TestV2DependencyRequirementLowersToLegacyPackageGate(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			decls, err := ParseV2Definitions(`
+			decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.express;
 binding requestBody {
   requires {
@@ -699,7 +730,7 @@ rule Two {
 }
 
 func TestV2ArgAnySinkLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.migration;
 binding catPath {
   query pattern callExpr where callee.path ~= "cat"
@@ -719,7 +750,7 @@ binding catPath {
 }
 
 func TestV2ExactPathSinkLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
 binding jqueryRoot {
   query pattern callExpr where callee.path == "$"
@@ -739,7 +770,7 @@ binding jqueryRoot {
 }
 
 func TestV2CollectionSinkLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding subprocessCall {
   query pattern callExpr where callee.path ~= "subprocess.call"
@@ -773,7 +804,7 @@ binding execAll {
 }
 
 func TestV2ReceiverConstraintLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.migration;
 binding servletParam {
   query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
@@ -807,7 +838,7 @@ binding urlOpen {
 }
 
 func TestV2CallPredicateInExpandsMappings(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.sql;
 binding sqlExecMethods {
   query pattern callExpr where callee.method in ["execute", "executeQuery"] and args.any.literal contains "SELECT"
@@ -842,7 +873,7 @@ binding sqlExecMethods {
 }
 
 func TestV2CallPredicateOrExpandsWithSharedConstraints(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.web;
 binding requestBodies {
   query pattern callExpr where (callee.path ~= "request.json" or callee.path ~= "request.get_json") and not args.any.literal contains "safe"
@@ -865,7 +896,7 @@ binding requestBodies {
 }
 
 func TestV2PropagateValueLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.c.migration;
 binding decodeOutParam {
   query call as c where c.callee.method == "decode"
@@ -912,7 +943,7 @@ binding badFlow {
 }
 
 func TestV2ReceiverTypeFactLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.migration;
 binding sqlOpenType {
   query pattern callExpr where callee.path ~= "sql.Open"
@@ -934,7 +965,7 @@ binding sqlOpenType {
 }
 
 func TestV2ValueGuardLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding yamlLoad {
   query pattern callExpr where callee.path == "yaml.load" and args.any.literal contains "Loader" and not args.any.literal contains "SafeLoader"
@@ -973,7 +1004,7 @@ binding unsafeMarker {
 }
 
 func TestV2AssumptionCheckLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding startsWithGuard {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
@@ -1014,7 +1045,7 @@ binding normpathSanitizer {
 }
 
 func TestV2AdvisoryCheckLowersToNonSuppressingMark(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding possiblePathValidation {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
@@ -1044,7 +1075,7 @@ binding possiblePathValidation {
 }
 
 func TestV2GlobalCheckLowersToExplicitGlobalEvidence(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding globalHardening {
   query pattern callExpr where callee.method == "enableHardening"
@@ -1067,7 +1098,7 @@ binding globalHardening {
 }
 
 func TestV2ParamSourceLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.library.migration;
 binding externalEntryInput {
   query param as param
@@ -1087,7 +1118,7 @@ binding externalEntryInput {
 }
 
 func TestV2ReceiverCheckLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding relativeTo {
   query pattern callExpr where callee.method == "relative_to"
@@ -1111,7 +1142,7 @@ binding relativeTo {
 }
 
 func TestV2CharFilterCheckLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.ruby.migration;
 binding gsubFilter {
   query pattern callExpr where callee.method == "gsub" and call.filter.global == true
@@ -1136,7 +1167,7 @@ binding gsubFilter {
 }
 
 func TestV2NonGlobalCharFilterCheckLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
 binding replaceFilter {
   query pattern callExpr where callee.method == "replace"
@@ -1188,7 +1219,7 @@ binding containmentCheck {
 }
 
 func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.perl.migration;
 binding cleartextChannel {
   query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")
@@ -1221,7 +1252,7 @@ binding cleartextChannel {
 }
 
 func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.crypto;
 binding weakRandom {
   query pattern presenceNode where node.path ~= "RANDOM"
@@ -1248,7 +1279,7 @@ binding weakRandom {
 }
 
 func TestV2PresenceNodeExactPathLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.dart.crypto;
 binding weakRandom {
   query pattern presenceNode where node.path == "Random"
@@ -1268,7 +1299,7 @@ binding weakRandom {
 }
 
 func TestV2PresenceNodeMethodPackagesAndMultipleEmits(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.ruby.logging;
 binding logWrite {
   requires {
@@ -1297,7 +1328,7 @@ binding logWrite {
 }
 
 func TestV2PresenceNodePreservesAdvisoryCheckMetadata(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.memory;
 binding memoryBounds {
   query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne"
@@ -1320,7 +1351,7 @@ binding memoryBounds {
 }
 
 func TestV2ImportedPresenceNodePatternLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.lua.crypto;
 uses patterns.core.presenceNode;
 binding weakHash {
@@ -1357,7 +1388,7 @@ binding unsupported {
 }
 
 func TestV2PresenceNodeOperandAndPseudoSubjectLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, ["token", "secret"]))
@@ -1384,7 +1415,7 @@ binding secretCompare {
 }
 
 func TestV2PresenceNodeSnakeCasePseudoSubjectLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and not (containsAny(node.scope_call.any, [scmp])) and containsAny(node.flow_to.op, [return])
@@ -1508,7 +1539,7 @@ binding unsupported {
 }
 
 func TestV2LoweringSupportsArgsCountBindingPredicate(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.express;
 binding executeWithParams {
   query pattern callExpr where callee.method == "execute" and args.count >= 2
@@ -1532,7 +1563,7 @@ binding executeWithParams {
 }
 
 func TestV2LoweringExpandsArgsCountInList(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.express;
 binding executeWithParamCounts {
   query pattern callExpr where callee.method == "execute" and args.count in [1, 3]
@@ -1554,7 +1585,7 @@ binding executeWithParamCounts {
 }
 
 func TestV2ConcreteCoverageChecksLowerWithExplicitCoverageMode(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.xml;
 binding endpointHardening {
   query pattern callExpr where callee.method == "setFeature"
@@ -1826,11 +1857,34 @@ mechanic ruleVerb assume { solver: graph.assume }
 mechanic ruleVerb issue { solver: fact.exists }
 mechanic ruleVerb fact { solver: fact.exists }
 mechanic ruleVerb query { solver: query.semantic }
+mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
+mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
+mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
+mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
+mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
+mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
 `
 
 func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 	t.Helper()
 	return parseRuntimeFiles(t, src)
+}
+
+func parseV2DefinitionsForTest(src string) ([]Decl, error) {
+	decls, err := ParseV2Definitions(v2CoreMechanicsForLoweringTest + "\n" + src)
+	if err != nil {
+		return nil, err
+	}
+	out := decls[:0]
+	for _, decl := range decls {
+		switch decl.(type) {
+		case *V2MechanicDecl, *V2PolicyDecl:
+			continue
+		default:
+			out = append(out, decl)
+		}
+	}
+	return out, nil
 }
 
 func parseRuntimeFiles(t *testing.T, srcs ...string) []Decl {
