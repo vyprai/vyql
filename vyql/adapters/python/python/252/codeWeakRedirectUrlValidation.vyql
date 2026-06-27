@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding weakRedirectUrlValidation252 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.token, ["function_name:validate_redirect", "function_name:is_safe_url", "function_name:safe_redirect"]) and node.context.callPath contains "urlsplit" and node.context.attrPath contains "request.host_url" and node.context.callPath contains "current_app.config.get" and containsAny(node.token, ["binary:__binop.not in"]) and containsAny(node.token, ["binary:__binop.ne"]) and not (containsAny(node.token, ["call_path:ord", "call_path:url.startswith", "call_path:url.replace", "call_path:quote", "call_path:urlquote"])) and not (containsAny(node.token, ["binary:__binop.le"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.functionName, ["validate_redirect", "is_safe_url", "safe_redirect"]) and node.context.callPath contains "urlsplit" and node.context.attrPath contains "request.host_url" and node.context.callPath contains "current_app.config.get" and containsAny(node.context.binary, ["__binop.not in"]) and containsAny(node.context.binary, ["__binop.ne"]) and not (containsAny(node.context.callPath, ["ord", "url.startswith", "url.replace", "quote", "urlquote"])) and not (containsAny(node.context.binary, ["__binop.le"]))
   emit issue code.WeakRedirectUrlValidation at node
 }

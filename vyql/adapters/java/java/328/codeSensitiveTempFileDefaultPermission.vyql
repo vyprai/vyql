@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding sensitiveTempFileDefaultPermission328 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "File.createTempFile" and containsAny(node.token, ["call_path:java.io.PrintWriter", "call_path:PrintWriter"]) and containsAny(node.token, ["call_path:Secret.toString", "call_path:getPrivateKeys"]) and not (containsAny(node.token, ["call_path:Files.createTempFile", "call_path:setReadable", "call_path:setWritable", "call_path:Files.setPosixFilePermissions", "call_path:PosixFilePermissions.asFileAttribute"]))
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "File.createTempFile" and containsAny(node.context.callPath, ["java.io.PrintWriter", "PrintWriter"]) and containsAny(node.context.callPath, ["Secret.toString", "getPrivateKeys"]) and not (containsAny(node.context.callPath, ["Files.createTempFile", "setReadable", "setWritable", "Files.setPosixFilePermissions", "PosixFilePermissions.asFileAttribute"]))
   emit issue code.SensitiveTempFileDefaultPermission at node
 }

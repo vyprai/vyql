@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding xmlParserCreate325 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "lxml.etree.XMLParser" and not (containsAny(node.token, ["call_arg:lxml.etree.XMLParser:resolve_entities=False", "call_arg:lxml.etree.XMLParser:no_network=True"]))
+  query pattern presenceNode where node.kind == "any" and node.path ~= "lxml.etree.XMLParser" and not (containsAny(node.context.callArg, ["lxml.etree.XMLParser:resolve_entities=False", "lxml.etree.XMLParser:no_network=True"]))
   emit issue code.XmlParserCreate at node
 }

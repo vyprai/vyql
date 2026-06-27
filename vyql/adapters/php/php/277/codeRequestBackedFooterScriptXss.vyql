@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding requestBackedFooterScriptXss277 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["subscript:$_REQUEST[\"footerScripts\"]", "subscript:$_REQUEST['footerScripts']"]) and containsAny(node.token, ["call_path:print", "call_path:echo"]) and not (containsAny(node.token, ["subscript:$GLOBALS[\"footerScripts\"]", "subscript:$GLOBALS['footerScripts']"]))
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["subscript:$_REQUEST[\"footerScripts\"]", "subscript:$_REQUEST['footerScripts']"]) and containsAny(node.context.callPath, ["print", "echo"]) and not (containsAny(node.token, ["subscript:$GLOBALS[\"footerScripts\"]", "subscript:$GLOBALS['footerScripts']"]))
   emit issue code.RequestBackedFooterScriptXss at node
 }

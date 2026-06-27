@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding webhookUrlFetchMissingSsrfGuard168 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.token, ["name=callWebhook", "name=sendWebhook", "name=deliverWebhook", "name=postWebhook"]) and containsAny(node.token, ["call_path:axios.post", "call_path:axios.request", "call_path:request.post", "call_path:undici.fetch", "call_path:fetch"]) and containsAny(node.token, ["selector:webhookUrl.url", "selector:webhook.url", "selector:callbackUrl", "selector:callback.url"]) and not (node.context.identifier contains "secureDispatcher") and not (containsAny(node.scopeCall.any, [safeFetch, fetchWithSsrfGuard, validateUrl, assertPublicUrl]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.name, ["callWebhook", "sendWebhook", "deliverWebhook", "postWebhook"]) and containsAny(node.context.callPath, ["axios.post", "axios.request", "request.post", "undici.fetch", "fetch"]) and containsAny(node.context.selector, ["webhookUrl.url", "webhook.url", "callbackUrl", "callback.url"]) and not (node.context.identifier contains "secureDispatcher") and not (containsAny(node.scopeCall.any, [safeFetch, fetchWithSsrfGuard, validateUrl, assertPublicUrl]))
   emit issue code.WebhookUrlFetchMissingSsrfGuard at node
 }

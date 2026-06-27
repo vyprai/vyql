@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding unparameterizedSqlExportStringBuilder498 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.callPath contains "cur.execute" and containsAny(node.token, ["identifier:creation_list", "identifier:values_list", "identifier:insert_list", "identifier:insert_query"]) and containsAny(node.token, ["identifier:plugin", "identifier:table", "identifier:col_names", "identifier:columns"]) and not (containsAny(node.token, ["call_path:sql.Identifier", "call_path:sql.Literal", "call_path:sql.Placeholder"])) and not (containsAny(node.token, ["call_path:cur.executemany", "call_path:execute_values", "call_path:execute_batch"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.callPath contains "cur.execute" and containsAny(node.context.identifier, ["creation_list", "values_list", "insert_list", "insert_query"]) and containsAny(node.context.identifier, ["plugin", "table", "col_names", "columns"]) and not (containsAny(node.context.callPath, ["sql.Identifier", "sql.Literal", "sql.Placeholder"])) and not (containsAny(node.context.callPath, ["cur.executemany", "execute_values", "execute_batch"]))
   emit issue code.UnparameterizedSqlExportStringBuilder at node
 }

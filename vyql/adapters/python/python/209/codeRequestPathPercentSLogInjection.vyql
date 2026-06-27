@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding requestPathPercentSLogInjection209 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.token, ["call_path:LOG.debug", "call_path:logger.debug", "call_path:logging.debug", "call_path:log.debug"]) and node.context.attrPath contains "request.path" and containsAny(node.token, ["call_arg:LOG.debug:Request to '%s'", "call_arg:logger.debug:request path %s", "call_arg:logging.debug:path %s", "call_arg:log.debug:path %s"]) and not (containsAny(node.token, ["call_arg:LOG.debug:Request to '%r'", "call_arg:logger.debug:request path %r", "call_arg:logging.debug:path %r", "call_arg:log.debug:path %r"])) and not (containsAny(node.token, ["call_path:repr", "call_path:escape", "call_path:sanitize"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["LOG.debug", "logger.debug", "logging.debug", "log.debug"]) and node.context.attrPath contains "request.path" and containsAny(node.context.callArg, ["LOG.debug:Request to '%s'", "logger.debug:request path %s", "logging.debug:path %s", "log.debug:path %s"]) and not (containsAny(node.context.callArg, ["LOG.debug:Request to '%r'", "logger.debug:request path %r", "logging.debug:path %r", "log.debug:path %r"])) and not (containsAny(node.context.callPath, ["repr", "escape", "sanitize"]))
   emit issue code.RequestPathPercentSLogInjection at node
 }

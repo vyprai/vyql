@@ -1,6 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding protocolStatusVectorUnknownArgumentFallback75 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.name contains "xdr_status_vector" and node.context.callPath contains "xdr_long" and node.context.callPath contains "xdr_wrapstring" and node.context.callPath contains "vectorDecode.push" and not (containsAny(node.token, ["identifier:isc_arg_unix", "identifier:isc_arg_win32", "identifier:isc_arg_gds", "identifier:isc_arg_warning", "identifier:isc_arg_next_mach"]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.name contains "xdr_status_vector" and node.context.callPath contains "xdr_long" and node.context.callPath contains "xdr_wrapstring" and node.context.callPath contains "vectorDecode.push" and not (containsAny(node.context.identifier, ["isc_arg_unix", "isc_arg_win32", "isc_arg_gds", "isc_arg_warning", "isc_arg_next_mach"]))
   emit issue code.ProtocolStatusVectorUnknownArgumentFallback at node
 }

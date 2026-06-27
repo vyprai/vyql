@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsStaplerStateChangeMissingPost239 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:doRemove", "function_name:doDelete"]) and containsAny(node.token, ["call:removeTemplateById", "call:delete", "call:remove"]) and node.context.call contains "checkPermission" and not (node.context.annotation contains "RequirePOST") and not (node.context.annotation contains "POST")
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doRemove", "doDelete"]) and containsAny(node.context.call, ["removeTemplateById", "delete", "remove"]) and node.context.call contains "checkPermission" and not (node.context.annotation contains "RequirePOST") and not (node.context.annotation contains "POST")
   emit issue code.JenkinsStaplerStateChangeMissingPost at node
 }

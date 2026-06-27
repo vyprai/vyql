@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding pairwiseConstraintIntersectionDos88 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.token, ["call_path:intersect_nodes", "call_path:name_constraints_intersect_nodes"]) and containsAny(node.token, ["call_path:node_list_add", "call_path:name_constraints_node_list_add"]) and containsAny(node.token, ["selector:permitted.size", "selector:permitted2.size", "selector:removed.size"]) and containsAny(node.token, ["binary:i<permitted2->size", "binary:j<removed.size", "binary:j<permitted2->size"]) and not (containsAny(node.token, ["call_path:ensure_sorted", "call_path:compare_name_constraint_nodes"])) and not (node.context.selector contains "sorted_view")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.callPath, ["intersect_nodes", "name_constraints_intersect_nodes"]) and containsAny(node.context.callPath, ["node_list_add", "name_constraints_node_list_add"]) and containsAny(node.context.selector, ["permitted.size", "permitted2.size", "removed.size"]) and containsAny(node.context.binary, ["i<permitted2->size", "j<removed.size", "j<permitted2->size"]) and not (containsAny(node.context.callPath, ["ensure_sorted", "compare_name_constraint_nodes"])) and not (node.context.selector contains "sorted_view")
   emit issue code.PairwiseConstraintIntersectionDos at node
 }

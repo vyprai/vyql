@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding commandStringWrapperExecution251 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["call_path:child_process.execSync", "call_path:execSync"]) and containsAny(node.token, ["identifier:command", "identifier:cmd"]) and not (containsAny(node.token, ["call_path:execFile", "call_path:execFileSync", "call_path:spawn", "call_path:spawnSync"]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["child_process.execSync", "execSync"]) and containsAny(node.context.identifier, ["command", "cmd"]) and not (containsAny(node.context.callPath, ["execFile", "execFileSync", "spawn", "spawnSync"]))
   emit issue code.CommandStringWrapperExecution at node
 }

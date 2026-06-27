@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding oAuthStateCookieValidationMissing253 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:verify_and_process", "function_name:oauth_callback", "function_name:auth_callback", "function_name:callback"]) and node.context.literal contains "state" and node.context.callPath contains "request.query_params.get" and containsAny(node.token, ["call:process_login", "call:exchange_code", "call:fetch_token"]) and not (node.context.literal contains "sso_state")
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["verify_and_process", "oauth_callback", "auth_callback", "callback"]) and node.context.literal contains "state" and node.context.callPath contains "request.query_params.get" and containsAny(node.context.call, ["process_login", "exchange_code", "fetch_token"]) and not (node.context.literal contains "sso_state")
   emit issue code.OAuthStateCookieValidationMissing at node
 }

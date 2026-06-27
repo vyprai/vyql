@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unencodedUrlQueryParameter235 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:generateURL", "function_name:getRenderer"]) and node.context.callPath contains "StringBuilder" and node.context.callPath contains "append" and containsAny(node.token, ["literal:?jobFilter=", "literal:&nodeFilter=", "literal:&launcherFilter="]) and containsAny(node.token, ["call_path:getJobFilter", "call_path:getNodeFilter", "call_path:getLauncherFilter"]) and not (containsAny(node.token, ["call_path:URLEncoder.encode", "call_path:Util.rawEncode", "call_path:encodeURIComponent"]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["generateURL", "getRenderer"]) and node.context.callPath contains "StringBuilder" and node.context.callPath contains "append" and containsAny(node.context.literal, ["?jobFilter=", "&nodeFilter=", "&launcherFilter="]) and containsAny(node.context.callPath, ["getJobFilter", "getNodeFilter", "getLauncherFilter"]) and not (containsAny(node.context.callPath, ["URLEncoder.encode", "Util.rawEncode", "encodeURIComponent"]))
   emit issue code.UnencodedUrlQueryParameter at node
 }

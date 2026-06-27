@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unicodeNormalizationAfterFilterBypass146 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:Preprocess", "function_name:preprocess", "function_name:Normalize", "function_name:normalize", "function_name:Canonical", "function_name:canonical", "function_name:Lookup", "function_name:lookup"]) and node.context.callPath contains "regexp.MustCompile.ReplaceAllString" and node.context.callPath contains "norm.NFKD.String" and node.context.callOrder contains "norm.NFKD.String>regexp.MustCompile.ReplaceAllString" and not (node.context.callOrder contains "regexp.MustCompile.ReplaceAllString>norm.NFKD.String") and containsAny(node.token, ["literal:-_ .", "literal:[-_ .]", "literal:-_."])
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["Preprocess", "preprocess", "Normalize", "normalize", "Canonical", "canonical", "Lookup", "lookup"]) and node.context.callPath contains "regexp.MustCompile.ReplaceAllString" and node.context.callPath contains "norm.NFKD.String" and node.context.callOrder contains "norm.NFKD.String>regexp.MustCompile.ReplaceAllString" and not (node.context.callOrder contains "regexp.MustCompile.ReplaceAllString>norm.NFKD.String") and containsAny(node.context.literal, ["-_ .", "[-_ .]", "-_."])
   emit issue code.UnicodeNormalizationAfterFilterBypass at node
 }

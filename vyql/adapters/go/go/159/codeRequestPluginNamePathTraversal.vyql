@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding requestPluginNamePathTraversal159 {
-  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "ShouldBindJSON" and node.context.selector contains ".PlugName" and node.context.selector contains ".Snake" and containsAny(node.token, ["call_path:CreatePlug", "call_path:GeneratePlug", "call_path:CreatePlugin", "call_path:GeneratePlugin", "call_path:CreateModule", "call_path:GenerateModule"]) and not (containsAny(node.token, ["call_path:filepath.Base", "call_path:path.Base", "call_path:regexp.MatchString"])) and not (containsAny(node.token, ["call_arg:strings.Contains:filepath.Separator", "call_arg:strings.Contains:os.PathSeparator", "call_arg:strings.Contains:/", "call_arg:strings.Contains:\\"]))
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "ShouldBindJSON" and node.context.selector contains ".PlugName" and node.context.selector contains ".Snake" and containsAny(node.context.callPath, ["CreatePlug", "GeneratePlug", "CreatePlugin", "GeneratePlugin", "CreateModule", "GenerateModule"]) and not (containsAny(node.context.callPath, ["filepath.Base", "path.Base", "regexp.MatchString"])) and not (containsAny(node.token, ["call_arg:strings.Contains:filepath.Separator", "call_arg:strings.Contains:os.PathSeparator", "call_arg:strings.Contains:/", "call_arg:strings.Contains:\\"]))
   emit issue code.RequestPluginNamePathTraversal at node
 }
