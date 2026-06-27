@@ -2284,6 +2284,21 @@ rule ExternalAssume {
 	}
 }
 
+func TestLowerV2DefinitionSourcesRejectsParsedGoOwnedMechanic(t *testing.T) {
+	_, err := LowerV2DefinitionSources([]V2Source{{
+		Name: "mechanics/bad.vyql",
+		Program: &V2Program{
+			Module: "mechanics.bad",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "assume"},
+			},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "mechanic ruleVerb.assume is Go-owned") {
+		t.Fatalf("LowerV2DefinitionSources error = %v, want Go-owned mechanic diagnostic", err)
+	}
+}
+
 const v2CorePoliciesForLoweringTest = `
 module policies.core;
 policy resultIdentity default {

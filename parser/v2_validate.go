@@ -37,6 +37,7 @@ var (
 	v2FactEmitKinds            = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2PropagateKinds           = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
 	v2ProductionPropagateKinds = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
+	v2GoOwnedMechanicNames     = map[string]bool{"assume": true}
 	v2FidelityLevels           = map[string]bool{"syntactic": true, "resolved": true, "semantic": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
 	v2CoverageSolversByMode    = map[string][]string{
@@ -796,6 +797,9 @@ func v2DeclNames(module string, d V2Decl) (local, fq string) {
 
 func validateV2Mechanic(m *V2MechanicDecl) []error {
 	var errs []error
+	if v2GoOwnedMechanicNames[m.Name] {
+		errs = append(errs, fmt.Errorf("mechanic %s %s: %q is a Go-owned language mechanic and must not be authored in VyQL", m.Kind, m.Name, m.Name))
+	}
 	switch m.Kind {
 	case "coverage":
 		if !v2CoverageModes[m.Name] {

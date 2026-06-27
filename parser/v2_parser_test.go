@@ -1171,6 +1171,44 @@ mechanic ruleVerb taint {
 	}
 }
 
+func TestParseV2RejectsAuthoredGoOwnedMechanic(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "rule verb assume",
+			src: `module mechanics.bad;
+mechanic ruleVerb assume {
+  solver: graph.grant
+  fromKinds: [principal]
+  toKinds: [privilege]
+  allowedClauses: [where]
+}`,
+		},
+		{
+			name: "coverage assume",
+			src: `module mechanics.bad;
+mechanic coverage assume {
+  capability: coverage.path
+  coversWhen: solver.pathCovered(check.anchor, candidate.path)
+  targetParts: [path]
+}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want Go-owned mechanic rejection")
+			}
+			if !strings.Contains(err.Error(), "Go-owned language mechanic") {
+				t.Fatalf("error = %v, want Go-owned mechanic diagnostic", err)
+			}
+		})
+	}
+}
+
 func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module mechanics.custom;

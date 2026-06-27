@@ -75,6 +75,9 @@ func validateV2ParsedSourceMechanicBoundary(sources []V2Source) error {
 			if !ok {
 				continue
 			}
+			if v2GoOwnedMechanicNames[m.Name] {
+				errs = append(errs, fmt.Errorf("%s: mechanic %s.%s is Go-owned and must not be authored", src.Name, m.Kind, m.Name))
+			}
 			key := v2MechanicID{Kind: m.Kind, Name: m.Name}
 			if builtins[key] != "" {
 				errs = append(errs, fmt.Errorf("%s: duplicate v2 mechanic %s.%s; first declared in <builtin>", src.Name, m.Kind, m.Name))

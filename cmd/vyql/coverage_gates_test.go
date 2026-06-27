@@ -633,6 +633,8 @@ func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 		for _, line := range strings.Split(src, "\n") {
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "assume ") ||
+				strings.HasPrefix(trimmed, "mechanic ruleVerb assume") ||
+				strings.HasPrefix(trimmed, "mechanic coverage assume") ||
 				strings.HasPrefix(trimmed, "where assume(") ||
 				strings.Contains(trimmed, " assume(") ||
 				strings.Contains(trimmed, " and assume(") ||
