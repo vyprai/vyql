@@ -2149,6 +2149,43 @@ binding sqlLiteralQuery {
 	}
 }
 
+func TestV2BindingQueryReferencesCallRequiresScopedCall(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+concept CommandExecution : sink {}
+binding guardedDanger {
+  query call as c where c.callee.method == "danger" references call as other where other.callee.method == "safe"
+  emit sink CommandExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "matchedArg", Type: "code.Arg", Scope: "fn", Props: map[string]string{
+		"loc": "app.js:7",
+	}})
+	store.AddNode(usg.Node{ID: "matchedCall", Type: "code.Call", Scope: "fn", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "danger", "method": "danger", "arg0": "matchedArg",
+	}})
+	store.AddNode(usg.Node{ID: "safeCall", Type: "code.Call", Scope: "fn", Props: map[string]string{
+		"loc": "app.js:8", "callee_path": "safe", "method": "safe",
+	}})
+	store.AddNode(usg.Node{ID: "otherArg", Type: "code.Arg", Scope: "other", Props: map[string]string{
+		"loc": "app.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "otherCall", Type: "code.Call", Scope: "other", Props: map[string]string{
+		"loc": "app.js:20", "callee_path": "danger", "method": "danger", "arg0": "otherArg",
+	}})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "matchedArg" || got[0].Concept != "bindings.javascript.composed.CommandExecution" {
+		t.Fatalf("scoped relation sink labels = %+v, want only matchedArg", got)
+	}
+}
+
 func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
 	want := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
 	if want == "" {

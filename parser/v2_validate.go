@@ -1630,7 +1630,14 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 }
 
 func v2SupportedBindingQueryRelationStep(q V2QueryExpr, step V2QueryStep) bool {
-	return q.Family == "call" &&
+	if normalizedV2CodeFamily(q.Family) == "call" &&
+		(step.Relation == "references" || step.Relation == "sameScope") &&
+		normalizedV2CodeFamily(step.Family) == "call" &&
+		step.Alias != "" &&
+		step.Where != nil {
+		return true
+	}
+	return normalizedV2CodeFamily(q.Family) == "call" &&
 		(step.Relation == "encloses" || step.Relation == "contains") &&
 		v2LiteralRelationFamily(step.Family) &&
 		step.Alias != "" &&

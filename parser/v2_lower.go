@@ -856,6 +856,13 @@ func v2AssignmentImplicitExpr() V2Expr {
 }
 
 func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
+	if (step.Relation == "references" || step.Relation == "sameScope") && normalizedV2CodeFamily(step.Family) == "call" && step.Alias != "" && step.Where != nil {
+		rewritten, err := rewriteV2BindingRelationRefs(step.Where, step.Alias)
+		if err != nil {
+			return nil, fmt.Errorf("binding %s: %w", binding, err)
+		}
+		return rewritten, nil
+	}
 	if (step.Relation != "encloses" && step.Relation != "contains") || !v2LiteralRelationFamily(step.Family) || step.Alias == "" || step.Where == nil {
 		return nil, fmt.Errorf("binding %s: query relation step %s %s needs native production v2 lowering", binding, step.Relation, step.Family)
 	}
@@ -874,10 +881,14 @@ func rewriteV2BindingRelationRefs(expr V2Expr, alias string) (V2Expr, error) {
 		head, rest, ok := strings.Cut(x.Name, ".")
 		if ok && head == alias {
 			switch rest {
+			case "callee.method":
+				return V2RefExpr{Name: "scope.call.method"}, nil
+			case "callee.path":
+				return V2RefExpr{Name: "scope.call.path"}, nil
 			case "value", "raw", "literal":
 				return V2RefExpr{Name: "args.any.literal"}, nil
 			default:
-				return nil, fmt.Errorf("literal relation field %q needs native production v2 lowering", rest)
+				return nil, fmt.Errorf("relation field %q needs native production v2 lowering", rest)
 			}
 		}
 		return x, nil
@@ -1948,6 +1959,7 @@ type v2CallShape struct {
 	ArgCountMax int
 	ValMatches  []string
 	ValAbsents  []string
+	ScopePreds  []BindingPresencePredicate
 }
 
 const maxV2CallShapeExpansion = 256
@@ -1966,6 +1978,7 @@ func (s v2CallShape) mapping(m BindingAction) BindingAction {
 		m.ArgCountMin = s.ArgCountMin
 		m.ArgCountMax = s.ArgCountMax
 	}
+	m.ScopePredicates = append(m.ScopePredicates, s.ScopePreds...)
 	return m
 }
 
@@ -2135,6 +2148,8 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool, family str
 			return nil, fmt.Errorf("binding %s: receiver type predicate must compare to string or string list", binding)
 		}
 		return []v2CallShape{{Constraint: constraint}}, nil
+	case "scope.call.method", "scope.call.path":
+		return lowerV2ScopeCallShapes(binding, field, cmp, cmpNeg)
 	case "args.any.literal", "call.args.any.literal":
 		if cmp.Op != "contains" {
 			return nil, fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in scanner IR lowering", binding, cmp.Op)
@@ -2189,6 +2204,50 @@ func lowerV2NodeValueShapes(binding, field string, cmp V2BinaryExpr, neg bool) (
 		return []v2CallShape{{ValAbsents: []string{value}}}, nil
 	}
 	return []v2CallShape{{ValMatches: []string{value}}}, nil
+}
+
+func lowerV2ScopeCallShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	property := ""
+	exact := false
+	switch field {
+	case "scope.call.method":
+		property = "method"
+	case "scope.call.path":
+		property = "path"
+		exact = cmp.Op == "==" || cmp.Op == "in"
+	default:
+		return nil, fmt.Errorf("binding %s: scope relation field %q is not implemented in scanner IR lowering", binding, field)
+	}
+	var values []string
+	switch cmp.Op {
+	case "==", "~=":
+		if field == "scope.call.method" && cmp.Op == "~=" {
+			return nil, fmt.Errorf("binding %s: scope call method does not support ~=; use == or in", binding)
+		}
+		value, ok := v2LiteralString(cmp.Right)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
+		}
+		values = []string{value}
+	case "in":
+		var ok bool
+		values, ok = v2RuleWhereStringList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, fmt.Errorf("binding %s: %s in predicate requires a non-empty string list", binding, field)
+		}
+	default:
+		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
+	}
+	if err := checkV2CallShapeExpansion(binding, field, len(values)); err != nil {
+		return nil, err
+	}
+	return []v2CallShape{{ScopePreds: []BindingPresencePredicate{{
+		Subject:  "scope_call",
+		Property: property,
+		Values:   values,
+		Exact:    exact,
+		Negative: neg,
+	}}}}, nil
 }
 
 func lowerV2AssignmentTokenShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
@@ -2423,6 +2482,7 @@ func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, er
 	}
 	out.ValMatches = append(out.ValMatches, right.ValMatches...)
 	out.ValAbsents = append(out.ValAbsents, right.ValAbsents...)
+	out.ScopePreds = append(out.ScopePreds, right.ScopePreds...)
 	return out, nil
 }
 
@@ -2441,6 +2501,7 @@ func dedupeV2CallShapes(shapes []v2CallShape) []v2CallShape {
 			strconv.Itoa(shape.ArgCountMax),
 			strings.Join(shape.ValMatches, "\x00"),
 			strings.Join(shape.ValAbsents, "\x00"),
+			v2PresencePredicatesKey(shape.ScopePreds),
 		}, "\x01")
 		if seen[key] {
 			continue
@@ -2449,6 +2510,24 @@ func dedupeV2CallShapes(shapes []v2CallShape) []v2CallShape {
 		out = append(out, shape)
 	}
 	return out
+}
+
+func v2PresencePredicatesKey(preds []BindingPresencePredicate) string {
+	if len(preds) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(preds))
+	for _, pred := range preds {
+		parts = append(parts, strings.Join([]string{
+			pred.Subject,
+			pred.Property,
+			pred.Op,
+			strings.Join(pred.Values, "\x1f"),
+			strconv.FormatBool(pred.Exact),
+			strconv.FormatBool(pred.Negative),
+		}, "\x1e"))
+	}
+	return strings.Join(parts, "\x1d")
 }
 
 func v2CallQueryField(name, family string) string {
@@ -2532,6 +2611,7 @@ func v2IsKnownCallQueryField(name string) bool {
 		"node.value", "node.name", "node.module",
 		"assignment.any", "assignment.target", "assignment.value", "assignment.targetValue",
 		"assignment.call", "assignment.callMethod", "assignment.item", "assignment.literal",
+		"scope.call.method", "scope.call.path",
 		"args.any.literal", "call.args.any.literal",
 		"args.count", "call.args.count",
 		"call.filter.global", "filter.global":

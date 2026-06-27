@@ -32,6 +32,7 @@ type inputSpec struct {
 	Constraint  string   // optional `on <type>` receiver-type constraint
 	ValMatches  []string // `val "substr"` (AND) — only a source when an arg literal matches
 	ValAbsents  []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
+	ScopePreds  []flagPredicate
 	ArgCountSet bool
 	ArgCountMin int
 	ArgCountMax int
@@ -52,6 +53,7 @@ type sinkSpec struct {
 	ArgIndex        int      // which argument position is targeted (default 0)
 	ValMatches      []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents      []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
+	ScopePreds      []flagPredicate
 	ArgCountSet     bool
 	ArgCountMin     int
 	ArgCountMax     int
@@ -78,6 +80,7 @@ type controlSpec struct {
 	CollectionIndex int      // selected collection element index
 	ValMatches      []string // `val "substr"` (AND — marks AND controls)
 	ValAbsents      []string // `nval "substr"` (AND — marks AND controls)
+	ScopePreds      []flagPredicate
 	ArgCountSet     bool
 	ArgCountMin     int
 	ArgCountMax     int
@@ -795,6 +798,7 @@ type advisoryNeutralizerSpec struct {
 	Detail      map[string]string
 	ValMatches  []string
 	ValAbsents  []string
+	ScopePreds  []flagPredicate
 	ArgCountSet bool
 	ArgCountMin int
 	ArgCountMax int
@@ -947,6 +951,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 				effects[i] = reqGate.effect(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
 			}
 			var out []adapters.Mapping
+			var scopeIdx flagMatchIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
@@ -964,6 +969,9 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 						continue
 					}
 					if !valCondsDirectForNode(n, as.ValMatches, as.ValAbsents) {
+						continue
+					}
+					if !scopePredicatesMatch(s, &scopeIdx, as.ScopePreds, n, spec.Technology, spec.crossLang) {
 						continue
 					}
 					detail := cloneStringMap(as.Detail)
@@ -1161,17 +1169,18 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 	}
 	srcByConcept := map[string]int{}
 	for _, mp := range d.Mappings {
+		scopePreds := scopePredicatesFromMapping(mp)
 		switch mp.Kind {
 		case "source":
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(scopePreds) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
 				paths := []string{mp.Pattern}
 				if mp.Pattern == "" {
 					paths = nil
 				}
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
-					Paths: paths, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+					Paths: paths, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
 					Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 				break
@@ -1186,9 +1195,9 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 				s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 			}
 		case "source_method":
-			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(scopePreds) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
-					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
 					Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 				break
@@ -1205,80 +1214,80 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_arg":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
 				ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_method_arg":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark_arg":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
 				ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "fact":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "fact_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "fact_arg":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
 				ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "fact_method_arg":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark_method_arg":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "flag":
@@ -1306,7 +1315,7 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 				mode = "sanitizer"
 			}
 			s.AdvisoryNeutralizers = append(s.AdvisoryNeutralizers, advisoryNeutralizerSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
-				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				Detail: adapterMappingDetail(mp), ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		}
@@ -1358,6 +1367,32 @@ func cloneStringMap(in map[string]string) map[string]string {
 	return out
 }
 
+func scopePredicatesFromMapping(mp parser.BindingAction) []flagPredicate {
+	if len(mp.ScopePredicates) == 0 {
+		return nil
+	}
+	out := make([]flagPredicate, 0, len(mp.ScopePredicates))
+	for _, pred := range mp.ScopePredicates {
+		out = append(out, newFlagPredicate("scope_call", pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
+	}
+	return out
+}
+
+func scopePredicatesMatch(s usg.Store, idx *flagMatchIndex, preds []flagPredicate, n usg.Node, tech string, crossLang bool) bool {
+	for _, pred := range preds {
+		probe := pred
+		probe.Negative = false
+		hit := flagScopeNodeHit(s, idx, probe, n, []string{"code.Call"}, tech, crossLang)
+		if pred.Negative {
+			hit = !hit
+		}
+		if !hit {
+			return false
+		}
+	}
+	return true
+}
+
 // inputAdapter labels source reads. Prefix matching is `resolved`; `contains`
 // matching (Go's varying receivers) is `syntactic` → lower confidence.
 func (spec adapterSpec) inputAdapter() adapters.Adapter {
@@ -1384,6 +1419,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				effects[i] = reqGate.effect(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
 			}
 			var out []adapters.Mapping
+			var scopeIdx flagMatchIndex
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" && len(inIdx.loose) == 0 {
@@ -1415,6 +1451,9 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 						// tokens are present or absent as declared by the adapter.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
 							!valCondsDirectForNode(n, in.ValMatches, in.ValAbsents) {
+							continue
+						}
+						if !scopePredicatesMatch(s, &scopeIdx, in.ScopePreds, n, spec.Technology, spec.crossLang) {
 							continue
 						}
 						// active-profile gating: a profile restricts which
@@ -1472,6 +1511,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
 			var collectionIdx collectionFlowIndex
+			var scopeIdx flagMatchIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
@@ -1503,6 +1543,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						hit = false
 					}
 					if hit && !callArgCountMatches(n, sk.ArgCountSet, sk.ArgCountMin, sk.ArgCountMax) {
+						hit = false
+					}
+					if hit && !scopePredicatesMatch(s, &scopeIdx, sk.ScopePreds, n, spec.Technology, spec.crossLang) {
 						hit = false
 					}
 					if !hit {
@@ -1672,6 +1715,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 			}
 			var out []adapters.Mapping
 			var collectionIdx collectionFlowIndex
+			var scopeIdx flagMatchIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
@@ -1692,7 +1736,8 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
 						hit = false
 					}
-					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) {
+					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) &&
+						scopePredicatesMatch(s, &scopeIdx, c.ScopePreds, n, spec.Technology, spec.crossLang) {
 						nodeID := id
 						if c.Receiver {
 							nodeID = n.Prop("recv")
@@ -3496,6 +3541,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
 			}
 			var collectionIdx collectionFlowIndex
+			var scopeIdx flagMatchIndex
 			for _, nodeType := range nodeTypes {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
@@ -3523,6 +3569,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 							continue
 						}
 						if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {
+							continue
+						}
+						if !scopePredicatesMatch(s, &scopeIdx, m.ScopePreds, n, spec.Technology, crossLang) {
 							continue
 						}
 						detail, conf := reviewDetail(m.Concept, m.Pattern)

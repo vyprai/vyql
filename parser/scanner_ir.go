@@ -82,6 +82,7 @@ type BindingAction struct {
 	ArgCountMax      int      // maximum call arity when ArgCountSet is true; -1 = none
 	ValMatches       []string // required argument/option literal substrings (AND)
 	ValAbsents       []string // forbidden argument/option literal substrings (AND)
+	ScopePredicates  []BindingPresencePredicate
 	Packages         []string // dependency requirements required for the binding to fire
 	Requirement      *BindingRequirement
 	Fidelity         string // authored binding evidence fidelity: syntactic, resolved, or semantic

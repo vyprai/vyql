@@ -1115,19 +1115,28 @@ binding sqlLiteralQuery {
 	}
 }
 
-func TestV2BindingQueryRejectsUnsupportedRelationStep(t *testing.T) {
-	_, err := ParseV2Definitions(`
+func TestV2BindingQueryReferencesCallLowersToScopePredicate(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.composed;
-binding bad {
+binding dangerAfterGuard {
   query call as c where c.callee.method == "danger" references call as other where other.callee.method == "safe"
   emit sink code.CommandExecution at args[0]
 }
 `)
-	if err == nil {
-		t.Fatal("ParseV2Definitions succeeded, want unsupported relation diagnostic")
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	if !strings.Contains(err.Error(), "query relation step references call needs native production v2 lowering") {
-		t.Fatalf("error = %v, want relation diagnostic", err)
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "sink_method" || got.Pattern != "danger" || len(got.ScopePredicates) != 1 {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	pred := got.ScopePredicates[0]
+	if pred.Subject != "scope_call" || pred.Property != "method" || len(pred.Values) != 1 || pred.Values[0] != "safe" {
+		t.Fatalf("scope predicate wrong: %+v", pred)
 	}
 }
 
