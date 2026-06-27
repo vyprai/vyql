@@ -693,6 +693,9 @@ func (p *v2Parser) parseV2FieldValue() any {
 		return p.parseV2WordList()
 	case p.atWord("true"), p.atWord("false"):
 		return p.parseV2Bool()
+	case p.at(tWord) && isV2Number(p.peek().val):
+		n, _ := strconv.Atoi(p.next().val)
+		return n
 	case p.at(tLBrace):
 		return p.parseV2FieldBlock()
 	default:

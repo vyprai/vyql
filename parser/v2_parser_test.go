@@ -144,6 +144,7 @@ func TestParseV2ProgramContract(t *testing.T) {
 func TestParseV2ProfileDetectPredicates(t *testing.T) {
 	prog, err := ParseV2(`module profiles;
 profile web {
+  priority: 80
   detect: [
     any(dependency("flask"), dependency("django"), file("config/routes.rb")),
     project.has("ext:.py")
@@ -171,6 +172,9 @@ profile web {
 	entrypoints, ok := profile.Fields["entrypoints"].([]string)
 	if !ok || !stringListFieldEqual(entrypoints, []string{"code.HttpInput", "core.UserControlledData"}) {
 		t.Fatalf("entrypoints = %#v", profile.Fields["entrypoints"])
+	}
+	if got := profile.Fields["priority"]; got != 80 {
+		t.Fatalf("priority = %#v, want numeric 80", got)
 	}
 }
 

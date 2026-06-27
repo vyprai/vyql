@@ -3,6 +3,6 @@ module profiles;
 profile mobile_ios {
   detect: [any(file("Info.plist"), file("Package.swift"), dependency("UIKit"), dependency("SwiftUI"), dependency("WebKit"), project.has("ext:.xcodeproj"), project.has("ext:.swift"))]
   entrypoints: [code.PasteboardInput, code.URLSchemeInput, code.ExternalApiResponse, code.DatabaseRead, code.StoredDataRead, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
-  priority: "90"
+  priority: 90
   title: "Mobile app — iOS"
 }

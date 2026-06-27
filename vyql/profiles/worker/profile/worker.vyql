@@ -3,6 +3,6 @@ module profiles;
 profile worker {
   detect: [any(dependency("celery"), dependency("sidekiq"), dependency("bull"), dependency("bullmq"), dependency("kafkajs"), dependency("amqplib"), dependency("@aws-sdk/client-sqs"))]
   entrypoints: [code.MessageInput, code.ExternalApiResponse, code.HttpInput, code.FileUpload, code.PatternOptionInput, code.DatabaseRead, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
-  priority: "60"
+  priority: 60
   title: "Background worker / queue consumer"
 }

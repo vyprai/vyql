@@ -84,7 +84,7 @@ func TestLoadSourcesParsesV2Profiles(t *testing.T) {
 		Data: []byte(`module profiles;
 profile sample {
   title: "Sample"
-  priority: "12"
+  priority: 12
   detect: [any(dependency("sample"), file("sample.toml"))]
   entrypoints: [code.HttpInput, core.UserControlledData]
 }`),

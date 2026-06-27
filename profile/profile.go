@@ -532,6 +532,9 @@ func str(v any) string {
 }
 
 func intField(v any) int {
+	if n, ok := v.(int); ok {
+		return n
+	}
 	s := strings.TrimSpace(str(v))
 	if s == "" {
 		return 0
