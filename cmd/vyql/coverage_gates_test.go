@@ -186,7 +186,7 @@ func TestConceptRefsResolveGate(t *testing.T) {
 }
 
 // isGeneratedAdapter reports whether a data-file path is part of the dynamically-loaded
-// generated package-adapter corpus (bindings/packages/generated/<lang>/<pkg>.vyql), which
+// generated package-binding corpus (bindings/packages/generated/<lang>/<pkg>.vyql), which
 // is auxiliary content gated at scan time and excluded from the curated coherence gates.
 func isGeneratedAdapter(path string) bool {
 	return strings.Contains(filepath.ToSlash(path), "/bindings/packages/generated/")
@@ -883,8 +883,11 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"cmdAdapters",
 		"cmdValidateAdapter",
 		"OverlayAdapters",
+		"GeneratedPackageAdaptersFor",
+		"parseGeneratedPackageAdapterSource",
 		"adapter-overlay",
 		"overlay adapter",
+		"generated package adapter",
 		"usage: vyql adapters",
 		"validate-adapter parse",
 		"json:\"adapters",

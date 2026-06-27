@@ -102,18 +102,18 @@ func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 	}
 }
 
-func TestGeneratedPackageAdapterSourceRejectsLegacySyntax(t *testing.T) {
+func TestGeneratedPackageBindingSourceRejectsLegacySyntax(t *testing.T) {
 	source := datadir.Source{
 		Name: "bindings/packages/generated/javascript/legacy.vyql",
 		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
 	}
 
-	_, err := parseGeneratedPackageAdapterSource(source)
+	_, err := parseGeneratedPackageBindingSource(source)
 	if err == nil {
-		t.Fatal("generated package adapter accepted legacy syntax")
+		t.Fatal("generated package binding accepted legacy syntax")
 	}
-	if !strings.Contains(err.Error(), "invalid generated package adapter bindings/packages/generated/javascript/legacy.vyql") {
-		t.Fatalf("generated adapter error = %v, want generated file context", err)
+	if !strings.Contains(err.Error(), "invalid generated package binding bindings/packages/generated/javascript/legacy.vyql") {
+		t.Fatalf("generated binding error = %v, want generated file context", err)
 	}
 
 }

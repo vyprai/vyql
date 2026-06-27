@@ -1153,7 +1153,7 @@ func loadSpec(tech string) adapterSpec {
 }
 
 // specFromBindingSet builds an adapterSpec from an already-compiled v2 binding
-// set. Split out of loadSpec so the dynamic per-package adapter loader
+// set. Split out of loadSpec so the dynamic per-package binding loader
 // (packages.go) can reuse the exact same action-to-spec compilation.
 func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 	s := adapterSpec{Name: d.Name, Technology: d.Name}

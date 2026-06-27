@@ -1,15 +1,15 @@
 package frontend
 
-// Dynamic, dependency-gated package-adapter loading.
+// Dynamic, dependency-gated package-binding loading.
 //
-// The vyrun batch generates one package-aware adapter per (language, top-1000 package)
+// The vyrun batch generates one package-aware binding set per (language, top-1000 package)
 // under <data root>/bindings/packages/generated/<lang>/<pkg>/ or
 // <data root>/bindings/packages/generated/<lang>/<pkg>.vyql — ~9k mapped
 // catalogs. Loading all of them on every scan would parse thousands of files and build a spec with
 // tens of thousands of mappings for packages a project never touches. Instead this layer
-// loads ONLY the per-package adapters whose package is present in the project's dependency
+// loads ONLY the per-package bindings whose package is present in the project's dependency
 // evidence (imported modules + SBOM/manifest packages). That is the "dynamic import":
-// an adapter for `flask` is parsed and activated only when the scanned code actually
+// a binding for `flask` is parsed and activated only when the scanned code actually
 // depends on flask. Each loaded mapping still carries its v2 dependency requirement,
 // so the engine's apply-time packageAllowed gate remains the authoritative second check.
 
@@ -28,19 +28,19 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// generatedRoot is the directory holding the generated per-package adapter corpus.
+// generatedRoot is the directory holding the generated per-package binding corpus.
 func generatedRoot() string {
 	return filepath.Join(datadir.Root(), "bindings", "packages", "generated")
 }
 
-// GeneratedRoot exports generatedRoot so the incremental adapter-label cache can fingerprint
+// GeneratedRoot exports generatedRoot so the incremental binding-label cache can fingerprint
 // the specific generated per-package files a scan loads.
 func GeneratedRoot() string { return generatedRoot() }
 
 // DependencyEvidence collects the project's dependency surface from an already-built
 // graph: imported modules/symbols (code.Import) and declared packages (sbom.PackageVersion),
 // normalized and expanded to package roots. This is the gate set used to decide which
-// generated package adapters to load. It mirrors the per-mapping packageEvidence used at
+// generated package bindings to load. It mirrors the per-mapping packageEvidence used at
 // apply time but spans all languages (crossLang) so a single call covers a polyglot repo.
 func DependencyEvidence(s usg.Store) map[string]bool {
 	return packageEvidence(s, "", true)
@@ -48,13 +48,13 @@ func DependencyEvidence(s usg.Store) map[string]bool {
 
 var generatedPackageIndex sync.Map // map[tech]map[lowercase stem]actual stem
 
-// GeneratedPackageAdaptersFor loads the generated per-package adapters for a language,
+// GeneratedPackageBindingsFor loads the generated per-package bindings for a language,
 // restricted to packages present in deps. The generated directory is indexed once per
 // language, then each call reads only files named by project dependency evidence.
 // Missing corpus remains non-fatal because the generated catalog augments a scan.
 // Present generated files must parse/lower successfully so SCA/CVE verification
 // cannot silently lose package coverage. Returns nil when nothing matches.
-func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.Adapter {
+func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []adapters.Adapter {
 	if len(deps) == 0 {
 		return nil
 	}
@@ -68,12 +68,12 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 		if !ok {
 			continue
 		}
-		sources, err := readGeneratedPackageAdapterSources(tech, actual)
+		sources, err := readGeneratedPackageBindingSources(tech, actual)
 		if err != nil {
-			panic(fmt.Sprintf("frontend: read generated package adapter %s/%s: %v", tech, actual, err))
+			panic(fmt.Sprintf("frontend: read generated package binding %s/%s: %v", tech, actual, err))
 		}
 		for _, source := range sources {
-			decls, err := parseGeneratedPackageAdapterSource(source)
+			decls, err := parseGeneratedPackageBindingSource(source)
 			if err != nil {
 				panic(err.Error())
 			}
@@ -92,7 +92,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 	return adaptersFromSpec(specFromBindingSet(merged))
 }
 
-func readGeneratedPackageAdapterSources(tech, pkg string) ([]datadir.Source, error) {
+func readGeneratedPackageBindingSources(tech, pkg string) ([]datadir.Source, error) {
 	dirRel := filepath.ToSlash(filepath.Join("bindings", "packages", "generated", tech, pkg))
 	if info, err := os.Stat(filepath.Join(datadir.Root(), dirRel)); err == nil && info.IsDir() {
 		return datadir.ReadVYQLDir(dirRel)
@@ -102,10 +102,10 @@ func readGeneratedPackageAdapterSources(tech, pkg string) ([]datadir.Source, err
 	return datadir.ReadVYQL(dirRel + ".vyql")
 }
 
-func parseGeneratedPackageAdapterSource(source datadir.Source) ([]parser.Decl, error) {
+func parseGeneratedPackageBindingSource(source datadir.Source) ([]parser.Decl, error) {
 	decls, err := parseV2AdapterSources([]datadir.Source{source})
 	if err != nil {
-		return nil, fmt.Errorf("frontend: invalid generated package adapter %s: %w", source.Name, err)
+		return nil, fmt.Errorf("frontend: invalid generated package binding %s: %w", source.Name, err)
 	}
 	return decls, nil
 }
