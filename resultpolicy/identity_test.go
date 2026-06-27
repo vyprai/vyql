@@ -85,6 +85,45 @@ policy confidence default {
 	}
 }
 
+func TestPriorityPolicyFromV2Decl(t *testing.T) {
+	prog, err := parser.ParseV2(`
+module policies.core;
+policy priority default {
+  score severity {
+    critical: 4
+    high: 3
+    medium: 2
+    low: 1
+    info: 0
+    default: 1
+  }
+
+  factor confidenceLow {
+    when finding.confidence == low
+    weight: -2
+  }
+
+  bands: [
+    { band: "P0", min: 8 },
+    { band: "P1", min: 6 }
+  ]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	policy, err := PriorityPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	if err != nil {
+		t.Fatalf("PriorityPolicyFromDecl: %v", err)
+	}
+	if policy.SeverityRank("critical") != 4 || policy.SeverityRank("medium") != 2 || policy.SeverityRank("info") != 0 {
+		t.Fatalf("severity ranks wrong: critical=%d medium=%d info=%d", policy.SeverityRank("critical"), policy.SeverityRank("medium"), policy.SeverityRank("info"))
+	}
+	if policy.SeverityRank("custom") != 1 {
+		t.Fatalf("default severity rank = %d, want 1", policy.SeverityRank("custom"))
+	}
+}
+
 func TestLifecyclePolicyFromV2Decl(t *testing.T) {
 	prog, err := parser.ParseV2(`
 module policies.core;
