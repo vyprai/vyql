@@ -48,7 +48,7 @@ func markerApplicator(name, prop string, acceptedValues ...string) bindings.Appl
 	}
 }
 
-func TestMarkedAssetThreeAdapters(t *testing.T) {
+func TestMarkedAssetThreeApplicators(t *testing.T) {
 	onto := solverContractOntology()
 	decls, err := parseV2DefinitionsForTest(assetMarkerRule)
 	if err != nil {
@@ -60,16 +60,16 @@ func TestMarkedAssetThreeAdapters(t *testing.T) {
 	}
 
 	sources := []struct {
-		adapter  bindings.Applicator
-		provider string
+		applicator bindings.Applicator
+		provider   string
 	}{
-		{markerApplicator("alpha.adapter", "flag_a", "shared"), "alpha"},
-		{markerApplicator("beta.adapter", "flag_b", "enabled"), "beta"},
-		{markerApplicator("gamma.adapter", "flag_c", "open"), "gamma"},
+		{markerApplicator("alpha.binding", "flag_a", "shared"), "alpha"},
+		{markerApplicator("beta.binding", "flag_b", "enabled"), "beta"},
+		{markerApplicator("gamma.binding", "flag_c", "open"), "gamma"},
 	}
 	for _, p := range sources {
 		g := assetMarkerGraph()
-		if _, _, err := bindings.Apply(g, []bindings.Applicator{p.adapter}, nil); err != nil {
+		if _, _, err := bindings.Apply(g, []bindings.Applicator{p.applicator}, nil); err != nil {
 			t.Fatal(err)
 		}
 		fs, err := New(onto, g).Evaluate(compiled[0])
@@ -80,7 +80,7 @@ func TestMarkedAssetThreeAdapters(t *testing.T) {
 			t.Fatalf("%s: expected 1 marked asset finding, got %d", p.provider, len(fs))
 		}
 		if prov := fs[0].Bindings[0].LabelProvenance; !strings.Contains(prov, p.provider) {
-			t.Fatalf("%s: finding provenance should cite the adapter, got %q", p.provider, prov)
+			t.Fatalf("%s: finding provenance should cite the binding applicator, got %q", p.provider, prov)
 		}
 	}
 }

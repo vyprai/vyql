@@ -2291,7 +2291,7 @@ binding guardedDanger {
 	}
 }
 
-func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
+func TestJSDomValueInputApplicatorUsesFlowIndex(t *testing.T) {
 	want := singleOntologyRoleConcept(ontology.InternalConceptRoleDomInput)
 	if want == "" {
 		t.Fatal("DomInput analysis role did not resolve")
@@ -2314,7 +2314,7 @@ func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
 	}
 }
 
-func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
+func TestSourceApplicatorVisitsCallablePropertyNodeTypes(t *testing.T) {
 	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -2803,7 +2803,7 @@ func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
-func TestAdapterMetadataCrossLanguageAcceptsBoolAndString(t *testing.T) {
+func TestBindingMetadataCrossLanguageAcceptsBoolAndString(t *testing.T) {
 	for _, meta := range []map[string]any{
 		{"cross_language": true},
 		{"cross_language": "true"},
@@ -2815,7 +2815,7 @@ func TestAdapterMetadataCrossLanguageAcceptsBoolAndString(t *testing.T) {
 	}
 }
 
-func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
+func TestCheckApplicatorPreservesCoverageDetail(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
@@ -2848,7 +2848,7 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	}
 }
 
-func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
+func TestCheckApplicatorLabelsArgumentLocation(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2880,7 +2880,7 @@ func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
 	}
 }
 
-func TestControlAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
+func TestCheckApplicatorLabelsAdvisoryArgumentLocation(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2915,7 +2915,7 @@ func TestControlAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 	}
 }
 
-func TestControlAdapterLabelsGlobalArgumentLocation(t *testing.T) {
+func TestCheckApplicatorLabelsGlobalArgumentLocation(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2946,7 +2946,7 @@ func TestControlAdapterLabelsGlobalArgumentLocation(t *testing.T) {
 	}
 }
 
-func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
+func TestSinkApplicatorUsesBindingEvidenceAttrs(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2972,7 +2972,7 @@ func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
 	}
 }
 
-func TestFlagAdapterPreservesAdvisoryDetail(t *testing.T) {
+func TestPresenceApplicatorPreservesAdvisoryDetail(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
