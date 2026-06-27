@@ -470,7 +470,7 @@ func cmdBindings(args []string) error {
 			continue
 		}
 		for _, m := range ad.Mappings {
-			kind := bindingDisplayKind(m.Kind)
+			kind := bindingDisplayKind(m)
 			arrow := ""
 			if m.Concept != "" {
 				arrow = " → " + m.Concept
@@ -481,7 +481,7 @@ func cmdBindings(args []string) error {
 			byKind[kind] = append(byKind[kind], fmt.Sprintf("    %q%s", m.Pattern, arrow))
 		}
 	}
-	for _, kind := range []string{"source", "sink", "control", "mark", "filter", "advisory", "type"} {
+	for _, kind := range []string{"source", "sink", "check", "issue", "fact", "propagate", "filter", "advisory", "type"} {
 		rows := byKind[kind]
 		if len(rows) == 0 {
 			continue
@@ -495,9 +495,28 @@ func cmdBindings(args []string) error {
 	return nil
 }
 
-func bindingDisplayKind(mappingKind string) string {
-	if strings.HasPrefix(mappingKind, "advisory_") {
+func bindingDisplayKind(m parser.BindingAction) string {
+	mappingKind := m.Kind
+	if strings.HasPrefix(mappingKind, "presence_") {
+		return strings.TrimPrefix(mappingKind, "presence_")
+	}
+	if m.Advisory || strings.HasPrefix(mappingKind, "advisory_") {
 		return "advisory"
+	}
+	switch {
+	case strings.HasPrefix(mappingKind, "control"):
+		return "check"
+	case strings.HasPrefix(mappingKind, "issue"):
+		return "issue"
+	case strings.HasPrefix(mappingKind, "fact"):
+		return "fact"
+	case strings.HasPrefix(mappingKind, "flow"):
+		return "propagate"
+	case strings.HasPrefix(mappingKind, "mark"):
+		if m.Coverage != "" {
+			return "check"
+		}
+		return "issue"
 	}
 	return strings.SplitN(mappingKind, "_", 2)[0]
 }
@@ -574,7 +593,7 @@ func cmdValidateBinding(args []string) error {
 		packageSeen := map[string]bool{}
 		for _, m := range ad.Mappings {
 			item.Mappings = append(item.Mappings, mappingSummary{
-				Kind:     m.Kind,
+				Kind:     bindingDisplayKind(m),
 				Pattern:  m.Pattern,
 				Concept:  m.Concept,
 				Packages: m.Packages,

@@ -55,18 +55,57 @@ binding bad {
 }
 
 func TestBindingDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
-	cases := map[string]string{
-		"advisory_guard_method":   "advisory",
-		"advisory_sanitizer_path": "advisory",
-		"source_param":            "source",
-		"sink_call_arg":           "sink",
-		"control_authentication":  "control",
-		"type":                    "type",
+	cases := []struct {
+		in   parser.BindingAction
+		want string
+	}{
+		{parser.BindingAction{Kind: "advisory_guard_method"}, "advisory"},
+		{parser.BindingAction{Kind: "advisory_sanitizer_path"}, "advisory"},
+		{parser.BindingAction{Kind: "source_param"}, "source"},
+		{parser.BindingAction{Kind: "sink_call_arg"}, "sink"},
+		{parser.BindingAction{Kind: "control_authentication"}, "check"},
+		{parser.BindingAction{Kind: "issue_method"}, "issue"},
+		{parser.BindingAction{Kind: "presence_issue"}, "issue"},
+		{parser.BindingAction{Kind: "presence_check"}, "check"},
+		{parser.BindingAction{Kind: "flow_method"}, "propagate"},
+		{parser.BindingAction{Kind: "mark_method", Coverage: "global"}, "check"},
+		{parser.BindingAction{Kind: "mark_method", Coverage: ""}, "issue"},
+		{parser.BindingAction{Kind: "mark_method", Advisory: true}, "advisory"},
+		{parser.BindingAction{Kind: "type"}, "type"},
 	}
-	for in, want := range cases {
-		if got := bindingDisplayKind(in); got != want {
-			t.Fatalf("bindingDisplayKind(%q) = %q, want %q", in, got, want)
+	for _, tc := range cases {
+		if got := bindingDisplayKind(tc.in); got != tc.want {
+			t.Fatalf("bindingDisplayKind(%+v) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestValidateBindingReportsV2IssueKinds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "binding.vyql")
+	if err := os.WriteFile(path, []byte(`
+module bindings.javascript.test;
+binding callIssue {
+  query pattern callExpr where callee.method == "danger"
+  emit issue code.WeakCipher at call
+}
+binding presenceIssue {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "Random"
+  emit issue code.WeakRandomValue at node
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := captureStdout(t, func() error {
+		return cmdValidateBinding([]string{"-file", path})
+	})
+	if err != nil {
+		t.Fatalf("cmdValidateBinding: %v", err)
+	}
+	if strings.Contains(out, `"mark`) || strings.Contains(out, `"flag"`) {
+		t.Fatalf("validate-binding leaked legacy action kind:\n%s", out)
+	}
+	if got := strings.Count(out, `"kind": "issue"`); got != 2 {
+		t.Fatalf("validate-binding issue kind count = %d, want 2:\n%s", got, out)
 	}
 }
 

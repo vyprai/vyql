@@ -13,7 +13,7 @@ Status: `STABLE`
                 │  extractors + pattern matchers
                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ ADAPTERS  (pattern → concept binding, with provenance)          │
+│ BINDINGS  (pattern → concept binding, with provenance)          │
 └───────────────┬─────────────────────────────────────────────────┘
                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -92,26 +92,27 @@ concept SqlParameterization : control {
 }
 ```
 
-### Layer 3 — Adapter Layer (binding)
+### Layer 3 — Binding Layer
 
-Adapters map patterns to concepts for one technology, with provenance and
+Bindings map patterns to concepts for one technology, with provenance and
 confidence ([07](07-adapters-and-patterns.md)):
 
 ```vyql
-adapter javascript.express {
-  requires pattern javascript.member_call
-  map property_access(req, "body")  to HTTP_INPUT
-  map property_access(req, "query") to HTTP_INPUT
-  provenance { author: vypr.research, reviewed: true, confidence: high }
+module bindings.javascript.express;
+
+binding requestBody {
+  requires { dependency("express", range: ">=4 <6") }
+  query pattern callExpr where callee.path ~= "req.body"
+  emit source code.HttpInput at call.result
 }
 ```
 
-One concept may have hundreds of adapters across technologies. Conflicts are
+One concept may have hundreds of bindings across technologies. Conflicts are
 resolved by the precedence model in [07](07-adapters-and-patterns.md).
 
 ### Layer 4 — Rule Layer (intent)
 
-Rules reference **only concepts** — never patterns, adapters, or raw node
+Rules reference **only concepts** — never patterns, bindings, or raw node
 types. This boundary is what makes rules durable:
 
 ```vyql
@@ -122,8 +123,8 @@ rule vypr.injection.sql {
     cwe: [CWE-89]
     owasp: ["A03:2021"]
   }
-  taint HTTP_INPUT -> SQL_EXECUTION
-  unless sanitized_by SQL_PARAMETERIZATION
+  taint code.HttpInput -> code.SqlExecution as sink
+  unless sink.path coveredBy core.SqlParameterization
 }
 ```
 
@@ -174,8 +175,8 @@ with batch-only evaluation.
 |---|---|---|
 | Extractors | producing raw nodes/edges per technology | concepts, rules |
 | Pattern matchers | structural matching dialects | concepts, rules |
-| Adapters | pattern→concept binding | rules, other adapters' internals |
-| Ontology | concept definitions, taint kinds, mappings | technologies, adapters |
+| Bindings | pattern→concept binding | rules, other bindings' internals |
+| Ontology | concept definitions, taint kinds, mappings | technologies, bindings |
 | Rule packs | intent, metadata, tests | patterns, technologies |
 | Solvers | flow semantics per domain | rule syntax |
 | Engine core | planning, stratification, evaluation, proofs | technologies |
@@ -192,7 +193,7 @@ The two boundaries that must never erode, in order of importance:
 
 - **Nexus-embedded** (primary): engine runs against the central Nexus USG;
   continuous evaluation on graph deltas.
-- **CI mode**: per-repo subset — code extractor + relevant adapters + Tier 2
+- **CI mode**: per-repo subset — code extractor + relevant bindings + Tier 2
   rule packs; emits SARIF; graph is ephemeral and scoped to the repo plus an
   imported summary of org context (e.g., which services are internet-facing).
 - **CLI/dev mode**: same as CI with local caching; used by rule authors with

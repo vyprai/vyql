@@ -1,10 +1,10 @@
 # 05 — Language Specification
 
-Status: `DRAFT` — surface syntax and semantic core proposed for v0.1;
-grammar will be frozen after the Tier 1 vertical slice ships. The grammar and
-semantic core here were validated by a runnable prototype (`../poc/`): every
-rule form parses, and the compile-time checks below are implemented and tested
-(`poc/cases/case_02`, `case_03`, `case_07`).
+Status: `SUPERSEDED` — this file records the historical v1 prototype syntax.
+The production language contract is VyQL v2 in
+[21-vyql-v2-definition.md](21-vyql-v2-definition.md). Production parsers and
+shipped definitions must reject the v1 forms shown below, including `adapter`,
+`match`, `sanitized_by`, and `guarded_by`.
 
 ## Design constraints
 

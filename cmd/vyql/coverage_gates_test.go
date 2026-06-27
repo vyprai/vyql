@@ -963,6 +963,8 @@ func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 		"framework/config adapters",
 		"adapter files",
 		"Concepts, threat kinds, adapters",
+		"`mechanic` and `policy` declarations define the security semantics",
+		"v2 `mechanic` and `policy` declarations define the security semantics",
 	}
 	var hits []string
 	for _, rel := range docs {
@@ -980,6 +982,53 @@ func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 	if len(hits) > 0 {
 		sort.Strings(hits)
 		t.Fatalf("public docs must describe v2 authored content as bindings, not adapters:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	docs := []string{
+		"docs/03-architecture-overview.md",
+		"docs/07-adapters-and-patterns.md",
+		"docs/18-ai-integration.md",
+	}
+	forbidden := []string{
+		"validate-adapter",
+		"`adapters`",
+		"adapter javascript",
+		"adapter_decl",
+		"unless sanitized_by",
+		"unless guarded_by",
+		"adapter application",
+		"adapter labels",
+		"adapter coverage",
+		"AI adapters",
+		"│ ADAPTERS",
+	}
+	var hits []string
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		src := string(data)
+		for _, snippet := range forbidden {
+			if strings.Contains(src, snippet) {
+				hits = append(hits, rel+": "+snippet)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("current design docs must present v2 bindings, not v1 adapter syntax:\n%s", strings.Join(hits, "\n"))
+	}
+
+	legacySpec, err := os.ReadFile(filepath.Join(root, "docs/05-language-specification.md"))
+	if err != nil {
+		t.Fatalf("read legacy language spec: %v", err)
+	}
+	if !strings.Contains(string(legacySpec), "Status: `SUPERSEDED`") {
+		t.Fatalf("docs/05-language-specification.md contains historical v1 syntax and must remain explicitly superseded")
 	}
 }
 

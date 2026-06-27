@@ -834,7 +834,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 				}
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit issue":
-				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+				m := shape.mapping(BindingAction{Kind: shape.issueKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit fact":
 				m, err := lowerV2FactEmit(b.Name, shape, action, pkgs, req)
@@ -1297,7 +1297,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 		}
 		flag := *fl
 		out = appendV2BindingAction(out, BindingAction{
-			Kind:           "flag",
+			Kind:           v2PresenceOutputKind(action.Kind),
 			Concept:        action.Concept,
 			About:          action.About,
 			Advisory:       action.Advisory != nil && *action.Advisory,
@@ -1309,6 +1309,21 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 		}, b.Attrs)
 	}
 	return out, true, nil
+}
+
+func v2PresenceOutputKind(actionKind string) string {
+	switch actionKind {
+	case "emit source":
+		return "presence_source"
+	case "emit sink":
+		return "presence_sink"
+	case "emit check":
+		return "presence_check"
+	case "emit issue":
+		return "presence_issue"
+	default:
+		return "presence"
+	}
 }
 
 func lowerV2PresenceFlagExpr(alias string, expr V2Expr, matchers v2MatcherResolver) (*BindingPresence, bool, error) {
@@ -2083,6 +2098,13 @@ func (s v2CallShape) markKind() string {
 		return "mark_method"
 	}
 	return "mark"
+}
+
+func (s v2CallShape) issueKind() string {
+	if s.Field == "callee.method" {
+		return "issue_method"
+	}
+	return "issue"
 }
 
 func (s v2CallShape) factKind() string {

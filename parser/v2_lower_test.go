@@ -228,7 +228,7 @@ binding receiverFlow {
 	for _, want := range []string{
 		"source", "source_receiver", "source_param",
 		"sink_method", "sink_path", "sink_receiver",
-		"mark_method", "flag",
+		"issue_method", "presence_issue",
 		"control_method_arg:path", "control:endpoint", "control_receiver_method:sameReceiver", "mark_method_arg:global",
 		"advisory_guard_method", "filter_method",
 		"type", "fact_method_arg",
@@ -241,7 +241,7 @@ binding receiverFlow {
 	if got := seen["source_receiver"]; got.Pattern != "getParameter" || got.Constraint != "Request" {
 		t.Fatalf("receiver-constrained source did not preserve method and type: %+v", got)
 	}
-	if got := seen["flag"]; got.Flag == nil || len(got.Flag.Predicates) < 3 || got.Flag.Predicates[2].Negative != true {
+	if got := seen["presence_issue"]; got.Flag == nil || len(got.Flag.Predicates) < 3 || got.Flag.Predicates[2].Negative != true {
 		t.Fatalf("presence/flag predicates did not preserve positive and negative tests: %+v", got)
 	}
 	for _, m := range adapter.Mappings {
@@ -1057,7 +1057,7 @@ binding secretAttr {
 	if got := adapter.Mappings[0]; got.Kind != "source_method" || got.Pattern != "value" || got.NodeType != "code.Attr" {
 		t.Fatalf("memberAccess property lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[1]; got.Kind != "mark" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
+	if got := adapter.Mappings[1]; got.Kind != "issue" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
 		t.Fatalf("memberAccess path lowering wrong: %+v", got)
 	}
 }
@@ -1085,13 +1085,13 @@ binding weakCompare {
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 3 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
-	if got := adapter.Mappings[0]; got.Kind != "mark_method" || got.Pattern != "eq" || got.NodeType != "code.BinOp" {
+	if got := adapter.Mappings[0]; got.Kind != "issue_method" || got.Pattern != "eq" || got.NodeType != "code.BinOp" {
 		t.Fatalf("binaryExpr equality lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[1]; got.Kind != "mark_method" || got.Pattern != "===" || got.NodeType != "code.BinOp" {
+	if got := adapter.Mappings[1]; got.Kind != "issue_method" || got.Pattern != "===" || got.NodeType != "code.BinOp" {
 		t.Fatalf("binaryExpr strict equality lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[2]; got.Kind != "mark_method" || got.Pattern != "ne" || got.NodeType != "code.BinOp" {
+	if got := adapter.Mappings[2]; got.Kind != "issue_method" || got.Pattern != "ne" || got.NodeType != "code.BinOp" {
 		t.Fatalf("binaryExpr inline lowering wrong: %+v", got)
 	}
 }
@@ -1112,7 +1112,7 @@ binding secretAssignment {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
+	if got.Kind != "issue" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
 		t.Fatalf("assignment mapping wrong: %+v", got)
 	}
 	if len(got.ValMatches) != 3 || got.ValMatches[0] != "assign:" || got.ValMatches[1] != "assign:token" || got.ValMatches[2] != "=secret" {
@@ -1136,7 +1136,7 @@ binding secretAssignment {
 		t.Fatalf("mappings = %#v, want one conjunction with all absences", mappings)
 	}
 	got := mappings[0]
-	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 1 || got.ValMatches[0] != "assign:" {
+	if got.Kind != "issue" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 1 || got.ValMatches[0] != "assign:" {
 		t.Fatalf("assignment not in mapping wrong: %+v", got)
 	}
 	if len(got.ValAbsents) != 2 || got.ValAbsents[0] != "assign_item:viewer_scopes:CONFIG_READ" || got.ValAbsents[1] != "assign_item:guest_scopes:CONFIG_READ" {
@@ -1164,7 +1164,7 @@ binding secretAssignment {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
+	if got.Kind != "issue" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
 		t.Fatalf("assignment pattern mapping wrong: %+v", got)
 	}
 	if len(got.ValMatches) != 2 || got.ValMatches[0] != "assign:" || got.ValMatches[1] != "assign:config.secret" {
@@ -1205,7 +1205,7 @@ binding secretIssue {
 	if got := adapter.Mappings[0]; got.Kind != "sink_method" || got.Pattern != "eval" {
 		t.Fatalf("composed call pattern lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[1]; got.Kind != "mark" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
+	if got := adapter.Mappings[1]; got.Kind != "issue" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
 		t.Fatalf("composed member pattern lowering wrong: %+v", got)
 	}
 }
@@ -1709,7 +1709,7 @@ binding sqlLiteral {
 	}
 	seen := map[string]bool{}
 	for _, got := range mappings {
-		if got.Kind != "mark" || got.NodeType != "code.Literal" || len(got.ValMatches) != 1 {
+		if got.Kind != "issue" || got.NodeType != "code.Literal" || len(got.ValMatches) != 1 {
 			t.Fatalf("literal containsAny mapping wrong: %+v", got)
 		}
 		seen[got.ValMatches[0]] = true
@@ -1735,7 +1735,7 @@ binding nonSqlLiteral {
 		t.Fatalf("mappings = %#v, want one conjunction with all absences", mappings)
 	}
 	got := mappings[0]
-	if got.Kind != "mark" || got.NodeType != "code.Literal" || len(got.ValAbsents) != 2 || got.ValAbsents[0] != "SELECT" || got.ValAbsents[1] != "UPDATE" {
+	if got.Kind != "issue" || got.NodeType != "code.Literal" || len(got.ValAbsents) != 2 || got.ValAbsents[0] != "SELECT" || got.ValAbsents[1] != "UPDATE" {
 		t.Fatalf("literal not in mapping wrong: %+v", got)
 	}
 }
@@ -1757,7 +1757,7 @@ binding secretAssignment {
 	}
 	seen := map[string]bool{}
 	for _, got := range mappings {
-		if got.Kind != "mark" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 2 {
+		if got.Kind != "issue" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 2 {
 			t.Fatalf("assignment containsAny mapping wrong: %+v", got)
 		}
 		seen[got.ValMatches[1]] = true
@@ -2203,7 +2203,7 @@ binding cleartextChannel {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	m := adapter.Mappings[0]
-	if m.Kind != "flag" || m.Concept != "code.CleartextChannel" || m.Flag == nil {
+	if m.Kind != "presence_issue" || m.Concept != "code.CleartextChannel" || m.Flag == nil {
 		t.Fatalf("presenceNode mapping wrong: %+v", m)
 	}
 	if m.Flag.NodeKind != "any" || len(m.Flag.Predicates) != 3 {
@@ -2327,7 +2327,7 @@ binding presentFields {
 	}
 }
 
-func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
+func TestV2PresenceNodePatternLowersToPresenceIssue(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.crypto;
 binding weakRandom {
@@ -2343,7 +2343,7 @@ binding weakRandom {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	m := adapter.Mappings[0]
-	if m.Kind != "flag" || m.Concept != "code.WeakRandomValue" || m.Flag == nil {
+	if m.Kind != "presence_issue" || m.Concept != "code.WeakRandomValue" || m.Flag == nil {
 		t.Fatalf("presenceNode mapping wrong: %+v", m)
 	}
 	if m.Flag.NodeKind != "any" || len(m.Flag.Predicates) != 1 {
@@ -2394,7 +2394,7 @@ binding logWrite {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	for _, m := range adapter.Mappings {
-		if m.Kind != "flag" || m.Flag == nil || len(m.Flag.Predicates) != 1 || len(m.Packages) != 1 || m.Packages[0] != "rails" {
+		if (m.Kind != "presence_issue" && m.Kind != "presence_sink") || m.Flag == nil || len(m.Flag.Predicates) != 1 || len(m.Packages) != 1 || m.Packages[0] != "rails" {
 			t.Fatalf("presenceNode mapping wrong: %+v", m)
 		}
 		if got := m.Flag.Predicates[0]; got.Subject != "node" || got.Property != "method" || got.Op != "equals" || got.Values[0] != "warn" {
@@ -2421,7 +2421,7 @@ binding memoryBounds {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	m := decls[0].(*BindingSet).Mappings[0]
-	if m.Kind != "flag" || !m.Advisory || m.About != "code.BufferAccess" || m.Coverage != "sameScope" {
+	if m.Kind != "presence_check" || !m.Advisory || m.About != "code.BufferAccess" || m.Coverage != "sameScope" {
 		t.Fatalf("presenceNode metadata not preserved: %+v", m)
 	}
 }

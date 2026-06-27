@@ -1,11 +1,13 @@
 # `vyql/` — VyQL content (definitions, not code)
 
 Every hand-authored **definition is written in VyQL v2** (top-level declarations
-such as `module`, `concept`, `threat`, `pattern`, `binding`, `rule`,
-`mechanic`, and `policy`) and loaded from disk at
-runtime — no `go:embed`. The engine resolves this directory via `$VYQL_HOME`, or
-by walking up from the working directory / the executable to find a `vyql/`
-containing `ontology/concepts.vyql` (see `go/datadir`).
+such as `module`, `concept`, `threat`, `pattern`, `binding`, `rule`, and
+`policy`) and loaded from disk at runtime — no `go:embed`. Built-in language
+mechanics such as rule verbs, coverage modes, and assume traversal are
+implemented in Go; shipped VyQL content must not author them. The engine resolves
+this directory via `$VYQL_HOME`, or by walking up from the working directory /
+the executable to find a `vyql/` containing `ontology/concepts.vyql` (see
+`go/datadir`).
 
 ```
 vyql/
@@ -41,9 +43,10 @@ vyql/
   not hand-written). Tunable security behavior such as confidence aggregation
   and priority bands is authored as v2 `policy` declarations.
 - **The engine is Go.** The graph store, stratified evaluator + solvers, the
-  type-checker, the language parsers (tree-sitter / go-ast; CGO cannot be data),
-  and the output formatters. Go supplies primitive predicates and execution; v2
-  `mechanic` and `policy` declarations define the security semantics.
+  type-checker, built-in language mechanics, the language parsers (tree-sitter /
+  go-ast; CGO cannot be data), and the output formatters. Go supplies primitive
+  predicates and execution; v2 `policy`, `binding`, and `rule` declarations
+  define the shipped security semantics.
 
 ### Binding Syntax (`bindings/<tech>/.../*.vyql`)
 
