@@ -2168,6 +2168,29 @@ binding contextFields {
 	}
 }
 
+func TestV2PresenceNodeBoundaryTextOperators(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.native;
+binding boundaryFields {
+  query pattern presenceNode where node.context.functionName startsWith "validate" and node.context.literal endsWith ".html"
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
+	if len(flag.Predicates) != 2 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "starts_with" || got.Values[0] != "function_name:validate" {
+		t.Fatalf("startsWith predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "ends_with" || got.Values[0] != "literal:.html" {
+		t.Fatalf("endsWith predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.crypto;

@@ -82,6 +82,32 @@ func TestClassBaseContextTokenDoesNotMatchSuffixes(t *testing.T) {
 	}
 }
 
+func TestBoundaryValuePredicatesMatchTokenSegments(t *testing.T) {
+	text := "alpha\x00BetaValue\x00omega"
+	if !valuePredicate("starts_with", []string{"beta"}, text) {
+		t.Fatal("starts_with should match a later NUL-delimited token")
+	}
+	if !valuePredicate("ends_with", []string{"value"}, text) {
+		t.Fatal("ends_with should match a later NUL-delimited token")
+	}
+	if valuePredicate("starts_with", []string{"value"}, text) {
+		t.Fatal("starts_with should not match a middle substring")
+	}
+}
+
+func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
+	tokens := "function_name:validateRedirect\x00literal:/admin.html"
+	if !contextTokenValuePredicate("starts_with", []string{"function_name:validate"}, tokens) {
+		t.Fatal("starts_with should match the context token value after its prefix")
+	}
+	if !contextTokenValuePredicate("ends_with", []string{"literal:.html"}, tokens) {
+		t.Fatal("ends_with should match the context token value after its prefix")
+	}
+	if contextTokenValuePredicate("ends_with", []string{"function_name:validate"}, tokens) {
+		t.Fatal("ends_with should not match a prefix-only value")
+	}
+}
+
 func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

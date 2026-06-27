@@ -1497,7 +1497,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
 	switch x.Op {
-	case "~=", "==", "contains":
+	case "~=", "==", "contains", "startsWith", "endsWith":
 		value, ok := v2LiteralString(x.Right)
 		if !ok {
 			return BindingPresencePredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
@@ -1505,11 +1505,15 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		value = prefixV2PresenceValue(field, value)
 		pred := BindingPresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg}
 		switch {
-		case prop == "path":
+		case prop == "path" && (x.Op == "~=" || x.Op == "==" || x.Op == "contains"):
 			pred.Op = "match"
 			pred.Exact = x.Op == "=="
 		case x.Op == "contains":
 			pred.Op = "contains"
+		case x.Op == "startsWith":
+			pred.Op = "starts_with"
+		case x.Op == "endsWith":
+			pred.Op = "ends_with"
 		case x.Op == "==":
 			pred.Op = "equals"
 		default:

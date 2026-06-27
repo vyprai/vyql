@@ -3216,6 +3216,12 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 			if path == "" {
 				continue
 			}
+			if pred.Op == "starts_with" || pred.Op == "ends_with" {
+				if flagValuePredicate(pred, path) {
+					return true
+				}
+				continue
+			}
 			for _, v := range pred.Values {
 				if pred.Exact && path == v || !pred.Exact && matchSinkPath(path, v) {
 					return true
@@ -3224,6 +3230,9 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 		}
 		return false
 	case "method":
+		if pred.Op == "contains" || pred.Op == "starts_with" || pred.Op == "ends_with" || pred.Op == "equals" || pred.Op == "equals_any" {
+			return flagValuePredicate(pred, n.Prop("method"))
+		}
 		return containsStr(pred.Values, n.Prop("method"))
 	case "op":
 		return flagValuePredicate(pred, n.Prop("op"))
@@ -3267,6 +3276,11 @@ func contextTokenValuePredicateLowerValues(op string, values, valuesLower []stri
 	}
 	if op == "contains" || op == "" || op == "contains_any" {
 		if contextTokenContainsPredicateLowerValues(op, values, valuesLower, text) {
+			return true
+		}
+	}
+	if op == "starts_with" || op == "ends_with" {
+		if contextTokenBoundaryPredicateLowerValues(op, values, valuesLower, text) {
 			return true
 		}
 	}
@@ -3365,6 +3379,50 @@ func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []s
 		}
 	}
 	return all
+}
+
+func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []string, text string) bool {
+	if len(values) == 0 {
+		return false
+	}
+	match := strings.HasPrefix
+	if op == "ends_with" {
+		match = strings.HasSuffix
+	}
+	if len(values) == 1 {
+		prefix, want, ok := splitContextTokenPredicateValue(values[0])
+		if !ok {
+			return false
+		}
+		wantLower := strings.ToLower(want)
+		if len(valuesLower) == 1 {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+				wantLower = lowerWant
+			}
+		}
+		return contextTokenValueMatch(text, prefix, func(got string) bool {
+			return match(strings.ToLower(got), wantLower)
+		})
+	}
+	tokens := contextTokensByPrefix(text)
+	for i, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		if !ok {
+			continue
+		}
+		wantLower := strings.ToLower(want)
+		if i < len(valuesLower) {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+				wantLower = lowerWant
+			}
+		}
+		for _, got := range tokens[prefix] {
+			if match(strings.ToLower(got), wantLower) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func contextTokenValueMatch(text, prefix string, match func(string) bool) bool {
@@ -3484,9 +3542,37 @@ func valuePredicateLowerValues(op string, values, valuesLower []string, text str
 			}
 		}
 		return false
+	case "starts_with":
+		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
+	case "ends_with":
+		return textTokenBoundaryPredicate(valuesLower, text, strings.HasSuffix)
 	default:
 		return valCondsLowerNeedles(strings.ToLower(text), valuesLower, nil)
 	}
+}
+
+func textTokenBoundaryPredicate(valuesLower []string, text string, match func(string, string) bool) bool {
+	if len(valuesLower) == 0 {
+		return false
+	}
+	for start := 0; start <= len(text); {
+		end := strings.IndexByte(text[start:], '\x00')
+		var tok string
+		if end < 0 {
+			tok = text[start:]
+			start = len(text) + 1
+		} else {
+			tok = text[start : start+end]
+			start += end + 1
+		}
+		lowerTok := strings.ToLower(tok)
+		for _, value := range valuesLower {
+			if match(lowerTok, value) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func nodeSearchText(n usg.Node) string {
