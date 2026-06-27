@@ -1497,36 +1497,36 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
 	switch x.Op {
-	case "~=", "==", "contains", "startsWith", "endsWith":
+	case "~=", "==", "!=", "contains", "startsWith", "endsWith":
 		value, ok := v2LiteralString(x.Right)
 		if !ok {
 			return BindingPresencePredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
 		}
 		value = prefixV2PresenceValue(field, value)
-		pred := BindingPresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg}
+		pred := BindingPresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg != (x.Op == "!=")}
 		switch {
-		case prop == "path" && (x.Op == "~=" || x.Op == "==" || x.Op == "contains"):
+		case prop == "path" && (x.Op == "~=" || x.Op == "==" || x.Op == "!=" || x.Op == "contains"):
 			pred.Op = "match"
-			pred.Exact = x.Op == "=="
+			pred.Exact = x.Op == "==" || x.Op == "!="
 		case x.Op == "contains":
 			pred.Op = "contains"
 		case x.Op == "startsWith":
 			pred.Op = "starts_with"
 		case x.Op == "endsWith":
 			pred.Op = "ends_with"
-		case x.Op == "==":
+		case x.Op == "==" || x.Op == "!=":
 			pred.Op = "equals"
 		default:
 			return BindingPresencePredicate{}, fmt.Errorf("unsupported operator %q for %s", x.Op, field)
 		}
 		return pred, nil
-	case "in":
+	case "in", "not in":
 		values, ok := v2RuleWhereStringList(x.Right)
 		if !ok {
-			return BindingPresencePredicate{}, fmt.Errorf("%s in predicate requires a string list", field)
+			return BindingPresencePredicate{}, fmt.Errorf("%s %s predicate requires a string list", field, x.Op)
 		}
 		values = prefixV2PresenceValues(field, values)
-		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg}, nil
+		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg != (x.Op == "not in")}, nil
 	case "is":
 		matcherName, ok := v2MatcherRef(x.Right)
 		if !ok {

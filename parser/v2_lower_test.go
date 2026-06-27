@@ -2191,6 +2191,29 @@ binding boundaryFields {
 	}
 }
 
+func TestV2PresenceNodeNonMembershipOperators(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.native;
+binding negativeFields {
+  query pattern presenceNode where node.method != "safe" and node.context.language not in ["go", "python"]
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
+	if len(flag.Predicates) != 2 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "method" || got.Op != "equals" || !got.Negative || got.Values[0] != "safe" {
+		t.Fatalf("!= predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "equals_any" || !got.Negative || got.Values[0] != "lang=go" || got.Values[1] != "lang=python" {
+		t.Fatalf("not in predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.crypto;

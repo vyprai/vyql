@@ -3216,6 +3216,12 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 			if path == "" {
 				continue
 			}
+			if pred.Op == "equals" || pred.Op == "equals_any" {
+				if flagValuePredicate(pred, path) {
+					return true
+				}
+				continue
+			}
 			if pred.Op == "starts_with" || pred.Op == "ends_with" {
 				if flagValuePredicate(pred, path) {
 					return true

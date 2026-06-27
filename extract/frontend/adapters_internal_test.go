@@ -108,6 +108,16 @@ func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	}
 }
 
+func TestPathEqualsAnyPredicateIsExact(t *testing.T) {
+	pred := newFlagPredicate("node", "path", "equals_any", []string{"source.value"}, false, false)
+	if flagPredicateHit(pred, usg.Node{Props: map[string]string{"callee_path": "source.valued"}}) {
+		t.Fatal("path equals_any should not segment-prefix match a longer path")
+	}
+	if !flagPredicateHit(pred, usg.Node{Props: map[string]string{"callee_path": "source.value"}}) {
+		t.Fatal("path equals_any should match the exact path")
+	}
+}
+
 func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
