@@ -1191,6 +1191,8 @@ func v2CoverageRefAllowed(ref string) bool {
 func validateV2Pattern(pat *V2PatternDecl) []error {
 	var errs []error
 	unstableOK := false
+	useCount := 0
+	nodeCount := 0
 	for _, item := range pat.Items {
 		switch item.Kind {
 		case "unstable":
@@ -1200,6 +1202,7 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 				unstableOK = true
 			}
 		case "node":
+			nodeCount++
 			if !v2FamilyAllowed(item.Name, "recognition") {
 				errs = append(errs, fmt.Errorf("pattern %s: node family %q is not a project/code family", pat.Name, item.Name))
 			}
@@ -1211,8 +1214,11 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 				errs = append(errs, fmt.Errorf("pattern %s: project prerequisites %s belong in requires, not where", pat.Name, strings.Join(calls, ", ")))
 			}
 		case "use":
-			errs = append(errs, fmt.Errorf("pattern %s: composed pattern use needs native production v2 lowering", pat.Name))
+			useCount++
 		}
+	}
+	if useCount > 0 && nodeCount > 0 {
+		errs = append(errs, fmt.Errorf("pattern %s: composed pattern use with additional node needs native production v2 lowering", pat.Name))
 	}
 	return errs
 }

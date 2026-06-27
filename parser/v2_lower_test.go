@@ -811,6 +811,66 @@ binding secretAttr {
 	}
 }
 
+func TestV2ComposedSingleNodePatternLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+pattern evalCall as c {
+  use callExpr as call
+  where call.callee.method == "eval"
+}
+pattern secretMember as attr {
+  use memberBase as member
+  where member.path ~= "config.secret"
+}
+pattern memberBase as member {
+  node: memberAccess
+}
+binding evalSink {
+  query pattern evalCall
+  emit sink code.CodeEval at args[0]
+}
+binding secretIssue {
+  query pattern secretMember
+  emit issue code.SecretValue at attr
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "sink_method" || got.Pattern != "eval" {
+		t.Fatalf("composed call pattern lowering wrong: %+v", got)
+	}
+	if got := adapter.Mappings[1]; got.Kind != "mark" || got.Pattern != "config.secret" || got.NodeType != "code.Attr" {
+		t.Fatalf("composed member pattern lowering wrong: %+v", got)
+	}
+}
+
+func TestV2ComposedPatternCycleRejected(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module bindings.javascript.bad;
+pattern a {
+  use b as b
+}
+pattern b {
+  use a as a
+}
+binding bad {
+  query pattern a
+  emit sink code.CodeEval at args[0]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions succeeded for cyclic pattern use")
+	}
+	if !strings.Contains(err.Error(), "cyclic use") {
+		t.Fatalf("error = %v, want cyclic use diagnostic", err)
+	}
+}
+
 func TestV2CollectionSinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;

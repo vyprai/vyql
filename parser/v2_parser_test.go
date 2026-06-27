@@ -809,14 +809,14 @@ binding bad {
 			want: "query relation steps need native production v2 lowering",
 		},
 		{
-			name: "composed pattern use not implemented",
+			name: "composed pattern use plus node not implemented",
 			src: `module patterns.javascript.composed;
 pattern base { node: call }
 pattern composed {
   use base as b
   node: call
 }`,
-			want: "composed pattern use needs native production v2 lowering",
+			want: "composed pattern use with additional node needs native production v2 lowering",
 		},
 		{
 			name: "unknown requirement",

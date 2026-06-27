@@ -835,7 +835,7 @@ func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2Patter
 	if !ok {
 		return nil, "", "", fmt.Errorf("binding %s: pattern %s is not declared in this module", binding, query.Pattern)
 	}
-	where, alias, nodeType, binds, err := lowerV2PatternRecognitionExpr(binding, pat)
+	where, alias, nodeType, binds, err := lowerV2PatternRecognitionExpr(binding, pat, patterns)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -843,10 +843,21 @@ func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2Patter
 	return andV2Expr(where, queryWhere), alias, nodeType, nil
 }
 
-func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, string, string, map[string]string, error) {
+func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl, patterns v2PatternResolver) (V2Expr, string, string, map[string]string, error) {
+	where, alias, nodeType, binds, _, err := lowerV2PatternRecognitionExprSeen(binding, pat, patterns, map[*V2PatternDecl]bool{})
+	return where, alias, nodeType, binds, err
+}
+
+func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patterns v2PatternResolver, seen map[*V2PatternDecl]bool) (V2Expr, string, string, map[string]string, int, error) {
 	if pat == nil {
-		return nil, "", "", nil, fmt.Errorf("binding %s: nil pattern", binding)
+		return nil, "", "", nil, 0, fmt.Errorf("binding %s: nil pattern", binding)
 	}
+	if seen[pat] {
+		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s has cyclic use", binding, pat.Name)
+	}
+	seen[pat] = true
+	defer delete(seen, pat)
+
 	alias := pat.Alias
 	nodeType := ""
 	binds := map[string]string{}
@@ -861,7 +872,7 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 			case "memberAccess":
 				nodeType = "code.Attr"
 			default:
-				return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
+				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
 			}
 			if alias == "" {
 				alias = item.Alias
@@ -869,23 +880,75 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 		case "bind":
 			ref, ok := item.Expr.(V2RefExpr)
 			if !ok {
-				return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s bind %s needs native expression lowering", binding, pat.Name, item.Name)
+				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s bind %s needs native expression lowering", binding, pat.Name, item.Name)
 			}
-			binds[item.Name] = ref.Name
+			if err := addV2PatternBind(binding, pat.Name, binds, item.Name, ref.Name); err != nil {
+				return nil, "", "", nil, 0, err
+			}
 		case "where":
 			where = andV2Expr(where, rewriteV2PatternRefs(item.Expr, binds))
 		case "unstable":
-			return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s unstable items need native pattern lowering", binding, pat.Name)
+			return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s unstable items need native pattern lowering", binding, pat.Name)
 		case "use":
-			return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s use items need native pattern lowering", binding, pat.Name)
+			sub, ok, err := patterns.resolve(item.Name)
+			if err != nil {
+				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s: %w", binding, pat.Name, item.Name, err)
+			}
+			if !ok {
+				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s is not declared in this module", binding, pat.Name, item.Name)
+			}
+			subWhere, subAlias, subNodeType, subBinds, subNodes, err := lowerV2PatternRecognitionExprSeen(binding, sub, patterns, seen)
+			if err != nil {
+				return nil, "", "", nil, 0, err
+			}
+			if alias == "" {
+				alias = item.Alias
+			}
+			targetAlias := alias
+			aliasBinds := map[string]string{}
+			if subAlias != "" && targetAlias != "" {
+				aliasBinds[subAlias] = targetAlias
+			}
+			if item.Alias != "" && targetAlias != "" {
+				aliasBinds[item.Alias] = targetAlias
+			}
+			where = andV2Expr(where, rewriteV2PatternRefs(subWhere, aliasBinds))
+			nodeCount += subNodes
+			if nodeType != "" && subNodeType != "" && nodeType != subNodeType {
+				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s composes incompatible node families", binding, pat.Name)
+			}
+			if nodeType == "" {
+				nodeType = subNodeType
+			}
+			for name, target := range subBinds {
+				if rewritten, ok := rewriteV2PatternRefName(target, aliasBinds); ok {
+					target = rewritten
+				}
+				if err := addV2PatternBind(binding, pat.Name, binds, name, target); err != nil {
+					return nil, "", "", nil, 0, err
+				}
+			}
+			if item.Alias != "" && targetAlias != "" {
+				if err := addV2PatternBind(binding, pat.Name, binds, item.Alias, targetAlias); err != nil {
+					return nil, "", "", nil, 0, err
+				}
+			}
 		default:
-			return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s item %q needs native pattern lowering", binding, pat.Name, item.Kind)
+			return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s item %q needs native pattern lowering", binding, pat.Name, item.Kind)
 		}
 	}
 	if nodeCount != 1 {
-		return nil, "", "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call/memberAccess node for scanner IR lowering", binding, pat.Name)
+		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one call/memberAccess node for scanner IR lowering", binding, pat.Name)
 	}
-	return where, alias, nodeType, binds, nil
+	return where, alias, nodeType, binds, nodeCount, nil
+}
+
+func addV2PatternBind(binding, pattern string, binds map[string]string, name, target string) error {
+	if prev := binds[name]; prev != "" && prev != target {
+		return fmt.Errorf("binding %s: pattern %s bind %s is ambiguous", binding, pattern, name)
+	}
+	binds[name] = target
+	return nil
 }
 
 func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, matchers v2MatcherResolver, mechanics v2Mechanics) ([]BindingAction, bool, error) {
