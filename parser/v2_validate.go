@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -33,7 +34,7 @@ var (
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2ImplementedMechanicKinds = map[string]bool{"ruleVerb": true, "coverage": true}
 	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
-	v2ImplementedPolicyKinds   = map[string]bool{"resultIdentity": true, "confidence": true, "priority": true, "display": true}
+	v2ImplementedPolicyKinds   = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
 	v2MechanicCapabilities     = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds          = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2EmitKinds                = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
@@ -1006,12 +1007,21 @@ func validateV2Policy(p *V2PolicyDecl) []error {
 		errs = append(errs, validateV2PriorityPolicy(p)...)
 	case "display":
 		errs = append(errs, validateV2DisplayPolicy(p)...)
+	case "diagnostic":
+		errs = append(errs, validateV2DiagnosticPolicy(p)...)
 	}
 	return errs
 }
 
 func validateV2ResultLifecyclePolicy(p *V2PolicyDecl) []error {
 	allowed := map[string]bool{"flagWhen": true, "candidateWhen": true, "findingWhen": true, "checkWhen": true}
+	required := map[string]V2Expr{
+		"flagWhen":      V2BinaryExpr{Op: "and", Left: V2CallExpr{Name: "emitted", Args: []V2Expr{V2RefExpr{Name: "issue"}}}, Right: V2CallExpr{Name: "hasReview", Args: []V2Expr{V2RefExpr{Name: "concept"}}}},
+		"candidateWhen": V2CallExpr{Name: "matched", Args: []V2Expr{V2RefExpr{Name: "rule"}}},
+		"findingWhen":   V2BinaryExpr{Op: "and", Left: V2RefExpr{Name: "candidate"}, Right: V2UnaryExpr{Op: "not", X: V2RefExpr{Name: "covered"}}},
+		"checkWhen":     V2BinaryExpr{Op: "and", Left: V2CallExpr{Name: "emitted", Args: []V2Expr{V2RefExpr{Name: "check"}}}, Right: V2BinaryExpr{Op: "or", Left: V2CallExpr{Name: "hasReview", Args: []V2Expr{V2RefExpr{Name: "concept"}}}, Right: V2RefExpr{Name: "explainsFinding"}}},
+	}
+	seen := map[string]bool{}
 	var errs []error
 	for _, item := range p.Items {
 		if len(item.Key) != 1 || !allowed[item.Key[0]] {
@@ -1024,6 +1034,15 @@ func validateV2ResultLifecyclePolicy(p *V2PolicyDecl) []error {
 			continue
 		}
 		errs = append(errs, validateV2PolicyExpr("policy resultLifecycle "+p.Name+": "+item.Key[0], expr, v2LifecyclePolicyRefs, v2LifecyclePolicyCalls)...)
+		if want := required[item.Key[0]]; !v2ExprEqual(expr, want) {
+			errs = append(errs, fmt.Errorf("policy resultLifecycle %s: %s must match the runtime-supported default lifecycle contract", p.Name, item.Key[0]))
+		}
+		seen[item.Key[0]] = true
+	}
+	for key := range required {
+		if !seen[key] {
+			errs = append(errs, fmt.Errorf("policy resultLifecycle %s: missing runtime-required item %s", p.Name, key))
+		}
 	}
 	return errs
 }
@@ -1167,6 +1186,39 @@ func validateV2DisplayPolicy(p *V2PolicyDecl) []error {
 	return errs
 }
 
+func validateV2DiagnosticPolicy(p *V2PolicyDecl) []error {
+	var errs []error
+	seen := map[string]bool{}
+	for _, item := range p.Items {
+		switch {
+		case len(item.Key) == 1 && item.Key[0] == "format":
+			value, ok := v2BlockValueString(item.Value)
+			if !ok {
+				errs = append(errs, fmt.Errorf("policy diagnostic %s: format must be a string", p.Name))
+			} else if value != "structured" {
+				errs = append(errs, fmt.Errorf("policy diagnostic %s: format must match runtime-supported value structured", p.Name))
+			}
+			seen["format"] = true
+		case len(item.Key) == 1 && item.Key[0] == "fields":
+			values := v2BlockItemValueStringList(item.Value)
+			if len(values) == 0 {
+				errs = append(errs, fmt.Errorf("policy diagnostic %s: fields must be a non-empty string list", p.Name))
+			} else if !v2StringListEqual(values, []string{"file", "line", "column", "declarationId", "code", "message", "why", "suggestedFix"}) {
+				errs = append(errs, fmt.Errorf("policy diagnostic %s: fields must match runtime-supported fields [file, line, column, declarationId, code, message, why, suggestedFix]", p.Name))
+			}
+			seen["fields"] = true
+		default:
+			errs = append(errs, fmt.Errorf("policy diagnostic %s: unknown item %s", p.Name, strings.Join(item.Key, ".")))
+		}
+	}
+	for _, key := range []string{"format", "fields"} {
+		if !seen[key] {
+			errs = append(errs, fmt.Errorf("policy diagnostic %s: missing runtime-required item %s", p.Name, key))
+		}
+	}
+	return errs
+}
+
 func validateV2StringListPolicy(p *V2PolicyDecl, allowedKeys ...string) []error {
 	allowed := v2StringSet(allowedKeys)
 	var errs []error
@@ -1198,6 +1250,54 @@ func validateV2ResultIdentityRuntimeField(policyName, field string, values []str
 		}
 	}
 	return nil
+}
+
+func v2ExprEqual(a, b V2Expr) bool {
+	switch ax := a.(type) {
+	case nil:
+		return b == nil
+	case V2RefExpr:
+		bx, ok := b.(V2RefExpr)
+		return ok && ax.Name == bx.Name
+	case V2LiteralExpr:
+		bx, ok := b.(V2LiteralExpr)
+		return ok && reflect.DeepEqual(ax.Value, bx.Value)
+	case V2UnaryExpr:
+		bx, ok := b.(V2UnaryExpr)
+		return ok && ax.Op == bx.Op && v2ExprEqual(ax.X, bx.X)
+	case V2BinaryExpr:
+		bx, ok := b.(V2BinaryExpr)
+		return ok && ax.Op == bx.Op && v2ExprEqual(ax.Left, bx.Left) && v2ExprEqual(ax.Right, bx.Right)
+	case V2CallExpr:
+		bx, ok := b.(V2CallExpr)
+		if !ok || ax.Name != bx.Name || len(ax.Args) != len(bx.Args) || len(ax.NamedArgs) != len(bx.NamedArgs) {
+			return false
+		}
+		for i := range ax.Args {
+			if !v2ExprEqual(ax.Args[i], bx.Args[i]) {
+				return false
+			}
+		}
+		for i := range ax.NamedArgs {
+			if ax.NamedArgs[i].Name != bx.NamedArgs[i].Name || !v2ExprEqual(ax.NamedArgs[i].Expr, bx.NamedArgs[i].Expr) {
+				return false
+			}
+		}
+		return true
+	case V2SequenceExpr:
+		bx, ok := b.(V2SequenceExpr)
+		if !ok || len(ax.Items) != len(bx.Items) {
+			return false
+		}
+		for i := range ax.Items {
+			if !v2ExprEqual(ax.Items[i], bx.Items[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func v2ConfidenceAggregateIsRuntimeSupported(expr V2Expr) bool {
@@ -1901,6 +2001,20 @@ func v2BlockValueInt(value any) (int, bool) {
 		return v2ExprInt(x)
 	default:
 		return 0, false
+	}
+}
+
+func v2BlockValueString(value any) (string, bool) {
+	switch x := value.(type) {
+	case string:
+		return x, true
+	case V2RefExpr:
+		return x.Name, true
+	case V2LiteralExpr:
+		s, ok := x.Value.(string)
+		return s, ok
+	default:
+		return "", false
 	}
 }
 

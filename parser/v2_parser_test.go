@@ -655,6 +655,12 @@ policy confidence default {
 func TestParseV2ValidatesPolicyContracts(t *testing.T) {
 	_, err := ParseV2(`
 module mechanics.policy;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]
@@ -676,6 +682,10 @@ policy display default {
   includeNearbyChecks: true
   nearbyCheckLimit: 5
 }
+policy diagnostic default {
+  format: "structured"
+  fields: [file, line, column, declarationId, code, message, why, suggestedFix]
+}
 `)
 	if err != nil {
 		t.Fatalf("ParseV2 valid policies: %v", err)
@@ -692,13 +702,30 @@ func TestParseV2RejectsInvalidPolicyContracts(t *testing.T) {
 			name: "unsupported lifecycle policy",
 			src: `module mechanics.policy;
 policy resultLifecycle default { findingWhen: heuristic(candidate) }`,
-			want: `policy kind is recognized by the v2 contract but is not implemented by the current runtime`,
+			want: `unknown policy builtin "heuristic"`,
+		},
+		{
+			name: "unsupported lifecycle contract",
+			src: `module mechanics.policy;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}`,
+			want: `findingWhen must match the runtime-supported default lifecycle contract`,
 		},
 		{
 			name: "unsupported diagnostic policy",
 			src: `module mechanics.policy;
 policy diagnostic default { render: [findings] }`,
-			want: `policy kind is recognized by the v2 contract but is not implemented by the current runtime`,
+			want: `unknown item render`,
+		},
+		{
+			name: "unsupported diagnostic fields",
+			src: `module mechanics.policy;
+policy diagnostic default { format: "structured" fields: [file, message] }`,
+			want: `fields must match runtime-supported fields`,
 		},
 		{
 			name: "unknown confidence state",
@@ -1615,6 +1642,12 @@ func parseV2CorpusForTest(t *testing.T, srcs ...string) []V2Source {
 func v2CoreMechanicsSourceForTest(t *testing.T) V2Source {
 	t.Helper()
 	src := `module policies.core;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]
@@ -1629,6 +1662,10 @@ policy confidence default {
   softRequirement unknown: downgrade(1) annotate("uninspected evidence")
   softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
   softRequirement satisfied: keep
+}
+policy diagnostic default {
+  format: "structured"
+  fields: [file, line, column, declarationId, code, message, why, suggestedFix]
 }
 `
 	prog, err := ParseV2(src)

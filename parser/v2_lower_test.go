@@ -2506,6 +2506,12 @@ func TestLowerV2DefinitionSourcesRejectsParsedGoOwnedMechanic(t *testing.T) {
 
 const v2CorePoliciesForLoweringTest = `
 module policies.core;
+policy resultLifecycle default {
+  flagWhen: emitted(issue) and hasReview(concept)
+  candidateWhen: matched(rule)
+  findingWhen: candidate and not covered
+  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
+}
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]
@@ -2520,6 +2526,10 @@ policy confidence default {
   softRequirement unknown: downgrade(1) annotate("uninspected evidence")
   softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
   softRequirement satisfied: keep
+}
+policy diagnostic default {
+  format: "structured"
+  fields: [file, line, column, declarationId, code, message, why, suggestedFix]
 }
 `
 
