@@ -440,7 +440,7 @@ func cmdGraph(args []string) error {
 }
 
 // ── vyql adapters ───────────────────────────────────────────────────────────────────
-// List the source/sink/control/mark/filter/assume vocabulary an adapter recognizes, so you
+// List the source/sink/control/mark/filter/advisory vocabulary an adapter recognizes, so you
 // don't have to grep the .vyql — and can see at a glance whether an API is modelled.
 
 func cmdAdapters(args []string) error {
@@ -470,7 +470,7 @@ func cmdAdapters(args []string) error {
 			continue
 		}
 		for _, m := range ad.Mappings {
-			kind := strings.SplitN(m.Kind, "_", 2)[0]
+			kind := adapterDisplayKind(m.Kind)
 			arrow := ""
 			if m.Concept != "" {
 				arrow = " → " + m.Concept
@@ -481,7 +481,7 @@ func cmdAdapters(args []string) error {
 			byKind[kind] = append(byKind[kind], fmt.Sprintf("    %q%s", m.Pattern, arrow))
 		}
 	}
-	for _, kind := range []string{"source", "sink", "control", "mark", "filter", "assume", "type"} {
+	for _, kind := range []string{"source", "sink", "control", "mark", "filter", "advisory", "type"} {
 		rows := byKind[kind]
 		if len(rows) == 0 {
 			continue
@@ -493,6 +493,13 @@ func cmdAdapters(args []string) error {
 		}
 	}
 	return nil
+}
+
+func adapterDisplayKind(mappingKind string) string {
+	if strings.HasPrefix(mappingKind, "advisory_") {
+		return "advisory"
+	}
+	return strings.SplitN(mappingKind, "_", 2)[0]
 }
 
 func adapterNames() []string {

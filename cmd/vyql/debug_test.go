@@ -52,6 +52,22 @@ binding bad {
 	}
 }
 
+func TestAdapterDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
+	cases := map[string]string{
+		"advisory_guard_method":   "advisory",
+		"advisory_sanitizer_path": "advisory",
+		"source_param":            "source",
+		"sink_call_arg":           "sink",
+		"control_authentication":  "control",
+		"type":                    "type",
+	}
+	for in, want := range cases {
+		if got := adapterDisplayKind(in); got != want {
+			t.Fatalf("adapterDisplayKind(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestCmdRuntimeDoesNotHardcodeDomainKnowledge(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
