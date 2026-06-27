@@ -2069,6 +2069,9 @@ func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool, family string) 
 	if u, ok := expr.(V2UnaryExpr); ok && u.Op == "not" {
 		return lowerV2CallShapeExpr(binding, u.X, !neg, family)
 	}
+	if call, ok := expr.(V2CallExpr); ok {
+		return lowerV2CallShapeCall(binding, call, neg, family)
+	}
 	cmp, ok := expr.(V2BinaryExpr)
 	if !ok {
 		return nil, fmt.Errorf("binding %s: unsupported query predicate %T", binding, expr)
@@ -2087,6 +2090,55 @@ func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool, family string) 
 	default:
 		return lowerV2CallShapeAtom(binding, cmp, neg, family)
 	}
+}
+
+func lowerV2CallShapeCall(binding string, call V2CallExpr, neg bool, family string) ([]v2CallShape, error) {
+	if call.Name != "containsAny" {
+		return nil, fmt.Errorf("binding %s: unsupported query predicate call %q", binding, call.Name)
+	}
+	if len(call.Args) != 2 || len(call.NamedArgs) != 0 {
+		return nil, fmt.Errorf("binding %s: containsAny requires two positional args", binding)
+	}
+	fieldRef, ok := call.Args[0].(V2RefExpr)
+	if !ok {
+		return nil, fmt.Errorf("binding %s: containsAny first arg must be a query field", binding)
+	}
+	field := v2CallQueryField(fieldRef.Name, family)
+	values, ok := v2RuleWhereStringList(call.Args[1])
+	if !ok || len(values) == 0 {
+		return nil, fmt.Errorf("binding %s: containsAny second arg requires a non-empty string list", binding)
+	}
+	if _, prefix, ok := v2ArgsAnyContextField(field); ok {
+		return lowerV2ContainsAnyValueShapes(binding, field, values, prefix, neg)
+	}
+	switch field {
+	case "args.any.literal", "call.args.any.literal":
+		return lowerV2ContainsAnyValueShapes(binding, field, values, "", neg)
+	default:
+		return nil, fmt.Errorf("binding %s: containsAny field %q is not implemented in scanner IR lowering", binding, fieldRef.Name)
+	}
+}
+
+func lowerV2ContainsAnyValueShapes(binding, field string, values []string, prefix string, neg bool) ([]v2CallShape, error) {
+	if err := checkV2CallShapeExpansion(binding, field, len(values)); err != nil {
+		return nil, err
+	}
+	values = append([]string(nil), values...)
+	if prefix != "" {
+		for i, value := range values {
+			if !strings.HasPrefix(value, prefix) {
+				values[i] = prefix + value
+			}
+		}
+	}
+	if neg {
+		return []v2CallShape{{ValAbsents: append([]string(nil), values...)}}, nil
+	}
+	out := make([]v2CallShape, 0, len(values))
+	for _, value := range values {
+		out = append(out, v2CallShape{ValMatches: []string{value}})
+	}
+	return out, nil
 }
 
 func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool, family string) ([]v2CallShape, error) {

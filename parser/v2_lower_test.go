@@ -1563,6 +1563,84 @@ binding badFlow {
 	}
 }
 
+func TestV2CallPredicateContainsAnyExpandsValueMatches(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding sqlLiteralKinds {
+  query pattern callExpr where callee.method == "query" and containsAny(args.any.literal, ["SELECT", "UPDATE"])
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	seen := map[string]bool{}
+	for _, got := range adapter.Mappings {
+		if got.Kind != "sink_method" || got.Pattern != "query" || len(got.ValMatches) != 1 {
+			t.Fatalf("containsAny mapping wrong: %+v", got)
+		}
+		seen[got.ValMatches[0]] = true
+	}
+	if !seen["SELECT"] || !seen["UPDATE"] {
+		t.Fatalf("containsAny values missing from mappings: %+v", seen)
+	}
+}
+
+func TestV2CallPredicateNegatedContainsAnyLowersValueAbsents(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding unsafeLoader {
+  query pattern callExpr where callee.path == "yaml.load" and not containsAny(args.any.literal, ["SafeLoader", "CSafeLoader"])
+  emit sink code.Deserialization at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "sink_path" || got.Pattern != "yaml.load" || !got.Exact {
+		t.Fatalf("negated containsAny mapping wrong: %+v", got)
+	}
+	if len(got.ValAbsents) != 2 || got.ValAbsents[0] != "SafeLoader" || got.ValAbsents[1] != "CSafeLoader" {
+		t.Fatalf("ValAbsents = %+v, want SafeLoader and CSafeLoader", got.ValAbsents)
+	}
+}
+
+func TestV2CallPredicateContainsAnyPrefixesContextValues(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.http;
+binding routeParams {
+  query pattern callExpr where callee.analysis == "parameter.entry" and containsAny(args.any.context.annotation, ["GetMapping", "PostMapping"])
+  emit source code.HttpInput at call.result
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	seen := map[string]bool{}
+	for _, got := range adapter.Mappings {
+		if got.Kind != "source" || got.Pattern != "analysis.parameter.entry" || len(got.ValMatches) != 1 {
+			t.Fatalf("context containsAny mapping wrong: %+v", got)
+		}
+		seen[got.ValMatches[0]] = true
+	}
+	if !seen["annotation:GetMapping"] || !seen["annotation:PostMapping"] {
+		t.Fatalf("prefixed context values missing from mappings: %+v", seen)
+	}
+}
+
 func TestV2ReceiverTypeFactLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.native;
