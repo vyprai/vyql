@@ -32,9 +32,10 @@ type Score struct {
 }
 
 type model struct {
-	Severity map[string]int
-	Factors  map[string]priorityFactor
-	Bands    []struct {
+	Severity    map[string]int
+	Factors     map[string]priorityFactor
+	FactorOrder []string
+	Bands       []struct {
 		Band string
 		Min  int
 	}
@@ -77,10 +78,16 @@ func (m model) factorWeight(name string) int {
 // urgency. Each emitted factor carries a witness; zero-weight factors are
 // omitted from the breakdown except severity, which is always shown as the base.
 func Prioritize(f *findings.Finding) Score {
-	m := conf()
+	return prioritizeWithModel(f, conf())
+}
+
+func prioritizeWithModel(f *findings.Finding, m model) Score {
 	var factors []Factor
 	total := 0
 	add := func(name string, w int, witness string) {
+		if w == 0 && name != "severity" {
+			return
+		}
 		factors = append(factors, Factor{Name: name, Weight: w, Witness: witness})
 		total += w
 	}
@@ -88,50 +95,14 @@ func Prioritize(f *findings.Finding) Score {
 	// severity — the intrinsic badness of the weakness class (rule metadata).
 	add("severity", m.severityWeight(strings.ToLower(f.Severity)), "severity: "+orUnset(f.Severity))
 
-	// exposure — reach(INTERNET, subject)?, confirmed by runtime if observed.
-	for _, c := range f.Context {
-		if strings.Contains(c, "internet-reachable") {
-			name := "exposure"
-			if strings.Contains(c, "confirmed by runtime") {
-				name = "runtimeExposure"
-			}
-			add(name, m.factorWeight(name), "exposure: "+c)
-			break
+	facts := priorityFactsForFinding(f)
+	for _, name := range m.FactorOrder {
+		factor := m.Factors[name]
+		ok, witnesses := evalPriorityBool(factor.When, facts)
+		if !ok {
+			continue
 		}
-	}
-
-	// asset_proximity — sink/subject near sensitive data (holds_asset_kind).
-	for _, c := range f.Context {
-		if strings.Contains(c, "holds [") {
-			add("assetProximity", m.factorWeight("assetProximity"), "asset: "+c)
-			break
-		}
-	}
-
-	// exploit_likelihood — advisory/CVE on the subject (SCA signal). EPSS/KEV
-	// membership would refine this; absent that feed it is a binary signal.
-	for _, b := range f.Bindings {
-		if strings.Contains(b.LabelProvenance, "CVE") || strings.Contains(b.LabelProvenance, "advisory") {
-			add("exploitLikelihood", m.factorWeight("exploitLikelihood"), "exploit: "+b.LabelProvenance)
-			break
-		}
-	}
-
-	// control_pressure — a compensating control on a sibling path reduces
-	// priority (the weakness is partially mitigated in practice).
-	for _, ne := range f.NegationEvidence {
-		if !ne.Satisfied && strings.Contains(ne.Detail, "sibling path") {
-			add("controlPressure", m.factorWeight("controlPressure"), "control: near-miss "+ne.Clause)
-			break
-		}
-	}
-
-	// confidence_discount — low derivation confidence lowers priority.
-	switch strings.ToLower(f.Confidence) {
-	case "low":
-		add("confidenceLow", m.factorWeight("confidenceLow"), "confidence: low")
-	case "medium":
-		add("confidenceMedium", m.factorWeight("confidenceMedium"), "confidence: medium")
+		add(name, factor.Weight, priorityWitness(witnesses, name))
 	}
 
 	return Score{RuleID: f.RuleID, Band: m.band(total), Total: total, Factors: factors}
@@ -187,8 +158,15 @@ func modelFromPriorityPolicy(policy *parser.V2PolicyDecl) (model, error) {
 			if !ok {
 				return model{}, fmt.Errorf("factor %s requires integer weight", item.Key[1])
 			}
-			when, _ := v2PolicyBlockExpr(item.Block, "when")
+			when, ok := v2PolicyBlockExpr(item.Block, "when")
+			if !ok {
+				return model{}, fmt.Errorf("factor %s requires when", item.Key[1])
+			}
+			if err := validatePriorityRuntimeExpr(when); err != nil {
+				return model{}, fmt.Errorf("factor %s when: %w", item.Key[1], err)
+			}
 			out.Factors[item.Key[1]] = priorityFactor{Weight: weight, When: when}
+			out.FactorOrder = append(out.FactorOrder, item.Key[1])
 		case len(item.Key) == 1 && item.Key[0] == "bands":
 			bands, ok := item.Value.([]any)
 			if !ok {
@@ -264,6 +242,217 @@ func v2PolicyBlockExpr(items []parser.V2BlockItem, key string) (parser.V2Expr, b
 		return expr, ok
 	}
 	return nil, false
+}
+
+type priorityFact struct {
+	Bool    bool
+	Scalar  string
+	Witness string
+}
+
+type priorityFactSet map[string]priorityFact
+
+func priorityFactsForFinding(f *findings.Finding) priorityFactSet {
+	out := priorityFactSet{
+		"finding.confidence": {Bool: f.Confidence != "", Scalar: strings.ToLower(f.Confidence), Witness: "confidence: " + orUnset(strings.ToLower(f.Confidence))},
+	}
+	for _, c := range f.Context {
+		lower := strings.ToLower(c)
+		if _, ok := out["context.internetReachable"]; !ok && strings.Contains(lower, "internet-reachable") {
+			out["context.internetReachable"] = priorityFact{Bool: true, Witness: "exposure: " + c}
+		}
+		if _, ok := out["context.runtimeConfirmed"]; !ok && strings.Contains(lower, "confirmed by runtime") {
+			out["context.runtimeConfirmed"] = priorityFact{Bool: true, Witness: "runtime: " + c}
+		}
+		if _, ok := out["context.holdsAsset"]; !ok && strings.Contains(lower, "holds [") {
+			out["context.holdsAsset"] = priorityFact{Bool: true, Witness: "asset: " + c}
+		}
+	}
+	for _, b := range f.Bindings {
+		lower := strings.ToLower(b.LabelProvenance)
+		if _, ok := out["finding.exploitSignal"]; !ok && (strings.Contains(lower, "cve") || strings.Contains(lower, "advisory")) {
+			out["finding.exploitSignal"] = priorityFact{Bool: true, Witness: "exploit: " + b.LabelProvenance}
+			break
+		}
+	}
+	for _, ne := range f.NegationEvidence {
+		if _, ok := out["finding.nearMissControl"]; ok {
+			break
+		}
+		if !ne.Satisfied && strings.Contains(strings.ToLower(ne.Detail), "sibling path") {
+			out["finding.nearMissControl"] = priorityFact{Bool: true, Witness: "control: near-miss " + ne.Clause}
+		}
+	}
+	return out
+}
+
+func evalPriorityBool(expr parser.V2Expr, facts priorityFactSet) (bool, []string) {
+	switch x := expr.(type) {
+	case nil:
+		return false, nil
+	case parser.V2LiteralExpr:
+		b, ok := x.Value.(bool)
+		return ok && b, nil
+	case parser.V2RefExpr:
+		fact := facts[x.Name]
+		if !fact.Bool {
+			return false, nil
+		}
+		return true, compactWitnesses(fact.Witness)
+	case parser.V2UnaryExpr:
+		if x.Op != "not" {
+			return false, nil
+		}
+		ok, _ := evalPriorityBool(x.X, facts)
+		return !ok, nil
+	case parser.V2BinaryExpr:
+		switch x.Op {
+		case "and":
+			leftOK, leftWitnesses := evalPriorityBool(x.Left, facts)
+			if !leftOK {
+				return false, nil
+			}
+			rightOK, rightWitnesses := evalPriorityBool(x.Right, facts)
+			if !rightOK {
+				return false, nil
+			}
+			return true, append(leftWitnesses, rightWitnesses...)
+		case "or":
+			leftOK, leftWitnesses := evalPriorityBool(x.Left, facts)
+			rightOK, rightWitnesses := evalPriorityBool(x.Right, facts)
+			switch {
+			case leftOK && rightOK:
+				return true, append(leftWitnesses, rightWitnesses...)
+			case leftOK:
+				return true, leftWitnesses
+			case rightOK:
+				return true, rightWitnesses
+			default:
+				return false, nil
+			}
+		case "==", "!=":
+			left, leftOK, leftWitnesses := evalPriorityScalar(x.Left, facts)
+			right, rightOK, rightWitnesses := evalPriorityScalar(x.Right, facts)
+			if !leftOK || !rightOK {
+				return false, nil
+			}
+			matches := left == right
+			if x.Op == "!=" {
+				matches = !matches
+			}
+			if !matches {
+				return false, nil
+			}
+			return true, append(leftWitnesses, rightWitnesses...)
+		default:
+			return false, nil
+		}
+	default:
+		return false, nil
+	}
+}
+
+func evalPriorityScalar(expr parser.V2Expr, facts priorityFactSet) (string, bool, []string) {
+	switch x := expr.(type) {
+	case parser.V2LiteralExpr:
+		switch v := x.Value.(type) {
+		case string:
+			return strings.ToLower(v), true, nil
+		case int:
+			return fmt.Sprint(v), true, nil
+		case bool:
+			return fmt.Sprint(v), true, nil
+		default:
+			return "", false, nil
+		}
+	case parser.V2RefExpr:
+		if fact, ok := facts[x.Name]; ok {
+			if fact.Scalar != "" {
+				return fact.Scalar, true, compactWitnesses(fact.Witness)
+			}
+			return fmt.Sprint(fact.Bool), true, compactWitnesses(fact.Witness)
+		}
+		if isPriorityLiteralRef(x.Name) {
+			return strings.ToLower(x.Name), true, nil
+		}
+		return "", false, nil
+	default:
+		return "", false, nil
+	}
+}
+
+func isPriorityLiteralRef(ref string) bool {
+	switch ref {
+	case "low", "medium", "high", "critical", "info":
+		return true
+	default:
+		return false
+	}
+}
+
+func compactWitnesses(witnesses ...string) []string {
+	out := make([]string, 0, len(witnesses))
+	seen := map[string]bool{}
+	for _, witness := range witnesses {
+		witness = strings.TrimSpace(witness)
+		if witness == "" || seen[witness] {
+			continue
+		}
+		seen[witness] = true
+		out = append(out, witness)
+	}
+	return out
+}
+
+func priorityWitness(witnesses []string, name string) string {
+	witnesses = compactWitnesses(witnesses...)
+	if len(witnesses) == 0 {
+		return "policy factor: " + name
+	}
+	return strings.Join(witnesses, "; ")
+}
+
+func validatePriorityRuntimeExpr(expr parser.V2Expr) error {
+	switch x := expr.(type) {
+	case parser.V2LiteralExpr:
+		return nil
+	case parser.V2RefExpr:
+		if isPriorityRuntimeRef(x.Name) || isPriorityLiteralRef(x.Name) {
+			return nil
+		}
+		return fmt.Errorf("unsupported reference %q", x.Name)
+	case parser.V2UnaryExpr:
+		if x.Op != "not" {
+			return fmt.Errorf("unsupported unary operator %q", x.Op)
+		}
+		return validatePriorityRuntimeExpr(x.X)
+	case parser.V2BinaryExpr:
+		switch x.Op {
+		case "and", "or", "==", "!=":
+		default:
+			return fmt.Errorf("unsupported binary operator %q", x.Op)
+		}
+		if err := validatePriorityRuntimeExpr(x.Left); err != nil {
+			return err
+		}
+		return validatePriorityRuntimeExpr(x.Right)
+	default:
+		return fmt.Errorf("unsupported expression %T", expr)
+	}
+}
+
+func isPriorityRuntimeRef(ref string) bool {
+	switch ref {
+	case "context.internetReachable",
+		"context.runtimeConfirmed",
+		"context.holdsAsset",
+		"finding.exploitSignal",
+		"finding.nearMissControl",
+		"finding.confidence":
+		return true
+	default:
+		return false
+	}
 }
 
 func v2PolicyInt(raw any) (int, bool) {
