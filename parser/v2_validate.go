@@ -190,9 +190,12 @@ func builtinV2CoverageMechanics() map[string]v2CoverageMechanic {
 }
 
 func builtinV2MechanicSources() map[v2MechanicID]string {
-	out := make(map[v2MechanicID]string, len(v2CoverageModes))
+	out := make(map[v2MechanicID]string, len(v2CoverageModes)+len(builtinV2RuleVerbMechanics()))
 	for mode := range v2CoverageModes {
 		out[v2MechanicID{Kind: "coverage", Name: mode}] = "<builtin>"
+	}
+	for verb := range builtinV2RuleVerbMechanics() {
+		out[v2MechanicID{Kind: "ruleVerb", Name: verb}] = "<builtin>"
 	}
 	return out
 }

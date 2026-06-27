@@ -1083,7 +1083,7 @@ rule XmlParserHardening {
 	}
 }
 
-func TestValidateV2CorpusUsesRuleVerbMechanicEndpointKinds(t *testing.T) {
+func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module mechanics.custom;
 mechanic ruleVerb taint {
@@ -1104,10 +1104,10 @@ rule SqlInjection {
 `)
 	err := ValidateV2Corpus(sources)
 	if err == nil {
-		t.Fatal("ValidateV2Corpus succeeded, want mechanic-authored endpoint kind diagnostic")
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
 	}
-	if !strings.Contains(err.Error(), `from uses concept code.HttpInput of kind source; want asset`) {
-		t.Fatalf("error = %v, want endpoint kind from authored mechanic", err)
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.taint; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
 	}
 }
 
@@ -1129,7 +1129,7 @@ mechanic ruleVerb taint {
 	}
 }
 
-func TestValidateV2CorpusUsesRuleVerbMechanicAllowedClauses(t *testing.T) {
+func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module mechanics.custom;
 mechanic ruleVerb fact {
@@ -1155,10 +1155,10 @@ rule ConfigGuard {
 `)
 	err := ValidateV2Corpus(sources)
 	if err == nil {
-		t.Fatal("ValidateV2Corpus succeeded, want allowed clause diagnostic")
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
 	}
-	if !strings.Contains(err.Error(), `clause "coveredBy" is not allowed by mechanic ruleVerb fact`) {
-		t.Fatalf("error = %v, want allowed clause diagnostic", err)
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.fact; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
 	}
 }
 

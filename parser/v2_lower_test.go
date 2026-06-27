@@ -88,7 +88,7 @@ rule CustomFlow {
 	}
 }
 
-func TestV2CorpusLoweringUsesMechanicsAcrossSources(t *testing.T) {
+func TestLowerV2DefinitionSourcesValidatesCorpus(t *testing.T) {
 	mechanics, err := ParseV2(`
 module mechanics.test;
 mechanic ruleVerb issue {
@@ -114,8 +114,8 @@ rule IssueAsFlow {
 		{Name: "mechanics.vyql", Program: mechanics},
 		{Name: "rules.vyql", Program: rules},
 	})
-	if err == nil || !strings.Contains(err.Error(), "rules.vyql") {
-		t.Fatalf("LowerV2DefinitionSources error = %v, want contextual lowering failure", err)
+	if err == nil || !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.issue; first declared in <builtin>`) {
+		t.Fatalf("LowerV2DefinitionSources error = %v, want built-in mechanic reservation diagnostic", err)
 	}
 }
 
@@ -136,24 +136,6 @@ func TestV2DefinitionSourcesFromTextPreservesSingleSource(t *testing.T) {
 
 func TestParseV2DefinitionSourcesValidatesCorpus(t *testing.T) {
 	_, err := ParseV2DefinitionSources([]V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
-module mechanics.test;
-mechanic ruleVerb issue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [coveredBy]
-}
-mechanic coverage path {
-  capability: coverage.path
-  coversWhen: solver.pathCovered(check.anchor, candidate.path)
-  targetParts: [path]
-}
-mechanic coverage endpoint {
-  capability: coverage.endpoint
-  coversWhen: solver.sameEndpoint(check.anchor, candidate.endpoint)
-  targetParts: [endpoint]
-}
-`},
 		{Name: "code.vyql", Source: `
 module code;
 concept Problem : issue {}
@@ -205,11 +187,10 @@ rule SelectedOnly {
 func TestV2ScannerIRPreservesMechanicsAndPolicies(t *testing.T) {
 	decls, err := ParseV2Definitions(`
 module mechanics.sast;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy, confidence]
+mechanic ruleVerb customIssue {
+  solver: fact.exists
+  fromKinds: [issue]
+  allowedClauses: [where]
 }
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
@@ -228,10 +209,10 @@ policy resultIdentity default {
 	if !ok {
 		t.Fatalf("decl[0] = %T, want *V2MechanicDecl", decls[0])
 	}
-	if mech.Module != "mechanics.sast" || mech.Kind != "ruleVerb" || mech.Name != "taint" {
+	if mech.Module != "mechanics.sast" || mech.Kind != "ruleVerb" || mech.Name != "customIssue" {
 		t.Fatalf("mechanic identity wrong: %+v", mech)
 	}
-	if got := mech.QualifiedName(); got != "mechanics.sast.mechanic:ruleVerb:taint" {
+	if got := mech.QualifiedName(); got != "mechanics.sast.mechanic:ruleVerb:customIssue" {
 		t.Fatalf("mechanic qualified name = %q", got)
 	}
 	policy, ok := decls[1].(*V2PolicyDecl)
@@ -250,11 +231,10 @@ func TestParseV2DefinitionSourcesSelectedPreservesSelectedMechanicsAndPolicies(t
 	decls, err := ParseV2DefinitionSourcesSelected([]V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.sast;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy, confidence]
+mechanic ruleVerb customIssue {
+  solver: fact.exists
+  fromKinds: [issue]
+  allowedClauses: [where]
 }
 `},
 		{Name: "policy.vyql", Source: `

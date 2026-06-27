@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -56,7 +57,31 @@ func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
 }
 
 func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
+	if err := validateV2ParsedSourceMechanicBoundary(sources); err != nil {
+		return nil, err
+	}
 	return lowerV2DefinitionSourcesSelected(sources, nil)
+}
+
+func validateV2ParsedSourceMechanicBoundary(sources []V2Source) error {
+	builtins := builtinV2MechanicSources()
+	var errs []error
+	for _, src := range sources {
+		if src.Program == nil {
+			continue
+		}
+		for _, decl := range src.Program.Decls {
+			m, ok := decl.(*V2MechanicDecl)
+			if !ok {
+				continue
+			}
+			key := v2MechanicID{Kind: m.Kind, Name: m.Name}
+			if builtins[key] != "" {
+				errs = append(errs, fmt.Errorf("%s: duplicate v2 mechanic %s.%s; first declared in <builtin>", src.Name, m.Kind, m.Name))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
