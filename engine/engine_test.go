@@ -202,7 +202,7 @@ func ontologyVocabularyNeedles(t *testing.T) []string {
 	t.Helper()
 	seen := map[string]bool{}
 	for _, c := range ontology.Seed().AllConcepts() {
-		if c.AnalysisRole != "" {
+		if ontology.IsInternalConceptRoleConcept(c.QualifiedName()) {
 			continue
 		}
 		seen["\""+c.Name+"\""] = true

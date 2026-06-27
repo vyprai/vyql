@@ -18,7 +18,7 @@ import (
 type Engine struct {
 	Onto               *ontology.Ontology
 	Store              usg.Store
-	analysisRole       map[string]map[string]bool
+	conceptRole        map[string]map[string]bool
 	contextReach       []contextReachSource
 	contextReachSet    bool
 	contextAssets      []contextAssetConcept
@@ -39,7 +39,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{
 		Onto:               onto,
 		Store:              store,
-		analysisRole:       map[string]map[string]bool{},
+		conceptRole:        map[string]map[string]bool{},
 		cfg:                map[string]bool{},
 		labelsByNode:       map[string][]usg.Label{},
 		nodesByConcept:     map[string][]string{},
@@ -445,7 +445,7 @@ func (e *Engine) grantMinLevel(concept string) string {
 // live taint path — meaning vyql could NOT prove it excludes this sink's required
 // character set (a sound allowlist filter would have killed the flow already).
 func (e *Engine) charFilterAdvisoryNote(path []string, excluded string) string {
-	charFilters := e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter)
+	charFilters := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter)
 	onPath := make(map[string]bool, len(path))
 	for _, id := range path {
 		onPath[id] = true
@@ -561,7 +561,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		excluded = excludedCharsFor(e.Onto, sinkConcepts)
 	}
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter))
+	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter))
 	if err != nil {
 		return nil, err
 	}
@@ -788,15 +788,15 @@ func (e *Engine) nodesWithConcept(concept string) []string {
 	return ids
 }
 
-func (e *Engine) conceptsWithAnalysisRole(role string) map[string]bool {
+func (e *Engine) conceptsWithInternalConceptRole(role string) map[string]bool {
 	if e == nil || e.Onto == nil || role == "" {
 		return nil
 	}
-	if concepts, ok := e.analysisRole[role]; ok {
+	if concepts, ok := e.conceptRole[role]; ok {
 		return concepts
 	}
-	concepts := e.Onto.ConceptsWithAnalysisRole(role)
-	e.analysisRole[role] = concepts
+	concepts := e.Onto.ConceptsWithInternalConceptRole(role)
+	e.conceptRole[role] = concepts
 	return concepts
 }
 
@@ -1063,11 +1063,11 @@ func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
 	if !ok {
 		return false
 	}
-	targets := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverTarget)
+	targets := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleSameReceiverTarget)
 	if len(targets) == 0 || !nodeHasAnyConcept(e.labels(sinkID), targets) {
 		return false
 	}
-	guards := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverGuard)
+	guards := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleSameReceiverGuard)
 	if len(guards) == 0 || !guards[control] {
 		return false
 	}

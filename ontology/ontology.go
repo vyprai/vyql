@@ -41,7 +41,6 @@ type Concept struct {
 	SourceAssumption        string   `json:"source_assumption,omitempty"`
 	SourceConfidence        string   `json:"source_confidence,omitempty"`
 	GrantMinLevel           string   `json:"grantMinLevel,omitempty"`
-	AnalysisRole            string   `json:"analysisRole,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
 	ContextReachTargetProp  string   `json:"context_reach_target_prop,omitempty"`
@@ -60,33 +59,46 @@ type Concept struct {
 const (
 	InternalNeutralizerAssumptionConcept = "vyql.internal.NeutralizerAssumption"
 
-	AnalysisRoleAttributeSink      = "attribute_sink"
-	AnalysisRoleCharFilter         = "char_filter"
-	AnalysisRoleDomInput           = "dom_input"
-	AnalysisRolePathAccessCheck    = "path_access_check"
-	AnalysisRoleProcessArgVector   = "process_arg_vector"
-	AnalysisRoleSameReceiverGuard  = "same_receiver_guard"
-	AnalysisRoleSameReceiverTarget = "same_receiver_guard_target"
+	InternalConceptRoleAttributeSink      = "attribute_sink"
+	InternalConceptRoleCharFilter         = "char_filter"
+	InternalConceptRoleDomInput           = "dom_input"
+	InternalConceptRolePathAccessCheck    = "path_access_check"
+	InternalConceptRoleProcessArgVector   = "process_arg_vector"
+	InternalConceptRoleSameReceiverGuard  = "same_receiver_guard"
+	InternalConceptRoleSameReceiverTarget = "same_receiver_guard_target"
 )
 
-var internalAnalysisRoleConcepts = map[string][]string{
-	AnalysisRoleAttributeSink:      {"code.ProtoPollute"},
-	AnalysisRoleCharFilter:         {"threat.CharFilter"},
-	AnalysisRoleDomInput:           {"code.DomInput"},
-	AnalysisRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
-	AnalysisRoleProcessArgVector:   {"core.ProcessArgVector"},
-	AnalysisRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
-	AnalysisRoleSameReceiverTarget: {"code.XmlParserCreate"},
+var internalConceptRoleConcepts = map[string][]string{
+	InternalConceptRoleAttributeSink:      {"code.ProtoPollute"},
+	InternalConceptRoleCharFilter:         {"threat.CharFilter"},
+	InternalConceptRoleDomInput:           {"code.DomInput"},
+	InternalConceptRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
+	InternalConceptRoleProcessArgVector:   {"core.ProcessArgVector"},
+	InternalConceptRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
+	InternalConceptRoleSameReceiverTarget: {"code.XmlParserCreate"},
 }
 
-// AnalysisRoles returns the Go-owned internal concept-role names.
-func AnalysisRoles() []string {
-	out := make([]string, 0, len(internalAnalysisRoleConcepts))
-	for role := range internalAnalysisRoleConcepts {
+// InternalConceptRoles returns the Go-owned internal concept-role names.
+func InternalConceptRoles() []string {
+	out := make([]string, 0, len(internalConceptRoleConcepts))
+	for role := range internalConceptRoleConcepts {
 		out = append(out, role)
 	}
 	sort.Strings(out)
 	return out
+}
+
+// IsInternalConceptRoleConcept reports whether concept is used only by a
+// Go-owned internal concept role.
+func IsInternalConceptRoleConcept(concept string) bool {
+	for _, concepts := range internalConceptRoleConcepts {
+		for _, candidate := range concepts {
+			if candidate == concept {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
@@ -142,14 +154,15 @@ func (o *Ontology) AllConcepts() []Concept {
 	return out
 }
 
-// ConceptsWithAnalysisRole returns the concepts assigned to an internal engine
-// role. The roles are Go-owned language mechanics, not authored ontology fields.
-func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
+// ConceptsWithInternalConceptRole returns the concepts assigned to an internal
+// engine role. The roles are Go-owned language mechanics, not authored ontology
+// fields.
+func (o *Ontology) ConceptsWithInternalConceptRole(role string) map[string]bool {
 	out := map[string]bool{}
 	if role == "" {
 		return out
 	}
-	for _, concept := range internalAnalysisRoleConcepts[role] {
+	for _, concept := range internalConceptRoleConcepts[role] {
 		if _, ok := o.concepts[concept]; ok {
 			out[concept] = true
 		}
@@ -157,9 +170,9 @@ func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
 	return out
 }
 
-// SingleConceptWithAnalysisRole returns the sole concept tagged for role.
-func (o *Ontology) SingleConceptWithAnalysisRole(role string) string {
-	concepts := o.ConceptsWithAnalysisRole(role)
+// SingleConceptWithInternalConceptRole returns the sole concept tagged for role.
+func (o *Ontology) SingleConceptWithInternalConceptRole(role string) string {
+	concepts := o.ConceptsWithInternalConceptRole(role)
 	var out string
 	for c := range concepts {
 		if out != "" {

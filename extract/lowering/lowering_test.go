@@ -48,7 +48,7 @@ func loweringForbiddenConceptLiterals(t *testing.T) []string {
 	t.Helper()
 	out := map[string]bool{}
 	for _, c := range ontology.Seed().AllConcepts() {
-		if c.AnalysisRole != "" {
+		if ontology.IsInternalConceptRoleConcept(c.QualifiedName()) {
 			continue
 		}
 		out[`"`+c.Name+`"`] = true

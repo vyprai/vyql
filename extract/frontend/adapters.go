@@ -749,8 +749,8 @@ func ontologyRoleConcepts(role string) map[string]bool {
 	conceptRoleOnce.Do(func() {
 		conceptRoles = map[string]map[string]bool{}
 		o := ontology.Seed()
-		for _, role := range ontology.AnalysisRoles() {
-			conceptRoles[role] = o.ConceptsWithAnalysisRole(role)
+		for _, role := range ontology.InternalConceptRoles() {
+			conceptRoles[role] = o.ConceptsWithInternalConceptRole(role)
 		}
 	})
 	return conceptRoles[role]
@@ -999,7 +999,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 // as an advisory note. The regex math is general (charfilter.go); WHICH methods
 // filter is data (the `filter` directive).
 func (spec adapterSpec) filterAdapter() adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRoleCharFilter)
+	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleCharFilter)
 	return adapters.Adapter{
 		Name: spec.Name + ".filters", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
@@ -1486,7 +1486,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 //
 // Collection-literal arg0s (vkind == Seq) are skipped.
 func (spec adapterSpec) sinkAdapter() adapters.Adapter {
-	attributeSinks := ontologyRoleConcepts(ontology.AnalysisRoleAttributeSink)
+	attributeSinks := ontologyRoleConcepts(ontology.InternalConceptRoleAttributeSink)
 	return adapters.Adapter{
 		Name: spec.Name + ".sinks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
@@ -3954,7 +3954,7 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 }
 
 func jsPathRegexGuardAdapter() adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRolePathAccessCheck)
+	concept := singleOntologyRoleConcept(ontology.InternalConceptRolePathAccessCheck)
 	return adapters.Adapter{
 		Name: "javascript.path-regex-guards", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
@@ -3988,7 +3988,7 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 }
 
 func jsDomValueInputAdapter() adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
+	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleDomInput)
 	return adapters.Adapter{
 		Name: "javascript.dom-value-inputs", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
@@ -4045,7 +4045,7 @@ func jsAttrReceiverFromDomLookup(s usg.Store, idx *flowTokenIndex, attrID string
 }
 
 func jsSafePathResolverAdapter() adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRolePathAccessCheck)
+	concept := singleOntologyRoleConcept(ontology.InternalConceptRolePathAccessCheck)
 	return adapters.Adapter{
 		Name: "javascript.safe-path-resolver-summaries", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
@@ -4253,7 +4253,7 @@ func jsRegexBody(lit string) (string, bool) {
 }
 
 func processArgVectorAdapter(tech string) adapters.Adapter {
-	concept := singleOntologyRoleConcept(ontology.AnalysisRoleProcessArgVector)
+	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleProcessArgVector)
 	return adapters.Adapter{
 		Name: "process-arg-vector.controls", Technology: tech, Specificity: 1,
 		Fidelity: "semantic", Origin: "human",

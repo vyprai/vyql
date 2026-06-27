@@ -108,23 +108,20 @@ concept CharFilter : check {
 	if got[0].GrantMinLevel != "ADMIN" {
 		t.Fatalf("grantMinLevel = %q, want ADMIN", got[0].GrantMinLevel)
 	}
-	if got[1].AnalysisRole != "" {
-		t.Fatalf("analysisRole should be Go-owned, got authored value %q", got[1].AnalysisRole)
-	}
 }
 
-func TestOntologyResolvesGoOwnedAnalysisRoles(t *testing.T) {
+func TestOntologyResolvesGoOwnedInternalConceptRoles(t *testing.T) {
 	o := Seed()
 	for role, want := range map[string]string{
-		AnalysisRoleAttributeSink:      "code.ProtoPollute",
-		AnalysisRoleCharFilter:         "threat.CharFilter",
-		AnalysisRoleDomInput:           "code.DomInput",
-		AnalysisRolePathAccessCheck:    "core.PathAccessCheck",
-		AnalysisRoleProcessArgVector:   "core.ProcessArgVector",
-		AnalysisRoleSameReceiverGuard:  "core.XmlHardening",
-		AnalysisRoleSameReceiverTarget: "code.XmlParserCreate",
+		InternalConceptRoleAttributeSink:      "code.ProtoPollute",
+		InternalConceptRoleCharFilter:         "threat.CharFilter",
+		InternalConceptRoleDomInput:           "code.DomInput",
+		InternalConceptRolePathAccessCheck:    "core.PathAccessCheck",
+		InternalConceptRoleProcessArgVector:   "core.ProcessArgVector",
+		InternalConceptRoleSameReceiverGuard:  "core.XmlHardening",
+		InternalConceptRoleSameReceiverTarget: "code.XmlParserCreate",
 	} {
-		if got := o.ConceptsWithAnalysisRole(role); !got[want] {
+		if got := o.ConceptsWithInternalConceptRole(role); !got[want] {
 			t.Fatalf("role %s concepts = %v, want %s", role, got, want)
 		}
 	}

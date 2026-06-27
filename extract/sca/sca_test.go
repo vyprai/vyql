@@ -186,7 +186,7 @@ func TestSCARuntimeDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	root := filepath.Dir(file)
 	var forbidden []string
 	for _, c := range ontology.Seed().AllConcepts() {
-		if c.AnalysisRole != "" {
+		if ontology.IsInternalConceptRoleConcept(c.QualifiedName()) {
 			continue
 		}
 		forbidden = append(forbidden,
