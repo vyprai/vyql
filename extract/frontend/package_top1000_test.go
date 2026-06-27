@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
-	"github.com/vyprai/vyql/parser"
 )
 
 type topPackageSources struct {
@@ -118,16 +117,6 @@ func TestGeneratedPackageAdapterSourceRejectsLegacySyntax(t *testing.T) {
 		t.Fatalf("generated adapter error = %v, want generated file context", err)
 	}
 
-	decls, err := parser.ParseRuntimeCompat(string(source.Data))
-	if err != nil {
-		t.Fatalf("compat parser should still accept migration legacy syntax: %v", err)
-	}
-	if len(decls) != 1 {
-		t.Fatalf("compat generated adapter decl count = %d, want 1", len(decls))
-	}
-	if _, ok := decls[0].(*parser.AdapterDecl); !ok {
-		t.Fatalf("compat generated adapter decl = %T, want *parser.AdapterDecl", decls[0])
-	}
 }
 
 func mustReadJSON(t *testing.T, rel string, dst any) {

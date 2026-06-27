@@ -604,7 +604,6 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 	root := testRepoRoot(t)
 	allowed := map[string]bool{
 		"go/parser/parser.go":        true,
-		"go/parser/v2_lower.go":      true,
 		"go/parser/v2_migrate.go":    true,
 		"go/cmd/vyql/definitions.go": true,
 	}
@@ -624,7 +623,7 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 		}
 		src := string(data)
 		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
-		usesLegacy := importsVyqlParser && strings.Contains(src, "parser.Parse(") || strings.Contains(src, "ParseRuntimeCompat(")
+		usesLegacy := importsVyqlParser && strings.Contains(src, "parser.Parse(")
 		if strings.HasPrefix(rel, "go/parser/") && strings.Contains(src, "Parse(src)") {
 			usesLegacy = true
 		}

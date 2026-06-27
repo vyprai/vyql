@@ -90,82 +90,9 @@ func ParseRuntimeStrict(src string) ([]Decl, error) {
 }
 
 // ParseRuntime parses definitions for the current scanner runtime. Production
-// runtime definitions are v2-only; migration and explicit compatibility tests
-// must call ParseRuntimeCompat instead of relying on an implicit v1 fallback.
+// runtime definitions are v2-only and never fall back to legacy v1 syntax.
 func ParseRuntime(src string) ([]Decl, error) {
 	return ParseRuntimeStrict(src)
-}
-
-// ParseRuntimeCompat parses runtime definitions with the old migration bridge:
-// v2 first, then legacy v1 fallback. Keep this out of production loaders so
-// malformed converted v2 cannot silently run through the v1 parser.
-func ParseRuntimeCompat(src string) ([]Decl, error) {
-	if looksObviouslyV1RuntimeSource(src) {
-		return Parse(src)
-	}
-	v2Decls, v2Err := ParseV2Runtime(src)
-	if v2Err == nil {
-		return v2Decls, nil
-	}
-	chunks := splitV2ModuleChunks(src)
-	if len(chunks) > 1 {
-		var out []Decl
-		var chunkErrs []string
-		for _, chunk := range chunks {
-			decls, chunkErr := ParseV2Runtime(chunk)
-			if chunkErr != nil {
-				chunkErrs = append(chunkErrs, chunkErr.Error())
-				continue
-			}
-			out = append(out, decls...)
-		}
-		if len(chunkErrs) == 0 {
-			return out, nil
-		}
-		v2Err = fmt.Errorf("%w; v2 module chunks: %s", v2Err, strings.Join(chunkErrs, "; "))
-	}
-	decls, err := Parse(src)
-	if err == nil {
-		return decls, nil
-	}
-	return nil, fmt.Errorf("v1 parse: %v; v2 parse/lower: %w", err, v2Err)
-}
-
-func looksObviouslyV1RuntimeSource(src string) bool {
-	first := firstVYQLWord(src)
-	switch first {
-	case "adapter", "source", "sink", "flag", "mark", "filter", "package", "import", "query", "state_machine":
-		return true
-	default:
-		return false
-	}
-}
-
-func firstVYQLWord(src string) string {
-	for i, n := 0, len(src); i < n; {
-		c := src[i]
-		if isSpace(c) || c == ';' {
-			i++
-			continue
-		}
-		if c == '/' && i+1 < n && src[i+1] == '/' {
-			i += 2
-			for i < n && src[i] != '\n' {
-				i++
-			}
-			continue
-		}
-		if !isWordStart(c) {
-			return ""
-		}
-		start := i
-		i++
-		for i < n && isWordCont(src[i]) {
-			i++
-		}
-		return src[start:i]
-	}
-	return ""
 }
 
 func splitV2ModuleChunks(src string) []string {

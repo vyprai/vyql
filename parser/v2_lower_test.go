@@ -515,40 +515,6 @@ rule SameReceiverCoverage {
 	}
 }
 
-func TestParseRuntimeCompatKeepsLegacyV1Fallback(t *testing.T) {
-	decls, err := ParseRuntimeCompat(`
-module code;
-concept LegacyControl : control {}
-`)
-	if err != nil {
-		t.Fatalf("ParseRuntimeCompat: %v", err)
-	}
-	concept := decls[0].(*ConceptDecl)
-	if concept.Kind != "control" {
-		t.Fatalf("legacy concept kind = %q, want control", concept.Kind)
-	}
-}
-
-func TestParseRuntimeCompatRecognizesObviousLegacyV1FirstToken(t *testing.T) {
-	src := `
-// legacy adapter syntax should not pay the v2 fallback tax
-adapter javascript {
-  source "req.body" -> code.HttpInput
-}
-`
-	if !looksObviouslyV1RuntimeSource(src) {
-		t.Fatal("legacy adapter source was not recognized as obvious v1")
-	}
-	decls, err := ParseRuntimeCompat(src)
-	if err != nil {
-		t.Fatalf("ParseRuntimeCompat: %v", err)
-	}
-	adapter := decls[0].(*AdapterDecl)
-	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
-		t.Fatalf("adapter parse wrong: %+v", adapter)
-	}
-}
-
 func TestParseRuntimeFallsThroughToV2Lowering(t *testing.T) {
 	decls, err := ParseRuntime(`
 module bindings.python.dbapi;
