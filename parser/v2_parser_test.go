@@ -141,6 +141,30 @@ func TestParseV2ProgramContract(t *testing.T) {
 	}
 }
 
+func TestParseV2PackTypedReferences(t *testing.T) {
+	prog, err := ParseV2(`
+module packs.web;
+pack webSecurity {
+  includes: [
+    profile web,
+    pack base,
+    rules.injection.SqlInjection
+  ]
+  excludes: [rules.experimental.NoisyRule]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pack := prog.Decls[0].(*V2PackDecl)
+	if got := pack.Fields["includes"]; !stringListFieldEqual(got, []string{"profile.web", "pack.base", "rules.injection.SqlInjection"}) {
+		t.Fatalf("includes = %#v", got)
+	}
+	if got := pack.Fields["excludes"]; !stringListFieldEqual(got, []string{"rules.experimental.NoisyRule"}) {
+		t.Fatalf("excludes = %#v", got)
+	}
+}
+
 func TestParseV2RejectsInvalidMatcherItems(t *testing.T) {
 	cases := []struct {
 		name string

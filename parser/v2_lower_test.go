@@ -536,7 +536,7 @@ func TestParseV2DefinitionsLowersPackDeclarations(t *testing.T) {
 	decls, err := ParseV2Definitions(`
 module packs.web;
 pack webSecurity {
-  includes: [profile.web, rules.injection.SqlInjection]
+  includes: [profile web, pack base, rules.injection.SqlInjection]
   excludes: [rules.experimental.NoisyRule]
 }
 `)
@@ -553,7 +553,7 @@ pack webSecurity {
 	if pack.Name != "webSecurity" {
 		t.Fatalf("pack name = %q, want webSecurity", pack.Name)
 	}
-	if got := pack.Fields["includes"]; !stringListFieldEqual(got, []string{"profile.web", "rules.injection.SqlInjection"}) {
+	if got := pack.Fields["includes"]; !stringListFieldEqual(got, []string{"profile.web", "pack.base", "rules.injection.SqlInjection"}) {
 		t.Fatalf("pack includes = %#v", got)
 	}
 	if got := pack.Fields["excludes"]; !stringListFieldEqual(got, []string{"rules.experimental.NoisyRule"}) {

@@ -436,7 +436,7 @@ func (p *v2Parser) parseV2Profile() *V2ProfileDecl {
 
 func (p *v2Parser) parseV2Pack() *V2PackDecl {
 	p.expectWord("pack")
-	return &V2PackDecl{Name: p.parseQName(), Fields: p.parseV2FieldBlock()}
+	return &V2PackDecl{Name: p.parseQName(), Fields: p.parseV2PackFieldBlock()}
 }
 
 func (p *v2Parser) parseV2Mechanic() *V2MechanicDecl {
@@ -605,6 +605,54 @@ func (p *v2Parser) parseV2FieldBlock() map[string]any {
 	}
 	p.expect(tRBrace, "}")
 	return out
+}
+
+func (p *v2Parser) parseV2PackFieldBlock() map[string]any {
+	p.expect(tLBrace, "{")
+	out := map[string]any{}
+	for !p.at(tRBrace) {
+		key := p.expect(tWord, "field name").val
+		p.expect(tColon, ":")
+		if (key == "includes" || key == "excludes") && p.at(tLBrack) {
+			out[key] = p.parseV2PackRefList()
+		} else {
+			out[key] = p.parseV2FieldValue()
+		}
+		p.consumeV2Separators()
+	}
+	p.expect(tRBrace, "}")
+	return out
+}
+
+func (p *v2Parser) parseV2PackRefList() []string {
+	p.expect(tLBrack, "[")
+	var out []string
+	for !p.at(tRBrack) {
+		if p.at(tString) {
+			out = append(out, p.next().val)
+		} else {
+			first := p.parseQName()
+			if isV2PackRefKind(first) && p.at(tWord) {
+				out = append(out, first+"."+p.parseQName())
+			} else {
+				out = append(out, first)
+			}
+		}
+		if p.at(tComma) {
+			p.next()
+		}
+	}
+	p.expect(tRBrack, "]")
+	return out
+}
+
+func isV2PackRefKind(value string) bool {
+	switch value {
+	case "profile", "pack", "module":
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *v2Parser) parseV2FieldValue() any {
