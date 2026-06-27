@@ -1185,6 +1185,18 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+		case "control_arg":
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
+				ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+		case "control_method_arg":
+			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
+				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
@@ -1602,6 +1614,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				effects[i] = reqGate.effect(spec.Controls[i].Packages, spec.Controls[i].Requirement)
 			}
 			var out []adapters.Mapping
+			var collectionIdx collectionFlowIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
@@ -1617,7 +1630,8 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 						continue
 					}
 					// no break: a single call can be MULTIPLE controls, so attach every match.
-					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
+					hit := c.ByMethod && method == c.Pattern ||
+						!c.ByMethod && ((c.Exact && path == c.Pattern) || (!c.Exact && matchPath(path, []string{c.Pattern}, "prefix")))
 					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
 						hit = false
 					}
@@ -1634,6 +1648,12 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 							spec = 3 // package-specific control supersedes native/general
 						}
 						conf, detail := effects[ci].apply(mappingConfidence(c.Confidence, ""), c.Detail)
+						if c.ArgTarget {
+							for _, target := range markTargets(s, &collectionIdx, n, c) {
+								out = append(out, adapters.Mapping{NodeID: target, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+							}
+							continue
+						}
 						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 					}
 				}

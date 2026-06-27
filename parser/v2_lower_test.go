@@ -64,7 +64,7 @@ rule SqlInjection {
 	if got := adapter.Mappings[1]; got.Kind != "source" || got.Pattern != "request.json" || got.Concept != "code.HttpInput" {
 		t.Fatalf("source lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[2]; got.Kind != "control_method" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" {
+	if got := adapter.Mappings[2]; got.Kind != "control_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 {
 		t.Fatalf("check lowering wrong: %+v", got)
 	}
 	if rule == nil || rule.QualifiedName() != "rules.injection.SqlInjection" {
@@ -468,7 +468,7 @@ binding parameterizedQuery {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	got := decls[0].(*BindingSet).Mappings[0]
-	if got.Kind != "control_method" || got.Coverage != "path" {
+	if got.Kind != "control_method_arg" || got.Coverage != "path" || got.ArgIndex != 0 {
 		t.Fatalf("check emission did not lower with builtin coverage mechanic: %+v", got)
 	}
 	if got.CoverageDetail["from"] != "args[0]" || got.CoverageDetail["to"] != "call" {
@@ -2070,9 +2070,9 @@ binding executeWithParams {
 		t.Fatalf("mappings = %#v, want one", ad.Mappings)
 	}
 	got := ad.Mappings[0]
-	if got.Kind != "control_method" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" ||
+	if got.Kind != "control_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 ||
 		!got.ArgCountSet || got.ArgCountMin != 2 || got.ArgCountMax != -1 {
-		t.Fatalf("args.count mapping = %#v, want arity-gated control_method", got)
+		t.Fatalf("args.count mapping = %#v, want arity-gated control_method_arg", got)
 	}
 }
 

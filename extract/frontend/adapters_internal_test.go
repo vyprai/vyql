@@ -2564,6 +2564,38 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	}
 }
 
+func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "samplepkg.execute", "method": "execute", "arg0": "arg",
+	}})
+
+	spec := specFromBindingSet(&parser.BindingSet{
+		Name: "neutral",
+		Mappings: []parser.BindingAction{{
+			Kind:           "control_method_arg",
+			Concept:        "custom.Parameterized",
+			Pattern:        "execute",
+			ArgIndex:       0,
+			Coverage:       "path",
+			CoverageDetail: map[string]string{"from": "args[0]", "to": "call"},
+			Fidelity:       "semantic",
+			Confidence:     "high",
+		}},
+	})
+	got := spec.controlAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Parameterized" {
+		t.Fatalf("argument control mapping wrong: %+v", got)
+	}
+	if got[0].Detail["coverage"] != "path" || got[0].Detail["coverage.from"] != "args[0]" || got[0].Detail["coverage.to"] != "call" {
+		t.Fatalf("coverage detail not preserved on argument control: %+v", got[0])
+	}
+	if got[0].Fidelity != "semantic" || got[0].Confidence != "high" {
+		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])
+	}
+}
+
 func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:2"}})

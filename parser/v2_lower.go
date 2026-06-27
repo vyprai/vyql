@@ -753,7 +753,22 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 				}
+				loc, hasArgTarget, err := v2CheckArgTarget(action.Location)
+				if err != nil {
+					return nil, fmt.Errorf("binding %s: %w", b.Name, err)
+				}
 				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+				if hasArgTarget {
+					if shape.Field == "callee.method" {
+						m.Kind = "control_method_arg"
+					} else {
+						m.Kind = "control_arg"
+					}
+					m.ArgIndex = loc.ArgIndex
+					m.Collection = loc.Collection
+					m.CollectionFirst = loc.CollectionFirst
+					m.CollectionIndex = loc.CollectionIndex
+				}
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit issue":
 				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
@@ -1768,6 +1783,19 @@ func validateV2PathOnlyCheck(binding string, action V2BindingOutput) error {
 		return fmt.Errorf("binding %s: this check only supports path coverage", binding)
 	}
 	return nil
+}
+
+func v2CheckArgTarget(location string) (v2SinkLocationInfo, bool, error) {
+	switch location {
+	case "call", "node", "callee.receiver":
+		return v2SinkLocationInfo{}, false, nil
+	default:
+		loc, err := v2SinkLocationParts(location)
+		if err != nil {
+			return v2SinkLocationInfo{}, false, err
+		}
+		return loc, true, nil
+	}
 }
 
 func lowerV2AdvisoryNeutralizerCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, bool, error) {
