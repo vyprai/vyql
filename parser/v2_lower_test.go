@@ -1464,6 +1464,29 @@ binding globalHardening {
 	}
 }
 
+func TestV2GlobalCheckLowersArgumentLocation(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.python.migration;
+binding globalHardening {
+  query pattern callExpr where callee.method == "enableHardening"
+  emit check core.XmlHardening at args[0] {
+    covers global {}
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "mark_method_arg" || got.Pattern != "enableHardening" || got.Concept != "core.XmlHardening" || got.Coverage != "global" || got.ArgIndex != 0 {
+		t.Fatalf("argument global check lowering wrong: %+v", got)
+	}
+}
+
 func TestV2ParamSourceLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.library.migration;

@@ -2631,6 +2631,37 @@ func TestMarkAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 	}
 }
 
+func TestMarkAdapterLabelsGlobalArgumentLocation(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "samplepkg.enableHardening", "method": "enableHardening", "arg0": "arg",
+	}})
+
+	spec := specFromBindingSet(&parser.BindingSet{
+		Name: "neutral",
+		Mappings: []parser.BindingAction{{
+			Kind:       "mark_method_arg",
+			Concept:    "custom.GlobalHardening",
+			Pattern:    "enableHardening",
+			ArgIndex:   0,
+			Coverage:   "global",
+			Fidelity:   "semantic",
+			Confidence: "medium",
+		}},
+	})
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.GlobalHardening" {
+		t.Fatalf("argument global mark mapping wrong: %+v", got)
+	}
+	if got[0].Detail["coverage"] != "global" {
+		t.Fatalf("global detail not preserved on argument mark: %+v", got[0])
+	}
+	if got[0].Fidelity != "semantic" || got[0].Confidence != "medium" {
+		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])
+	}
+}
+
 func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:2"}})

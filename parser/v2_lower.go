@@ -940,13 +940,14 @@ func isV2AdvisoryNeutralizerCheck(action V2BindingOutput) bool {
 }
 
 func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
-	if action.Location != "call" && action.Location != "node" {
-		return BindingAction{}, fmt.Errorf("binding %s: global checks currently lower at call/node only", binding)
-	}
 	if action.About != "" {
 		return BindingAction{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
 	}
-	return shape.mapping(BindingAction{
+	loc, hasArgTarget, err := v2CheckArgTarget(action.Location)
+	if err != nil {
+		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
+	}
+	out := shape.mapping(BindingAction{
 		Kind:           shape.markKind(),
 		Pattern:        shape.Pattern,
 		Exact:          shape.Exact,
@@ -957,7 +958,19 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 		ValAbsents:     shape.ValAbsents,
 		Packages:       pkgs,
 		Requirement:    req,
-	}), nil
+	})
+	if hasArgTarget {
+		if shape.Field == "callee.method" {
+			out.Kind = "mark_method_arg"
+		} else {
+			out.Kind = "mark_arg"
+		}
+		out.ArgIndex = loc.ArgIndex
+		out.Collection = loc.Collection
+		out.CollectionFirst = loc.CollectionFirst
+		out.CollectionIndex = loc.CollectionIndex
+	}
+	return out, nil
 }
 
 func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
