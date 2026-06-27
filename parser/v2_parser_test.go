@@ -2,6 +2,9 @@ package parser
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -79,6 +82,26 @@ review code.SecretComparisonReview {
   text: "verify secret comparisons use constant time comparison"
 }
 `
+
+func TestV2FixturesDoNotUseMigrationModuleNames(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	forbiddenModule := "." + "mig" + "ration;"
+	forbiddenPath := "mig" + "ration.vyql"
+	for _, name := range []string{"v2_parser_test.go", "v2_lower_test.go"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		src := string(raw)
+		if strings.Contains(src, forbiddenModule) || strings.Contains(src, forbiddenPath) {
+			t.Fatalf("%s must use native/rejection fixture modules, not migration module names", name)
+		}
+	}
+}
 
 func TestParseV2ProgramContract(t *testing.T) {
 	prog, err := ParseV2(v2Program)
@@ -1224,7 +1247,7 @@ binding bad {
 		},
 		{
 			name: "legacy unstable flag query",
-			src: `module bindings.javascript.migration;
+			src: `module bindings.javascript.rejection;
 binding bad {
   query unstable.legacyFlag as node where node.kind == "any"
   emit issue code.Review at node
@@ -1233,7 +1256,7 @@ binding bad {
 		},
 		{
 			name: "unstable binding query without metadata",
-			src: `module bindings.javascript.migration;
+			src: `module bindings.javascript.rejection;
 binding bad {
   query unstable.frameworkFlag as node where node.kind == "any"
   emit issue code.Review at node

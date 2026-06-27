@@ -967,7 +967,7 @@ rule Two {
 
 func TestV2ArgAnySinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.bash.migration;
+module bindings.bash.native;
 binding catPath {
   query pattern callExpr where callee.path ~= "cat"
   emit sink code.FilePathAccess at args.any
@@ -987,7 +987,7 @@ binding catPath {
 
 func TestV2ExactPathSinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 binding jqueryRoot {
   query pattern callExpr where callee.path == "$"
   emit sink code.HtmlRender at args[0]
@@ -1204,7 +1204,7 @@ binding bad {
 
 func TestV2CollectionSinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding subprocessCall {
   query pattern callExpr where callee.path ~= "subprocess.call"
   emit sink code.CommandExecution at args[0].collection[0]
@@ -1238,7 +1238,7 @@ binding execAll {
 
 func TestV2ReceiverConstraintLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.java.migration;
+module bindings.java.native;
 binding servletParam {
   query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
   emit source code.HttpInput at call.result
@@ -1447,7 +1447,7 @@ binding cartesian {
 
 func TestV2PropagateValueTaintAndIdentityLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.c.migration;
+module bindings.c.native;
 binding decodeOutParam {
   query call as c where c.callee.method == "decode"
   propagate value from c.args[0] to c.args[1].pointee
@@ -1501,7 +1501,7 @@ func TestV2PropagateValueRejectsUnsupportedShape(t *testing.T) {
 	}
 	for _, output := range cases {
 		_, err := ParseV2Definitions(`
-module bindings.c.migration;
+module bindings.c.native;
 binding badFlow {
   query pattern callExpr where callee.method == "decode"
   ` + output + `
@@ -1515,7 +1515,7 @@ binding badFlow {
 
 func TestV2ReceiverTypeFactLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.go.migration;
+module bindings.go.native;
 binding sqlOpenType {
   query pattern callExpr where callee.path ~= "sql.Open"
   emit fact runtime.ReceiverType at call.result {
@@ -1607,7 +1607,7 @@ binding routeArgs {
 
 func TestV2ValueGuardLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding yamlLoad {
   query pattern callExpr where callee.path == "yaml.load" and args.any.literal contains "Loader" and not args.any.literal contains "SafeLoader"
   emit sink code.Deserialization at args[0]
@@ -1646,7 +1646,7 @@ binding unsafeMarker {
 
 func TestV2AdvisoryNeutralizerCheckLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding startsWithGuard {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
   emit check core.InputValidation at call {
@@ -1687,7 +1687,7 @@ binding normpathSanitizer {
 
 func TestV2AdvisoryCheckLowersToNonSuppressingMark(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding possiblePathValidation {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
   emit check core.PathCanonicalization at call {
@@ -1717,7 +1717,7 @@ binding possiblePathValidation {
 
 func TestV2AdvisoryCheckLowersArgumentLocation(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding possiblePathValidation {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
   emit check core.PathCanonicalization at args[0] {
@@ -1747,7 +1747,7 @@ binding possiblePathValidation {
 
 func TestV2GlobalCheckLowersToExplicitGlobalEvidence(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding globalHardening {
   query pattern callExpr where callee.method == "enableHardening"
   emit check core.XmlHardening at call {
@@ -1770,7 +1770,7 @@ binding globalHardening {
 
 func TestV2GlobalCheckLowersArgumentLocation(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding globalHardening {
   query pattern callExpr where callee.method == "enableHardening"
   emit check core.XmlHardening at args[0] {
@@ -1793,7 +1793,7 @@ binding globalHardening {
 
 func TestV2ParamSourceLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.library.migration;
+module bindings.library.native;
 binding externalEntryInput {
   query param as param
   emit source code.ExternalEntryInput at param
@@ -1813,7 +1813,7 @@ binding externalEntryInput {
 
 func TestV2ReceiverCheckLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.python.migration;
+module bindings.python.native;
 binding relativeTo {
   query pattern callExpr where callee.method == "relative_to"
   emit check core.PathCanonicalization at callee.receiver {
@@ -1837,7 +1837,7 @@ binding relativeTo {
 
 func TestV2CharFilterCheckLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.ruby.migration;
+module bindings.ruby.native;
 binding gsubFilter {
   query pattern callExpr where callee.method == "gsub" and call.filter.global == true
   emit check threat.CharFilter at call {
@@ -1862,7 +1862,7 @@ binding gsubFilter {
 
 func TestV2NonGlobalCharFilterCheckLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 binding replaceFilter {
   query pattern callExpr where callee.method == "replace"
   emit check threat.CharFilter at call {
@@ -1887,7 +1887,7 @@ binding replaceFilter {
 
 func TestV2UnstablePrivateGuardRejected(t *testing.T) {
 	_, err := ParseV2Definitions(`
-module bindings.java.migration;
+module bindings.java.rejection;
 binding containmentCheck {
   unstable: {
     owner: "test"
@@ -1914,7 +1914,7 @@ binding containmentCheck {
 
 func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.perl.migration;
+module bindings.perl.native;
 binding cleartextChannel {
   query pattern presenceNode where node.kind == "any" and node.analysis == "text_pattern.credential_literal" and node.context.literal contains "http://" and not (node.context.literal contains "127.0")
   emit issue code.CleartextChannel at node
@@ -1947,7 +1947,7 @@ binding cleartextChannel {
 
 func TestV2PresenceNodeContextFieldPrefixes(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 matcher sensitiveName {
   containsAny: ["token", "secret"]
 }
@@ -2124,7 +2124,7 @@ binding unsupported {
 
 func TestV2PresenceNodeOperandAndPseudoSubjectLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 matcher secretTokenName {
   containsAny: ["token", "secret"]
 }
@@ -2166,8 +2166,8 @@ matcher secretTokenName {
   containsAny: ["token", "secret"]
 }
 `},
-		{Name: "bindings/javascript/migration.vyql", Source: `
-module bindings.javascript.migration;
+		{Name: "bindings/javascript/native.vyql", Source: `
+module bindings.javascript.native;
 uses patterns.javascript.matchers.secretTokenName as SecretName;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and operand(node, where: operand.identifier is SecretName)
@@ -2190,8 +2190,8 @@ matcher secretTokenName {
   containsAny: ["token", "secret"]
 }
 `},
-		{Name: "bindings/javascript/migration.vyql", Source: `
-module bindings.javascript.migration;
+		{Name: "bindings/javascript/native.vyql", Source: `
+module bindings.javascript.native;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and operand(node, where: operand.identifier is secretTokenName)
   emit issue code.SecretComparisonReview at node
@@ -2205,7 +2205,7 @@ binding secretCompare {
 
 func TestV2PresenceNodeRejectsRegexMatcherInvocationUntilScannerSupport(t *testing.T) {
 	_, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 matcher riskyName {
   matches: "token|secret"
 }
@@ -2221,7 +2221,7 @@ binding secretCompare {
 
 func TestV2PresenceNodeContextScopeCallAndFlowToLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
-module bindings.javascript.migration;
+module bindings.javascript.native;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and not (containsAny(node.context.inScopeCall, [scmp])) and containsAny(node.flow_to.op, [return])
   emit issue code.SecretComparisonReview at node
@@ -2681,7 +2681,7 @@ rule SqlInjection {
 
 func TestV2BindingMetadataLowersToScannerIRAdapterMeta(t *testing.T) {
 	decls := parseIRFiles(t, `
-module bindings.textpattern.migration;
+module bindings.textpattern.native;
 pattern bindingMetadata {
   binding: {
     name: "textpattern"
@@ -2710,7 +2710,7 @@ pattern bindingMetadata {
 
 func TestV2UnstableBindingMetadataRejected(t *testing.T) {
 	_, err := ParseV2Definitions(`
-module bindings.textpattern.migration;
+module bindings.textpattern.rejection;
 pattern bindingMetadata {
   unstable: {
     owner: "test"
