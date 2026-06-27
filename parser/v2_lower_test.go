@@ -532,6 +532,35 @@ binding cursorExecuteQuery {
 	}
 }
 
+func TestParseV2DefinitionsLowersPackDeclarations(t *testing.T) {
+	decls, err := ParseV2Definitions(`
+module packs.web;
+pack webSecurity {
+  includes: [profile.web, rules.injection.SqlInjection]
+  excludes: [rules.experimental.NoisyRule]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	if len(decls) != 1 {
+		t.Fatalf("decls = %d, want 1", len(decls))
+	}
+	pack, ok := decls[0].(*PackDecl)
+	if !ok {
+		t.Fatalf("decl = %T, want *PackDecl", decls[0])
+	}
+	if pack.Name != "webSecurity" {
+		t.Fatalf("pack name = %q, want webSecurity", pack.Name)
+	}
+	if got := pack.Fields["includes"]; !stringListFieldEqual(got, []string{"profile.web", "rules.injection.SqlInjection"}) {
+		t.Fatalf("pack includes = %#v", got)
+	}
+	if got := pack.Fields["excludes"]; !stringListFieldEqual(got, []string{"rules.experimental.NoisyRule"}) {
+		t.Fatalf("pack excludes = %#v", got)
+	}
+}
+
 func TestParseV2DefinitionsRejectsV1FallbackAndMultipleModules(t *testing.T) {
 	if _, err := ParseV2Definitions(`
 adapter javascript {
@@ -2400,6 +2429,19 @@ func stringSlicesEqual(a, b []string) bool {
 	}
 	for i := range a {
 		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func stringListFieldEqual(got any, want []string) bool {
+	items, ok := got.([]string)
+	if !ok || len(items) != len(want) {
+		return false
+	}
+	for i := range items {
+		if items[i] != want[i] {
 			return false
 		}
 	}

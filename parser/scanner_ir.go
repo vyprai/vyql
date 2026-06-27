@@ -169,6 +169,14 @@ type ProfileDecl struct {
 
 func (*ProfileDecl) isDecl() {}
 
+// PackDecl groups rules, bindings, profiles, and review output for activation.
+type PackDecl struct {
+	Name   string
+	Fields map[string]any
+}
+
+func (*PackDecl) isDecl() {}
+
 // --- statements (rule body) ----------------------------------------------
 
 // Stmt is a scanner IR rule body.

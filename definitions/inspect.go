@@ -24,6 +24,7 @@ type Catalog struct {
 	Rules    []RuleSummary    `json:"rules,omitempty"`
 	Adapters []MappingSummary `json:"adapters,omitempty"`
 	Reviews  []ReviewSummary  `json:"reviews,omitempty"`
+	Packs    []PackSummary    `json:"packs,omitempty"`
 }
 
 type CatalogStats struct {
@@ -31,6 +32,7 @@ type CatalogStats struct {
 	Rules    int `json:"rules"`
 	Adapters int `json:"adapters"`
 	Reviews  int `json:"reviews"`
+	Packs    int `json:"packs"`
 }
 
 type ConceptSummary struct {
@@ -77,6 +79,13 @@ type ReviewSummary struct {
 	Source   string   `json:"source"`
 }
 
+type PackSummary struct {
+	Name     string   `json:"name"`
+	Includes []string `json:"includes,omitempty"`
+	Excludes []string `json:"excludes,omitempty"`
+	Source   string   `json:"source"`
+}
+
 func Inspect(opts InspectOptions) (Catalog, error) {
 	if opts.Max <= 0 {
 		opts.Max = 80
@@ -89,7 +98,7 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 	opts.Query = strings.ToLower(strings.TrimSpace(opts.Query))
 
 	cat := Catalog{Root: datadir.Root()}
-	if wantKind(opts.Kind, "concepts") || wantKind(opts.Kind, "rules") || wantKind(opts.Kind, "reviews") {
+	if wantKind(opts.Kind, "concepts") || wantKind(opts.Kind, "rules") || wantKind(opts.Kind, "reviews") || wantKind(opts.Kind, "packs") {
 		if err := inspectDeclDir(&cat, "ontology"); err != nil {
 			return cat, err
 		}
@@ -112,6 +121,7 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 		Rules:    len(cat.Rules),
 		Adapters: len(cat.Adapters),
 		Reviews:  len(cat.Reviews),
+		Packs:    len(cat.Packs),
 	}
 	filterCatalog(&cat, opts)
 	return cat, nil
@@ -130,6 +140,8 @@ func wantKind(got, want string) bool {
 		got = "adapters"
 	case "review":
 		got = "reviews"
+	case "pack":
+		got = "packs"
 	}
 	return got == want
 }
@@ -265,6 +277,13 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 			Text:     stringField(x.Fields, "text"),
 			Source:   source,
 		})
+	case *parser.PackDecl:
+		cat.Packs = append(cat.Packs, PackSummary{
+			Name:     x.Name,
+			Includes: listField(x.Fields, "includes"),
+			Excludes: listField(x.Fields, "excludes"),
+			Source:   source,
+		})
 	}
 }
 
@@ -344,6 +363,7 @@ func sortCatalog(cat *Catalog) {
 		return a.Language+"\x00"+a.Kind+"\x00"+a.Pattern+"\x00"+a.Concept < b.Language+"\x00"+b.Kind+"\x00"+b.Pattern+"\x00"+b.Concept
 	})
 	sort.Slice(cat.Reviews, func(i, j int) bool { return cat.Reviews[i].Concept < cat.Reviews[j].Concept })
+	sort.Slice(cat.Packs, func(i, j int) bool { return cat.Packs[i].Name < cat.Packs[j].Name })
 }
 
 func filterCatalog(cat *Catalog, opts InspectOptions) {
@@ -352,6 +372,7 @@ func filterCatalog(cat *Catalog, opts InspectOptions) {
 		cat.Rules = filterSlice(cat.Rules, opts.Query, ruleHaystack)
 		cat.Adapters = filterSlice(cat.Adapters, opts.Query, mappingHaystack)
 		cat.Reviews = filterSlice(cat.Reviews, opts.Query, reviewHaystack)
+		cat.Packs = filterSlice(cat.Packs, opts.Query, packHaystack)
 	}
 	if opts.Language != "" {
 		cat.Adapters = filterSlice(cat.Adapters, opts.Language, func(v MappingSummary) string {
@@ -362,6 +383,7 @@ func filterCatalog(cat *Catalog, opts InspectOptions) {
 	cat.Rules = limitSlice(cat.Rules, opts.Max)
 	cat.Adapters = limitSlice(cat.Adapters, opts.Max)
 	cat.Reviews = limitSlice(cat.Reviews, opts.Max)
+	cat.Packs = limitSlice(cat.Packs, opts.Max)
 }
 
 func filterSlice[T any](in []T, q string, hay func(T) string) []T {
@@ -404,5 +426,11 @@ func mappingHaystack(v MappingSummary) string {
 func reviewHaystack(v ReviewSummary) string {
 	return strings.ToLower(strings.Join([]string{
 		v.Concept, v.Category, v.Kind, strings.Join(v.Expected, " "), v.Text, v.Source,
+	}, " "))
+}
+
+func packHaystack(v PackSummary) string {
+	return strings.ToLower(strings.Join([]string{
+		v.Name, strings.Join(v.Includes, " "), strings.Join(v.Excludes, " "), v.Source,
 	}, " "))
 }

@@ -267,6 +267,8 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 			out = append(out, &ReviewDecl{Concept: names.concept(x.Concept), Fields: lowerV2FieldNames(x.Fields)})
 		case *V2ProfileDecl:
 			out = append(out, &ProfileDecl{Name: x.Name, Fields: lowerV2FieldNames(x.Fields)})
+		case *V2PackDecl:
+			out = append(out, &PackDecl{Name: x.Name, Fields: lowerV2FieldNames(x.Fields)})
 		case *V2BindingDecl:
 			tech := v2BindingTechnology(x.Module)
 			if tech == "" {
