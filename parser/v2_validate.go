@@ -26,21 +26,22 @@ var (
 		"framework": true, "schema": true, "project.has": true,
 	}
 	v2RequirementCombinators = map[string]bool{"all": true, "any": true, "not": true, "soft": true}
-	v2CoverageModes          = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "global": true}
+	v2CoverageModes          = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true, "global": true}
 	v2ConceptKinds           = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
 	v2MechanicKinds          = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2PolicyKinds            = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
-	v2MechanicCapabilities   = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.global": true, "dataflow.taint": true, "dataflow.flow": true, "graph.reach": true, "graph.grant": true, "graph.assume": true, "fact.exists": true, "query.semantic": true}
+	v2MechanicCapabilities   = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "dataflow.flow": true, "graph.reach": true, "graph.grant": true, "graph.assume": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds        = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2FactEmitKinds          = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
 	v2ConfidenceLevels       = map[string]bool{"low": true, "medium": true, "high": true}
 	v2CoverageSolversByMode  = map[string][]string{
-		"path":         {"solver.pathCovered"},
-		"endpoint":     {"solver.sameEndpoint"},
-		"sameReceiver": {"solver.sameValue"},
-		"sameScope":    {"solver.sameScope"},
-		"dominates":    {"solver.dominates", "graph.reach"},
-		"global":       {"solver.always"},
+		"path":          {"solver.pathCovered"},
+		"endpoint":      {"solver.sameEndpoint"},
+		"sameReceiver":  {"solver.sameValue"},
+		"sameScope":     {"solver.sameScope"},
+		"dominates":     {"solver.dominates", "graph.reach"},
+		"postDominates": {"solver.postDominates"},
+		"global":        {"solver.always"},
 	}
 )
 

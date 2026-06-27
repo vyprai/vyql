@@ -1,7 +1,7 @@
 module core;
 
 concept ResourceRelease : check {
-  covers: [dominates, path]
+  covers: [postDominates, path]
   cwe: [CWE_772]
   neutralizes: [resource.ResourceLeak]
 }

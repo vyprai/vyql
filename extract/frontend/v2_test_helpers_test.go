@@ -17,6 +17,7 @@ mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true 
 mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
 mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
 mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
+mechanic coverage postDominates { capability: coverage.postDominates requiresAnchor: true targetParts: [postDominates] }
 mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
 policy confidence default {
   values: [low, medium, high]

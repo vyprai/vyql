@@ -3,7 +3,7 @@ module bindings.c.migration.mce54b166;
 binding resourceRelease126 {
   query pattern callExpr where callee.path ~= "ucsdet_close"
   emit check core.ResourceRelease at call {
-    covers dominates {
+    covers postDominates {
       from: call
       to: call
     }

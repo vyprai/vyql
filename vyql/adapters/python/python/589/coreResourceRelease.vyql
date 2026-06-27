@@ -3,7 +3,7 @@ module bindings.python.migration.m21017d75;
 binding resourceRelease589 {
   query pattern callExpr where callee.method == "close"
   emit check core.ResourceRelease at call {
-    covers dominates {
+    covers postDominates {
       from: call
       to: call
     }

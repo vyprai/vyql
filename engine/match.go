@@ -16,7 +16,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	candidates := e.nodesWithConcept(body.Concept)
 
 	var where parser.Expr
-	var guards, dominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards, closers []string
+	var guards, dominanceGuards, postDominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards []string
 	for _, cl := range cr.Rule.Clauses {
 		switch cl.Kind {
 		case "where":
@@ -27,14 +27,14 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 				guards = append(guards, ex.Concept)
 			case parser.DominatesCoveredBy:
 				dominanceGuards = append(dominanceGuards, ex.Concept)
+			case parser.PostDominatesCoveredBy:
+				postDominanceGuards = append(postDominanceGuards, ex.Concept)
 			case parser.SameReceiverCoveredBy:
 				sameReceiverGuards = append(sameReceiverGuards, ex.Concept)
 			case parser.SameScopeCoveredBy:
 				sameScopeGuards = append(sameScopeGuards, ex.Concept)
 			case parser.GlobalCoveredBy:
 				globalGuards = append(globalGuards, ex.Concept)
-			case parser.ClosedBy:
-				closers = append(closers, ex.Concept)
 			}
 		}
 	}
@@ -62,6 +62,11 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
+		for _, g := range postDominanceGuards {
+			ok := e.postDominatesCovered(node, g)
+			ne = append(ne, findings.NegationEvidence{Clause: "post_dominates_covered_by " + g, Satisfied: ok})
+			suppressed = suppressed || ok
+		}
 		for _, g := range sameReceiverGuards {
 			ok := e.sameReceiverGuarded(node, g)
 			ne = append(ne, findings.NegationEvidence{Clause: "same_receiver_covered_by " + g, Satisfied: ok})
@@ -75,11 +80,6 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		for _, g := range globalGuards {
 			ok := e.globalGuarded(g)
 			ne = append(ne, findings.NegationEvidence{Clause: "global_covered_by " + g, Satisfied: ok})
-			suppressed = suppressed || ok
-		}
-		for _, rel := range closers {
-			ok := e.endpointClosed(node, rel)
-			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + rel, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		if suppressed {

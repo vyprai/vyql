@@ -3,7 +3,7 @@ module bindings.perl.migration.mfca40a44;
 binding resourceRelease71 {
   query pattern callExpr where callee.path ~= "close"
   emit check core.ResourceRelease at call {
-    covers dominates {
+    covers postDominates {
       from: call
       to: call
     }

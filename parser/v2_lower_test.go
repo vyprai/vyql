@@ -1711,7 +1711,7 @@ rule DominatedParser {
 module rules.lifecycle;
 rule LockNotReleased {
   issue code.LockAcquire as l
-  unless l.dominates coveredBy core.LockRelease
+  unless l.postDominates coveredBy core.LockRelease
 }
 `)
 	for _, decl := range decls {
@@ -1741,8 +1741,8 @@ rule LockNotReleased {
 				t.Fatalf("dominates coveredBy did not preserve coverage mode: %+v", rule.Clauses[0])
 			}
 		case "LockNotReleased":
-			if _, ok := rule.Clauses[0].Unless.(ClosedBy); !ok {
-				t.Fatalf("release-style dominates coveredBy did not preserve post-dominance semantics: %+v", rule.Clauses[0])
+			if _, ok := rule.Clauses[0].Unless.(PostDominatesCoveredBy); !ok {
+				t.Fatalf("postDominates coveredBy did not preserve coverage mode: %+v", rule.Clauses[0])
 			}
 		default:
 			t.Fatalf("unexpected rule %s", rule.Name)
@@ -1912,6 +1912,7 @@ mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true 
 mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
 mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
 mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
+mechanic coverage postDominates { capability: coverage.postDominates requiresAnchor: true targetParts: [postDominates] }
 mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
 policy confidence default {
   values: [low, medium, high]

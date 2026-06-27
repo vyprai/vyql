@@ -826,7 +826,7 @@ func (p *v2Parser) isV2Relation(t tok) bool {
 		return false
 	}
 	switch t.val {
-	case "contains", "encloses", "references", "declaredIn", "importedBy", "sameScope", "sameReceiver", "dominates", "labeledAs", "flowsTo", "reaches", "coveredBy":
+	case "contains", "encloses", "references", "declaredIn", "importedBy", "sameScope", "sameReceiver", "dominates", "postDominates", "labeledAs", "flowsTo", "reaches", "coveredBy":
 		return true
 	}
 	return false
@@ -856,7 +856,7 @@ func v2StopAtQueryStepOr(stop func(tok) bool) func(tok) bool {
 		}
 		return t.kind == tWord && (t.val == "encloses" || t.val == "references" ||
 			t.val == "declaredIn" || t.val == "importedBy" || t.val == "sameScope" || t.val == "sameReceiver" ||
-			t.val == "dominates" || t.val == "labeledAs" || t.val == "flowsTo" || t.val == "reaches" || t.val == "coveredBy")
+			t.val == "dominates" || t.val == "postDominates" || t.val == "labeledAs" || t.val == "flowsTo" || t.val == "reaches" || t.val == "coveredBy")
 	}
 }
 

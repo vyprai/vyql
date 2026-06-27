@@ -104,6 +104,13 @@ mechanic coverage dominates {
   suppresses: true
 }
 
+mechanic coverage postDominates {
+  capability: coverage.postDominates
+  coversWhen: solver.postDominates(check.anchor, candidate.postDominates)
+  targetParts: [postDominates]
+  suppresses: true
+}
+
 mechanic coverage global {
   capability: coverage.global
   coversWhen: solver.always()

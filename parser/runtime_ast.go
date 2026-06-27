@@ -213,17 +213,17 @@ type SameReceiverCoveredBy struct{ Concept string }
 type SameScopeCoveredBy struct{ Concept string }
 type GlobalCoveredBy struct{ Concept string }
 type DominatesCoveredBy struct{ Concept string }
-type ClosedBy struct{ Concept string } // post-dominance: a release on every path to exit
+type PostDominatesCoveredBy struct{ Concept string }
 type ExprException struct{ Expr Expr }
 
-func (PathCoveredBy) isException()         {}
-func (EndpointCoveredBy) isException()     {}
-func (SameReceiverCoveredBy) isException() {}
-func (SameScopeCoveredBy) isException()    {}
-func (GlobalCoveredBy) isException()       {}
-func (DominatesCoveredBy) isException()    {}
-func (ClosedBy) isException()              {}
-func (ExprException) isException()         {}
+func (PathCoveredBy) isException()          {}
+func (EndpointCoveredBy) isException()      {}
+func (SameReceiverCoveredBy) isException()  {}
+func (SameScopeCoveredBy) isException()     {}
+func (GlobalCoveredBy) isException()        {}
+func (DominatesCoveredBy) isException()     {}
+func (PostDominatesCoveredBy) isException() {}
+func (ExprException) isException()          {}
 
 // --- expressions ---------------------------------------------------------
 

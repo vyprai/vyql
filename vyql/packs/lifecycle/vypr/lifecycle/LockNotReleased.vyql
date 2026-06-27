@@ -7,5 +7,5 @@ rule LockNotReleased {
     severity: medium
   }
   issue code.LockAcquire as l
-  unless l.dominates coveredBy core.LockRelease
+  unless l.postDominates coveredBy core.LockRelease
 }

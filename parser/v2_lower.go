@@ -1165,7 +1165,7 @@ func validateV2ConcreteCheck(binding string, action V2BindingOutput) error {
 		return fmt.Errorf("binding %s: concrete checks require exactly one coverage mode", binding)
 	}
 	switch action.Covers[0].Mode {
-	case "path", "endpoint", "sameReceiver", "sameScope", "dominates":
+	case "path", "endpoint", "sameReceiver", "sameScope", "dominates", "postDominates":
 		return nil
 	case "global":
 		return fmt.Errorf("binding %s: global checks must lower through global coverage support", binding)
@@ -1863,12 +1863,9 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 			case "path":
 				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: PathCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "dominates":
-				concept := names.concept(cl.Concept)
-				unless := Exception(DominatesCoveredBy{Concept: concept})
-				if isV2PostDominanceReleaseConcept(concept) {
-					unless = ClosedBy{Concept: concept}
-				}
-				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: unless})
+				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: DominatesCoveredBy{Concept: names.concept(cl.Concept)}})
+			case "postDominates":
+				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: PostDominatesCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "endpoint":
 				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: EndpointCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "sameReceiver":
@@ -1905,14 +1902,6 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 		}
 	}
 	return out, nil
-}
-
-func isV2PostDominanceReleaseConcept(concept string) bool {
-	short := concept
-	if i := strings.LastIndexByte(short, '.'); i >= 0 {
-		short = short[i+1:]
-	}
-	return short == "ResourceRelease" || short == "LockRelease"
 }
 
 func appendStringField(raw any, value string) []string {

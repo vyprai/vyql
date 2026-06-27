@@ -170,6 +170,13 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
 						return nil, err
 					}
+				case parser.PostDominatesCoveredBy:
+					if err := requireConcept(onto, ex.Concept, "post-dominating guard of "+r.QualifiedName()); err != nil {
+						return nil, err
+					}
+					if _, err := onto.CheckSanitizerTyping(body.Src.Concept, body.Dst.Concept, ex.Concept); err != nil {
+						return nil, err
+					}
 				case parser.SameReceiverCoveredBy:
 					if err := requireConcept(onto, ex.Concept, "same-receiver guard of "+r.QualifiedName()); err != nil {
 						return nil, err
@@ -217,6 +224,10 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 				if err := requireConcept(onto, ex.Concept, "dominating control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
+			case parser.PostDominatesCoveredBy:
+				if err := requireConcept(onto, ex.Concept, "post-dominating control of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
 			case parser.SameReceiverCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "same-receiver control of "+r.QualifiedName()); err != nil {
 					return nil, err
@@ -227,10 +238,6 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 				}
 			case parser.GlobalCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "global control of "+r.QualifiedName()); err != nil {
-					return nil, err
-				}
-			case parser.ClosedBy:
-				if err := requireConcept(onto, ex.Concept, "release of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
 			}

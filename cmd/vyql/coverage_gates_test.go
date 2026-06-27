@@ -251,7 +251,15 @@ func collectRuleConceptRefs(r *parser.Rule, refs map[string]bool) {
 			addCoverageConceptRef(refs, ex.Concept)
 		case parser.EndpointCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
-		case parser.ClosedBy:
+		case parser.DominatesCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.PostDominatesCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.SameReceiverCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.SameScopeCoveredBy:
+			addCoverageConceptRef(refs, ex.Concept)
+		case parser.GlobalCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
 		case parser.ExprException:
 			collectExprConceptRefs(ex.Expr, refs)
@@ -426,7 +434,15 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 					consumed[shortConceptName(ex.Concept)] = true
 				case parser.EndpointCoveredBy:
 					consumed[shortConceptName(ex.Concept)] = true
-				case parser.ClosedBy:
+				case parser.DominatesCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.PostDominatesCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.SameReceiverCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.SameScopeCoveredBy:
+					consumed[shortConceptName(ex.Concept)] = true
+				case parser.GlobalCoveredBy:
 					consumed[shortConceptName(ex.Concept)] = true
 				}
 			}
@@ -634,6 +650,10 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"guarded_by",
 		"closed_by",
 	}
+	securityConceptNames := []string{
+		"ResourceRelease",
+		"LockRelease",
+	}
 	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -651,6 +671,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
 		usesLegacy := false
 		for _, snippet := range legacyCoverageClauses {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range securityConceptNames {
 			if strings.Contains(src, snippet) {
 				usesLegacy = true
 				break

@@ -3,7 +3,7 @@ module bindings.objc.migration.mccadd221;
 binding lockRelease70 {
   query pattern callExpr where callee.path ~= "pthread_mutex_unlock"
   emit check core.LockRelease at call {
-    covers dominates {
+    covers postDominates {
       from: call
       to: call
     }

@@ -7,5 +7,5 @@ rule ResourceLeak {
     severity: medium
   }
   issue code.ResourceHandle as h
-  unless h.dominates coveredBy core.ResourceRelease
+  unless h.postDominates coveredBy core.ResourceRelease
 }

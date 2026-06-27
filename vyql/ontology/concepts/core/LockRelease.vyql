@@ -1,7 +1,7 @@
 module core;
 
 concept LockRelease : check {
-  covers: [dominates, path]
+  covers: [postDominates, path]
   cwe: [CWE_667]
   neutralizes: [concurrency.Deadlock]
 }

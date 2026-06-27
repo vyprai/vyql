@@ -531,7 +531,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 
-	var guards, dominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards []string
+	var guards, dominanceGuards, postDominanceGuards, sameReceiverGuards, sameScopeGuards, globalGuards []string
 	var sanitizer string
 	for _, cl := range cr.Rule.Clauses {
 		if cl.Kind != "unless" {
@@ -542,6 +542,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			guards = append(guards, ex.Concept)
 		case parser.DominatesCoveredBy:
 			dominanceGuards = append(dominanceGuards, ex.Concept)
+		case parser.PostDominatesCoveredBy:
+			postDominanceGuards = append(postDominanceGuards, ex.Concept)
 		case parser.SameReceiverCoveredBy:
 			sameReceiverGuards = append(sameReceiverGuards, ex.Concept)
 		case parser.SameScopeCoveredBy:
@@ -600,6 +602,15 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				detail = "guard dominates sink"
 			}
 			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + g, Satisfied: ok, Detail: detail})
+			suppressed = suppressed || ok
+		}
+		for _, g := range postDominanceGuards {
+			ok := e.postDominatesCovered(fl.SinkID, g)
+			detail := "no post-dominating check on sink"
+			if ok {
+				detail = "check post-dominates sink"
+			}
+			ne = append(ne, findings.NegationEvidence{Clause: "post_dominates_covered_by " + g, Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range sameReceiverGuards {
@@ -1307,6 +1318,30 @@ func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
 	return solvers.Reaches(e.Store, guardID, sinkID)
 }
 
+// postDominatesCovered reports whether a concrete check runs on every path from
+// the candidate to function exit. Frontends without CFG metadata retain the
+// v2-authored conservative fallback: a concrete postDominates check covers.
+func (e *Engine) postDominatesCovered(candidateID, control string) bool {
+	candidateCFG := e.hasCFG(candidateID)
+	checks := e.nodesWithConcept(control)
+	for _, checkID := range checks {
+		if !nodeHasConcreteCoverage(e.labels(checkID), control, "postDominates") {
+			continue
+		}
+		if checkID == candidateID {
+			continue
+		}
+		if candidateCFG && e.hasCFG(checkID) {
+			if solvers.PostDominates(e.Store, checkID, candidateID) {
+				return true
+			}
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func nearestLoopParent(region string) (string, bool) {
 	parts := strings.Split(region, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
@@ -1319,31 +1354,6 @@ func nearestLoopParent(region string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// endpointClosed reports whether a release carrying `control` POST-DOMINATES the alloc —
-// i.e. the resource is released on every path to function exit (so there is no leak). With
-// CFG metadata it uses post-dominance; without it falls back to presence (any release
-// suppresses — conservative, to avoid leak false positives on unconverted frontends).
-func (e *Engine) endpointClosed(allocID, control string) bool {
-	allocCFG := e.hasCFG(allocID)
-	releases := e.nodesWithConcept(control)
-	for _, rid := range releases {
-		if !nodeHasConcreteCoverage(e.labels(rid), control, "dominates") {
-			continue
-		}
-		if rid == allocID {
-			continue
-		}
-		if allocCFG && e.hasCFG(rid) {
-			if solvers.PostDominates(e.Store, rid, allocID) {
-				return true
-			}
-			continue
-		}
-		return true // presence fallback (no CFG metadata)
-	}
-	return false
 }
 
 // hasCFG reports whether a node carries structured-CFG metadata (a region tag).

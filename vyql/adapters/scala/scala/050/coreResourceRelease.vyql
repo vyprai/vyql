@@ -3,7 +3,7 @@ module bindings.scala.migration.m06d0685b;
 binding resourceRelease50 {
   query pattern callExpr where callee.method == "close"
   emit check core.ResourceRelease at call {
-    covers dominates {
+    covers postDominates {
       from: call
       to: call
     }
