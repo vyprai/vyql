@@ -70,7 +70,7 @@ rule BadCoverageMode {
 	}
 }
 
-func TestCompiledRulesForKeepsLoadedMechanicsAuthoritative(t *testing.T) {
+func TestCompiledRulesForUsesGoBuiltInRuleVerbs(t *testing.T) {
 	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("rules/test.vyql", `
 module rules.test;
 rule SqlInjection {
@@ -83,10 +83,9 @@ rule SqlInjection {
 	for _, decl := range decls {
 		m, ok := decl.(*parser.V2MechanicDecl)
 		if ok && m.Kind == "ruleVerb" && m.Name == "taint" {
-			return
+			t.Fatalf("built-in rule verb taint should not require a loaded v2 mechanic declaration")
 		}
 	}
-	t.Fatalf("loaded scanner IR did not retain mechanic ruleVerb taint")
 }
 
 func TestRuleActiveForProfileHonorsV2RequiredProfiles(t *testing.T) {

@@ -181,7 +181,7 @@ rule SourceToSink {
 	}
 }
 
-func TestCompileRulesRequiresLoadedRuleVerbMechanics(t *testing.T) {
+func TestCompileRulesUsesGoBuiltInRuleVerbMechanics(t *testing.T) {
 	decls := []parser.Decl{
 		&parser.Rule{
 			Name:    "SourceToSink",
@@ -193,13 +193,16 @@ func TestCompileRulesRequiresLoadedRuleVerbMechanics(t *testing.T) {
 			},
 		},
 	}
-	_, errs := CompileRules(decls, ontology.Seed())
-	if len(errs) != 1 || !strings.Contains(errs[0].Msg, "no loaded mechanic ruleVerb declarations") {
-		t.Fatalf("CompileRules errors = %+v, want missing mechanics rejection", errs)
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("CompileRules errors = %+v, want built-in rule verb mechanics", errs)
+	}
+	if len(compiled) != 1 {
+		t.Fatalf("compiled rules = %d, want 1", len(compiled))
 	}
 }
 
-func TestCompileRequiresLoadedRuleVerbWhenMechanicsAreAuthoritative(t *testing.T) {
+func TestPartialAuthoredRuleVerbMechanicsDoNotDisableBuiltIns(t *testing.T) {
 	raw := []parser.V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
@@ -230,9 +233,12 @@ rule SourceToSink {
 		}
 		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
 	}
-	_, err := parser.LowerV2DefinitionSources(sources)
-	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic ruleVerb "taint"`) {
-		t.Fatalf("LowerV2DefinitionSources error = %v, want missing ruleVerb mechanic", err)
+	decls, err := parser.LowerV2DefinitionSources(sources)
+	if err != nil {
+		t.Fatalf("LowerV2DefinitionSources: %v", err)
+	}
+	if len(decls) == 0 {
+		t.Fatal("LowerV2DefinitionSources produced no declarations")
 	}
 }
 

@@ -50,7 +50,9 @@ func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2Defi
 
 // lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.
 func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
-	return lowerV2ProgramToDeclarationsWithMechanics(prog, v2MechanicsFromProgram(prog))
+	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers()}
+	mechanics.merge(v2MechanicsFromProgram(prog))
+	return lowerV2ProgramToDeclarationsWithMechanics(prog, mechanics)
 }
 
 func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
@@ -58,7 +60,7 @@ func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
 }
 
 func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
-	mechanics := v2Mechanics{}
+	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers()}
 	outCap := 0
 	for _, src := range sources {
 		mechanics.merge(v2MechanicsFromProgram(src.Program))
@@ -135,6 +137,19 @@ func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
 	return out
 }
 
+func builtinV2RuleSolvers() map[string]string {
+	return map[string]string{
+		"taint":  "dataflow.taint",
+		"flow":   "dataflow.flow",
+		"reach":  "graph.reach",
+		"grant":  "graph.grant",
+		"assume": "graph.assume",
+		"issue":  "fact.exists",
+		"fact":   "fact.exists",
+		"query":  "query.semantic",
+	}
+}
+
 func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mechanics) ([]Decl, error) {
 	if prog == nil {
 		return nil, nil
@@ -169,6 +184,8 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 					set.Meta[k] = v
 				}
 			}
+		case *V2MatcherDecl:
+			return nil, fmt.Errorf("matcher %s: matcher invocation is not implemented in scanner IR lowering", x.Name)
 		case *V2ReviewDecl:
 			out = append(out, &ReviewDecl{Concept: names.concept(x.Concept), Fields: lowerV2FieldNames(x.Fields)})
 		case *V2ProfileDecl:
@@ -1814,7 +1831,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2Mechanics) (*R
 	}
 	solver := mechanics.ruleSolvers[r.Body.Verb]
 	if solver == "" {
-		return nil, fmt.Errorf("rule %s: no loaded mechanic ruleVerb %q", r.Name, r.Body.Verb)
+		return nil, fmt.Errorf("rule %s: no built-in solver for rule verb %q", r.Name, r.Body.Verb)
 	}
 	switch solver {
 	case "dataflow.taint", "dataflow.flow", "graph.reach":
@@ -1834,9 +1851,9 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2Mechanics) (*R
 		if r.Body.From.Concept == "" || r.Body.To.Concept == "" {
 			return nil, fmt.Errorf("rule %s: solver capability %q requires from/to endpoints", r.Name, solver)
 		}
-		verb := "assume"
-		if solver == "graph.grant" {
-			verb = "grant"
+		verb := "grant"
+		if solver == "graph.assume" {
+			verb = "assume"
 		}
 		out.Body = &FlowStmt{
 			Verb: verb,

@@ -64,7 +64,7 @@ func TestSolverContractConformance(t *testing.T) {
 		name     string
 		rule     string
 		wantKind string
-		wantFlow bool // witness must be non-empty (taint/reach/assume); match may be empty
+		wantFlow bool // witness must be non-empty (taint/reach/grant); match may be empty
 		build    func(*usg.InMemStore)
 	}{
 		{

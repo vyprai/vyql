@@ -32,13 +32,13 @@ rule ReachAsset {
 }
 
 rule ActorCapability {
-  meta { id: "TEST-ASSUME-004", severity: critical }
-  assume custom.Actor -> custom.Capability
+  meta { id: "TEST-GRANT-004", severity: critical }
+  grant custom.Actor -> custom.Capability
 }
 rule ComposedMatch {
   meta { id: "TEST-MATCH-005", severity: critical }
   issue custom.WorkItem as w
-  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
+  where reach(custom.Edge, w.workload) and grant(w, custom.Capability)
 }
 `
 	decls, err := parseV2DefinitionsForTest(rules)
@@ -86,11 +86,11 @@ rule ComposedMatch {
 	}
 
 	want := map[string]int{
-		"TEST-FLOW-001":   1,
-		"TEST-FLOW-002":   1,
-		"TEST-REACH-003":  1,
-		"TEST-ASSUME-004": 1,
-		"TEST-MATCH-005":  1,
+		"TEST-FLOW-001":  1,
+		"TEST-FLOW-002":  1,
+		"TEST-REACH-003": 1,
+		"TEST-GRANT-004": 1,
+		"TEST-MATCH-005": 1,
 	}
 	for id, n := range want {
 		if byID[id] != n {

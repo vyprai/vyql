@@ -57,12 +57,12 @@ func coverageLabel(concept, coverage string) usg.Label {
 	return usg.Label{Concept: concept, Detail: map[string]string{"coverage": coverage}}
 }
 
-func TestMatchComposesReachAndAssume(t *testing.T) {
+func TestMatchComposesReachAndGrant(t *testing.T) {
 	src := `
 module test;
 rule ComposedMatch {
   issue custom.WorkItem as w
-  where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
+  where reach(custom.Edge, w.workload) and grant(w, custom.Capability)
 }
 `
 	s := usg.NewInMemStore()

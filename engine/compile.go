@@ -72,7 +72,7 @@ type ruleVerbMechanic struct {
 }
 
 func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
-	out := ruleVerbMechanicPolicy{verbs: map[string]ruleVerbMechanic{}}
+	out := builtinRuleVerbMechanics()
 	for _, d := range decls {
 		m, ok := d.(*parser.V2MechanicDecl)
 		if !ok || m.Kind != "ruleVerb" {
@@ -85,6 +85,22 @@ func ruleVerbMechanicsFromDecls(decls []parser.Decl) ruleVerbMechanicPolicy {
 		}
 	}
 	return out
+}
+
+func builtinRuleVerbMechanics() ruleVerbMechanicPolicy {
+	return ruleVerbMechanicPolicy{
+		present: true,
+		verbs: map[string]ruleVerbMechanic{
+			"taint":  {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
+			"flow":   {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
+			"reach":  {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
+			"grant":  {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
+			"assume": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
+			"issue":  {FromKinds: map[string]bool{"issue": true}, ToKinds: nil},
+			"fact":   {FromKinds: map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
+			"query":  {FromKinds: map[string]bool{"concept": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
+		},
+	}
 }
 
 func v2MechanicStringSet(items []parser.V2BlockItem, key string) map[string]bool {
@@ -283,11 +299,11 @@ func excludedCharsFor(onto *ontology.Ontology, concepts map[string]bool) string 
 
 func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string, ruleVerbs ruleVerbMechanicPolicy) error {
 	if !ruleVerbs.present {
-		return fmt.Errorf("no loaded mechanic ruleVerb declarations")
+		return fmt.Errorf("no built-in rule verb policy")
 	}
 	allowed, ok := endpointKindPolicy(body.Verb, ruleVerbs)
 	if !ok {
-		return fmt.Errorf("rule verb %q has no loaded mechanic ruleVerb declaration", body.Verb)
+		return fmt.Errorf("rule verb %q has no built-in rule verb policy", body.Verb)
 	}
 	src, _ := onto.Get(body.Src.Concept)
 	dst, _ := onto.Get(body.Dst.Concept)

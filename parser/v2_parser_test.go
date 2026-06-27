@@ -141,6 +141,50 @@ func TestParseV2ProgramContract(t *testing.T) {
 	}
 }
 
+func TestParseV2RejectsInvalidMatcherItems(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "unknown item",
+			src: `module patterns.test;
+matcher badName {
+  containsOne: ["token"]
+}
+`,
+			want: `unknown matcher item "containsOne"`,
+		},
+		{
+			name: "empty list",
+			src: `module patterns.test;
+matcher emptyName {
+  containsAny: []
+}
+`,
+			want: `containsAny requires a non-empty string list`,
+		},
+		{
+			name: "empty regex",
+			src: `module patterns.test;
+matcher emptyRegex {
+  matches: ""
+}
+`,
+			want: `matches requires one non-empty regex string`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(tc.src)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ParseV2 error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseV2RejectsV1Syntax(t *testing.T) {
 	bad := []string{
 		`adapter javascript { source "req.body" -> code.HttpInput }`,

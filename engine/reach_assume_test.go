@@ -50,7 +50,7 @@ rule ReachAsset {
 	}
 }
 
-func TestAssumeEscalation(t *testing.T) {
+func TestAssumeEscalationMultiStep(t *testing.T) {
 	src := `
 module test;
 rule ActorToCapability {
@@ -79,6 +79,9 @@ rule ActorToCapability {
 	fs, _ := eng.Evaluate(compiled[0])
 	if len(fs) != 1 {
 		t.Fatalf("expected 1 escalation finding, got %d", len(fs))
+	}
+	if fs[0].WitnessKind != "assume" {
+		t.Fatalf("WitnessKind = %q, want assume", fs[0].WitnessKind)
 	}
 	if len(fs[0].Witness) != 3 {
 		t.Fatalf("expected a 3-step ability chain, got %v", fs[0].Witness)

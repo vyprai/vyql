@@ -58,6 +58,8 @@ func ValidateV2(prog *V2Program) error {
 			errs = append(errs, validateV2Concept(x)...)
 		case *V2PatternDecl:
 			errs = append(errs, validateV2Pattern(x)...)
+		case *V2MatcherDecl:
+			errs = append(errs, validateV2Matcher(x)...)
 		case *V2BindingDecl:
 			errs = append(errs, validateV2Binding(x, localConceptKinds)...)
 		case *V2RuleDecl:
@@ -75,6 +77,28 @@ func ValidateV2(prog *V2Program) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func validateV2Matcher(m *V2MatcherDecl) []error {
+	var errs []error
+	if len(m.Items) == 0 {
+		errs = append(errs, fmt.Errorf("matcher %s: must declare at least one matcher item", m.Name))
+	}
+	for _, item := range m.Items {
+		switch item.Kind {
+		case "containsAny", "equalsAny":
+			if len(item.Values) == 0 {
+				errs = append(errs, fmt.Errorf("matcher %s: %s requires a non-empty string list", m.Name, item.Kind))
+			}
+		case "matches":
+			if len(item.Values) != 1 || item.Values[0] == "" {
+				errs = append(errs, fmt.Errorf("matcher %s: matches requires one non-empty regex string", m.Name))
+			}
+		default:
+			errs = append(errs, fmt.Errorf("matcher %s: unknown matcher item %q", m.Name, item.Kind))
+		}
+	}
+	return errs
 }
 
 type V2Source struct {
@@ -142,6 +166,20 @@ func (s v2ModelScope) lookupModel(name string) bool {
 	return s.lookupThreat(name)
 }
 
+func builtinV2RuleVerbMechanics() map[string]v2RuleVerbMechanic {
+	clauses := v2StringSet([]string{"where", "coveredBy", "confidence", "profile"})
+	return map[string]v2RuleVerbMechanic{
+		"taint":  {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
+		"flow":   {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
+		"reach":  {FromKinds: []string{"asset", "exposure"}, ToKinds: []string{"asset", "exposure"}, AllowedClauses: clauses},
+		"grant":  {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
+		"assume": {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
+		"issue":  {FromKinds: []string{"issue"}, AllowedClauses: clauses},
+		"fact":   {FromKinds: []string{"fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: clauses},
+		"query":  {FromKinds: []string{"concept", "fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: v2StringSet([]string{"where", "confidence", "profile"})},
+	}
+}
+
 // ValidateV2Corpus applies whole-definition-graph checks that require all files:
 // duplicate fully qualified declarations, import resolution, concept existence,
 // emit kind compatibility, rule endpoint kind compatibility, and coveredBy
@@ -157,7 +195,7 @@ func ValidateV2Corpus(sources []V2Source) error {
 	concepts := make(map[string]v2ConceptMeta, declCount)
 	threats := make(map[string]bool, declCount/8)
 	mechanics := make(map[v2MechanicID]string, 16)
-	ruleMechanics := make(map[string]v2RuleVerbMechanic, 8)
+	ruleMechanics := builtinV2RuleVerbMechanics()
 	coverageMechanics := make(map[string]v2CoverageMechanic, 8)
 	policies := make(map[v2PolicyID]string, 8)
 	var errs []error
@@ -229,7 +267,6 @@ func ValidateV2Corpus(sources []V2Source) error {
 				errs = append(errs, validateV2BindingMechanics(src.Name, x, mechanics)...)
 			case *V2RuleDecl:
 				errs = append(errs, validateV2RuleCorpus(src.Name, x, scope, ruleMechanics, coverageMechanics, policies)...)
-				errs = append(errs, validateV2RuleMechanics(src.Name, x, mechanics)...)
 			}
 		}
 	}
@@ -373,16 +410,6 @@ func validateV2RequiredMechanics(concepts map[string]v2ConceptMeta, mechanics ma
 		}
 	}
 	return errs
-}
-
-func validateV2RuleMechanics(sourceName string, r *V2RuleDecl, mechanics map[v2MechanicID]string) []error {
-	if r.Body.Verb == "" {
-		return nil
-	}
-	if mechanics[v2MechanicID{Kind: "ruleVerb", Name: r.Body.Verb}] != "" {
-		return nil
-	}
-	return []error{fmt.Errorf("%s: rule %s uses verb %q without mechanic ruleVerb %s", sourceName, r.Name, r.Body.Verb, r.Body.Verb)}
 }
 
 func validateV2BindingMechanics(sourceName string, b *V2BindingDecl, mechanics map[v2MechanicID]string) []error {

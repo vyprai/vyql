@@ -585,6 +585,21 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 	t.Logf("checked %d shipped v2 definition files", checked)
 }
 
+func TestShippedMechanicsDoNotRedefineBuiltInRuleVerbs(t *testing.T) {
+	var hits []string
+	for path, src := range readDataFiles(t, "mechanics", ".vyql") {
+		if !strings.Contains(src, "mechanic ruleVerb") {
+			continue
+		}
+		rel, _ := filepath.Rel(datadir.Root(), path)
+		hits = append(hits, filepath.ToSlash(rel))
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("built-in v2 rule verbs are implemented in Go and must not be redeclared in shipped mechanics:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 // T0.5 — every adapter loads (parses v2 bindings and builds graph-labeling actions)
 // without panicking, for every adapter shipped under vyql/adapters/.
 func TestAllAdaptersLoadGate(t *testing.T) {
@@ -611,12 +626,7 @@ func TestAllAdaptersLoadGate(t *testing.T) {
 	}
 }
 
-func TestEverySourceLanguageHasV2TaintMechanicCoverage(t *testing.T) {
-	decls := parseDataDecls(t, "mechanics", ".vyql")
-	if !hasTaintRuleVerbMechanic(decls) {
-		t.Fatalf("mechanics corpus must define mechanic ruleVerb taint with dataflow.taint source->sink endpoint kinds")
-	}
-
+func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 	for _, lang := range sourceLanguagesForCoverage() {
 		t.Run(lang, func(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")); err != nil {
@@ -809,73 +819,6 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
 		}
 	}
 	return sourceCount, sinkCount
-}
-
-func hasTaintRuleVerbMechanic(files map[string][]parser.Decl) bool {
-	for _, decls := range files {
-		for _, decl := range decls {
-			m, ok := decl.(*parser.V2MechanicDecl)
-			if !ok || m.Kind != "ruleVerb" || m.Name != "taint" {
-				continue
-			}
-			if v2BlockStringValue(m.Items, "solver") != "dataflow.taint" {
-				continue
-			}
-			from := v2BlockStringSet(m.Items, "fromKinds")
-			to := v2BlockStringSet(m.Items, "toKinds")
-			if from["source"] && to["sink"] {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func v2BlockStringValue(items []parser.V2BlockItem, key string) string {
-	for _, item := range items {
-		if len(item.Key) != 1 || item.Key[0] != key {
-			continue
-		}
-		switch value := item.Value.(type) {
-		case string:
-			return value
-		case parser.V2RefExpr:
-			return value.Name
-		case parser.V2LiteralExpr:
-			if s, ok := value.Value.(string); ok {
-				return s
-			}
-		}
-		return ""
-	}
-	return ""
-}
-
-func v2BlockStringSet(items []parser.V2BlockItem, key string) map[string]bool {
-	out := map[string]bool{}
-	for _, item := range items {
-		if len(item.Key) != 1 || item.Key[0] != key {
-			continue
-		}
-		values, ok := item.Value.([]any)
-		if !ok {
-			return out
-		}
-		for _, value := range values {
-			switch x := value.(type) {
-			case string:
-				out[x] = true
-			case parser.V2RefExpr:
-				out[x.Name] = true
-			case parser.V2LiteralExpr:
-				if s, ok := x.Value.(string); ok {
-					out[s] = true
-				}
-			}
-		}
-		return out
-	}
-	return out
 }
 
 func TestCVE1000LedgerCoverageGate(t *testing.T) {

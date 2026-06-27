@@ -45,7 +45,7 @@ type Finding struct {
 	Bindings         []Binding
 	Witness          []string // solver witness (node ids / hops, kind-specific)
 	PathLocs         []string // distinct file:line locs along the witness (taint path), in order
-	WitnessKind      string   // taint | reach | assume | match
+	WitnessKind      string   // taint | reach | grant | assume | match
 	NegationEvidence []NegationEvidence
 	Confidence       string
 	Context          []string
@@ -88,7 +88,7 @@ func (f *Finding) render(fp string) string {
 		if len(f.Witness) > 0 {
 			fmt.Fprintf(&b, "    taint path: %s\n", strings.Join(f.Witness, " -> "))
 		}
-	case "reach", "assume":
+	case "reach", "grant", "assume":
 		for _, w := range f.Witness {
 			fmt.Fprintf(&b, "    %s: %s\n", f.WitnessKind, w)
 		}

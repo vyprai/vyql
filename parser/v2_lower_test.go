@@ -612,6 +612,18 @@ binding requestBody {
 	}
 }
 
+func TestParseV2DefinitionsRejectsMatcherUntilScannerIRSupportsInvocation(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module patterns.javascript;
+matcher secretTokenName {
+  containsAny: ["token", "secret"]
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), "matcher secretTokenName: matcher invocation is not implemented in scanner IR lowering") {
+		t.Fatalf("ParseV2Definitions error = %v, want matcher lowering diagnostic", err)
+	}
+}
+
 func TestV2RequirementLowersToPackageHintsAndRequirementTree(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -1455,7 +1467,7 @@ func TestV2RuleWhereLowering(t *testing.T) {
 module rules.migrated;
 rule ToxicWorkloadExposure {
   issue identity.WorkloadIdentity as w
-  where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
+  where reach(cloud.Internet, w.workload) and grant(w, identity.AdminPrivilege)
 }
 rule PublicSensitiveDatabase {
   reach cloud.Internet -> cloud.Database
@@ -1888,7 +1900,7 @@ concept PublicEdgeObservation : observation {
 }
 `, `
 module rules.identity;
-rule ExternalToElevated {
+rule ExternalAssume {
   assume custom.External -> custom.Elevated
 }
 rule ExternalGrant {
@@ -1906,7 +1918,7 @@ rule ExternalGrant {
 				}
 			}
 		case *Rule:
-			if d.QualifiedName() == "rules.identity.ExternalToElevated" {
+			if d.QualifiedName() == "rules.identity.ExternalAssume" {
 				body, ok := d.Body.(*FlowStmt)
 				if !ok || body.Verb != "assume" {
 					t.Fatalf("assume rule lowering wrong: %+v", d.Body)
@@ -1929,14 +1941,6 @@ rule ExternalGrant {
 
 const v2CoreMechanicsForLoweringTest = `
 module mechanics.core;
-mechanic ruleVerb taint { solver: dataflow.taint }
-mechanic ruleVerb flow { solver: dataflow.flow }
-mechanic ruleVerb reach { solver: graph.reach }
-mechanic ruleVerb grant { solver: graph.grant }
-mechanic ruleVerb assume { solver: graph.assume }
-mechanic ruleVerb issue { solver: fact.exists }
-mechanic ruleVerb fact { solver: fact.exists }
-mechanic ruleVerb query { solver: query.semantic }
 mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
 mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
 mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
