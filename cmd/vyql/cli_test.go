@@ -142,6 +142,90 @@ func TestRunAllRejectsSarif(t *testing.T) {
 	}
 }
 
+// TestScanAllJsonShapeStable pins the documented stable shape of `scan --all`
+// JSON so the contract external/AI callers depend on does not drift: a top-level
+// object with exactly "findings" and "flags", and findings keyed by the stable
+// field names.
+func TestScanAllJsonShapeStable(t *testing.T) {
+	dir := t.TempDir()
+	src := `function verify(data, userToken) {
+  return data['x-csrf-token'] === userToken;
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "app.js"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Default scan stays a bare findings array.
+	defaultOut, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "json", "auto", scanRunOptions{})
+	})
+	if err != nil {
+		t.Fatalf("default json scan failed: %v", err)
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(defaultOut), &arr); err != nil {
+		t.Fatalf("default json should decode as a findings array: %v\n%s", err, defaultOut)
+	}
+
+	allOut, err := captureStdout(t, func() error {
+		return run([]string{dir}, "", "json", "auto", scanRunOptions{IncludeFlags: true})
+	})
+	if err != nil {
+		t.Fatalf("scan --all json failed: %v", err)
+	}
+	var generic map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(allOut), &generic); err != nil {
+		t.Fatalf("scan --all json should decode as an object: %v\n%s", err, allOut)
+	}
+	if _, ok := generic["findings"]; !ok {
+		t.Fatalf("scan --all json missing stable key %q: %v", "findings", keysOf(generic))
+	}
+	if _, ok := generic["flags"]; !ok {
+		t.Fatalf("scan --all json missing stable key %q: %v", "flags", keysOf(generic))
+	}
+	if len(generic) != 2 {
+		t.Fatalf("scan --all json should expose exactly findings+flags, got keys %v", keysOf(generic))
+	}
+
+	var flags []map[string]any
+	if err := json.Unmarshal(generic["flags"], &flags); err != nil {
+		t.Fatalf("flags should be an array: %v", err)
+	}
+	if len(flags) == 0 {
+		t.Fatalf("expected at least one flag in scan --all output")
+	}
+	for _, key := range []string{"concept", "category"} {
+		if _, ok := flags[0][key]; !ok {
+			t.Fatalf("flag object missing stable field %q: %v", key, flags[0])
+		}
+	}
+}
+
+// TestNoSarifFlagsWithoutExplicitSupport asserts SARIF stays finding-only:
+// findings render to SARIF, but any request that would add flags to SARIF is
+// rejected until a flags-in-SARIF design is approved.
+func TestNoSarifFlagsWithoutExplicitSupport(t *testing.T) {
+	dir := writeNeutralPy(t)
+	if err := run([]string{dir}, "", "sarif", "auto", scanRunOptions{}); err != nil {
+		t.Fatalf("findings-only SARIF should succeed: %v", err)
+	}
+	if err := run([]string{dir}, "", "sarif", "auto", scanRunOptions{IncludeFlags: true}); err == nil {
+		t.Error("scan --all SARIF must be rejected until flags have a SARIF representation")
+	}
+	if err := run([]string{dir}, "", "sarif", "auto", scanRunOptions{FlagsOnly: true}); err == nil {
+		t.Error("scan --flags SARIF must be rejected until flags have a SARIF representation")
+	}
+}
+
+func keysOf(m map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 func captureStdout(t *testing.T, fn func() error) (string, error) {
 	t.Helper()
 	old := os.Stdout

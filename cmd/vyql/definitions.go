@@ -31,6 +31,9 @@ func cmdDefinitions(args []string) error {
 	if len(args) > 0 && args[0] == "refs" {
 		return cmdDefinitionsRefs(args[1:])
 	}
+	if len(args) > 0 && args[0] == "explain" {
+		return cmdDefinitionsExplain(args[1:])
+	}
 	if len(args) > 0 && args[0] == "show-policy" {
 		return cmdDefinitionsShowPolicy(args[1:])
 	}

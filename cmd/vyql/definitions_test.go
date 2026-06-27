@@ -126,6 +126,125 @@ concept HttpInput : source {}
 	}
 }
 
+func TestDefinitionsInspectV2(t *testing.T) {
+	out, err := captureStdout(t, func() error {
+		return cmdDefinitions([]string{"-kind", "concepts", "-query", "SqlParameterization", "-max", "5"})
+	})
+	if err != nil {
+		t.Fatalf("definitions inspect: %v", err)
+	}
+	for _, want := range []string{
+		"VyQL definitions:",
+		"== concepts",
+		"core.SqlParameterization",
+		"kind=check",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("inspect output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDefinitionsExplainBinding(t *testing.T) {
+	dir := t.TempDir()
+	writeTestVYQL(t, dir, "concepts.vyql", `
+module core;
+concept HttpInput : source {}
+concept SqlExecution : sink {}
+concept SqlParameterization : check { neutralizes: [SqlInjection] }
+`)
+	writeTestVYQL(t, dir, "bindings.vyql", `
+module bindings.python.dbapi;
+binding cursorExecute {
+  query pattern callExpr where callee.method == "execute"
+  emit sink core.SqlExecution at args[0]
+}
+binding parameterizedQuery {
+  requires { dependency("psycopg2") }
+  query pattern callExpr where callee.method == "execute" and args.count >= 2
+  emit check core.SqlParameterization at args[0] {
+    covers path { from: args[0] to: call }
+  }
+}
+`)
+	writeTestVYQL(t, dir, "rules.vyql", `
+module rules.injection;
+rule SqlInjection {
+  meta { id: "py.sqli" }
+  taint core.HttpInput as input -> core.SqlExecution as sql
+  unless sql.path coveredBy core.SqlParameterization
+}
+`)
+
+	// Explain a binding by name: shows its pattern, dependency predicate, emits.
+	out, err := captureStdout(t, func() error {
+		return cmdDefinitions([]string{"explain", "-in", dir, "parameterizedQuery"})
+	})
+	if err != nil {
+		t.Fatalf("explain binding: %v", err)
+	}
+	for _, want := range []string{
+		"explain parameterizedQuery",
+		"resolves to: binding",
+		"parameterizedQuery [named]",
+		"pattern: callExpr",
+		"depends_on: dependency(\"psycopg2\")",
+		"check core.SqlParameterization",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("explain binding output missing %q:\n%s", want, out)
+		}
+	}
+
+	// Explain a concept: shows the model concept, the emitting bindings, and the
+	// rules that consume it.
+	conceptOut, err := captureStdout(t, func() error {
+		return cmdDefinitions([]string{"explain", "-in", dir, "-format", "json", "core.SqlParameterization"})
+	})
+	if err != nil {
+		t.Fatalf("explain concept: %v", err)
+	}
+	var view explainView
+	if err := json.Unmarshal([]byte(conceptOut), &view); err != nil {
+		t.Fatalf("decode explain json: %v\n%s", err, conceptOut)
+	}
+	if view.Concept == nil || view.Concept.Name != "core.SqlParameterization" {
+		t.Fatalf("explain concept missing model concept: %+v", view.Concept)
+	}
+	if len(view.Concept.Neutralizes) == 0 {
+		t.Fatalf("explain concept should surface neutralizes: %+v", view.Concept)
+	}
+	foundEmitter := false
+	for _, b := range view.Bindings {
+		if b.Name == "parameterizedQuery" && b.Role == "emitter" {
+			foundEmitter = true
+		}
+	}
+	if !foundEmitter {
+		t.Fatalf("explain concept should list emitting binding, got %+v", view.Bindings)
+	}
+	foundRule := false
+	for _, r := range view.Rules {
+		if r.Name == "SqlInjection" {
+			foundRule = true
+		}
+	}
+	if !foundRule {
+		t.Fatalf("explain concept should list consuming rule, got %+v", view.Rules)
+	}
+}
+
+func TestDefinitionsExplainUnknownErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeTestVYQL(t, dir, "concepts.vyql", "module core;\nconcept HttpInput : source {}\n")
+	_, err := captureStdout(t, func() error {
+		return cmdDefinitions([]string{"explain", "-in", dir, "core.NoSuchConcept"})
+	})
+	if err == nil {
+		t.Fatal("explain on an unknown target should error")
+	}
+}
+
 func writeTestVYQL(t *testing.T, dir, name, src string) {
 	t.Helper()
 	path := filepath.Join(dir, name)

@@ -633,7 +633,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  bindings   list a binding set's source/sink/check/issue/advisory vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; check-v2 verifies v2 definitions")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; explain <concept|binding> traces a label's source; check-v2 verifies v2 definitions")
 	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }
