@@ -37,6 +37,7 @@ var (
 	v2FactEmitKinds            = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2PropagateKinds           = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
 	v2ProductionPropagateKinds = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
+	v2FidelityLevels           = map[string]bool{"syntactic": true, "resolved": true, "semantic": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
 	v2CoverageSolversByMode    = map[string][]string{
 		"path":          {"solver.pathCovered"},
@@ -1227,6 +1228,12 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 
 func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error {
 	var errs []error
+	if fidelity := b.Attrs["fidelity"]; fidelity != "" && !v2FidelityLevels[fidelity] {
+		errs = append(errs, fmt.Errorf("binding %s: unknown fidelity level %q", b.Name, fidelity))
+	}
+	if confidence := b.Attrs["confidence"]; confidence != "" && !v2ConfidenceLevels[confidence] {
+		errs = append(errs, fmt.Errorf("binding %s: unknown confidence level %q", b.Name, confidence))
+	}
 	for _, req := range b.Requirements {
 		errs = append(errs, validateV2Requirement("binding "+b.Name, req)...)
 	}

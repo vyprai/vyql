@@ -2372,6 +2372,8 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 			Pattern:        "normalize",
 			Coverage:       "sameScope",
 			CoverageDetail: map[string]string{"anchor": "call.scope"},
+			Fidelity:       "semantic",
+			Confidence:     "medium",
 		}},
 	})
 	got := spec.controlAdapter().Apply(store)
@@ -2383,6 +2385,35 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	}
 	if got[0].Detail["coverage.anchor"] != "call.scope" {
 		t.Fatalf("coverage item detail not preserved: %+v", got[0])
+	}
+	if got[0].Fidelity != "semantic" || got[0].Confidence != "medium" {
+		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])
+	}
+}
+
+func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:2"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:2", "callee_path": "runner.exec", "method": "exec", "arg0": "arg",
+	}})
+
+	spec := specFromBindingSet(&parser.BindingSet{
+		Name: "javascript",
+		Mappings: []parser.BindingAction{{
+			Kind:       "sink_method",
+			Concept:    "custom.Command",
+			Pattern:    "exec",
+			Fidelity:   "semantic",
+			Confidence: "medium",
+		}},
+	})
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Command" {
+		t.Fatalf("sink mapping wrong: %+v", got)
+	}
+	if got[0].Fidelity != "semantic" || got[0].Confidence != "medium" {
+		t.Fatalf("binding evidence attrs not used: %+v", got[0])
 	}
 }
 

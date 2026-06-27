@@ -84,6 +84,8 @@ type BindingAction struct {
 	ValAbsents       []string // forbidden argument/option literal substrings (AND)
 	Packages         []string // dependency requirements required for the binding to fire
 	Requirement      *BindingRequirement
+	Fidelity         string // authored binding evidence fidelity: syntactic, resolved, or semantic
+	Confidence       string // authored binding evidence confidence: low, medium, or high
 	Collection       bool   // also flag a Seq/collection-literal arg
 	CollectionFirst  bool   // target element 0 of a Seq/collection arg when present
 	CollectionIndex  int    // collection target index; defaults to 0 when CollectionFirst is set

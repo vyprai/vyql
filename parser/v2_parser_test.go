@@ -798,6 +798,26 @@ rule Bad {
 			want: "not allowed in semantic-tier query",
 		},
 		{
+			name: "unknown binding fidelity",
+			src: `module bindings.javascript.evidence;
+binding bad {
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+  fidelity: fuzzy
+}`,
+			want: "unknown fidelity level",
+		},
+		{
+			name: "unknown binding confidence",
+			src: `module bindings.javascript.evidence;
+binding bad {
+  query pattern callExpr where callee.method == "source"
+  emit source code.HttpInput at call.result
+  confidence: certain
+}`,
+			want: "unknown confidence level",
+		},
+		{
 			name: "staged route query without schema",
 			src: `module bindings.javascript.routes;
 concept Input : source {}

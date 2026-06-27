@@ -37,6 +37,8 @@ type inputSpec struct {
 	ArgCountMax int
 	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Requirement *parser.BindingRequirement
+	Fidelity    string
+	Confidence  string
 }
 
 type sinkSpec struct {
@@ -58,6 +60,8 @@ type sinkSpec struct {
 	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
 	CollectionIndex int      // selected collection element index
 	Requirement     *parser.BindingRequirement
+	Fidelity        string
+	Confidence      string
 }
 
 type controlSpec struct {
@@ -75,6 +79,8 @@ type controlSpec struct {
 	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Detail      map[string]string
 	Requirement *parser.BindingRequirement
+	Fidelity    string
+	Confidence  string
 }
 
 type flagPredicate struct {
@@ -100,6 +106,8 @@ type flagSpec struct {
 	Packages    []string
 	Detail      map[string]string
 	Requirement *parser.BindingRequirement
+	Fidelity    string
+	Confidence  string
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
@@ -752,12 +760,16 @@ type advisoryNeutralizerSpec struct {
 	ArgCountMax int
 	Packages    []string
 	Requirement *parser.BindingRequirement
+	Fidelity    string
+	Confidence  string
 }
 
 type paramSourceSpec struct {
 	Concept     string
 	Packages    []string
 	Requirement *parser.BindingRequirement
+	Fidelity    string
+	Confidence  string
 }
 
 type adapterSpec struct {
@@ -890,9 +902,9 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
-			allowed := make([]bool, len(spec.AdvisoryNeutralizers))
+			effects := make([]requirementEffect, len(spec.AdvisoryNeutralizers))
 			for i := range spec.AdvisoryNeutralizers {
-				allowed[i] = reqGate.allowed(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
+				effects[i] = reqGate.effect(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -902,7 +914,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				for ai, as := range spec.AdvisoryNeutralizers {
-					if !allowed[ai] {
+					if !effects[ai].Allowed {
 						continue
 					}
 					if !(as.ByMethod && method == as.Pattern || !as.ByMethod && matchSinkPath(path, as.Pattern)) {
@@ -921,8 +933,9 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 					detail["mode"] = as.Mode
 					detail["about"] = as.About
 					detail["pattern"] = as.Pattern
+					conf, detail := effects[ai].apply(mappingConfidence(as.Confidence, ""), detail)
 					out = append(out, adapters.Mapping{NodeID: id, Concept: concept,
-						Detail: detail})
+						Fidelity: mappingFidelity(as.Fidelity, "syntactic"), Confidence: conf, Detail: detail})
 					break
 				}
 			}
@@ -1112,10 +1125,11 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "source":
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
+					Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1126,10 +1140,11 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
-			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
+			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
+					Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1140,41 +1155,46 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
 		case "source_param":
-			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages, Requirement: mp.Requirement})
+			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "flag":
 			if mp.Flag != nil {
-				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)}
+				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence}
 				for _, pred := range mp.Flag.Predicates {
 					fs.Predicates = append(fs.Predicates, newFlagPredicate(pred.Subject, pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
 				}
@@ -1198,7 +1218,8 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.AdvisoryNeutralizers = append(s.AdvisoryNeutralizers, advisoryNeutralizerSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
 				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				Detail: adapterMappingDetail(mp), ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+				Detail: adapterMappingDetail(mp), ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		}
 	}
 	return s
@@ -1310,8 +1331,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							if len(in.Packages) > 0 {
 								spec = 3 // package-specific source supersedes native/general
 							}
-							conf, detail := effects[ci].apply("", nil)
-							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Confidence: conf, Specificity: spec, Detail: detail})
+							conf, detail := effects[ci].apply(mappingConfidence(in.Confidence, ""), nil)
+							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Fidelity: mappingFidelity(in.Fidelity, fidelity), Confidence: conf, Specificity: spec, Detail: detail})
 						}
 						break
 					}
@@ -1422,12 +1443,14 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if isAttr {
 						if sk.ByMethod {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						} else {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved", Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "resolved"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -1438,8 +1461,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							continue
 						}
 						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+						conf = mappingConfidence(sk.Confidence, conf)
 						conf, detail = effects[i].apply(conf, detail)
-						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
+						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
 					}
 					fidelity := "resolved"
@@ -1484,8 +1508,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 								continue
 							}
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -1514,8 +1539,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+					conf = mappingConfidence(sk.Confidence, conf)
 					conf, detail = effects[i].apply(conf, detail)
-					out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
+					out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
 			return out
@@ -1583,8 +1609,8 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 						if len(c.Packages) > 0 {
 							spec = 3 // package-specific control supersedes native/general
 						}
-						conf, detail := effects[ci].apply("", c.Detail)
-						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Confidence: conf, Specificity: spec, Detail: detail})
+						conf, detail := effects[ci].apply(mappingConfidence(c.Confidence, ""), c.Detail)
+						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 					}
 				}
 			}
@@ -2004,6 +2030,39 @@ func downgradeConfidence(conf string, steps int) string {
 	return levels[idx]
 }
 
+func mappingFidelity(authored, fallback string) string {
+	if authored != "" {
+		return authored
+	}
+	return fallback
+}
+
+func mappingConfidence(authored, derived string) string {
+	if authored == "" {
+		return derived
+	}
+	if derived == "" {
+		return authored
+	}
+	if confidenceRank(authored) <= confidenceRank(derived) {
+		return authored
+	}
+	return derived
+}
+
+func confidenceRank(conf string) int {
+	switch conf {
+	case "low":
+		return 1
+	case "medium":
+		return 2
+	case "high":
+		return 3
+	default:
+		return 3
+	}
+}
+
 func dependencyVersionEvidence(s usg.Store) map[string][]string {
 	out := map[string][]string{}
 	sbomIDs, _ := s.NodesOfType("sbom.PackageVersion")
@@ -2332,12 +2391,13 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
 						detail = mergeMappingDetail(detail, fl.Detail)
+						conf = mappingConfidence(fl.Confidence, conf)
 						conf, detail = effects[i].apply(conf, detail)
 						specificity := 0
 						if len(fl.Packages) > 0 {
 							specificity = 3
 						}
-						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: fl.Concept, Confidence: conf, Specificity: specificity, Detail: detail})
+						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: fl.Concept, Fidelity: mappingFidelity(fl.Fidelity, "resolved"), Confidence: conf, Specificity: specificity, Detail: detail})
 					}
 				}
 			}
@@ -3365,12 +3425,13 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						}
 						detail, conf := reviewDetail(m.Concept, m.Pattern)
 						detail = mergeMappingDetail(detail, m.Detail)
+						conf = mappingConfidence(m.Confidence, conf)
 						conf, detail = effects[mi].apply(conf, detail)
 						spec := 0
 						if len(m.Packages) > 0 {
 							spec = 3 // package-specific mark supersedes native/general
 						}
-						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept, Confidence: conf, Specificity: spec, Detail: detail})
+						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 						seenConcept[m.Concept] = true
 					}
 				}
@@ -3678,8 +3739,8 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 					if len(src.Packages) > 0 {
 						spec = 3
 					}
-					conf, detail := activeSrc.effect.apply("", nil)
-					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Confidence: conf, Specificity: spec, Detail: detail})
+					conf, detail := activeSrc.effect.apply(mappingConfidence(src.Confidence, ""), nil)
+					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Fidelity: mappingFidelity(src.Fidelity, "syntactic"), Confidence: conf, Specificity: spec, Detail: detail})
 				}
 			}
 			return out

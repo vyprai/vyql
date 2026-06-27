@@ -58,6 +58,9 @@ rule SqlInjection {
 	if got := adapter.Mappings[0]; got.Kind != "sink_method" || got.Pattern != "execute" || got.Concept != "code.SqlExecution" || got.ArgIndex != 0 {
 		t.Fatalf("sink lowering wrong: %+v", got)
 	}
+	if got := adapter.Mappings[0]; got.Fidelity != "resolved" || got.Confidence != "high" {
+		t.Fatalf("binding evidence attrs not lowered: %+v", got)
+	}
 	if got := adapter.Mappings[1]; got.Kind != "source" || got.Pattern != "request.json" || got.Concept != "code.HttpInput" {
 		t.Fatalf("source lowering wrong: %+v", got)
 	}

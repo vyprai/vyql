@@ -652,11 +652,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			switch {
 			case action.Kind == "emit source":
 				m := shape.mapping(BindingAction{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit sink":
 				if action.Location == "call" || action.Location == "node" {
 					m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
-					out = append(out, m)
+					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
 				kind := shape.sinkKind()
@@ -684,7 +684,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					Packages:        pkgs,
 					Requirement:     req,
 				})
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit check":
 				if isV2AdvisoryNeutralizerCheck(action) {
 					m, ok, err := lowerV2AdvisoryNeutralizerCheck(b.Name, shape, action, pkgs, req)
@@ -692,7 +692,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 					if ok {
-						out = append(out, m)
+						out = appendV2BindingAction(out, m, b.Attrs)
 						continue
 					}
 				}
@@ -701,7 +701,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if err != nil {
 						return nil, err
 					}
-					out = append(out, m)
+					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
 				if action.Concept == "threat.CharFilter" {
@@ -719,7 +719,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if lowerV2CharFilterGlobal(queryWhere) {
 						constraint = "global"
 					}
-					out = append(out, shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}))
+					out = appendV2BindingAction(out, shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}), b.Attrs)
 					continue
 				}
 				if isV2GlobalCheck(action) {
@@ -727,7 +727,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if err != nil {
 						return nil, err
 					}
-					out = append(out, m)
+					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
 				kind := shape.controlKind()
@@ -748,25 +748,33 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					}
 				}
 				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit issue":
 				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
 				m := shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			case strings.HasPrefix(action.Kind, "propagate "):
 				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs, req)
 				if err != nil {
 					return nil, err
 				}
-				out = append(out, m)
+				out = appendV2BindingAction(out, m, b.Attrs)
 			default:
 				return nil, fmt.Errorf("binding %s: unsupported output %q", b.Name, action.Kind)
 			}
 		}
 	}
 	return out, nil
+}
+
+func appendV2BindingAction(out []BindingAction, m BindingAction, attrs map[string]string) []BindingAction {
+	if attrs != nil {
+		m.Fidelity = attrs["fidelity"]
+		m.Confidence = attrs["confidence"]
+	}
+	return append(out, m)
 }
 
 func isV2GlobalCheck(action V2BindingOutput) bool {
@@ -989,7 +997,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 			coverageDetail = lowerV2CoverageDetail(action.Covers[0])
 		}
 		flag := *fl
-		out = append(out, BindingAction{
+		out = appendV2BindingAction(out, BindingAction{
 			Kind:           "flag",
 			Concept:        action.Concept,
 			About:          action.About,
@@ -999,7 +1007,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 			Packages:       pkgs,
 			Requirement:    req,
 			Flag:           &flag,
-		})
+		}, b.Attrs)
 	}
 	return out, true, nil
 }
@@ -1114,7 +1122,7 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Bindin
 		if action.Kind != "emit source" || action.Location != "param" {
 			return nil, fmt.Errorf("binding %s: param query only supports emit source at param", b.Name)
 		}
-		out = append(out, BindingAction{Kind: "source_param", Concept: action.Concept, Packages: pkgs, Requirement: req})
+		out = appendV2BindingAction(out, BindingAction{Kind: "source_param", Concept: action.Concept, Packages: pkgs, Requirement: req}, b.Attrs)
 	}
 	return out, nil
 }
