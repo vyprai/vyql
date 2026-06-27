@@ -6,6 +6,7 @@ package profile
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,12 +49,16 @@ func (p Profile) ActiveSources() map[string]bool {
 func Load() ([]Profile, error) {
 	files, err := datadir.ReadVYQLDir("profiles")
 	if err != nil {
-		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
+		return genericProfiles(), fmt.Errorf("load profiles: %w", err)
 	}
+	return loadSources(files)
+}
+
+func loadSources(files []datadir.Source) ([]Profile, error) {
 	var out []Profile
 	decls, err := parser.ParseV2DefinitionSources(v2DefinitionSources(files))
 	if err != nil {
-		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
+		return genericProfiles(), fmt.Errorf("parse profiles: %w", err)
 	}
 	for _, d := range decls {
 		pd, ok := d.(*parser.ProfileDecl)
@@ -68,7 +73,14 @@ func Load() ([]Profile, error) {
 			Entrypoints: list(pd.Fields["entrypoints"]),
 		})
 	}
+	if len(out) == 0 {
+		return genericProfiles(), nil
+	}
 	return out, nil
+}
+
+func genericProfiles() []Profile {
+	return []Profile{{Name: "generic", Title: "Generic application"}}
 }
 
 func v2DefinitionSources(files []datadir.Source) []parser.V2DefinitionSource {

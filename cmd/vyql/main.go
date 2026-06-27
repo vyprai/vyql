@@ -195,7 +195,10 @@ func parseBytes(s string) (int64, error) {
 // applyProfile selects the analysis profile (explicit name or auto-detected),
 // sets the active source families, and returns it for reporting.
 func applyProfile(paths []string, name string) profile.Profile {
-	profiles, _ := profile.Load()
+	profiles, err := profile.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: %v; using generic profile\n", err)
+	}
 	var p profile.Profile
 	switch {
 	case name == "" || name == "auto":
@@ -212,7 +215,10 @@ func applyProfile(paths []string, name string) profile.Profile {
 }
 
 func profileNames() string {
-	profiles, _ := profile.Load()
+	profiles, err := profile.Load()
+	if err != nil {
+		return "generic"
+	}
 	var names []string
 	for _, p := range profiles {
 		names = append(names, p.Name)
