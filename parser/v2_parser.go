@@ -773,6 +773,8 @@ func (p *v2Parser) parseV2Compare(stop func(tok) bool) V2Expr {
 	switch {
 	case p.at(tEq), p.at(tNe), p.at(tGe), p.at(tLe), p.at(tGt), p.at(tLt), p.at(tMatch):
 		op = p.next().val
+	case p.atWord("contains") && p.looksLikeV2ContainsRelationStep():
+		return left
 	case p.atWord("in"), p.atWord("contains"), p.atWord("startsWith"), p.atWord("endsWith"), p.atWord("matches"), p.atWord("is"):
 		op = p.next().val
 	case p.atWord("not") && p.peek2().kind == tWord && p.peek2().val == "in":
@@ -783,6 +785,12 @@ func (p *v2Parser) parseV2Compare(stop func(tok) bool) V2Expr {
 		return left
 	}
 	return V2BinaryExpr{Op: op, Left: left, Right: p.parseV2Unary(stop)}
+}
+
+func (p *v2Parser) looksLikeV2ContainsRelationStep() bool {
+	family := p.peekN(1)
+	next := p.peekN(2)
+	return family.kind == tWord && next.kind == tWord && (next.val == "as" || next.val == "where")
 }
 
 func (p *v2Parser) parseV2Unary(stop func(tok) bool) V2Expr {

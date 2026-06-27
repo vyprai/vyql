@@ -1033,6 +1033,32 @@ rule TagsContainHigh {
 	}
 }
 
+func TestParseV2QueryWhereContainsRelationStep(t *testing.T) {
+	prog, err := ParseV2(`
+module bindings.javascript.composed;
+binding sqlLiteral {
+  query call as c where c.callee.method == "query" contains literal as lit where lit.value contains "SELECT"
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	binding := prog.Decls[0].(*V2BindingDecl)
+	query := binding.Query.Expr
+	if query == nil || len(query.Steps) != 1 {
+		t.Fatalf("query = %+v, want one contains relation step", binding.Query)
+	}
+	step := query.Steps[0]
+	if step.Relation != "contains" || step.Family != "literal" || step.Alias != "lit" {
+		t.Fatalf("step = %+v, want contains literal as lit", step)
+	}
+	where, ok := step.Where.(V2BinaryExpr)
+	if !ok || where.Op != "contains" {
+		t.Fatalf("step where = %#v, want contains expression", step.Where)
+	}
+}
+
 func TestParseV2ValidationRejectsContractViolations(t *testing.T) {
 	cases := []struct {
 		name   string
