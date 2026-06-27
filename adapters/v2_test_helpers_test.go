@@ -4,14 +4,14 @@ import "github.com/vyprai/vyql/parser"
 
 const v2CoreMechanicsForAdaptersTest = `
 module mechanics.core;
-mechanic ruleVerb taint { solver: dataflow.taint }
-mechanic ruleVerb flow { solver: dataflow.flow }
-mechanic ruleVerb reach { solver: graph.reach }
-mechanic ruleVerb grant { solver: graph.grant }
-mechanic ruleVerb assume { solver: graph.assume }
-mechanic ruleVerb issue { solver: fact.exists }
-mechanic ruleVerb fact { solver: fact.exists }
-mechanic ruleVerb query { solver: query.semantic }
+mechanic ruleVerb taint { solver: dataflow.taint fromKinds: [source] toKinds: [sink] }
+mechanic ruleVerb flow { solver: dataflow.flow fromKinds: [source] toKinds: [sink] }
+mechanic ruleVerb reach { solver: graph.reach fromKinds: [asset, exposure] toKinds: [asset, exposure] }
+mechanic ruleVerb grant { solver: graph.grant fromKinds: [principal] toKinds: [principal, privilege] }
+mechanic ruleVerb assume { solver: graph.assume fromKinds: [principal] toKinds: [principal, privilege] }
+mechanic ruleVerb issue { solver: fact.exists fromKinds: [issue] }
+mechanic ruleVerb fact { solver: fact.exists fromKinds: [fact, asset, exposure, principal, privilege, state, observation] }
+mechanic ruleVerb query { solver: query.semantic fromKinds: [concept, fact, asset, exposure, principal, privilege, state, observation] }
 mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
 mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
 mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
@@ -34,14 +34,5 @@ func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := decls[:0]
-	for _, decl := range decls {
-		switch decl.(type) {
-		case *parser.V2MechanicDecl, *parser.V2PolicyDecl:
-			continue
-		default:
-			out = append(out, decl)
-		}
-	}
-	return out, nil
+	return decls, nil
 }

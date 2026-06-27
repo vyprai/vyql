@@ -31,15 +31,6 @@ type CompiledRule struct {
 	NeutralizedThreats map[string]bool
 }
 
-// allowed concept kinds per flow verb endpoint (docs/05 §safety conditions)
-var endpointKinds = map[string][2]map[string]bool{
-	"taint":  {{"source": true}, {"sink": true}},
-	"flow":   {{"source": true}, {"sink": true}},
-	"reach":  {{"exposure": true, "asset": true}, {"asset": true, "exposure": true}},
-	"grant":  {{"principal": true}, {"privilege": true, "principal": true}},
-	"assume": {{"principal": true}, {"privilege": true, "principal": true}},
-}
-
 // CompileRules compiles all rules; returns the compiled set and any errors.
 func CompileRules(decls []parser.Decl, onto *ontology.Ontology) ([]*CompiledRule, []CompileError) {
 	var compiled []*CompiledRule
@@ -284,12 +275,12 @@ func excludedCharsFor(onto *ontology.Ontology, concepts map[string]bool) string 
 }
 
 func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule string, ruleVerbs ruleVerbMechanicPolicy) error {
+	if !ruleVerbs.present {
+		return fmt.Errorf("no loaded mechanic ruleVerb declarations")
+	}
 	allowed, ok := endpointKindPolicy(body.Verb, ruleVerbs)
 	if !ok {
-		if ruleVerbs.present {
-			return fmt.Errorf("rule verb %q has no loaded mechanic ruleVerb declaration", body.Verb)
-		}
-		return nil
+		return fmt.Errorf("rule verb %q has no loaded mechanic ruleVerb declaration", body.Verb)
 	}
 	src, _ := onto.Get(body.Src.Concept)
 	dst, _ := onto.Get(body.Dst.Concept)
@@ -305,15 +296,11 @@ func checkEndpointKinds(onto *ontology.Ontology, body *parser.FlowStmt, rule str
 }
 
 func endpointKindPolicy(verb string, ruleVerbs ruleVerbMechanicPolicy) ([2]map[string]bool, bool) {
-	if ruleVerbs.present {
-		m, ok := ruleVerbs.verbs[verb]
-		if !ok {
-			return [2]map[string]bool{}, false
-		}
-		return [2]map[string]bool{m.FromKinds, m.ToKinds}, true
+	m, ok := ruleVerbs.verbs[verb]
+	if !ok {
+		return [2]map[string]bool{}, false
 	}
-	allowed, ok := endpointKinds[verb]
-	return allowed, ok
+	return [2]map[string]bool{m.FromKinds, m.ToKinds}, true
 }
 
 func keys(m map[string]bool) []string {

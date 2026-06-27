@@ -181,6 +181,24 @@ rule SourceToSink {
 	}
 }
 
+func TestCompileRulesRequiresLoadedRuleVerbMechanics(t *testing.T) {
+	decls := []parser.Decl{
+		&parser.Rule{
+			Name:    "SourceToSink",
+			Package: "rules.test",
+			Body: &parser.FlowStmt{
+				Verb: "taint",
+				Src:  parser.Endpoint{Concept: "code.HttpInput"},
+				Dst:  parser.Endpoint{Concept: "code.SqlExecution"},
+			},
+		},
+	}
+	_, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 1 || !strings.Contains(errs[0].Msg, "no loaded mechanic ruleVerb declarations") {
+		t.Fatalf("CompileRules errors = %+v, want missing mechanics rejection", errs)
+	}
+}
+
 func TestCompileRequiresLoadedRuleVerbWhenMechanicsAreAuthoritative(t *testing.T) {
 	raw := []parser.V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `

@@ -14,6 +14,17 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
+func firstBindingSet(t *testing.T, decls []parser.Decl) *parser.BindingSet {
+	t.Helper()
+	for _, decl := range decls {
+		if ad, ok := decl.(*parser.BindingSet); ok {
+			return ad
+		}
+	}
+	t.Fatalf("expected binding declaration, got %d decls", len(decls))
+	return nil
+}
+
 func TestConstraintAllows(t *testing.T) {
 	cases := []struct {
 		constraint, recvType string
@@ -516,11 +527,7 @@ binding secretComparison {
 	if err != nil {
 		t.Fatalf("parse context flag: %v", err)
 	}
-	ad, ok := decls[0].(*parser.BindingSet)
-	if !ok {
-		t.Fatalf("expected adapter decl, got %#v", decls[0])
-	}
-	spec := specFromBindingSet(ad)
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	if len(spec.Flags) != 1 {
 		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
 	}
@@ -585,7 +592,7 @@ binding worldAccess {
 	if err != nil {
 		t.Fatalf("parse scoped context flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -653,7 +660,7 @@ binding shareInfoLeak {
 	if err != nil {
 		t.Fatalf("parse scoped selector flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -714,7 +721,7 @@ binding secretComparison {
 	if err != nil {
 		t.Fatalf("parse ast flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
 		"loc": "sample.js:10", "op": "===", "callee_path": "__binop.eq", "method": "eq", "arg0": "a0", "arg1": "a1",
@@ -755,7 +762,7 @@ binding prototypeMerge {
 	if err != nil {
 		t.Fatalf("parse context ast flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -810,7 +817,7 @@ binding lockOpen {
 	if err != nil {
 		t.Fatalf("parse context ast selector flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -865,7 +872,7 @@ binding emptyPayloadCheck {
 	if err != nil {
 		t.Fatalf("parse context binary flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -925,7 +932,7 @@ binding icmpEchoPayloadLengthUnderflow {
 	if err != nil {
 		t.Fatalf("parse C context flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	tokens := strings.Join([]string{
 		"lang=c",
@@ -973,7 +980,7 @@ binding lockNoFollow {
 	if err != nil {
 		t.Fatalf("parse soft-lock context flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1016,7 +1023,7 @@ binding directJsonEncode {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1072,7 +1079,7 @@ binding gitCloneWrapper {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "index.js:1", Scope: "index.js/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1105,7 +1112,7 @@ binding bulkMailRecipients {
 	if err != nil {
 		t.Fatalf("parse context nested call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1139,7 +1146,7 @@ binding bulkMailRecipients {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "issue_mail.go:1", Scope: "issue_mail.go/fn1", Props: map[string]string{
 		"callee_path": "analysis.function.context",
@@ -1186,7 +1193,7 @@ binding unhardenedXmlParser {
 	if err != nil {
 		t.Fatalf("parse direct call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:   "parser",
@@ -1227,7 +1234,7 @@ binding passwordOnlySessionHash {
 	if err != nil {
 		t.Fatalf("parse context subscript flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1274,7 +1281,7 @@ binding remoteUrlDebugLog {
 	if err != nil {
 		t.Fatalf("parse context identifier flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1331,7 +1338,7 @@ binding directJsonEncode {
 	if err != nil {
 		t.Fatalf("parse context call-arg flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "fields.php:1",
@@ -1357,7 +1364,7 @@ binding exactParse {
 	if err != nil {
 		t.Fatalf("parse context exact-token flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
 		"loc":         "nat.rb:10",
@@ -1395,7 +1402,7 @@ binding scopedLiteral {
 	if err != nil {
 		t.Fatalf("parse region-scoped context flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "target-ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "fields.php:10",
@@ -1440,7 +1447,7 @@ binding railsSecretToken {
 	if err != nil {
 		t.Fatalf("parse context structured-token flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "secret_token.rb:1",
@@ -1484,7 +1491,7 @@ binding pathBasedSandboxExposeBindRace {
 	if err != nil {
 		t.Fatalf("parse module context ast flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{
 		ID:    "ctx",
@@ -1556,7 +1563,7 @@ binding pointerAddOverflow {
 	if err != nil {
 		t.Fatalf("parse ast flow flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
 		"loc":         "sample.h:1",
@@ -1606,7 +1613,7 @@ binding remoteUrlDebugLog {
 	if err != nil {
 		t.Fatalf("parse param flow flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "url-param", Type: "code.Param", Props: map[string]string{
 		"loc": "file.js:10", "name": "url",
@@ -1657,7 +1664,7 @@ binding zipCompressedSizeRead {
 	if err != nil {
 		t.Fatalf("parse call operand flag: %v", err)
 	}
-	spec := specFromBindingSet(decls[0].(*parser.BindingSet))
+	spec := specFromBindingSet(firstBindingSet(t, decls))
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "size", Type: "code.Attr", Props: map[string]string{
 		"loc": "file.js:20", "callee_path": "zipHeader.compressedSize",
