@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
@@ -183,6 +185,9 @@ func syntheticSourceActive(concept string) bool {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
@@ -198,6 +203,30 @@ func eqKeys(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func adapterStatKey(root string) string {
+	h := sha256.New()
+	statStaticAdapterData(h, root)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func TestStaticAdapterFingerprintIncludesSplitLayout(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "javascript.vyql"), "module bindings.javascript.flat;\n")
+	before := adapterStatKey(root)
+
+	writeFile(t, filepath.Join(root, "javascript", "javascript", "001", "codeHttpInput.vyql"), "module bindings.javascript.split;\n")
+	afterSplit := adapterStatKey(root)
+	if afterSplit == before {
+		t.Fatal("static adapter fingerprint did not include split adapter file")
+	}
+
+	writeFile(t, filepath.Join(root, "packages", "generated", "javascript", "express.vyql"), "module bindings.javascript.generated;\n")
+	afterGenerated := adapterStatKey(root)
+	if afterGenerated != afterSplit {
+		t.Fatal("static adapter fingerprint should not include generated package corpus")
+	}
 }
 
 // TestIncrementalFingerprintActiveSources proves the incremental cache fingerprints the active

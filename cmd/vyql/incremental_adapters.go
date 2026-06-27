@@ -269,13 +269,13 @@ func adapterFingerprint(deps map[string]bool) string {
 }
 
 // statAdapterData folds the identity (path+size+mtime) of the adapter data that actually loads
-// into h: the static top-level <data>/adapters/*.vyql, plus the generated per-package files for
-// packages in deps. It deliberately avoids stat-walking the full ~9k-file generated corpus —
-// only the matched files matter, and walking all of them every scan would cost what this cache
-// saves.
+// into h: static adapters in both the flat v1-era layout and split v2 layout, plus the generated
+// per-package files for packages in deps. It deliberately avoids stat-walking the full generated
+// corpus — only the matched generated files matter, and walking all of them every scan would cost
+// what this cache saves.
 func statAdapterData(h hash.Hash, deps map[string]bool) {
 	root := filepath.Join(datadir.Root(), "adapters")
-	statGlob(h, filepath.Join(root, "*.vyql"))
+	statStaticAdapterData(h, root)
 	if len(deps) == 0 {
 		return
 	}
@@ -292,4 +292,10 @@ func statAdapterData(h hash.Hash, deps map[string]bool) {
 			statFile(h, filepath.Join(langDir, p+".vyql"))
 		}
 	}
+}
+
+func statStaticAdapterData(h hash.Hash, root string) {
+	statVYQLTreeExcept(h, root, map[string]bool{
+		"packages/generated": true,
+	})
 }

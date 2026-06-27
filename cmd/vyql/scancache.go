@@ -108,6 +108,34 @@ func statGlob(h hash.Hash, pattern string) {
 	}
 }
 
+func statVYQLTreeExcept(h hash.Hash, root string, excludedRelDirs map[string]bool) {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			rel, relErr := filepath.Rel(root, p)
+			if relErr == nil {
+				rel = filepath.ToSlash(rel)
+				if excludedRelDirs[rel] {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".vyql") {
+			return nil
+		}
+		info, e := d.Info()
+		if e != nil {
+			return nil
+		}
+		io.WriteString(h, p)
+		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
+		return nil
+	})
+}
+
 // loadCachedScan returns a previously cached scan result for key, if present.
 func loadCachedScan(c *parsecache.Cache, key string) (cachedScan, bool) {
 	raw, ok := c.GetRaw("scan\x00" + key)
