@@ -2285,6 +2285,118 @@ binding secretComparison {
 	}
 }
 
+func TestV2LiteralPatternLabelsLiteralNodesByValue(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.literal;
+pattern dangerousPath as lit {
+  node: literal
+  where lit.value contains "/etc/"
+}
+binding dangerousPathLiteral {
+  query pattern dangerousPath
+  emit issue custom.DangerousPath at lit
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "lit", Type: "code.Literal", Props: map[string]string{
+		"loc": "sample.js:1", "value": "/etc/passwd",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:2", "value": "/etc/passwd",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "lit" || got[0].Concept != "custom.DangerousPath" {
+		t.Fatalf("literal pattern matched wrong nodes: %+v", got)
+	}
+}
+
+func TestV2FunctionInlineQueryLabelsFunctionNodesByName(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.functions;
+binding exportedHandler {
+  query function as fn where fn.name contains "handler"
+  emit source custom.HandlerEntry at fn
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "fn", Type: "code.Function", Props: map[string]string{
+		"loc": "sample.js:1", "name": "exportedHandler",
+	}})
+	store.AddNode(usg.Node{ID: "name", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.js:2", "name": "exportedHandler",
+	}})
+
+	got := spec.inputAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "fn" || got[0].Concept != "custom.HandlerEntry" {
+		t.Fatalf("function query matched wrong nodes: %+v", got)
+	}
+}
+
+func TestV2ImportInlineQueryLabelsImportNodesByModule(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.imports;
+binding lodashImport {
+  query import as imp where imp.module == "lodash"
+  emit fact custom.DependencyUse at imp
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+		"loc": "sample.js:1", "module": "lodash",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:2", "module": "lodash",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "imp" || got[0].Concept != "custom.DependencyUse" {
+		t.Fatalf("import query matched wrong nodes: %+v", got)
+	}
+}
+
+func TestV2ClassInlineQueryLabelsClassNodesByName(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.classes;
+binding adminClass {
+  query class as cls where cls.name contains "Admin"
+  emit source custom.AdminSurface at cls
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "class", Type: "code.Class", Props: map[string]string{
+		"loc": "sample.js:1", "name": "AdminController",
+	}})
+	store.AddNode(usg.Node{ID: "fn", Type: "code.Function", Props: map[string]string{
+		"loc": "sample.js:2", "name": "AdminController",
+	}})
+
+	got := spec.inputAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "class" || got[0].Concept != "custom.AdminSurface" {
+		t.Fatalf("class query matched wrong nodes: %+v", got)
+	}
+}
+
 func TestV2FactEmitLabelsMatchedCall(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.facts;

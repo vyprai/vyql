@@ -416,7 +416,42 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 }
 
 func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
-	return len(vals) == 0 && len(nvals) == 0 || valConds(n.Prop("str_args"), vals, nvals)
+	if len(vals) == 0 && len(nvals) == 0 {
+		return true
+	}
+	return valConds(nodeDirectValueTokens(n), vals, nvals)
+}
+
+var nodeDirectValuePropKeys = []string{
+	"value",
+	"raw",
+	"name",
+	"module",
+	"symbol",
+	"package",
+	"root",
+}
+
+func nodeDirectValueTokens(n usg.Node) string {
+	tokens := n.Prop("str_args")
+	var b strings.Builder
+	for _, key := range nodeDirectValuePropKeys {
+		value := n.Prop(key)
+		if value == "" {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString(tokens)
+		}
+		if b.Len() > 0 {
+			b.WriteByte(0)
+		}
+		b.WriteString(value)
+	}
+	if b.Len() > 0 {
+		return b.String()
+	}
+	return tokens
 }
 
 func callArgCount(n usg.Node) int {
@@ -480,6 +515,11 @@ var callablePropTypes = []string{
 	"code.BinOp",
 	"code.Unary",
 	"code.Seq",
+	"code.Literal",
+	"code.Const",
+	"code.Function",
+	"code.Class",
+	"code.Import",
 }
 
 func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
@@ -1126,8 +1166,12 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
 			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
+				paths := []string{mp.Pattern}
+				if mp.Pattern == "" {
+					paths = nil
+				}
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
-					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+					Paths: paths, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement,
 					Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 				break
@@ -1138,7 +1182,9 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 				i = len(s.Inputs) - 1
 				srcByConcept[mp.Concept] = i
 			}
-			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
+			if mp.Pattern != "" {
+				s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
+			}
 		case "source_method":
 			if mp.NodeType != "" || len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil || mp.Fidelity != "" || mp.Confidence != "" {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
@@ -1326,6 +1372,9 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
+				if spec.Inputs[i].NodeType != "" && len(spec.Inputs[i].Methods) == 0 && len(spec.Inputs[i].Paths) == 0 {
+					return nil, nil, true
+				}
 				return spec.Inputs[i].Methods, spec.Inputs[i].Paths, spec.Inputs[i].Match == "contains"
 			})
 			// package gating is node-independent (pkgs is constant for this Apply), so
@@ -1337,7 +1386,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			var out []adapters.Mapping
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
-				if path == "" && method == "" {
+				if path == "" && method == "" && len(inIdx.loose) == 0 {
 					return true
 				}
 				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
@@ -1352,7 +1401,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 						continue
 					}
 					matched := (path != "" && matchPath(path, in.Paths, in.Match)) ||
-						(method != "" && containsStr(in.Methods, method))
+						(method != "" && containsStr(in.Methods, method)) ||
+						(in.NodeType != "" && len(in.Paths) == 0 && len(in.Methods) == 0)
 					if in.Receiver {
 						matched = method != "" && containsStr(in.Methods, method) &&
 							constraintAllows(in.Constraint, n.Prop("recv_type"))
@@ -3429,6 +3479,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			pkgs := packageEvidence(s, spec.Technology, crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			markIdx := buildSpecIndex(len(spec.Marks), func(i int) (methods, paths []string, loose bool) {
+				if spec.Marks[i].NodeType != "" && spec.Marks[i].Pattern == "" {
+					return nil, nil, true
+				}
 				if spec.Marks[i].ByMethod {
 					return []string{spec.Marks[i].Pattern}, nil, false
 				}
@@ -3438,7 +3491,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			for i := range spec.Marks {
 				effects[i] = reqGate.effect(spec.Marks[i].Packages, spec.Marks[i].Requirement)
 			}
-			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"}
+			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Literal", "code.Const", "code.Function", "code.Class", "code.Import"}
 			if crossLang {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
 			}
@@ -3462,7 +3515,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 							continue
 						}
 						hit := m.ByMethod && method == m.Pattern ||
-							!m.ByMethod && ((m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
+							!m.ByMethod && ((m.Pattern == "" && m.NodeType != "") || (m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
 						if !hit {
 							continue
 						}

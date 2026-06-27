@@ -607,15 +607,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	queryAlias := ""
 	queryNodeType := ""
 	if b.Query.Expr != nil {
-		switch b.Query.Expr.Family {
-		case "call":
-		case "memberAccess":
-			queryNodeType = "code.Attr"
-		case "binaryExpr":
-			queryNodeType = "code.BinOp"
-		default:
-			return nil, fmt.Errorf("binding %s: inline query lowering is only implemented for single call, memberAccess, or binaryExpr queries", b.Name)
+		nodeType, ok := v2QueryFamilyNodeType(b.Query.Expr.Family)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: inline query lowering is not implemented for query family %q", b.Name, b.Query.Expr.Family)
 		}
+		queryNodeType = nodeType
 		var err error
 		queryWhere, err = lowerV2BindingQueryRelations(b.Name, *b.Query.Expr)
 		if err != nil {
@@ -636,7 +632,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			return out, err
 		}
 	}
-	shapes, err := lowerV2CallShapes(b.Name, queryWhere)
+	shapes, err := lowerV2CallShapes(b.Name, queryWhere, queryNodeType != "")
 	if err != nil {
 		return nil, err
 	}
@@ -652,6 +648,9 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		for _, action := range b.Outputs {
 			action.Concept = names.concept(action.Concept)
 			action.About = names.concept(action.About)
+			if queryAlias != "" && queryAlias != "call" && queryAlias != "node" && action.Location == queryAlias {
+				action.Location = "node"
+			}
 			if err := validateV2OutputCoverageMechanics(b.Name, action, mechanics); err != nil {
 				return nil, err
 			}
@@ -803,6 +802,27 @@ func lowerV2BindingQueryRelations(binding string, q V2QueryExpr) (V2Expr, error)
 		where = andV2Expr(where, rewritten)
 	}
 	return where, nil
+}
+
+func v2QueryFamilyNodeType(family string) (string, bool) {
+	switch family {
+	case "call":
+		return "", true
+	case "memberAccess":
+		return "code.Attr", true
+	case "binaryExpr":
+		return "code.BinOp", true
+	case "literal", "stringLiteral":
+		return "code.Literal", true
+	case "function":
+		return "code.Function", true
+	case "class":
+		return "code.Class", true
+	case "import":
+		return "code.Import", true
+	default:
+		return "", false
+	}
 }
 
 func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
@@ -1050,15 +1070,15 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 		switch item.Kind {
 		case "node":
 			nodeCount++
-			switch item.Name {
-			case "call", "callExpr", "node":
-			case "memberAccess":
-				nodeType = "code.Attr"
-			case "binaryExpr":
-				nodeType = "code.BinOp"
-			default:
+			family := item.Name
+			if family == "callExpr" || family == "node" {
+				family = "call"
+			}
+			itemNodeType, ok := v2QueryFamilyNodeType(family)
+			if !ok {
 				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
 			}
+			nodeType = itemNodeType
 			if alias == "" {
 				alias = item.Alias
 			}
@@ -1123,7 +1143,7 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 		}
 	}
 	if nodeCount != 1 {
-		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one call/memberAccess node for scanner IR lowering", binding, pat.Name)
+		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one stable code node for scanner IR lowering", binding, pat.Name)
 	}
 	return where, alias, nodeType, binds, nodeCount, nil
 }
@@ -1951,13 +1971,16 @@ func (s v2CallShape) factKind() string {
 	return "fact"
 }
 
-func lowerV2CallShapes(binding string, expr V2Expr) ([]v2CallShape, error) {
+func lowerV2CallShapes(binding string, expr V2Expr, allowNodeOnly bool) ([]v2CallShape, error) {
+	if expr == nil && allowNodeOnly {
+		return []v2CallShape{{}}, nil
+	}
 	shapes, err := lowerV2CallShapeExpr(binding, expr, false)
 	if err != nil {
 		return nil, err
 	}
 	for _, shape := range shapes {
-		if shape.Field == "" {
+		if shape.Field == "" && !allowNodeOnly {
 			return nil, fmt.Errorf("binding %s: query pattern lowering needs a callee.method/path predicate", binding)
 		}
 	}
@@ -2057,6 +2080,8 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return []v2CallShape{{ValMatches: []string{value}}}, nil
 	}
 	switch field {
+	case "node.value", "node.name", "node.module":
+		return lowerV2NodeValueShapes(binding, field, cmp, cmpNeg)
 	case "operator":
 		return lowerV2OperatorShapes(binding, cmp, cmpNeg)
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
@@ -2111,6 +2136,20 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 	default:
 		return nil, fmt.Errorf("binding %s: query predicate %q is not implemented in scanner IR lowering", binding, left.Name)
 	}
+}
+
+func lowerV2NodeValueShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	if cmp.Op != "contains" && cmp.Op != "==" {
+		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
+	}
+	value, ok := v2LiteralString(cmp.Right)
+	if !ok {
+		return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
+	}
+	if neg {
+		return []v2CallShape{{ValAbsents: []string{value}}}, nil
+	}
+	return []v2CallShape{{ValMatches: []string{value}}}, nil
 }
 
 func v2ArgsAnyContextField(field string) (string, string, bool) {
@@ -2335,6 +2374,12 @@ func v2MappedCallQueryField(name string) string {
 		return "callee.path"
 	case "operator", "op", "binaryExpr.operator", "binaryExpr.op":
 		return "operator"
+	case "value", "raw", "literal.value", "literal.raw", "stringLiteral.value", "stringLiteral.raw":
+		return "node.value"
+	case "name", "function.name", "class.name":
+		return "node.name"
+	case "module", "import.module", "import.symbol", "import.package":
+		return "node.module"
 	default:
 		if v2IsKnownCallQueryField(name) {
 			return name
@@ -2348,6 +2393,7 @@ func v2IsKnownCallQueryField(name string) bool {
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
 		"callee.analysis", "call.callee.analysis",
 		"callee.receiver.type", "call.callee.receiver.type",
+		"node.value", "node.name", "node.module",
 		"args.any.literal", "call.args.any.literal",
 		"args.count", "call.args.count",
 		"call.filter.global", "filter.global":
