@@ -2625,6 +2625,53 @@ binding executeWithParamCounts {
 	}
 }
 
+func TestV2LoweringExpandsNegatedArgsCountPredicates(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+		want [][2]int
+	}{
+		{
+			name: "not equal",
+			expr: `args.count != 1`,
+			want: [][2]int{{0, 0}, {2, -1}},
+		},
+		{
+			name: "not in",
+			expr: `args.count not in [1, 3]`,
+			want: [][2]int{{0, 0}, {2, 2}, {4, -1}},
+		},
+		{
+			name: "not comparison",
+			expr: `not (args.count >= 2)`,
+			want: [][2]int{{0, 1}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.express;
+binding executeWithNegatedParamCounts {
+  query pattern callExpr where callee.method == "execute" and ` + tt.expr + `
+  emit sink code.SqlExecution at args[0]
+}
+`)
+			if err != nil {
+				t.Fatalf("ParseV2Definitions: %v", err)
+			}
+			mappings := decls[0].(*BindingSet).Mappings
+			if len(mappings) != len(tt.want) {
+				t.Fatalf("mappings = %#v, want %d arity intervals", mappings, len(tt.want))
+			}
+			for i, want := range tt.want {
+				if !mappings[i].ArgCountSet || mappings[i].ArgCountMin != want[0] || mappings[i].ArgCountMax != want[1] {
+					t.Fatalf("mapping %d = %#v, want args.count interval [%d, %d]", i, mappings[i], want[0], want[1])
+				}
+			}
+		})
+	}
+}
+
 func TestV2ConcreteCoverageChecksLowerWithExplicitCoverageMode(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.xml;

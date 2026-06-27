@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -2703,34 +2704,57 @@ func v2IsKnownCallQueryField(name string) bool {
 }
 
 func lowerV2ArgsCountShapes(cmp V2BinaryExpr, neg bool) ([]v2CallShape, bool) {
-	if neg {
-		return nil, false
-	}
 	value, ok := v2LiteralInt(cmp.Right)
 	switch cmp.Op {
 	case "==":
 		if !ok {
 			return nil, false
 		}
+		if neg {
+			return v2ArgCountComplementValues([]int{value}), true
+		}
 		return []v2CallShape{v2ArgCountShape(value, value)}, true
+	case "!=":
+		if !ok {
+			return nil, false
+		}
+		if neg {
+			return []v2CallShape{v2ArgCountShape(value, value)}, true
+		}
+		return v2ArgCountComplementValues([]int{value}), true
 	case ">=":
 		if !ok {
 			return nil, false
+		}
+		if neg {
+			return v2ArgCountRange(0, value-1), true
 		}
 		return []v2CallShape{v2ArgCountShape(value, -1)}, true
 	case ">":
 		if !ok {
 			return nil, false
 		}
+		if neg {
+			return []v2CallShape{v2ArgCountShape(0, value)}, true
+		}
 		return []v2CallShape{v2ArgCountShape(value+1, -1)}, true
 	case "<=":
 		if !ok {
 			return nil, false
 		}
+		if neg {
+			return []v2CallShape{v2ArgCountShape(value+1, -1)}, true
+		}
 		return []v2CallShape{v2ArgCountShape(0, value)}, true
 	case "<":
 		if !ok || value == 0 {
-			return nil, false
+			if !ok || !neg {
+				return nil, false
+			}
+			return []v2CallShape{v2ArgCountShape(0, -1)}, true
+		}
+		if neg {
+			return []v2CallShape{v2ArgCountShape(value, -1)}, true
 		}
 		return []v2CallShape{v2ArgCountShape(0, value-1)}, true
 	case "in":
@@ -2738,11 +2762,27 @@ func lowerV2ArgsCountShapes(cmp V2BinaryExpr, neg bool) ([]v2CallShape, bool) {
 		if !ok || len(values) == 0 {
 			return nil, false
 		}
+		if neg {
+			return v2ArgCountComplementValues(values), true
+		}
 		out := make([]v2CallShape, 0, len(values))
 		for _, v := range values {
 			out = append(out, v2ArgCountShape(v, v))
 		}
 		return out, true
+	case "not in":
+		values, ok := v2LiteralIntList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, false
+		}
+		if neg {
+			out := make([]v2CallShape, 0, len(values))
+			for _, v := range values {
+				out = append(out, v2ArgCountShape(v, v))
+			}
+			return out, true
+		}
+		return v2ArgCountComplementValues(values), true
 	default:
 		return nil, false
 	}
@@ -2750,6 +2790,34 @@ func lowerV2ArgsCountShapes(cmp V2BinaryExpr, neg bool) ([]v2CallShape, bool) {
 
 func v2ArgCountShape(min, max int) v2CallShape {
 	return v2CallShape{ArgCountSet: true, ArgCountMin: min, ArgCountMax: max}
+}
+
+func v2ArgCountRange(min, max int) []v2CallShape {
+	if max >= 0 && min > max {
+		return nil
+	}
+	return []v2CallShape{v2ArgCountShape(min, max)}
+}
+
+func v2ArgCountComplementValues(values []int) []v2CallShape {
+	if len(values) == 0 {
+		return []v2CallShape{v2ArgCountShape(0, -1)}
+	}
+	values = append([]int(nil), values...)
+	sort.Ints(values)
+	out := make([]v2CallShape, 0, len(values)+1)
+	next := 0
+	for _, v := range values {
+		if v < next {
+			continue
+		}
+		if next < v {
+			out = append(out, v2ArgCountShape(next, v-1))
+		}
+		next = v + 1
+	}
+	out = append(out, v2ArgCountShape(next, -1))
+	return out
 }
 
 func intersectV2ArgCount(aMin, aMax, bMin, bMax int) (int, int, bool) {
