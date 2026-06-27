@@ -677,6 +677,11 @@ func TestV2RequirementLoweringRejectsMalformedCombinators(t *testing.T) {
 			req:  `soft(any(dependency("express"), import("koa")))`,
 			want: "soft requirement needs native v2 confidence policy evaluation",
 		},
+		{
+			name: "project has needs native evidence",
+			req:  `project.has("custom")`,
+			want: "project.has requirement needs native v2 project evidence evaluation",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

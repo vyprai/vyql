@@ -100,7 +100,7 @@ type BindingAction struct {
 // binding. It is evaluated once per adapter application against indexed project
 // evidence, not once per candidate node.
 type BindingRequirement struct {
-	Op    string // dependency, import, language, file, framework, schema, project.has, all, any, not, soft
+	Op    string // dependency, import, language, file, framework, schema, all, any, not
 	Value string
 	Range string
 	Args  []BindingRequirement

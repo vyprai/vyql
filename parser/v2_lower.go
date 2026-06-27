@@ -2142,7 +2142,9 @@ func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 		return BindingRequirement{Op: req.Name, Args: []BindingRequirement{lowered}}, nil
 	case "soft":
 		return BindingRequirement{}, fmt.Errorf("soft requirement needs native v2 confidence policy evaluation")
-	case "dependency", "import", "language", "file", "framework", "schema", "project.has":
+	case "project.has":
+		return BindingRequirement{}, fmt.Errorf("project.has requirement needs native v2 project evidence evaluation")
+	case "dependency", "import", "language", "file", "framework", "schema":
 		return lowerV2PrimitiveRequirement(req)
 	default:
 		return BindingRequirement{}, fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)
