@@ -1095,6 +1095,9 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 		default:
 			t.Fatalf("ledger row %d rank %d has unknown status %q", i+1, rank, status)
 		}
+		if strings.TrimSpace(fields[5]) == "" {
+			t.Fatalf("ledger row %d rank %d status %s is missing verification evidence", i+1, rank, status)
+		}
 		if prev, ok := ledgerByRank[rank]; ok {
 			t.Fatalf("cve-1000 ledger rank %d appears more than once:\nfirst: %s\nagain: %s", rank, prev, row)
 		}
