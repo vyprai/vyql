@@ -621,38 +621,21 @@ func TestParseV2RejectsNonIndexedCoverageMechanicCoversWhen(t *testing.T) {
 	}
 }
 
-func TestValidateV2CorpusRejectsRuleCoverageTargetOutsideMechanicTargetParts(t *testing.T) {
+func TestValidateV2CorpusRejectsAuthoredBuiltInCoverageMechanic(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module mechanics.custom;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [coveredBy]
-}
 mechanic coverage endpoint {
   capability: coverage.endpoint
   coversWhen: solver.sameEndpoint(check.anchor, candidate.path)
   targetParts: [path]
 }
-`, `
-module code;
-concept Input : source {}
-concept Sink : sink {}
-concept Guard : check { covers: [endpoint] }
-`, `
-module rules.custom;
-rule BadCoverageTarget {
-  taint code.Input -> code.Sink as sink
-  unless sink.endpoint coveredBy code.Guard
-}
 `)
 	err := ValidateV2Corpus(sources)
 	if err == nil {
-		t.Fatal("ValidateV2Corpus succeeded, want targetParts diagnostic")
+		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
 	}
-	if !strings.Contains(err.Error(), `coverage part "endpoint" not declared by mechanic coverage endpoint targetParts [path]`) {
-		t.Fatalf("error = %v, want targetParts diagnostic", err)
+	if !strings.Contains(err.Error(), `duplicate v2 mechanic coverage.endpoint; first declared in <builtin>`) {
+		t.Fatalf("error = %v, want duplicate built-in mechanic diagnostic", err)
 	}
 }
 
@@ -1057,13 +1040,6 @@ rule ConfigGuard {
 
 func TestValidateV2CorpusAllowsEmitFactObservation(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
-module mechanics.custom;
-mechanic coverage global {
-  capability: coverage.global
-  coversWhen: solver.always()
-  targetParts: [global]
-}
-`, `
 module code;
 concept PublicRouteObservation : observation {}
 `, `
@@ -1207,32 +1183,12 @@ func parseV2CorpusForTest(t *testing.T, srcs ...string) []V2Source {
 
 func v2CoreMechanicsSourceForTest(t *testing.T) V2Source {
 	t.Helper()
-	src := `module mechanics.core;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy, confidence]
-}
-mechanic ruleVerb issue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [where, coveredBy, confidence]
-}
-mechanic ruleVerb fact {
-  solver: fact.exists
-  fromKinds: [fact, asset, exposure, principal, privilege, state, observation]
-  allowedClauses: [where, coveredBy, confidence]
-}
-mechanic coverage path {
-  capability: coverage.path
-  coversWhen: solver.pathCovered(check.anchor, candidate.path)
-  targetParts: [path]
-}
-mechanic coverage endpoint {
-  capability: coverage.endpoint
-  coversWhen: solver.sameEndpoint(check.anchor, candidate.endpoint)
-  targetParts: [endpoint]
+	src := `module policies.core;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
 }
 policy confidence default {
   values: [low, medium, high]
@@ -1246,7 +1202,7 @@ policy confidence default {
 `
 	prog, err := ParseV2(src)
 	if err != nil {
-		t.Fatalf("ParseV2 core mechanics fixture: %v", err)
+		t.Fatalf("ParseV2 core policy fixture: %v", err)
 	}
-	return V2Source{Name: "mechanics/core.vyql", Program: prog}
+	return V2Source{Name: "policies/core.vyql", Program: prog}
 }

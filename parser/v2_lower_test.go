@@ -522,25 +522,22 @@ rule SameReceiverCoverage {
 	}
 }
 
-func TestV2LoweringRequiresLoadedCoverageMechanicForCoveredBy(t *testing.T) {
-	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
-		{Name: "mechanics/test.vyql", Source: `module mechanics.test;
-mechanic ruleVerb issue { solver: fact.exists }
-`},
-		{Name: "rules/review.vyql", Source: `module rules.review;
+func TestV2LoweringUsesBuiltinCoverageMechanicForCoveredBy(t *testing.T) {
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
+module rules.review;
 rule GuardedIssue {
   issue code.Problem as p
   unless p.path coveredBy core.Guard
 }
-`},
-	})
-	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic coverage "path"`) {
-		t.Fatalf("ParseV2Definitions error = %v, want missing coverage mechanic", err)
+`)
+	rule := decls[0].(*Rule)
+	if _, ok := rule.Clauses[0].Unless.(PathCoveredBy); !ok {
+		t.Fatalf("path coveredBy did not lower with builtin coverage mechanic: %+v", rule.Clauses[0])
 	}
 }
 
-func TestV2LoweringRequiresLoadedCoverageMechanicForCheckEmission(t *testing.T) {
-	_, err := ParseV2Definitions(`
+func TestV2LoweringUsesBuiltinCoverageMechanicForCheckEmission(t *testing.T) {
+	decls, err := ParseV2Definitions(`
 module bindings.python.dbapi;
 binding parameterizedQuery {
   query pattern callExpr where callee.method == "execute"
@@ -549,8 +546,12 @@ binding parameterizedQuery {
   }
 }
 `)
-	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic coverage "path"`) {
-		t.Fatalf("ParseV2Definitions error = %v, want missing coverage mechanic", err)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	got := decls[0].(*BindingSet).Mappings[0]
+	if got.Kind != "control_method" || got.Coverage != "path" {
+		t.Fatalf("check emission did not lower with builtin coverage mechanic: %+v", got)
 	}
 }
 
@@ -1672,9 +1673,7 @@ rule HighConfidenceReview {
 
 func TestV2RuleConfidenceClauseRequiresLoadedConfidencePolicy(t *testing.T) {
 	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
-		{Name: "mechanics/core.vyql", Source: `module mechanics.core;
-mechanic ruleVerb issue { solver: fact.exists }
-`},
+		{Name: "policies/empty.vyql", Source: `module policies.empty;`},
 		{Name: "rules/review.vyql", Source: `module rules.review;
 rule HighConfidenceReview {
   issue code.Review as r
@@ -1692,9 +1691,7 @@ rule HighConfidenceReview {
 
 func TestV2RuleConfidenceMetadataRequiresLoadedConfidencePolicy(t *testing.T) {
 	_, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
-		{Name: "mechanics/core.vyql", Source: `module mechanics.core;
-mechanic ruleVerb issue { solver: fact.exists }
-`},
+		{Name: "policies/empty.vyql", Source: `module policies.empty;`},
 		{Name: "rules/review.vyql", Source: `module rules.review;
 rule HighConfidenceReview {
   meta { confidenceFloor: high }
@@ -2049,7 +2046,7 @@ concept SqlExecution : sink {
 	}
 }
 
-func TestV2ScannerIRSupportsGrantAssumeRulesAndObservationConcepts(t *testing.T) {
+func TestV2ScannerIRSupportsGrantRulesAndObservationConcepts(t *testing.T) {
 	decls := parseIRFiles(t, `
 module custom;
 concept External : principal {}
@@ -2061,14 +2058,11 @@ concept PublicEdgeObservation : observation {
 }
 `, `
 module rules.identity;
-rule ExternalAssume {
-  assume custom.External -> custom.Elevated
-}
 rule ExternalGrant {
   grant custom.External -> custom.Elevated
 }
 `)
-	var sawObservation, sawAssume, sawGrant bool
+	var sawObservation, sawGrant bool
 	for _, decl := range decls {
 		switch d := decl.(type) {
 		case *ConceptDecl:
@@ -2079,13 +2073,6 @@ rule ExternalGrant {
 				}
 			}
 		case *Rule:
-			if d.QualifiedName() == "rules.identity.ExternalAssume" {
-				body, ok := d.Body.(*FlowStmt)
-				if !ok || body.Verb != "assume" {
-					t.Fatalf("assume rule lowering wrong: %+v", d.Body)
-				}
-				sawAssume = true
-			}
 			if d.QualifiedName() == "rules.identity.ExternalGrant" {
 				body, ok := d.Body.(*FlowStmt)
 				if !ok || body.Verb != "grant" {
@@ -2095,20 +2082,31 @@ rule ExternalGrant {
 			}
 		}
 	}
-	if !sawObservation || !sawAssume || !sawGrant {
-		t.Fatalf("missing observation=%v assume=%v grant=%v in decls: %+v", sawObservation, sawAssume, sawGrant, decls)
+	if !sawObservation || !sawGrant {
+		t.Fatalf("missing observation=%v grant=%v in decls: %+v", sawObservation, sawGrant, decls)
 	}
 }
 
-const v2CoreMechanicsForLoweringTest = `
-module mechanics.core;
-mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
-mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
-mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
-mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
-mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
-mechanic coverage postDominates { capability: coverage.postDominates requiresAnchor: true targetParts: [postDominates] }
-mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
+func TestV2ScannerIRRejectsAuthoredAssumeRuleVerb(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module rules.identity;
+rule ExternalAssume {
+  assume custom.External -> custom.Elevated
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), `unknown v2 rule verb "assume"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want authored assume rejection", err)
+	}
+}
+
+const v2CorePoliciesForLoweringTest = `
+module policies.core;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}
 policy confidence default {
   values: [low, medium, high]
   order: [low, medium, high]
@@ -2126,19 +2124,19 @@ func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 }
 
 func parseV2DefinitionsForTest(src string) ([]Decl, error) {
-	sources := []V2DefinitionSource{{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForLoweringTest}}
+	sources := []V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForLoweringTest}}
 	sources = append(sources, V2DefinitionSourcesFromText("test.vyql", src)...)
 	return parseV2DefinitionSourcesForTest(sources)
 }
 
 func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, error) {
 	allSources := make([]V2DefinitionSource, 0, len(sources)+1)
-	hasMechanics := false
+	hasPolicies := false
 	for _, source := range sources {
-		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
 	}
-	if !hasMechanics {
-		allSources = append(allSources, V2DefinitionSource{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForLoweringTest})
+	if !hasPolicies {
+		allSources = append(allSources, V2DefinitionSource{Name: "policies/core.vyql", Source: v2CorePoliciesForLoweringTest})
 	}
 	allSources = append(allSources, sources...)
 	parsed := make([]V2Source, 0, len(allSources))
@@ -2167,7 +2165,7 @@ func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, erro
 
 func parseIRFiles(t *testing.T, srcs ...string) []Decl {
 	t.Helper()
-	sources := []V2Source{parseV2SourceForLoweringTest(t, "mechanics/core.vyql", v2CoreMechanicsForLoweringTest)}
+	sources := []V2Source{parseV2SourceForLoweringTest(t, "policies/core.vyql", v2CorePoliciesForLoweringTest)}
 	keep := []bool{false}
 	for i, src := range srcs {
 		for _, raw := range V2DefinitionSourcesFromText("test", src) {

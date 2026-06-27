@@ -92,18 +92,6 @@ func TestSolverContractConformance(t *testing.T) {
 			},
 		},
 		{
-			name:     "assume",
-			rule:     "module t;\nrule R { meta { id: \"X-ASSUME\" }\n assume custom.Actor -> custom.Capability }",
-			wantKind: "assume", wantFlow: true,
-			build: func(s *usg.InMemStore) {
-				s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor"})
-				s.AddNode(usg.Node{ID: "capability", Type: "custom.Capability", Props: map[string]string{"level": "high"}})
-				s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
-				s.AddLabel("capability", usg.Label{Concept: "custom.Capability"})
-				s.AddEdge(usg.Edge{Type: "STEP", Src: "actor", Dst: "capability", Props: map[string]string{"ability": "delegated"}})
-			},
-		},
-		{
 			name:     "grant",
 			rule:     "module t;\nrule R { meta { id: \"X-GRANT\" }\n grant custom.Actor -> custom.Capability }",
 			wantKind: "grant", wantFlow: true,

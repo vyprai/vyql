@@ -6,5 +6,5 @@ rule ToxicWorkloadExposure {
     severity: critical
   }
   fact identity.WorkloadIdentity as w
-  where reach(cloud.Internet, w.workload) and assume(w, identity.AdminPrivilege)
+  where reach(cloud.Internet, w.workload) and grant(w, identity.AdminPrivilege)
 }

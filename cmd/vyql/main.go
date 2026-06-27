@@ -426,15 +426,15 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 
 func loadRules(path string) ([]parser.V2DefinitionSource, error) {
 	if path == "" {
-		// Default scans load authored mechanics before the standalone rule packs.
+		// Default scans load authored policies before the standalone rule packs.
 		return loadDefaultRuleSources()
 	}
 	var out []parser.V2DefinitionSource
-	mechanics, err := loadRuleSourcesUnder(filepath.Join(datadir.Root(), "mechanics"))
+	policies, err := loadRuleSourcesUnder(filepath.Join(datadir.Root(), "policies"))
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, mechanics...)
+	out = append(out, policies...)
 	sources, err := loadRuleSourcesUnder(path)
 	if err != nil {
 		return nil, err
@@ -446,7 +446,7 @@ func loadRules(path string) ([]parser.V2DefinitionSource, error) {
 func loadDefaultRuleSources() ([]parser.V2DefinitionSource, error) {
 	var out []parser.V2DefinitionSource
 	for _, dir := range []string{
-		filepath.Join(datadir.Root(), "mechanics"),
+		filepath.Join(datadir.Root(), "policies"),
 		filepath.Join(datadir.Root(), "packs"),
 	} {
 		sources, err := loadRuleSourcesUnder(dir)
@@ -506,8 +506,8 @@ func v2DefinitionSourcesForRules(ruleSources []parser.V2DefinitionSource) []pars
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
-	if !v2SourcesContainPrefix(ruleSources, "mechanics/") {
-		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+	if !v2SourcesContainPrefix(ruleSources, "policies/") {
+		if files, err := datadir.ReadVYQLDir("policies"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}

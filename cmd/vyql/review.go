@@ -80,7 +80,7 @@ func loadReviewConfigFromRoot(dataRoot string) (map[string]reviewConceptInfo, re
 	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "ontology/threatkinds"); err != nil {
 		return nil, reviewDisplayPolicy{}, err
 	}
-	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "mechanics"); err != nil {
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "policies"); err != nil {
 		return nil, reviewDisplayPolicy{}, err
 	}
 	selected := map[string]bool{}
@@ -89,7 +89,7 @@ func loadReviewConfigFromRoot(dataRoot string) (map[string]reviewConceptInfo, re
 		return nil, reviewDisplayPolicy{}, err
 	}
 	for _, source := range sources {
-		if strings.HasPrefix(source.Name, "mechanics/") {
+		if strings.HasPrefix(source.Name, "policies/") {
 			selected[source.Name] = true
 		}
 	}

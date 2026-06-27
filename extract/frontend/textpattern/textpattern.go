@@ -254,8 +254,8 @@ func v2DefinitionSourcesForProfile(files []datadir.Source) []parser.V2Definition
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
-	if mechanics, err := datadir.ReadVYQLDir("mechanics"); err == nil {
-		for _, file := range mechanics {
+	if policies, err := datadir.ReadVYQLDir("policies"); err == nil {
+		for _, file := range policies {
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}

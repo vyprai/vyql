@@ -9,7 +9,7 @@ import (
 
 func TestIdentityPolicyFromV2Decl(t *testing.T) {
 	prog, err := parser.ParseV2(`
-module mechanics.core;
+module policies.core;
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]

@@ -30,7 +30,7 @@ test "short human description"
 ### Graph specs (cloud / identity / business / runtime / SCA)
 
 Rules that run over an asset/identity graph rather than source code (the `reach`,
-`assume`, `match … where`, `transition` packs) are tested with a `graph` block instead of
+`grant`, `match … where`, `transition` packs) are tested with a `graph` block instead of
 `code` — same `expect`/`reject`, no `lang`. The block is a tiny line DSL compiled into a
 USG store and evaluated against the shipped packs:
 
@@ -50,7 +50,7 @@ test "internet reaches a PII database (CLD-001)"
   right place).
 - `label <id> <concept> [{ k = v, … }]` — an additional concept label on a node.
 - `edge <TYPE> <src> -> <dst> [{ k = v, … }]` — a typed edge (`NET` for reach, `STEP` for
-  assume, `FLOWS` for runtime taint, `CHECKS`/`PROTECTS` for guards).
+  identity grants/assumption traversal, `FLOWS` for runtime taint, `CHECKS`/`PROTECTS` for guards).
 
 These live in `graph/*.test.vyql` and run through the same `TestVyqlSpecs` runner.
 

@@ -2,15 +2,14 @@ package engine
 
 import "github.com/vyprai/vyql/parser"
 
-const v2CoreMechanicsForEngineTest = `
-module mechanics.core;
-mechanic coverage path { capability: coverage.path requiresAnchor: true targetParts: [path] }
-mechanic coverage endpoint { capability: coverage.endpoint requiresAnchor: true targetParts: [endpoint] }
-mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAnchor: true targetParts: [sameReceiver] }
-mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
-mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
-mechanic coverage postDominates { capability: coverage.postDominates requiresAnchor: true targetParts: [postDominates] }
-mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
+const v2CorePoliciesForEngineTest = `
+module policies.core;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}
 policy confidence default {
   values: [low, medium, high]
   order: [low, medium, high]
@@ -23,7 +22,7 @@ policy confidence default {
 `
 
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
-	sources := []parser.V2DefinitionSource{{Name: "mechanics/core.vyql", Source: v2CoreMechanicsForEngineTest}}
+	sources := []parser.V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForEngineTest}}
 	sources = append(sources, parser.V2DefinitionSourcesFromText("test.vyql", src)...)
 	parsed := make([]parser.V2Source, 0, len(sources))
 	for _, source := range sources {

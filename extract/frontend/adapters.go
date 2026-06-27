@@ -1034,10 +1034,10 @@ type bindingSetCacheKey struct {
 
 func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2DefinitionSource {
 	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
-	hasOntology, hasMechanics := false, false
+	hasOntology, hasPolicies := false, false
 	for _, source := range sources {
 		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
-		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
 	}
 	if !hasOntology {
 		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
@@ -1051,8 +1051,8 @@ func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2Definiti
 			}
 		}
 	}
-	if !hasMechanics {
-		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+	if !hasPolicies {
+		if files, err := datadir.ReadVYQLDir("policies"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}

@@ -120,7 +120,7 @@ func primaryTarget(f *findings.Finding) findings.Binding {
 }
 
 func loadIdentityPolicy() (IdentityPolicy, error) {
-	files, err := datadir.ReadVYQLDir("mechanics")
+	files, err := datadir.ReadVYQLDir("policies")
 	if err != nil {
 		return IdentityPolicy{}, err
 	}

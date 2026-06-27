@@ -588,12 +588,31 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 
 func TestShippedMechanicsDoNotRedefineBuiltInRuleVerbs(t *testing.T) {
 	var hits []string
-	for path, src := range readDataFiles(t, "mechanics", ".vyql") {
+	root := filepath.Join(datadir.Root(), "mechanics")
+	if _, err := os.Stat(root); err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatalf("stat mechanics dir: %v", err)
+	}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		src := string(data)
 		if !strings.Contains(src, "mechanic ruleVerb") {
-			continue
+			return nil
 		}
 		rel, _ := filepath.Rel(datadir.Root(), path)
 		hits = append(hits, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk mechanics dir: %v", err)
 	}
 	if len(hits) > 0 {
 		sort.Strings(hits)

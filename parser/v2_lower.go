@@ -50,7 +50,7 @@ func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2Defi
 
 // lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.
 func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
-	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers()}
+	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers(), coverageModes: builtinV2CoverageModes()}
 	mechanics.merge(v2MechanicsFromProgram(prog))
 	return lowerV2ProgramToDeclarationsWithMechanics(prog, mechanics)
 }
@@ -60,7 +60,7 @@ func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
 }
 
 func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
-	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers()}
+	mechanics := v2Mechanics{ruleSolvers: builtinV2RuleSolvers(), coverageModes: builtinV2CoverageModes()}
 	outCap := 0
 	for _, src := range sources {
 		mechanics.merge(v2MechanicsFromProgram(src.Program))
@@ -183,15 +183,22 @@ func v2MatcherSpecFromDecl(m *V2MatcherDecl) v2MatcherSpec {
 
 func builtinV2RuleSolvers() map[string]string {
 	return map[string]string{
-		"taint":  "dataflow.taint",
-		"flow":   "dataflow.flow",
-		"reach":  "graph.reach",
-		"grant":  "graph.grant",
-		"assume": "graph.assume",
-		"issue":  "fact.exists",
-		"fact":   "fact.exists",
-		"query":  "query.semantic",
+		"taint": "dataflow.taint",
+		"flow":  "dataflow.flow",
+		"reach": "graph.reach",
+		"grant": "graph.grant",
+		"issue": "fact.exists",
+		"fact":  "fact.exists",
+		"query": "query.semantic",
 	}
+}
+
+func builtinV2CoverageModes() map[string]bool {
+	out := make(map[string]bool, len(v2CoverageModes))
+	for mode := range v2CoverageModes {
+		out[mode] = true
+	}
+	return out
 }
 
 func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mechanics) ([]Decl, error) {
@@ -2214,16 +2221,12 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2Mechanics) (*R
 			Src:  Endpoint{Concept: names.concept(r.Body.From.Concept), Binding: r.Body.From.Alias},
 			Dst:  Endpoint{Concept: names.concept(r.Body.To.Concept), Binding: r.Body.To.Alias},
 		}
-	case "graph.grant", "graph.assume":
+	case "graph.grant":
 		if r.Body.From.Concept == "" || r.Body.To.Concept == "" {
 			return nil, fmt.Errorf("rule %s: solver capability %q requires from/to endpoints", r.Name, solver)
 		}
-		verb := "grant"
-		if solver == "graph.assume" {
-			verb = "assume"
-		}
 		out.Body = &FlowStmt{
-			Verb: verb,
+			Verb: "grant",
 			Src:  Endpoint{Concept: names.concept(r.Body.From.Concept), Binding: r.Body.From.Alias},
 			Dst:  Endpoint{Concept: names.concept(r.Body.To.Concept), Binding: r.Body.To.Alias},
 		}

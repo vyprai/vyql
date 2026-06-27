@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
+	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -51,19 +52,8 @@ rule ReachAsset {
 }
 
 func TestAssumeEscalationMultiStep(t *testing.T) {
-	src := `
-module test;
-rule ActorToCapability {
-  meta { id: "TEST-ASSUME", severity: critical }
-  assume custom.Actor -> custom.Capability
-}
-`
 	onto := solverContractOntology()
-	decls, _ := parseV2DefinitionsForTest(src)
-	compiled, errs := CompileRules(decls, onto)
-	if len(errs) != 0 {
-		t.Fatalf("compile: %v", errs)
-	}
+	cr := compileInternalAssumeRuleForTest(t, onto, "TEST-ASSUME", "custom.Actor", "custom.Capability")
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor", Props: map[string]string{"loc": "actor"}})
 	s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
@@ -76,7 +66,7 @@ rule ActorToCapability {
 	s.AddEdge(usg.Edge{Type: "STEP", Src: "step2", Dst: "capability", Props: map[string]string{"ability": "third"}})
 
 	eng := New(onto, s)
-	fs, _ := eng.Evaluate(compiled[0])
+	fs, _ := eng.Evaluate(cr)
 	if len(fs) != 1 {
 		t.Fatalf("expected 1 escalation finding, got %d", len(fs))
 	}
@@ -122,42 +112,54 @@ rule ActorToCapability {
 }
 
 func TestAssumeMinLevelComesFromOntology(t *testing.T) {
-	src := `
+	concepts := `
 module custom;
 concept External : principal { }
 concept Elevated : privilege {
   assume_min_level: ADMIN
 }
-rule ExternalToElevated {
-  assume custom.External -> custom.Elevated
-}
 `
 	onto := ontology.New()
-	cs, err := ontology.LoadConceptText(src)
+	cs, err := ontology.LoadConceptText(concepts)
 	if err != nil {
 		t.Fatalf("load concepts: %v", err)
 	}
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parseV2DefinitionsForTest(src)
-	compiled, errs := CompileRules(decls, onto)
-	if len(errs) != 0 {
-		t.Fatalf("compile: %v", errs)
-	}
+	cr := compileInternalAssumeRuleForTest(t, onto, "TEST-ASSUME", "custom.External", "custom.Elevated")
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "ext", Type: "custom.Principal"})
 	s.AddLabel("ext", usg.Label{Concept: "custom.External"})
 	s.AddNode(usg.Node{ID: "role", Type: "custom.Role", Props: map[string]string{"priv_level": "ADMIN"}})
 	s.AddEdge(usg.Edge{Type: "STEP", Src: "ext", Dst: "role", Props: map[string]string{"ability": "assume"}})
 
-	fs, err := New(onto, s).Evaluate(compiled[0])
+	fs, err := New(onto, s).Evaluate(cr)
 	if err != nil {
 		t.Fatalf("eval: %v", err)
 	}
 	if len(fs) != 1 {
 		t.Fatalf("expected data-driven min-level assume finding, got %d", len(fs))
 	}
+}
+
+func compileInternalAssumeRuleForTest(t *testing.T, onto *ontology.Ontology, id, src, dst string) *CompiledRule {
+	t.Helper()
+	decls := []parser.Decl{&parser.Rule{
+		Name:    "InternalAssume",
+		Package: "test",
+		Meta:    map[string]any{"id": id, "severity": "critical"},
+		Body: &parser.FlowStmt{
+			Verb: "assume",
+			Src:  parser.Endpoint{Concept: src},
+			Dst:  parser.Endpoint{Concept: dst},
+		},
+	}}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile internal assume: %v", errs)
+	}
+	return compiled[0]
 }
 
 func TestRawSemanticQueryPrincipalReachesAsset(t *testing.T) {

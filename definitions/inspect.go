@@ -181,10 +181,10 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 }
 
 func v2DefinitionSourcesWithCore(sources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
-	hasOntology, hasMechanics := false, false
+	hasOntology, hasPolicies := false, false
 	for _, source := range sources {
 		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
-		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
+		hasPolicies = hasPolicies || strings.HasPrefix(source.Name, "policies/")
 	}
 	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
 	if !hasOntology {
@@ -199,8 +199,8 @@ func v2DefinitionSourcesWithCore(sources []parser.V2DefinitionSource) []parser.V
 			}
 		}
 	}
-	if !hasMechanics {
-		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
+	if !hasPolicies {
+		if files, err := datadir.ReadVYQLDir("policies"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}

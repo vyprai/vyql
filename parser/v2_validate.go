@@ -30,7 +30,7 @@ var (
 	v2ConceptKinds           = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
 	v2MechanicKinds          = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2PolicyKinds            = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
-	v2MechanicCapabilities   = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "dataflow.flow": true, "graph.reach": true, "graph.grant": true, "graph.assume": true, "fact.exists": true, "query.semantic": true}
+	v2MechanicCapabilities   = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "dataflow.flow": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds        = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2FactEmitKinds          = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
 	v2ConfidenceLevels       = map[string]bool{"low": true, "medium": true, "high": true}
@@ -169,15 +169,30 @@ func (s v2ModelScope) lookupModel(name string) bool {
 func builtinV2RuleVerbMechanics() map[string]v2RuleVerbMechanic {
 	clauses := v2StringSet([]string{"where", "coveredBy", "confidence", "profile"})
 	return map[string]v2RuleVerbMechanic{
-		"taint":  {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
-		"flow":   {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
-		"reach":  {FromKinds: []string{"asset", "exposure"}, ToKinds: []string{"asset", "exposure"}, AllowedClauses: clauses},
-		"grant":  {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
-		"assume": {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
-		"issue":  {FromKinds: []string{"issue"}, AllowedClauses: clauses},
-		"fact":   {FromKinds: []string{"fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: clauses},
-		"query":  {FromKinds: []string{"concept", "fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: v2StringSet([]string{"where", "confidence", "profile"})},
+		"taint": {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
+		"flow":  {FromKinds: []string{"source"}, ToKinds: []string{"sink"}, AllowedClauses: clauses},
+		"reach": {FromKinds: []string{"asset", "exposure"}, ToKinds: []string{"asset", "exposure"}, AllowedClauses: clauses},
+		"grant": {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
+		"issue": {FromKinds: []string{"issue"}, AllowedClauses: clauses},
+		"fact":  {FromKinds: []string{"fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: clauses},
+		"query": {FromKinds: []string{"concept", "fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: v2StringSet([]string{"where", "confidence", "profile"})},
 	}
+}
+
+func builtinV2CoverageMechanics() map[string]v2CoverageMechanic {
+	out := make(map[string]v2CoverageMechanic, len(v2CoverageModes))
+	for mode := range v2CoverageModes {
+		out[mode] = v2CoverageMechanic{TargetParts: map[string]bool{mode: true}}
+	}
+	return out
+}
+
+func builtinV2MechanicSources() map[v2MechanicID]string {
+	out := make(map[v2MechanicID]string, len(v2CoverageModes))
+	for mode := range v2CoverageModes {
+		out[v2MechanicID{Kind: "coverage", Name: mode}] = "<builtin>"
+	}
+	return out
 }
 
 // ValidateV2Corpus applies whole-definition-graph checks that require all files:
@@ -194,9 +209,9 @@ func ValidateV2Corpus(sources []V2Source) error {
 	declSources := make(map[string]string, declCount)
 	concepts := make(map[string]v2ConceptMeta, declCount)
 	threats := make(map[string]bool, declCount/8)
-	mechanics := make(map[v2MechanicID]string, 16)
+	mechanics := builtinV2MechanicSources()
 	ruleMechanics := builtinV2RuleVerbMechanics()
-	coverageMechanics := make(map[string]v2CoverageMechanic, 8)
+	coverageMechanics := builtinV2CoverageMechanics()
 	policies := make(map[v2PolicyID]string, 8)
 	var errs []error
 	for _, src := range sources {

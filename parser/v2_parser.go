@@ -379,7 +379,7 @@ func (p *v2Parser) parseV2RuleBody() V2RuleBody {
 	}
 	verb := p.expect(tWord, "rule verb").val
 	switch verb {
-	case "taint", "flow", "reach", "grant", "assume":
+	case "taint", "flow", "reach", "grant":
 		from := p.parseV2Endpoint()
 		p.expect(tArrow, "->")
 		return V2RuleBody{Verb: verb, From: from, To: p.parseV2Endpoint()}
