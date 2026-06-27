@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/definitions"
 	"github.com/vyprai/vyql/parser"
 )
@@ -19,6 +21,12 @@ func cmdDefinitions(args []string) error {
 	}
 	if len(args) > 0 && args[0] == "lint" {
 		return cmdDefinitionsLint(args[1:])
+	}
+	if len(args) > 0 && args[0] == "show-policy" {
+		return cmdDefinitionsShowPolicy(args[1:])
+	}
+	if len(args) > 0 && args[0] == "show-mechanic" {
+		return cmdDefinitionsShowMechanic(args[1:])
 	}
 	fs := flag.NewFlagSet("definitions", flag.ExitOnError)
 	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | adapters | reviews")
@@ -50,6 +58,305 @@ func cmdDefinitions(args []string) error {
 		return fmt.Errorf("unknown -format %q (use text or json)", *format)
 	}
 	return nil
+}
+
+type v2PolicyView struct {
+	Kind   string            `json:"kind"`
+	Name   string            `json:"name"`
+	Module string            `json:"module,omitempty"`
+	Source string            `json:"source,omitempty"`
+	Items  []v2BlockItemView `json:"items"`
+}
+
+type v2MechanicView struct {
+	Kind       string            `json:"kind"`
+	Name       string            `json:"name"`
+	Source     string            `json:"source"`
+	Capability string            `json:"capability,omitempty"`
+	Fields     map[string]any    `json:"fields,omitempty"`
+	Items      []v2BlockItemView `json:"items,omitempty"`
+}
+
+type v2BlockItemView struct {
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+}
+
+func cmdDefinitionsShowPolicy(args []string) error {
+	fs := flag.NewFlagSet("definitions show-policy", flag.ExitOnError)
+	format := fs.String("format", "text", "output format: text | json")
+	_ = fs.Parse(args)
+	if fs.NArg() != 1 {
+		return fmt.Errorf("definitions show-policy requires <kind.name>, e.g. resultIdentity.default")
+	}
+	kind, name, err := splitDefinitionKindName(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	policy, err := findV2Policy(kind, name)
+	if err != nil {
+		return err
+	}
+	switch *format {
+	case "json":
+		b, err := json.MarshalIndent(policy, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+	case "text":
+		printV2PolicyView(policy)
+	default:
+		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+	}
+	return nil
+}
+
+func cmdDefinitionsShowMechanic(args []string) error {
+	fs := flag.NewFlagSet("definitions show-mechanic", flag.ExitOnError)
+	format := fs.String("format", "text", "output format: text | json")
+	_ = fs.Parse(args)
+	if fs.NArg() != 1 {
+		return fmt.Errorf("definitions show-mechanic requires <kind.name>, e.g. ruleVerb.taint")
+	}
+	kind, name, err := splitDefinitionKindName(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	mechanic, err := findV2Mechanic(kind, name)
+	if err != nil {
+		return err
+	}
+	switch *format {
+	case "json":
+		b, err := json.MarshalIndent(mechanic, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+	case "text":
+		printV2MechanicView(mechanic)
+	default:
+		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+	}
+	return nil
+}
+
+func splitDefinitionKindName(raw string) (kind, name string, err error) {
+	raw = strings.TrimSpace(raw)
+	kind, name, ok := strings.Cut(raw, ".")
+	if !ok || kind == "" || name == "" || strings.Contains(name, ".") {
+		return "", "", fmt.Errorf("definition id %q must be <kind.name>", raw)
+	}
+	return kind, name, nil
+}
+
+func findV2Policy(kind, name string) (v2PolicyView, error) {
+	files, err := vyqlFilesUnder(filepath.Join(datadirRoot(), "policies"))
+	if err != nil {
+		return v2PolicyView{}, err
+	}
+	var matches []v2PolicyView
+	for _, path := range files {
+		prog, err := parseV2File(path)
+		if err != nil {
+			return v2PolicyView{}, err
+		}
+		for _, decl := range prog.Decls {
+			p, ok := decl.(*parser.V2PolicyDecl)
+			if !ok || p.Kind != kind || p.Name != name {
+				continue
+			}
+			matches = append(matches, v2PolicyView{
+				Kind: p.Kind, Name: p.Name, Module: p.Module, Source: relPathFromDataRoot(path),
+				Items: v2BlockItemsView(p.Items),
+			})
+		}
+	}
+	if len(matches) == 0 {
+		return v2PolicyView{}, fmt.Errorf("policy %s.%s not found", kind, name)
+	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].Source < matches[j].Source })
+	return matches[0], nil
+}
+
+func findV2Mechanic(kind, name string) (v2MechanicView, error) {
+	if builtin, ok := builtinV2MechanicView(kind, name); ok {
+		return builtin, nil
+	}
+	files, err := vyqlFilesUnder(datadirRoot())
+	if err != nil {
+		return v2MechanicView{}, err
+	}
+	var matches []v2MechanicView
+	for _, path := range files {
+		prog, err := parseV2File(path)
+		if err != nil {
+			return v2MechanicView{}, err
+		}
+		for _, decl := range prog.Decls {
+			m, ok := decl.(*parser.V2MechanicDecl)
+			if !ok || m.Kind != kind || m.Name != name {
+				continue
+			}
+			matches = append(matches, v2MechanicView{
+				Kind: m.Kind, Name: m.Name, Source: relPathFromDataRoot(path),
+				Items: v2BlockItemsView(m.Items),
+			})
+		}
+	}
+	if len(matches) == 0 {
+		return v2MechanicView{}, fmt.Errorf("mechanic %s.%s not found", kind, name)
+	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].Source < matches[j].Source })
+	return matches[0], nil
+}
+
+func builtinV2MechanicView(kind, name string) (v2MechanicView, bool) {
+	if kind == "ruleVerb" {
+		solvers := map[string]string{
+			"taint": "dataflow.taint",
+			"reach": "graph.reach",
+			"grant": "graph.grant",
+			"issue": "fact.exists",
+			"fact":  "fact.exists",
+			"query": "query.semantic",
+		}
+		if solver := solvers[name]; solver != "" {
+			return v2MechanicView{
+				Kind: kind, Name: name, Source: "<builtin:go>", Capability: solver,
+				Fields: map[string]any{"authored": false},
+			}, true
+		}
+	}
+	if kind == "coverage" {
+		capabilities := map[string]string{
+			"path": "coverage.path", "endpoint": "coverage.endpoint", "sameReceiver": "coverage.sameReceiver",
+			"sameScope": "coverage.sameScope", "dominates": "coverage.dominates", "postDominates": "coverage.postDominates",
+			"global": "coverage.global",
+		}
+		if cap := capabilities[name]; cap != "" {
+			return v2MechanicView{
+				Kind: kind, Name: name, Source: "<builtin:go>", Capability: cap,
+				Fields: map[string]any{"authored": false, "requiresAnchor": name != "global"},
+			}, true
+		}
+	}
+	return v2MechanicView{}, false
+}
+
+func parseV2File(path string) (*parser.V2Program, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	prog, err := parser.ParseV2(string(raw))
+	if err != nil {
+		return nil, fmt.Errorf("%s: v2 parse failed: %w", path, err)
+	}
+	return prog, nil
+}
+
+func datadirRoot() string {
+	return filepath.Clean(datadir.Root())
+}
+
+func relPathFromDataRoot(path string) string {
+	rel, err := filepath.Rel(datadirRoot(), path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	return filepath.ToSlash(rel)
+}
+
+func v2BlockItemsView(items []parser.V2BlockItem) []v2BlockItemView {
+	out := make([]v2BlockItemView, 0, len(items))
+	for _, item := range items {
+		out = append(out, v2BlockItemView{Key: strings.Join(item.Key, "."), Value: v2BlockValueString(item.Value)})
+	}
+	return out
+}
+
+func v2BlockValueString(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return strconv.Quote(v)
+	case int, bool:
+		return fmt.Sprint(v)
+	case parser.V2RefExpr:
+		return v.Name
+	case parser.V2LiteralExpr:
+		return v2BlockValueString(v.Value)
+	case parser.V2CallExpr:
+		args := make([]string, 0, len(v.Args))
+		for _, arg := range v.Args {
+			args = append(args, v2BlockValueString(arg))
+		}
+		return v.Name + "(" + strings.Join(args, ", ") + ")"
+	case parser.V2UnaryExpr:
+		return v.Op + " " + v2BlockValueString(v.X)
+	case parser.V2BinaryExpr:
+		return v2BlockValueString(v.Left) + " " + v.Op + " " + v2BlockValueString(v.Right)
+	case parser.V2SequenceExpr:
+		parts := make([]string, 0, len(v.Items))
+		for _, item := range v.Items {
+			parts = append(parts, v2BlockValueString(item))
+		}
+		return strings.Join(parts, " ")
+	case []any:
+		parts := make([]string, 0, len(v))
+		for _, item := range v {
+			parts = append(parts, v2BlockListValueString(item))
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+func v2BlockListValueString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case parser.V2LiteralExpr:
+		return v2BlockListValueString(v.Value)
+	default:
+		return v2BlockValueString(value)
+	}
+}
+
+func printV2PolicyView(policy v2PolicyView) {
+	fmt.Printf("policy %s.%s\n", policy.Kind, policy.Name)
+	if policy.Module != "" {
+		fmt.Printf("module: %s\n", policy.Module)
+	}
+	if policy.Source != "" {
+		fmt.Printf("source: %s\n", policy.Source)
+	}
+	for _, item := range policy.Items {
+		fmt.Printf("%s: %s\n", item.Key, item.Value)
+	}
+}
+
+func printV2MechanicView(mechanic v2MechanicView) {
+	fmt.Printf("mechanic %s.%s\n", mechanic.Kind, mechanic.Name)
+	fmt.Printf("source: %s\n", mechanic.Source)
+	if mechanic.Capability != "" {
+		fmt.Printf("capability: %s\n", mechanic.Capability)
+	}
+	keys := make([]string, 0, len(mechanic.Fields))
+	for key := range mechanic.Fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fmt.Printf("%s: %v\n", key, mechanic.Fields[key])
+	}
+	for _, item := range mechanic.Items {
+		fmt.Printf("%s: %s\n", item.Key, item.Value)
+	}
 }
 
 type v2UnstableUse struct {
