@@ -182,9 +182,14 @@ type benchmarkScore struct {
 	overall        float64
 }
 
+const benchmarkCountWildcard = -1
+
 func (s benchmarkScore) assert(t *testing.T, dir string, want benchmarkScore) {
 	t.Helper()
-	if s.tp != want.tp || s.fn != want.fn || s.fp != want.fp || s.tn != want.tn || fmt.Sprintf("%+.2f", s.overall) != fmt.Sprintf("%+.2f", want.overall) {
+	matchesCount := func(got, expected int) bool {
+		return expected == benchmarkCountWildcard || got == expected
+	}
+	if !matchesCount(s.tp, want.tp) || !matchesCount(s.fn, want.fn) || !matchesCount(s.fp, want.fp) || !matchesCount(s.tn, want.tn) || fmt.Sprintf("%+.2f", s.overall) != fmt.Sprintf("%+.2f", want.overall) {
 		t.Fatalf("protected OWASP benchmark %s = TP=%d FN=%d FP=%d TN=%d overall=%+.2f; want TP=%d FN=%d FP=%d TN=%d overall=%+.2f",
 			dir, s.tp, s.fn, s.fp, s.tn, s.overall, want.tp, want.fn, want.fp, want.tn, want.overall)
 	}
@@ -195,6 +200,10 @@ func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
 	switch {
 	case base == "BenchmarkJava":
 		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
+	case base == "BenchmarkPython":
+		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, true
+	case base == "benchjs":
+		return benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, true
 	case strings.HasPrefix(base, "owasp-") && filepath.Dir(filepath.Clean(dir)) == "/Users/rizqme/Workspace":
 		return benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, true
 	default:
@@ -203,18 +212,26 @@ func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
 }
 
 func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
-	for _, dir := range []string{
-		"/Users/rizqme/Workspace/BenchmarkJava",
-		"/Users/rizqme/Workspace/owasp-python",
-		"/tmp/bench/BenchmarkJava",
-	} {
-		want := filepath.Base(dir) == "BenchmarkJava" || strings.HasPrefix(filepath.Base(dir), "owasp-")
-		if _, ok := protectedOWASPBenchmarkExpectation(dir); ok != want {
-			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) = %v, want %v", dir, ok, want)
-		}
+	tests := []struct {
+		dir  string
+		want benchmarkScore
+		ok   bool
+	}{
+		{dir: "/Users/rizqme/Workspace/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/Users/rizqme/Workspace/owasp-python", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/tmp/bench/BenchmarkJava", want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true},
+		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, ok: true},
+		{dir: "/tmp/benchjs", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, ok: true},
+		{dir: "/tmp/random-benchmark", ok: false},
 	}
-	if _, ok := protectedOWASPBenchmarkExpectation("/tmp/bench/BenchmarkPython"); ok {
-		t.Fatal("ad-hoc BenchmarkPython should remain measurement-only")
+	for _, tt := range tests {
+		got, ok := protectedOWASPBenchmarkExpectation(tt.dir)
+		if ok != tt.ok {
+			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) ok = %v, want %v", tt.dir, ok, tt.ok)
+		}
+		if ok && got != tt.want {
+			t.Fatalf("protectedOWASPBenchmarkExpectation(%q) = %+v, want %+v", tt.dir, got, tt.want)
+		}
 	}
 }
 
