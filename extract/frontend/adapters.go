@@ -19,6 +19,7 @@ import (
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -2258,21 +2259,17 @@ func (e requirementEffect) apply(conf string, detail map[string]string) (string,
 }
 
 func downgradeConfidence(conf string, steps int) string {
-	levels := []string{"low", "medium", "high"}
-	idx := 2
+	idx := resultpolicy.MaxConfidenceRank()
 	if conf != "" {
-		for i, level := range levels {
-			if conf == level {
-				idx = i
-				break
-			}
+		if rank := resultpolicy.ConfidenceRank(conf); rank > 0 {
+			idx = rank
 		}
 	}
 	idx -= steps
-	if idx < 0 {
-		idx = 0
+	if idx < 1 {
+		idx = 1
 	}
-	return levels[idx]
+	return resultpolicy.ConfidenceName(idx)
 }
 
 func mappingFidelity(authored, fallback string) string {
@@ -2296,16 +2293,10 @@ func mappingConfidence(authored, derived string) string {
 }
 
 func confidenceRank(conf string) int {
-	switch conf {
-	case "low":
-		return 1
-	case "medium":
-		return 2
-	case "high":
-		return 3
-	default:
-		return 3
+	if rank := resultpolicy.ConfidenceRank(conf); rank > 0 {
+		return rank
 	}
+	return resultpolicy.MaxConfidenceRank()
 }
 
 func dependencyVersionEvidence(s usg.Store) map[string][]string {
