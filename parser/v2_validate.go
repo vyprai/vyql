@@ -80,6 +80,8 @@ func ValidateV2(prog *V2Program) error {
 				errs = append(errs, fmt.Errorf("policy %s: unknown policy kind %q", x.Name, x.Kind))
 			}
 			errs = append(errs, validateV2Policy(x)...)
+		case *V2PackDecl:
+			errs = append(errs, validateV2Pack(x)...)
 		}
 	}
 	return errors.Join(errs...)
@@ -272,6 +274,7 @@ func ValidateV2Corpus(sources []V2Source) error {
 			}
 		}
 	}
+	errs = append(errs, validateV2PackCycles(sources)...)
 	errs = append(errs, validateV2RequiredMechanics(concepts, mechanics)...)
 	for _, src := range sources {
 		if src.Program == nil {
@@ -294,6 +297,117 @@ func ValidateV2Corpus(sources []V2Source) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func validateV2Pack(p *V2PackDecl) []error {
+	var errs []error
+	for _, key := range []string{"includes", "excludes"} {
+		raw, ok := p.Fields[key]
+		if !ok {
+			continue
+		}
+		values, ok := raw.([]string)
+		if !ok {
+			errs = append(errs, fmt.Errorf("pack %s: %s must be a string reference list", p.Name, key))
+			continue
+		}
+		for _, value := range values {
+			if strings.TrimSpace(value) == "" {
+				errs = append(errs, fmt.Errorf("pack %s: %s contains an empty reference", p.Name, key))
+			}
+		}
+	}
+	return errs
+}
+
+func validateV2PackCycles(sources []V2Source) []error {
+	type packInfo struct {
+		fq       string
+		includes []string
+	}
+	var packs []packInfo
+	refToFQ := map[string]string{}
+	ambiguous := map[string]bool{}
+	addRef := func(ref, fq string) {
+		if ref == "" {
+			return
+		}
+		if prev := refToFQ[ref]; prev != "" && prev != fq {
+			ambiguous[ref] = true
+			return
+		}
+		refToFQ[ref] = fq
+	}
+	for _, src := range sources {
+		if src.Program == nil {
+			continue
+		}
+		for _, decl := range src.Program.Decls {
+			p, ok := decl.(*V2PackDecl)
+			if !ok {
+				continue
+			}
+			local, fq := v2DeclNames(src.Program.Module, p)
+			if fq == "" {
+				continue
+			}
+			packs = append(packs, packInfo{fq: fq, includes: v2PackStringList(p.Fields, "includes")})
+			addRef(local, fq)
+			addRef(fq, fq)
+			addRef("pack."+local, fq)
+			addRef("pack."+fq, fq)
+		}
+	}
+	if len(packs) == 0 {
+		return nil
+	}
+	edges := make(map[string][]string, len(packs))
+	var errs []error
+	for _, pack := range packs {
+		for _, ref := range pack.includes {
+			if ambiguous[ref] {
+				errs = append(errs, fmt.Errorf("pack %s: include reference %q is ambiguous", pack.fq, ref))
+				continue
+			}
+			if target := refToFQ[ref]; target != "" {
+				edges[pack.fq] = append(edges[pack.fq], target)
+			}
+		}
+	}
+	visiting := map[string]bool{}
+	visited := map[string]bool{}
+	var stack []string
+	var visit func(string)
+	visit = func(node string) {
+		if visiting[node] {
+			cycle := append(append([]string(nil), stack...), node)
+			errs = append(errs, fmt.Errorf("pack cycle detected: %s", strings.Join(cycle, " -> ")))
+			return
+		}
+		if visited[node] {
+			return
+		}
+		visiting[node] = true
+		stack = append(stack, node)
+		for _, next := range edges[node] {
+			visit(next)
+		}
+		stack = stack[:len(stack)-1]
+		visiting[node] = false
+		visited[node] = true
+	}
+	for _, pack := range packs {
+		visit(pack.fq)
+	}
+	return errs
+}
+
+func v2PackStringList(fields map[string]any, key string) []string {
+	values, ok := fields[key].([]string)
+	if !ok {
+		return nil
+	}
+	return values
 }
 
 func v2CorpusModelScope(prog *V2Program, concepts v2ConceptScope, threats map[string]bool, declSources map[string]string) v2ModelScope {

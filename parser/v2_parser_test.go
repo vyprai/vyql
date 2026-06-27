@@ -165,6 +165,42 @@ pack webSecurity {
 	}
 }
 
+func TestParseV2RejectsMalformedPackReferences(t *testing.T) {
+	_, err := ParseV2(`
+module packs.web;
+pack webSecurity {
+  includes: "profile.web"
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want malformed pack reference diagnostic")
+	}
+	if !strings.Contains(err.Error(), "includes must be a string reference list") {
+		t.Fatalf("error = %v, want pack reference list diagnostic", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsPackCycles(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module packs.a;
+pack a {
+  includes: [pack b]
+}
+`, `
+module packs.b;
+pack b {
+  includes: [pack a]
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want pack cycle diagnostic")
+	}
+	if !strings.Contains(err.Error(), "pack cycle detected") {
+		t.Fatalf("error = %v, want pack cycle diagnostic", err)
+	}
+}
+
 func TestParseV2RejectsInvalidMatcherItems(t *testing.T) {
 	cases := []struct {
 		name string
