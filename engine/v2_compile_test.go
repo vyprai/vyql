@@ -175,42 +175,17 @@ func TestCompileRulesUsesGoBuiltInRuleVerbMechanics(t *testing.T) {
 	}
 }
 
-func TestPartialAuthoredRuleVerbMechanicsDoNotDisableBuiltIns(t *testing.T) {
-	raw := []parser.V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
+func TestAuthoredExtensionRuleVerbMechanicsRejected(t *testing.T) {
+	_, err := parser.ParseV2(`
 module mechanics.test;
 mechanic ruleVerb observe {
   solver: fact.exists
   fromKinds: [issue]
   allowedClauses: [where, confidence]
 }
-`},
-		{Name: "concepts.vyql", Source: `
-module custom;
-concept Input : source {}
-concept Sink : sink {}
-`},
-		{Name: "rules.vyql", Source: `
-module rules.test;
-rule SourceToSink {
-  taint custom.Input -> custom.Sink
-}
-`},
-	}
-	sources := make([]parser.V2Source, 0, len(raw))
-	for _, src := range raw {
-		prog, err := parser.ParseV2(src.Source)
-		if err != nil {
-			t.Fatalf("ParseV2 %s: %v", src.Name, err)
-		}
-		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
-	}
-	decls, err := parser.LowerV2DefinitionSources(sources)
-	if err != nil {
-		t.Fatalf("LowerV2DefinitionSources: %v", err)
-	}
-	if len(decls) == 0 {
-		t.Fatal("LowerV2DefinitionSources produced no declarations")
+`)
+	if err == nil || !strings.Contains(err.Error(), "extension rule verbs are recognized by the v2 contract but are not implemented") {
+		t.Fatalf("ParseV2 error = %v, want extension rule verb rejection", err)
 	}
 }
 

@@ -180,14 +180,9 @@ rule SelectedOnly {
 	}
 }
 
-func TestV2ScannerIRPreservesMechanicsAndPolicies(t *testing.T) {
+func TestV2ScannerIRPreservesPolicies(t *testing.T) {
 	decls, err := ParseV2Definitions(`
 module mechanics.sast;
-mechanic ruleVerb customIssue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [where]
-}
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]
@@ -198,22 +193,12 @@ policy resultIdentity default {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	if len(decls) != 2 {
-		t.Fatalf("decls = %d, want mechanic + policy: %+v", len(decls), decls)
+	if len(decls) != 1 {
+		t.Fatalf("decls = %d, want policy: %+v", len(decls), decls)
 	}
-	mech, ok := decls[0].(*V2MechanicDecl)
+	policy, ok := decls[0].(*V2PolicyDecl)
 	if !ok {
-		t.Fatalf("decl[0] = %T, want *V2MechanicDecl", decls[0])
-	}
-	if mech.Module != "mechanics.sast" || mech.Kind != "ruleVerb" || mech.Name != "customIssue" {
-		t.Fatalf("mechanic identity wrong: %+v", mech)
-	}
-	if got := mech.QualifiedName(); got != "mechanics.sast.mechanic:ruleVerb:customIssue" {
-		t.Fatalf("mechanic qualified name = %q", got)
-	}
-	policy, ok := decls[1].(*V2PolicyDecl)
-	if !ok {
-		t.Fatalf("decl[1] = %T, want *V2PolicyDecl", decls[1])
+		t.Fatalf("decl[0] = %T, want *V2PolicyDecl", decls[0])
 	}
 	if policy.Module != "mechanics.sast" || policy.Kind != "resultIdentity" || policy.Name != "default" {
 		t.Fatalf("policy identity wrong: %+v", policy)
@@ -223,16 +208,8 @@ policy resultIdentity default {
 	}
 }
 
-func TestParseV2DefinitionSourcesSelectedPreservesSelectedMechanicsAndPolicies(t *testing.T) {
+func TestParseV2DefinitionSourcesSelectedPreservesSelectedPolicies(t *testing.T) {
 	decls, err := ParseV2DefinitionSourcesSelected([]V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
-module mechanics.sast;
-mechanic ruleVerb customIssue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [where]
-}
-`},
 		{Name: "policy.vyql", Source: `
 module policies.default;
 policy display default {
@@ -254,19 +231,16 @@ rule SelectedOnly {
 }
 `},
 	}, func(src V2DefinitionSource) bool {
-		return src.Name == "mechanics.vyql" || src.Name == "policy.vyql"
+		return src.Name == "policy.vyql"
 	})
 	if err != nil {
 		t.Fatalf("ParseV2DefinitionSourcesSelected: %v", err)
 	}
-	if len(decls) != 2 {
-		t.Fatalf("decls = %d, want selected mechanic + policy: %+v", len(decls), decls)
+	if len(decls) != 1 {
+		t.Fatalf("decls = %d, want selected policy: %+v", len(decls), decls)
 	}
-	if _, ok := decls[0].(*V2MechanicDecl); !ok {
-		t.Fatalf("decl[0] = %T, want *V2MechanicDecl", decls[0])
-	}
-	if _, ok := decls[1].(*V2PolicyDecl); !ok {
-		t.Fatalf("decl[1] = %T, want *V2PolicyDecl", decls[1])
+	if _, ok := decls[0].(*V2PolicyDecl); !ok {
+		t.Fatalf("decl[0] = %T, want *V2PolicyDecl", decls[0])
 	}
 }
 

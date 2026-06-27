@@ -926,6 +926,9 @@ func validateV2Mechanic(m *V2MechanicDecl) []error {
 	if isV2BuiltInMechanicDecl(m) {
 		errs = append(errs, fmt.Errorf("mechanic %s %s: built-in language mechanics are implemented in Go and must not be authored in VyQL", m.Kind, m.Name))
 	}
+	if m.Kind == "ruleVerb" && !v2BuiltInRuleVerbs[m.Name] {
+		errs = append(errs, fmt.Errorf("mechanic ruleVerb %s: extension rule verbs are recognized by the v2 contract but are not implemented by the current parser/runtime", m.Name))
+	}
 	switch m.Kind {
 	case "coverage":
 		if !v2CoverageModes[m.Name] {

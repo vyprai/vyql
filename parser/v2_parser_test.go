@@ -557,15 +557,9 @@ pattern sensitiveHandler as handler {
 	}
 }
 
-func TestParseV2MechanicAndPolicyDeclarations(t *testing.T) {
+func TestParseV2PolicyDeclarations(t *testing.T) {
 	prog, err := ParseV2(`
 module mechanics.sast;
-
-mechanic ruleVerb customIssue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [where]
-}
 
 policy priority default {
   score severity {
@@ -591,17 +585,10 @@ policy priority default {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	if len(prog.Decls) != 2 {
-		t.Fatalf("decl count = %d, want 2", len(prog.Decls))
+	if len(prog.Decls) != 1 {
+		t.Fatalf("decl count = %d, want 1", len(prog.Decls))
 	}
-	mech := prog.Decls[0].(*V2MechanicDecl)
-	if mech.Kind != "ruleVerb" || mech.Name != "customIssue" || len(mech.Items) != 3 {
-		t.Fatalf("mechanic header/items wrong: %+v", mech)
-	}
-	if got, ok := mech.Items[0].Value.(V2RefExpr); !ok || got.Name != "fact.exists" {
-		t.Fatalf("solver = %+v, want fact.exists", mech.Items[0].Value)
-	}
-	pol := prog.Decls[1].(*V2PolicyDecl)
+	pol := prog.Decls[0].(*V2PolicyDecl)
 	if pol.Kind != "priority" || pol.Name != "default" || len(pol.Items) != 3 {
 		t.Fatalf("policy header/items wrong: %+v", pol)
 	}
@@ -825,13 +812,15 @@ func TestParseV2RejectsUnsupportedMechanicKinds(t *testing.T) {
 	cases := []string{
 		`module mechanics.policy; mechanic context internetExposure { when context.internetReachable }`,
 		`module mechanics.policy; mechanic requirement manifestEvidence { when project.has("manifest") }`,
+		`module mechanics.policy; mechanic ruleVerb observe { solver: fact.exists fromKinds: [issue] allowedClauses: [where] }`,
 	}
 	for _, src := range cases {
 		_, err := ParseV2(src)
 		if err == nil {
 			t.Fatalf("ParseV2(%q) succeeded, want unsupported mechanic diagnostic", src)
 		}
-		if !strings.Contains(err.Error(), "recognized by the v2 contract but is not implemented") {
+		if !strings.Contains(err.Error(), "recognized by the v2 contract but is not implemented") &&
+			!strings.Contains(err.Error(), "extension rule verbs are recognized by the v2 contract but are not implemented") {
 			t.Fatalf("error = %v, want unsupported mechanic diagnostic", err)
 		}
 	}
