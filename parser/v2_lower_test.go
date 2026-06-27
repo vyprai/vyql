@@ -1038,6 +1038,31 @@ binding sqlLiteralQuery {
 	}
 }
 
+func TestV2BindingQueryEnclosesStringLiteralLowersToValueMatch(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding sqlLiteralQuery {
+  query call as c where c.callee.method == "query"
+    encloses stringLiteral as lit where lit.value contains "SELECT"
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "sink_method" || got.Pattern != "query" {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	if len(got.ValMatches) != 1 || got.ValMatches[0] != "SELECT" {
+		t.Fatalf("ValMatches = %+v, want SELECT", got.ValMatches)
+	}
+}
+
 func TestV2BindingQueryRejectsUnsupportedRelationStep(t *testing.T) {
 	_, err := ParseV2Definitions(`
 module bindings.javascript.composed;

@@ -806,7 +806,7 @@ func lowerV2BindingQueryRelations(binding string, q V2QueryExpr) (V2Expr, error)
 }
 
 func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
-	if (step.Relation != "encloses" && step.Relation != "contains") || step.Family != "literal" || step.Alias == "" || step.Where == nil {
+	if (step.Relation != "encloses" && step.Relation != "contains") || !v2LiteralRelationFamily(step.Family) || step.Alias == "" || step.Where == nil {
 		return nil, fmt.Errorf("binding %s: query relation step %s %s needs native production v2 lowering", binding, step.Relation, step.Family)
 	}
 	rewritten, err := rewriteV2BindingRelationRefs(step.Where, step.Alias)

@@ -14,7 +14,7 @@ var (
 	}
 	v2CodeFamilies = map[string]bool{
 		"call": true, "memberAccess": true, "assignment": true, "binaryExpr": true,
-		"literal": true, "function": true, "class": true, "import": true,
+		"literal": true, "stringLiteral": true, "function": true, "class": true, "import": true,
 		"route": true, "config": true, "param": true,
 	}
 	v2SchemaGatedCodeFamilies = map[string]string{"route": "nir", "config": "nir"}
@@ -1529,9 +1529,18 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 func v2SupportedBindingQueryRelationStep(q V2QueryExpr, step V2QueryStep) bool {
 	return q.Family == "call" &&
 		(step.Relation == "encloses" || step.Relation == "contains") &&
-		step.Family == "literal" &&
+		v2LiteralRelationFamily(step.Family) &&
 		step.Alias != "" &&
 		step.Where != nil
+}
+
+func v2LiteralRelationFamily(family string) bool {
+	switch family {
+	case "literal", "stringLiteral":
+		return true
+	default:
+		return false
+	}
 }
 
 func isV2PresenceNodeBinding(b *V2BindingDecl) bool {

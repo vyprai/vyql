@@ -951,9 +951,10 @@ rule TagsContainHigh {
 
 func TestParseV2ValidationRejectsContractViolations(t *testing.T) {
 	cases := []struct {
-		name string
-		src  string
-		want string
+		name   string
+		src    string
+		want   string
+		wantOK bool
 	}{
 		{
 			name: "requirement in query",
@@ -1030,6 +1031,15 @@ binding bad {
   emit sink code.CommandExecution at args[0]
 }`,
 			want: "query relation step references call needs native production v2 lowering",
+		},
+		{
+			name: "binding query string literal relation supported",
+			src: `module bindings.javascript.composed;
+binding ok {
+  query call as c where c.callee.method == "danger" encloses stringLiteral as lit where lit.value contains "danger"
+  emit sink code.CommandExecution at args[0]
+}`,
+			wantOK: true,
 		},
 		{
 			name: "composed pattern use plus node is cartesian composition",
@@ -1190,6 +1200,12 @@ pattern bad {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParseV2(tc.src)
+			if tc.wantOK {
+				if err != nil {
+					t.Fatalf("ParseV2 error = %v, want success", err)
+				}
+				return
+			}
 			if err == nil {
 				t.Fatal("ParseV2 succeeded, want validation error")
 			}
