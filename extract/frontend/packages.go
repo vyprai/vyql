@@ -9,8 +9,8 @@ package frontend
 // loads ONLY the per-package adapters whose package is present in the project's dependency
 // evidence (imported modules + SBOM/manifest packages). That is the "dynamic import":
 // an adapter for `flask` is parsed and activated only when the scanned code actually
-// depends on flask. Each loaded mapping still carries its `package "name"` block, so the
-// engine's apply-time packageAllowed gate remains the authoritative second check.
+// depends on flask. Each loaded mapping still carries its v2 dependency requirement,
+// so the engine's apply-time packageAllowed gate remains the authoritative second check.
 
 import (
 	"fmt"

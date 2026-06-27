@@ -824,6 +824,10 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"assume_guard_",
 		"assume_sanitizer_",
 	}
+	legacyAuthoredSyntax := []string{
+		"`package \"name\"",
+		"`flag <concept> on|in",
+	}
 	securityConceptNames := []string{
 		"ResourceRelease",
 		"LockRelease",
@@ -851,6 +855,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 			}
 		}
 		for _, snippet := range legacyMetadataNames {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyAuthoredSyntax {
 			if strings.Contains(src, snippet) {
 				usesLegacy = true
 				break

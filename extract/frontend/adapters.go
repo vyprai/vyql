@@ -34,7 +34,7 @@ type inputSpec struct {
 	ArgCountSet bool
 	ArgCountMin int
 	ArgCountMax int
-	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Requirement *parser.BindingRequirement
 }
 
@@ -51,7 +51,7 @@ type sinkSpec struct {
 	ArgCountSet     bool
 	ArgCountMin     int
 	ArgCountMax     int
-	Packages        []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Packages        []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Collection      bool     // also flag a Seq/collection-literal arg
 	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
 	CollectionIndex int      // selected collection element index
@@ -69,7 +69,7 @@ type controlSpec struct {
 	ArgCountSet bool
 	ArgCountMin int
 	ArgCountMax int
-	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
 	Detail      map[string]string
 	Requirement *parser.BindingRequirement
 }
@@ -2088,8 +2088,8 @@ func packageGatePathSegments(name string) []string {
 	return out
 }
 
-// flagAdapter labels nodes with presence/review concepts through the AST-shaped
-// `flag <concept> on|in ... { ... }` DSL.
+// flagAdapter labels nodes with presence/review concepts emitted by v2
+// presenceNode bindings.
 func (spec adapterSpec) flagAdapter() adapters.Adapter {
 	return adapters.Adapter{
 		Name: spec.Name + ".flags", Technology: spec.Technology, Specificity: 2,
