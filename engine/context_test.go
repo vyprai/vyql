@@ -51,7 +51,7 @@ func buildContextGraph(exposed, important bool) usg.Store {
 
 func TestCrossDomainContext(t *testing.T) {
 	onto := contextTestOntology()
-	decls, err := parser.ParseRuntime(flowRule)
+	decls, err := parser.ParseV2Definitions(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -125,7 +125,7 @@ rule Flow {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.ParseRuntime(src)
+	decls, _ := parser.ParseV2Definitions(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

@@ -9,7 +9,7 @@ import (
 
 func TestContextSensitivityBoundary(t *testing.T) {
 	onto := testOntology()
-	decls, err := parser.ParseRuntime(flowRule)
+	decls, err := parser.ParseV2Definitions(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

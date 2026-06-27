@@ -24,7 +24,7 @@ rule Sql {
 func evalSQLI(t *testing.T, store usg.Store) []*finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.ParseRuntime(sqliRule)
+	decls, err := parser.ParseV2Definitions(sqliRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 func fireOne(t *testing.T, rule string, build func(*usg.InMemStore)) findingView {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

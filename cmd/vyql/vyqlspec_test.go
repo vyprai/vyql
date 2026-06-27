@@ -209,7 +209,7 @@ func TestVyqlSpecs(t *testing.T) {
 	// compile the shipped packs once — `graph` specs evaluate them over a synthetic
 	// asset/identity graph (the code specs scan source instead).
 	onto := ontology.Seed()
-	decls, err := parser.ParseRuntime(rules)
+	decls, err := parser.ParseV2Definitions(rules)
 	if err != nil {
 		t.Fatalf("parse packs: %v", err)
 	}

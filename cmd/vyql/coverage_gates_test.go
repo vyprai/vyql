@@ -55,7 +55,7 @@ func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 			t.Fatalf("no %s sources under vyql/%s", suffix, sub)
 		}
 		for _, source := range sources {
-			decls, err := parser.ParseRuntime(string(source.Data))
+			decls, err := parser.ParseV2Definitions(string(source.Data))
 			if err != nil {
 				t.Fatalf("parse %s: %v", source.Name, err)
 			}
@@ -65,7 +65,7 @@ func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	}
 	files := readDataFiles(t, sub, suffix)
 	for f, c := range files {
-		decls, err := parser.ParseRuntime(c)
+		decls, err := parser.ParseV2Definitions(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -78,7 +78,7 @@ func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id ->
 	t.Helper()
 	out := map[string]string{}
 	for f, c := range files {
-		decls, err := parser.ParseRuntime(c)
+		decls, err := parser.ParseV2Definitions(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -600,9 +600,25 @@ func TestEverySourceLanguageHasV2TaintMechanicCoverage(t *testing.T) {
 	}
 }
 
-func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
+func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 	root := testRepoRoot(t)
 	var hits []string
+	legacyParserCalls := []string{
+		"parser.Parse(",
+		"parser.ParseRuntime",
+		"parser.ParseRuntimeSources",
+		"parser.RuntimeSource",
+		"parser.RuntimeSourcesFromText",
+		"parser.LowerRuntimeSources",
+	}
+	legacyParserDefinitions := []string{
+		"func Parse(",
+		"func ParseRuntime",
+		"func ParseRuntimeSources",
+		"type RuntimeSource",
+		"func RuntimeSourcesFromText",
+		"func LowerRuntimeSources",
+	}
 	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -618,9 +634,22 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 		}
 		src := string(data)
 		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
-		usesLegacy := importsVyqlParser && strings.Contains(src, "parser.Parse(")
-		if strings.HasPrefix(rel, "go/parser/") && strings.Contains(src, "func Parse(") {
-			usesLegacy = true
+		usesLegacy := false
+		if importsVyqlParser {
+			for _, snippet := range legacyParserCalls {
+				if strings.Contains(src, snippet) {
+					usesLegacy = true
+					break
+				}
+			}
+		}
+		if strings.HasPrefix(rel, "go/parser/") {
+			for _, snippet := range legacyParserDefinitions {
+				if strings.Contains(src, snippet) {
+					usesLegacy = true
+					break
+				}
+			}
 		}
 		if usesLegacy {
 			hits = append(hits, rel)
@@ -632,7 +661,7 @@ func TestProductionRuntimeDoesNotUseLegacyV1Parser(t *testing.T) {
 	}
 	if len(hits) > 0 {
 		sort.Strings(hits)
-		t.Fatalf("production code must not define or call the legacy v1 parser:\n%s", strings.Join(hits, "\n"))
+		t.Fatalf("production code must not define or call the legacy v1 parser or runtime bridge:\n%s", strings.Join(hits, "\n"))
 	}
 }
 
@@ -689,7 +718,7 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
 	sourceCount, sinkCount := 0, 0
 	for _, sub := range subs {
 		for path, src := range readDataFiles(t, sub, ".vyql") {
-			decls, err := parser.ParseRuntime(src)
+			decls, err := parser.ParseV2Definitions(src)
 			if err != nil {
 				t.Fatalf("parse %s: %v", path, err)
 			}

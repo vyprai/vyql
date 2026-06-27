@@ -66,19 +66,19 @@ func loadReviewConcepts() (map[string]reviewConceptInfo, error) {
 
 func loadReviewConceptsFromRoot(dataRoot string) (map[string]reviewConceptInfo, error) {
 	out := map[string]reviewConceptInfo{}
-	var sources []parser.RuntimeSource
-	if err := appendRuntimeSourcesFromRoot(&sources, dataRoot, "ontology/concepts"); err != nil {
+	var sources []parser.V2DefinitionSource
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "ontology/concepts"); err != nil {
 		return nil, err
 	}
-	if err := appendRuntimeSourcesFromRoot(&sources, dataRoot, "ontology/threatkinds"); err != nil {
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "ontology/threatkinds"); err != nil {
 		return nil, err
 	}
-	if err := appendRuntimeSourcesFromRoot(&sources, dataRoot, "mechanics"); err != nil {
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "mechanics"); err != nil {
 		return nil, err
 	}
 	selected := map[string]bool{}
 	beforeReview := len(sources)
-	if err := appendRuntimeSourcesFromRoot(&sources, dataRoot, "review"); err != nil {
+	if err := appendV2DefinitionSourcesFromRoot(&sources, dataRoot, "review"); err != nil {
 		return nil, err
 	}
 	if len(sources) == beforeReview {
@@ -87,7 +87,7 @@ func loadReviewConceptsFromRoot(dataRoot string) (map[string]reviewConceptInfo, 
 	for _, source := range sources[beforeReview:] {
 		selected[source.Name] = true
 	}
-	decls, err := parser.ParseRuntimeSourcesSelected(sources, func(src parser.RuntimeSource) bool {
+	decls, err := parser.ParseV2DefinitionSourcesSelected(sources, func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func loadReviewConceptsFromRoot(dataRoot string) (map[string]reviewConceptInfo, 
 	return out, nil
 }
 
-func appendRuntimeSourcesFromRoot(dst *[]parser.RuntimeSource, dataRoot, rel string) error {
+func appendV2DefinitionSourcesFromRoot(dst *[]parser.V2DefinitionSource, dataRoot, rel string) error {
 	root := filepath.Join(dataRoot, filepath.FromSlash(rel))
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -125,7 +125,7 @@ func appendRuntimeSourcesFromRoot(dst *[]parser.RuntimeSource, dataRoot, rel str
 		if err != nil {
 			name = path
 		}
-		*dst = append(*dst, parser.RuntimeSource{Name: filepath.ToSlash(name), Source: string(data)})
+		*dst = append(*dst, parser.V2DefinitionSource{Name: filepath.ToSlash(name), Source: string(data)})
 		return nil
 	})
 	if os.IsNotExist(err) {

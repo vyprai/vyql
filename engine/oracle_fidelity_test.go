@@ -179,7 +179,7 @@ rule AliasFlow {
   unless sink.path coveredBy custom.Transform
 }
 `
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

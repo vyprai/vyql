@@ -11,7 +11,7 @@ import (
 func compileEval(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -34,7 +34,7 @@ func compileEval(t *testing.T, src string, s usg.Store) []int {
 func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		t.Fatalf("parse v2: %v", err)
 	}
@@ -97,7 +97,7 @@ rule PreciseMatch {
   issue custom.Precise as p
 }
 `
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -358,7 +358,7 @@ rule CountDerivedElementAccess {
 	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
 	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -390,7 +390,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -422,7 +422,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -455,7 +455,7 @@ rule XxeUnhardened {
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 	g.AddEdge(usg.Edge{Type: "PROTECTS", Src: "hardening", Dst: "parser"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -487,7 +487,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -519,7 +519,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.ParseRuntime(rule)
+	decls, err := parser.ParseV2Definitions(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

@@ -298,7 +298,7 @@ func compiledRulesFor(rulesSrc string) (compiledRuleSet, error) {
 	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
 		return cached.(compiledRuleSet), nil
 	}
-	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(rulesSrc), lowerNonCoreRuntimeSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(rulesSrc), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return compiledRuleSet{}, fmt.Errorf("rule parse: %w", err)
 	}
@@ -484,30 +484,30 @@ func loadRuleSourcesUnder(path string) (string, error) {
 	return sb.String(), err
 }
 
-func runtimeSourcesForRules(rulesSrc string) []parser.RuntimeSource {
-	var out []parser.RuntimeSource
+func v2DefinitionSourcesForRules(rulesSrc string) []parser.V2DefinitionSource {
+	var out []parser.V2DefinitionSource
 	if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 		for _, file := range files {
-			out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
 	if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
 		for _, file := range files {
-			out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
 	if !strings.Contains(rulesSrc, "module mechanics.") {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
-	out = append(out, parser.RuntimeSourcesFromText("rules", rulesSrc)...)
+	out = append(out, parser.V2DefinitionSourcesFromText("rules", rulesSrc)...)
 	return out
 }
 
-func lowerNonCoreRuntimeSource(src parser.RuntimeSource) bool {
+func lowerNonCoreV2DefinitionSource(src parser.V2DefinitionSource) bool {
 	return !strings.HasPrefix(src.Name, "ontology/")
 }
 

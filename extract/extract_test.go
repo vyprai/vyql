@@ -53,7 +53,7 @@ rule Sql {
 func runRule(t *testing.T, src string, g usg.Store) []*findings.Finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

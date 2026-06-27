@@ -51,7 +51,7 @@ func Load() ([]Profile, error) {
 		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
 	}
 	var out []Profile
-	decls, err := parser.ParseRuntimeSources(runtimeSources(files))
+	decls, err := parser.ParseV2DefinitionSources(v2DefinitionSources(files))
 	if err != nil {
 		return []Profile{{Name: "generic", Title: "Generic application"}}, nil
 	}
@@ -71,10 +71,10 @@ func Load() ([]Profile, error) {
 	return out, nil
 }
 
-func runtimeSources(files []datadir.Source) []parser.RuntimeSource {
-	out := make([]parser.RuntimeSource, 0, len(files))
+func v2DefinitionSources(files []datadir.Source) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(files))
 	for _, file := range files {
-		out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 	}
 	return out
 }

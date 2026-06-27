@@ -42,7 +42,7 @@ rule ComposedMatch {
   where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
-	decls, err := parser.ParseRuntime(rules)
+	decls, err := parser.ParseV2Definitions(rules)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

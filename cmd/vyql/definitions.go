@@ -226,7 +226,7 @@ func checkV2Sources(sources []parser.V2Source) (int, error) {
 	if err := parser.ValidateV2Corpus(sources); err != nil {
 		return 0, fmt.Errorf("v2 corpus validation failed: %w", err)
 	}
-	if _, err := parser.LowerRuntimeSources(sources); err != nil {
+	if _, err := parser.LowerV2DefinitionSources(sources); err != nil {
 		return 0, fmt.Errorf("v2 lower failed: %w", err)
 	}
 	return len(sources), nil

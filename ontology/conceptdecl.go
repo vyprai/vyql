@@ -58,7 +58,7 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 // `package` declarations) into Concepts. Non-concept declarations are ignored,
 // so a file may mix concepts with rules.
 func LoadConceptText(src string) ([]Concept, error) {
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		return nil, err
 	}

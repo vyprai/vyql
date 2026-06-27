@@ -1024,8 +1024,8 @@ type adapterDeclCacheKey struct {
 	tech string
 }
 
-func runtimeSourcesForAdapter(sources []datadir.Source) []parser.RuntimeSource {
-	out := make([]parser.RuntimeSource, 0, len(sources)+32)
+func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
 	hasOntology, hasMechanics := false, false
 	for _, source := range sources {
 		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
@@ -1034,24 +1034,24 @@ func runtimeSourcesForAdapter(sources []datadir.Source) []parser.RuntimeSource {
 	if !hasOntology {
 		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
 	if !hasMechanics {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
 	for _, source := range sources {
-		out = append(out, parser.RuntimeSource{Name: source.Name, Source: string(source.Data)})
+		out = append(out, parser.V2DefinitionSource{Name: source.Name, Source: string(source.Data)})
 	}
 	return out
 }
@@ -1061,7 +1061,7 @@ func parseRuntimeAdapterSources(sources []datadir.Source) ([]parser.Decl, error)
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	return parser.ParseRuntimeSourcesSelected(runtimeSourcesForAdapter(sources), func(src parser.RuntimeSource) bool {
+	return parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForAdapter(sources), func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
 }

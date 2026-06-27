@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// ParseRuntime parses runtime definitions for the current scanner. Runtime
-// definitions are VyQL v2 modules; v1 syntax is rejected instead of translated.
-func ParseRuntime(src string) ([]Decl, error) {
+// ParseV2Definitions parses authored VyQL v2 definition modules and materializes
+// them into the scanner declaration model.
+func ParseV2Definitions(src string) ([]Decl, error) {
 	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
 		programs := make([]*V2Program, 0, len(chunks))
 		mechanics := runtimeMechanics{}
@@ -22,7 +22,7 @@ func ParseRuntime(src string) ([]Decl, error) {
 		}
 		var out []Decl
 		for _, prog := range programs {
-			decls, err := lowerProgramToRuntimeWithMechanics(prog, mechanics)
+			decls, err := lowerV2ProgramToDeclarationsWithMechanics(prog, mechanics)
 			if err != nil {
 				return nil, err
 			}
@@ -34,33 +34,33 @@ func ParseRuntime(src string) ([]Decl, error) {
 	if err != nil {
 		return nil, err
 	}
-	return lowerProgramToRuntime(prog)
+	return lowerV2ProgramToDeclarations(prog)
 }
 
-type RuntimeSource struct {
+type V2DefinitionSource struct {
 	Name   string
 	Source string
 }
 
-func RuntimeSourcesFromText(name, src string) []RuntimeSource {
+func V2DefinitionSourcesFromText(name, src string) []V2DefinitionSource {
 	chunks := splitV2ModuleChunks(src)
 	if len(chunks) == 0 {
-		return []RuntimeSource{{Name: name, Source: src}}
+		return []V2DefinitionSource{{Name: name, Source: src}}
 	}
-	out := make([]RuntimeSource, 0, len(chunks))
+	out := make([]V2DefinitionSource, 0, len(chunks))
 	for i, chunk := range chunks {
-		out = append(out, RuntimeSource{Name: fmt.Sprintf("%s#module%d", name, i+1), Source: chunk})
+		out = append(out, V2DefinitionSource{Name: fmt.Sprintf("%s#module%d", name, i+1), Source: chunk})
 	}
 	return out
 }
 
-func ParseRuntimeSources(raw []RuntimeSource) ([]Decl, error) {
-	return ParseRuntimeSourcesSelected(raw, nil)
+func ParseV2DefinitionSources(raw []V2DefinitionSource) ([]Decl, error) {
+	return ParseV2DefinitionSourcesSelected(raw, nil)
 }
 
-// ParseRuntimeSourcesSelected validates the full v2 corpus but only lowers
+// ParseV2DefinitionSourcesSelected validates the full v2 corpus but only lowers
 // sources accepted by keep. A nil keep function lowers every source.
-func ParseRuntimeSourcesSelected(raw []RuntimeSource, keep func(RuntimeSource) bool) ([]Decl, error) {
+func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2DefinitionSource) bool) ([]Decl, error) {
 	sources := make([]V2Source, 0, len(raw))
 	keepSource := make([]bool, 0, len(raw))
 	for _, src := range raw {
@@ -74,7 +74,7 @@ func ParseRuntimeSourcesSelected(raw []RuntimeSource, keep func(RuntimeSource) b
 	if err := ValidateV2Corpus(sources); err != nil {
 		return nil, fmt.Errorf("v2 corpus validation failed: %w", err)
 	}
-	return lowerRuntimeSourcesSelected(sources, keepSource)
+	return lowerV2DefinitionSourcesSelected(sources, keepSource)
 }
 
 func splitV2ModuleChunks(src string) []string {
@@ -107,17 +107,17 @@ func splitV2ModuleChunks(src string) []string {
 	return chunks
 }
 
-// lowerProgramToRuntime materializes authored v2 definitions into the scanner
-// runtime declaration model.
-func lowerProgramToRuntime(prog *V2Program) ([]Decl, error) {
-	return lowerProgramToRuntimeWithMechanics(prog, runtimeMechanicsFromProgram(prog))
+// lowerV2ProgramToDeclarations materializes authored v2 definitions into the
+// scanner declaration model.
+func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
+	return lowerV2ProgramToDeclarationsWithMechanics(prog, runtimeMechanicsFromProgram(prog))
 }
 
-func LowerRuntimeSources(sources []V2Source) ([]Decl, error) {
-	return lowerRuntimeSourcesSelected(sources, nil)
+func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
+	return lowerV2DefinitionSourcesSelected(sources, nil)
 }
 
-func lowerRuntimeSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
+func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
 	mechanics := runtimeMechanics{}
 	outCap := 0
 	for _, src := range sources {
@@ -136,7 +136,7 @@ func lowerRuntimeSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error
 		if keep != nil && !keep[i] {
 			continue
 		}
-		decls, err := lowerProgramToRuntimeWithMechanics(src.Program, mechanics)
+		decls, err := lowerV2ProgramToDeclarationsWithMechanics(src.Program, mechanics)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", src.Name, err)
 		}
@@ -178,7 +178,7 @@ func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
 	return out
 }
 
-func lowerProgramToRuntimeWithMechanics(prog *V2Program, mechanics runtimeMechanics) ([]Decl, error) {
+func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtimeMechanics) ([]Decl, error) {
 	if prog == nil {
 		return nil, nil
 	}

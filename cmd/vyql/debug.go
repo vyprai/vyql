@@ -458,7 +458,7 @@ func cmdAdapters(args []string) error {
 	if err != nil {
 		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
 	}
-	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(string(data)), lowerNonCoreRuntimeSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(string(data)), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}
@@ -522,7 +522,7 @@ func cmdValidateAdapter(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(string(data)), lowerNonCoreRuntimeSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(string(data)), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}

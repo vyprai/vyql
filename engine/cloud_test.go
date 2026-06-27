@@ -51,7 +51,7 @@ func markerAdapter(name, prop string, acceptedValues ...string) adapters.Adapter
 
 func TestMarkedAssetThreeAdapters(t *testing.T) {
 	onto := solverContractOntology()
-	decls, err := parser.ParseRuntime(assetMarkerRule)
+	decls, err := parser.ParseV2Definitions(assetMarkerRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

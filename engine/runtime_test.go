@@ -13,7 +13,7 @@ import (
 func evalOne(t *testing.T, src string, s usg.Store) int {
 	t.Helper()
 	onto := runtimeTestOntology()
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 	if edge, err := onto.Get("custom.Edge"); err == nil {
 		edge.ContextReachLabel = "internet-reachable"
 	}
-	decls, _ := parser.ParseRuntime(flowRule)
+	decls, _ := parser.ParseV2Definitions(flowRule)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

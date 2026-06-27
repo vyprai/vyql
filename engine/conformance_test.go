@@ -10,7 +10,7 @@ import (
 func nFlow(t *testing.T, labels map[string]string, edges [][2]string) int {
 	t.Helper()
 	onto := testOntology()
-	decls, err := parser.ParseRuntime(flowRule)
+	decls, err := parser.ParseV2Definitions(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -72,7 +72,7 @@ rule WrongTransform {
   unless sink.path coveredBy custom.OtherTransform
 }
 `
-	decls, _ := parser.ParseRuntime(wrong)
+	decls, _ := parser.ParseV2Definitions(wrong)
 	_, errs := CompileRules(decls, testOntology())
 	if len(errs) != 1 || !contains(errs[0].Msg, "does not defend") {
 		t.Fatalf("row6 wrong transform -> compile error, got %v", errs)
@@ -85,7 +85,7 @@ rule WrongTransform {
 
 func TestAdvisoryControlDoesNotSuppressTaint(t *testing.T) {
 	onto := testOntology()
-	decls, err := parser.ParseRuntime(flowRule)
+	decls, err := parser.ParseV2Definitions(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

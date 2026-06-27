@@ -19,7 +19,7 @@ rule ReachAsset {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseRuntime(src)
+	decls, _ := parser.ParseV2Definitions(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -60,7 +60,7 @@ rule ActorToCapability {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseRuntime(src)
+	decls, _ := parser.ParseV2Definitions(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -98,7 +98,7 @@ rule ActorToCapability {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseRuntime(src)
+	decls, _ := parser.ParseV2Definitions(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -138,7 +138,7 @@ rule ExternalToElevated {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.ParseRuntime(src)
+	decls, _ := parser.ParseV2Definitions(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

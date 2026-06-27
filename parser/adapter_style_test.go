@@ -69,7 +69,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := ParseRuntime(string(data))
+		decls, err := ParseV2Definitions(string(data))
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := ParseRuntime(string(data))
+		decls, err := ParseV2Definitions(string(data))
 		if err != nil {
 			return err
 		}
@@ -169,7 +169,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 	}
 	var decls []Decl
 	for _, source := range sources {
-		parsed, err := ParseRuntime(string(source.Data))
+		parsed, err := ParseV2Definitions(string(source.Data))
 		if err != nil {
 			t.Fatalf("parse %s: %v", source.Name, err)
 		}
@@ -247,7 +247,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := ParseRuntime(string(data))
+		decls, err := ParseV2Definitions(string(data))
 		if err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		decls, err := ParseRuntime(string(data))
+		decls, err := ParseV2Definitions(string(data))
 		if err != nil {
 			return err
 		}

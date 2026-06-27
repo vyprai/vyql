@@ -36,7 +36,7 @@ func scanFindingKeys(t *testing.T, paths []string, cache lowering.DeltaCache) []
 	if g == nil {
 		return nil
 	}
-	decls, err := parser.ParseRuntime(syntheticIncrementalRules)
+	decls, err := parser.ParseV2Definitions(syntheticIncrementalRules)
 	if err != nil {
 		t.Fatalf("rule parse: %v", err)
 	}

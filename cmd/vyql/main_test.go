@@ -71,14 +71,14 @@ rule BadCoverageMode {
 }
 
 func TestCompiledRulesForKeepsLoadedMechanicsAuthoritative(t *testing.T) {
-	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(`
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(`
 module rules.test;
 rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
 }
-`), lowerNonCoreRuntimeSource)
+`), lowerNonCoreV2DefinitionSource)
 	if err != nil {
-		t.Fatalf("ParseRuntimeSourcesSelected: %v", err)
+		t.Fatalf("ParseV2DefinitionSourcesSelected: %v", err)
 	}
 	for _, decl := range decls {
 		m, ok := decl.(*parser.V2MechanicDecl)
@@ -311,7 +311,7 @@ func TestDefaultPacksCompile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	decls, err := parser.ParseRuntime(src)
+	decls, err := parser.ParseV2Definitions(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
