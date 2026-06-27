@@ -810,6 +810,8 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"analysis_role",
 		"AssumeMinLevel",
 		"assumeMinLevel",
+		"assume_guard_",
+		"assume_sanitizer_",
 	}
 	securityConceptNames := []string{
 		"ResourceRelease",

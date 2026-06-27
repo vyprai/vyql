@@ -648,8 +648,8 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 				})
 				out = append(out, m)
 			case action.Kind == "emit check":
-				if isV2InternalAssumptionCheck(action) {
-					m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs, req)
+				if isV2AdvisoryNeutralizerCheck(action) {
+					m, ok, err := lowerV2AdvisoryNeutralizerCheck(b.Name, shape, action, pkgs, req)
 					if err != nil {
 						return nil, err
 					}
@@ -735,7 +735,7 @@ func isV2GlobalCheck(action V2BindingOutput) bool {
 	return len(action.Covers) == 1 && action.Covers[0].Mode == "global"
 }
 
-func isV2InternalAssumptionCheck(action V2BindingOutput) bool {
+func isV2AdvisoryNeutralizerCheck(action V2BindingOutput) bool {
 	advisory := action.Advisory != nil && *action.Advisory
 	if !advisory || action.About == "" || len(action.Covers) != 1 {
 		return false
@@ -1485,16 +1485,16 @@ func validateV2PathOnlyCheck(binding string, action V2BindingOutput) error {
 	return nil
 }
 
-func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, bool, error) {
+func lowerV2AdvisoryNeutralizerCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, bool, error) {
 	advisory := action.Advisory != nil && *action.Advisory
 	if !advisory || action.About == "" {
 		return BindingAction{}, false, nil
 	}
 	if action.Location != "call" {
-		return BindingAction{}, true, fmt.Errorf("binding %s: Assumption check must be emitted at call", binding)
+		return BindingAction{}, true, fmt.Errorf("binding %s: advisory neutralizer check must be emitted at call", binding)
 	}
 	if len(action.Covers) != 1 {
-		return BindingAction{}, true, fmt.Errorf("binding %s: Assumption check requires exactly one coverage mode", binding)
+		return BindingAction{}, true, fmt.Errorf("binding %s: advisory neutralizer check requires exactly one coverage mode", binding)
 	}
 	mode := ""
 	switch action.Covers[0].Mode {
@@ -1503,11 +1503,11 @@ func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingO
 	case "path":
 		mode = "sanitizer"
 	default:
-		return BindingAction{}, true, fmt.Errorf("binding %s: unsupported Assumption coverage mode %q", binding, action.Covers[0].Mode)
+		return BindingAction{}, true, fmt.Errorf("binding %s: unsupported advisory neutralizer coverage mode %q", binding, action.Covers[0].Mode)
 	}
-	kind := "assume_" + mode + "_path"
+	kind := "advisory_" + mode + "_path"
 	if shape.Field == "callee.method" {
-		kind = "assume_" + mode + "_method"
+		kind = "advisory_" + mode + "_method"
 	}
 	return shape.mapping(BindingAction{
 		Kind:        kind,

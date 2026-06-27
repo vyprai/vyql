@@ -1028,7 +1028,7 @@ binding unsafeMarker {
 	}
 }
 
-func TestV2AssumptionCheckLowering(t *testing.T) {
+func TestV2AdvisoryNeutralizerCheckLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
 binding startsWithGuard {
@@ -1061,11 +1061,11 @@ binding normpathSanitizer {
 	if len(adapter.Mappings) != 2 {
 		t.Fatalf("adapter mappings = %d, want 2: %+v", len(adapter.Mappings), adapter)
 	}
-	if got := adapter.Mappings[0]; got.Kind != "assume_guard_method" || got.Pattern != "startswith" || got.About != "code.FilePathAccess" || got.ValMatches[0] != "os.sep" {
-		t.Fatalf("guard assumption lowering wrong: %+v", got)
+	if got := adapter.Mappings[0]; got.Kind != "advisory_guard_method" || got.Pattern != "startswith" || got.About != "code.FilePathAccess" || got.ValMatches[0] != "os.sep" {
+		t.Fatalf("advisory guard lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[1]; got.Kind != "assume_sanitizer_path" || got.Pattern != "os.path.normpath" || got.About != "code.FilePathAccess" {
-		t.Fatalf("sanitizer assumption lowering wrong: %+v", got)
+	if got := adapter.Mappings[1]; got.Kind != "advisory_sanitizer_path" || got.Pattern != "os.path.normpath" || got.About != "code.FilePathAccess" {
+		t.Fatalf("advisory sanitizer lowering wrong: %+v", got)
 	}
 }
 
@@ -1216,7 +1216,7 @@ binding replaceFilter {
 	}
 }
 
-func TestV2UnstableAnalysisAssumeGuardRejected(t *testing.T) {
+func TestV2UnstablePrivateGuardRejected(t *testing.T) {
 	_, err := ParseV2Definitions(`
 module bindings.java.migration;
 binding containmentCheck {
@@ -1224,7 +1224,7 @@ binding containmentCheck {
     owner: "test"
     reason: "obsolete private query family should not lower"
   }
-  query unstable.analysisAssumeGuard as call where call.path == "analysis.guard.containment_check"
+  query unstable.privateGuard as call where call.path == "analysis.guard.containment_check"
   emit check core.InputValidation at call {
     advisory: true
     about: code.FilePathAccess
@@ -1236,9 +1236,9 @@ binding containmentCheck {
 }
 `)
 	if err == nil {
-		t.Fatal("ParseV2Definitions succeeded for unstable.analysisAssumeGuard")
+		t.Fatal("ParseV2Definitions succeeded for unstable.privateGuard")
 	}
-	if !strings.Contains(err.Error(), `unsupported unstable query family "unstable.analysisAssumeGuard"`) {
+	if !strings.Contains(err.Error(), `unsupported unstable query family "unstable.privateGuard"`) {
 		t.Fatalf("ParseV2Definitions error = %v", err)
 	}
 }

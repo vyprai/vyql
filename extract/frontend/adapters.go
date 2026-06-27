@@ -729,10 +729,10 @@ type filterSpec struct {
 	Requirement *parser.BindingRequirement
 }
 
-// assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
+// advisoryNeutralizerSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
 // might apply but cannot be proven to. It never kills a flow; the engine
 // attaches an assumption note instead.
-type assumeSpec struct {
+type advisoryNeutralizerSpec struct {
 	Pattern     string
 	ByMethod    bool
 	Mode        string // "guard" (must dominate the sink) | "sanitizer" (must lie on the path)
@@ -753,18 +753,18 @@ type paramSourceSpec struct {
 }
 
 type adapterSpec struct {
-	Name          string
-	Technology    string
-	containsMatch bool
-	crossLang     bool // labels nodes in EVERY language (skips the per-tech filter)
-	Inputs        []inputSpec
-	Sinks         []sinkSpec
-	Controls      []controlSpec
-	Marks         []controlSpec // presence markers (label the call node with a concept)
-	Flags         []flagSpec
-	Filters       []filterSpec
-	Assumes       []assumeSpec
-	ParamSources  []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
+	Name                 string
+	Technology           string
+	containsMatch        bool
+	crossLang            bool // labels nodes in EVERY language (skips the per-tech filter)
+	Inputs               []inputSpec
+	Sinks                []sinkSpec
+	Controls             []controlSpec
+	Marks                []controlSpec // presence markers (label the call node with a concept)
+	Flags                []flagSpec
+	Filters              []filterSpec
+	AdvisoryNeutralizers []advisoryNeutralizerSpec
+	ParamSources         []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
 }
 
 // AdaptersFor loads v2 bindings for a technology and builds the graph-labeling
@@ -864,16 +864,16 @@ func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	if len(spec.ParamSources) > 0 {
 		out = append(out, spec.paramSourceAdapter())
 	}
-	if len(spec.Assumes) > 0 {
-		out = append(out, spec.assumeAdapter())
+	if len(spec.AdvisoryNeutralizers) > 0 {
+		out = append(out, spec.advisoryNeutralizerAdapter())
 	}
 	return out
 }
 
-// assumeAdapter labels unsound-neutralizer calls (guards/transforms that cannot be
+// advisoryNeutralizerAdapter labels unsound-neutralizer calls (guards/transforms that cannot be
 // proven sound) with a Go-owned internal concept that the engine can surface as
 // review context.
-func (spec adapterSpec) assumeAdapter() adapters.Adapter {
+func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 	concept := ontology.InternalNeutralizerAssumptionConcept
 	return adapters.Adapter{
 		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
@@ -882,9 +882,9 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
-			allowed := make([]bool, len(spec.Assumes))
-			for i := range spec.Assumes {
-				allowed[i] = reqGate.allowed(spec.Assumes[i].Packages, spec.Assumes[i].Requirement)
+			allowed := make([]bool, len(spec.AdvisoryNeutralizers))
+			for i := range spec.AdvisoryNeutralizers {
+				allowed[i] = reqGate.allowed(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -893,7 +893,7 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 					continue
 				}
 				method, path := n.Prop("method"), n.Prop("callee_path")
-				for ai, as := range spec.Assumes {
+				for ai, as := range spec.AdvisoryNeutralizers {
 					if !allowed[ai] {
 						continue
 					}
@@ -1176,12 +1176,12 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "filter_path":
 			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
-		case "assume_guard_method", "assume_guard_path", "assume_sanitizer_method", "assume_sanitizer_path":
+		case "advisory_guard_method", "advisory_guard_path", "advisory_sanitizer_method", "advisory_sanitizer_path":
 			mode := "guard"
 			if strings.Contains(mp.Kind, "sanitizer") {
 				mode = "sanitizer"
 			}
-			s.Assumes = append(s.Assumes, assumeSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
+			s.AdvisoryNeutralizers = append(s.AdvisoryNeutralizers, advisoryNeutralizerSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
 				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		}
