@@ -189,9 +189,9 @@ func charClasses(s string) int {
 
 func loadProfile() textPatternProfile {
 	profileOnce.Do(func() {
-		files, err := datadir.ReadVYQLDir("adapters/textpattern")
+		files, err := datadir.ReadVYQLDir("bindings/textpattern")
 		if err != nil {
-			panic("textpattern: read adapters/textpattern: " + err.Error())
+			panic("textpattern: read bindings/textpattern: " + err.Error())
 		}
 		selected := map[string]bool{}
 		for _, file := range files {

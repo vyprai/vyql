@@ -274,7 +274,7 @@ func adapterFingerprint(deps map[string]bool) string {
 // generated corpus — only the matched generated files matter, and walking all of
 // them every scan would cost what this cache saves.
 func statAdapterData(h hash.Hash, deps map[string]bool) {
-	root := filepath.Join(datadir.Root(), "adapters")
+	root := filepath.Join(datadir.Root(), "bindings")
 	statStaticAdapterData(h, root)
 	if len(deps) == 0 {
 		return

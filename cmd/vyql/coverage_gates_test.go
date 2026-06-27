@@ -167,12 +167,12 @@ func TestConceptRefsResolveGate(t *testing.T) {
 			}
 		}
 	}
-	check("adapters", ".vyql")
+	check("bindings", ".vyql")
 	check("packs", ".vyql")
 	// the dynamically-loaded generated package corpus must also reference only real
 	// concepts (a dead label otherwise), but it is excluded from the curated coherence
 	// gates below because it legitimately wires broad concepts that have no curated rule.
-	for f, refs := range conceptRefsByFile(t, "adapters", ".vyql") {
+	for f, refs := range conceptRefsByFile(t, "bindings", ".vyql") {
 		if !isGeneratedAdapter(f) {
 			continue
 		}
@@ -186,10 +186,10 @@ func TestConceptRefsResolveGate(t *testing.T) {
 }
 
 // isGeneratedAdapter reports whether a data-file path is part of the dynamically-loaded
-// generated package-adapter corpus (adapters/packages/generated/<lang>/<pkg>.vyql), which
+// generated package-adapter corpus (bindings/packages/generated/<lang>/<pkg>.vyql), which
 // is auxiliary content gated at scan time and excluded from the curated coherence gates.
 func isGeneratedAdapter(path string) bool {
-	return strings.Contains(filepath.ToSlash(path), "/adapters/packages/generated/")
+	return strings.Contains(filepath.ToSlash(path), "/bindings/packages/generated/")
 }
 
 // conceptRefsIn returns the set of code/core concept names referenced (as targets or
@@ -328,7 +328,7 @@ func TestSinkConceptsWiredGate(t *testing.T) {
 	for s := range conceptsByKind(t, "sink") {
 		sinks[s] = true
 	}
-	adapterRefs := conceptRefsIn(t, "adapters")
+	adapterRefs := conceptRefsIn(t, "bindings")
 	ruleRefs := conceptRefsIn(t, "packs")
 	var latent []string
 	for s := range sinks {
@@ -400,7 +400,7 @@ func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 func TestSourceConceptsWiredGate(t *testing.T) {
 	reserved := conceptsWithBoolField(t, "source", "coverage_reserved_source")
 	sources := conceptsByKind(t, "source")
-	wired := conceptRefsIn(t, "adapters")
+	wired := conceptRefsIn(t, "bindings")
 	var unwired []string
 	for s := range sources {
 		if reserved[s] || wired[s] {
@@ -422,7 +422,7 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 func TestControlsWiredAreConsumedGate(t *testing.T) {
 	reserved := conceptsWithBoolField(t, "control", "coverage_reserved_control")
 	controls := conceptsByKind(t, "control")
-	wired := conceptRefsIn(t, "adapters")
+	wired := conceptRefsIn(t, "bindings")
 	consumed := map[string]bool{}
 	for _, decls := range parseDataDecls(t, "packs", ".vyql") {
 		for _, decl := range decls {
@@ -783,12 +783,12 @@ func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
 }
 
 // T0.5 — every adapter loads (parses v2 bindings and builds graph-labeling actions)
-// without panicking, for every adapter shipped under vyql/adapters/.
+// without panicking, for every adapter shipped under vyql/bindings/.
 func TestAllAdaptersLoadGate(t *testing.T) {
-	root := filepath.Join(datadir.Root(), "adapters")
+	root := filepath.Join(datadir.Root(), "bindings")
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		t.Fatalf("read adapters: %v", err)
+		t.Fatalf("read bindings: %v", err)
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() || entry.Name() == "packages" {
@@ -814,10 +814,10 @@ func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")); err != nil {
 				t.Fatalf("missing exhaustive language coverage spec: %v", err)
 			}
-			if _, err := os.Stat(filepath.Join(datadir.Root(), "adapters", "packages", lang)); err != nil {
+			if _, err := os.Stat(filepath.Join(datadir.Root(), "bindings", "packages", lang)); err != nil {
 				t.Fatalf("missing package catalog for %q: %v", lang, err)
 			}
-			sourceCount, sinkCount := countV2TaintEndpointMappings(t, filepath.Join("adapters", lang), filepath.Join("adapters", "packages", lang))
+			sourceCount, sinkCount := countV2TaintEndpointMappings(t, filepath.Join("bindings", lang), filepath.Join("bindings", "packages", lang))
 			if sourceCount == 0 {
 				t.Fatalf("%q has no v2 source endpoint definitions", lang)
 			}
@@ -1003,7 +1003,7 @@ func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 
 func TestDefinitionsDoNotUseLegacyFlagBridge(t *testing.T) {
 	var hits []string
-	for path, src := range readDataFiles(t, "adapters", ".vyql") {
+	for path, src := range readDataFiles(t, "bindings", ".vyql") {
 		lines := strings.Split(src, "\n")
 		for i, line := range lines {
 			trimmed := strings.TrimSpace(line)

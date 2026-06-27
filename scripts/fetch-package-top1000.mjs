@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-const sourcePath = path.join(repoRoot, "vyql/adapters/packages/top1000.sources.json");
-const outPath = path.join(repoRoot, "vyql/adapters/packages/top1000.snapshot.json");
+const sourcePath = path.join(repoRoot, "vyql/bindings/packages/top1000.sources.json");
+const outPath = path.join(repoRoot, "vyql/bindings/packages/top1000.snapshot.json");
 
 const sources = JSON.parse(await fs.readFile(sourcePath, "utf8"));
 const baseUrl = sources.source.base_url.replace(/\/$/, "");

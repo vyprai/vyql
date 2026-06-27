@@ -89,9 +89,9 @@ func (p sourceVarProfile) normalizeNoStrip(s string) string {
 
 func loadSourceVarProfiles() {
 	sourceVarProfiles = map[string]sourceVarProfile{}
-	files, err := datadir.ReadVYQLDirExcept("adapters", "packages")
+	files, err := datadir.ReadVYQLDirExcept("bindings", "packages")
 	if err != nil {
-		panic("treesitter: read adapters: " + err.Error())
+		panic("treesitter: read bindings: " + err.Error())
 	}
 	selected := map[string]bool{}
 	for _, file := range files {

@@ -3,8 +3,8 @@ package frontend
 // Dynamic, dependency-gated package-adapter loading.
 //
 // The vyrun batch generates one package-aware adapter per (language, top-1000 package)
-// under <data root>/adapters/packages/generated/<lang>/<pkg>/ or
-// <data root>/adapters/packages/generated/<lang>/<pkg>.vyql — ~9k mapped
+// under <data root>/bindings/packages/generated/<lang>/<pkg>/ or
+// <data root>/bindings/packages/generated/<lang>/<pkg>.vyql — ~9k mapped
 // catalogs. Loading all of them on every scan would parse thousands of files and build a spec with
 // tens of thousands of mappings for packages a project never touches. Instead this layer
 // loads ONLY the per-package adapters whose package is present in the project's dependency
@@ -30,7 +30,7 @@ import (
 
 // generatedRoot is the directory holding the generated per-package adapter corpus.
 func generatedRoot() string {
-	return filepath.Join(datadir.Root(), "adapters", "packages", "generated")
+	return filepath.Join(datadir.Root(), "bindings", "packages", "generated")
 }
 
 // GeneratedRoot exports generatedRoot so the incremental adapter-label cache can fingerprint
@@ -93,7 +93,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 }
 
 func readGeneratedPackageAdapterSources(tech, pkg string) ([]datadir.Source, error) {
-	dirRel := filepath.ToSlash(filepath.Join("adapters", "packages", "generated", tech, pkg))
+	dirRel := filepath.ToSlash(filepath.Join("bindings", "packages", "generated", tech, pkg))
 	if info, err := os.Stat(filepath.Join(datadir.Root(), dirRel)); err == nil && info.IsDir() {
 		return datadir.ReadVYQLDir(dirRel)
 	} else if err != nil && !os.IsNotExist(err) {

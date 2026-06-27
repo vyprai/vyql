@@ -1,7 +1,7 @@
 // Package frontend turns extracted code.* graphs into concept labels using
 // framework adapters (docs/07). The adapter CONTENT — which framework calls
 // are inputs, sinks, controls, and which constructors yield which types — is
-// VyQL, authored in vyql/adapters/<tech>.vyql and loaded at runtime. Only the
+// VyQL, authored in vyql/bindings/<tech>.vyql and loaded at runtime. Only the
 // matching engine and the language parsers are Go code.
 package frontend
 
@@ -848,7 +848,7 @@ func AdaptersFor(tech string) []adapters.Adapter {
 }
 
 // OverlayAdapters loads repo-local adapter overlays from root. Files may live
-// directly under root or under root/adapters. The overlay is intentionally
+// directly under root or under root/bindings. The overlay is intentionally
 // explicit and opt-in; parse errors are returned so a bad generated file does
 // not silently change scan behavior.
 func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
@@ -860,7 +860,7 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 		allowed[tech] = true
 	}
 	var files []string
-	for _, dir := range []string{root, filepath.Join(root, "adapters")} {
+	for _, dir := range []string{root, filepath.Join(root, "bindings")} {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
@@ -1069,11 +1069,11 @@ func loadBindingSet(tech string) *parser.BindingSet {
 	if cached, ok := bindingSetCache.Load(key); ok {
 		return cached.(*parser.BindingSet)
 	}
-	sources, err := datadir.ReadVYQLDir("adapters/" + tech)
+	sources, err := datadir.ReadVYQLDir("bindings/" + tech)
 	if err != nil {
-		panic("frontend: read adapters/" + tech + ": " + err.Error())
+		panic("frontend: read bindings/" + tech + ": " + err.Error())
 	}
-	if extra, err := datadir.ReadVYQLDir("adapters/packages/" + tech); err == nil {
+	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + tech); err == nil {
 		sources = append(sources, extra...)
 	}
 	decls, err := parseV2AdapterSources(sources)
@@ -1099,7 +1099,7 @@ func loadBindingSet(tech string) *parser.BindingSet {
 		actual, _ := bindingSetCache.LoadOrStore(key, merged)
 		return actual.(*parser.BindingSet)
 	}
-	panic("frontend: no v2 binding set in adapters/" + tech)
+	panic("frontend: no v2 binding set in bindings/" + tech)
 }
 
 type bindingSetCacheKey struct {
@@ -3800,7 +3800,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 	return false
 }
 
-// Per-language adapter sets (loaded from vyql/adapters/<tech>/).
+// Per-language adapter sets (loaded from vyql/bindings/<tech>/).
 func ConfigAdapters() []adapters.Adapter      { return AdaptersFor("config") }
 func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern") }
 
@@ -3863,7 +3863,7 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 }
 
 func autoAdapterSources() ([]datadir.Source, error) {
-	root := filepath.Join(datadir.Root(), "adapters")
+	root := filepath.Join(datadir.Root(), "bindings")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
@@ -3875,7 +3875,7 @@ func autoAdapterSources() ([]datadir.Source, error) {
 			if name == "packages" {
 				continue
 			}
-			sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("adapters", name)))
+			sources, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("bindings", name)))
 			if err != nil {
 				return nil, err
 			}
@@ -3885,7 +3885,7 @@ func autoAdapterSources() ([]datadir.Source, error) {
 		if !strings.HasSuffix(name, ".vyql") {
 			continue
 		}
-		rel := filepath.ToSlash(filepath.Join("adapters", name))
+		rel := filepath.ToSlash(filepath.Join("bindings", name))
 		raw, err := datadir.Read(rel)
 		if err != nil {
 			return nil, err

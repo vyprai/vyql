@@ -599,9 +599,9 @@ var (
 
 func loadProfile() configProfile {
 	configProfileOnce.Do(func() {
-		files, err := datadir.ReadVYQLDir("adapters/config")
+		files, err := datadir.ReadVYQLDir("bindings/config")
 		if err != nil {
-			panic("config: read adapters/config: " + err.Error())
+			panic("config: read bindings/config: " + err.Error())
 		}
 		selected := map[string]bool{}
 		for _, file := range files {

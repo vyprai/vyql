@@ -455,11 +455,11 @@ func cmdBindings(args []string) error {
 		}
 		return nil
 	}
-	data, err := datadir.Read("adapters/" + *lang + ".vyql")
+	sources, err := bindingDefinitionSources(*lang)
 	if err != nil {
 		return fmt.Errorf("no binding set for %q (%v)", *lang, err)
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(sources), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return fmt.Errorf("binding parse: %w", err)
 	}
@@ -506,11 +506,26 @@ func bindingNames() []string {
 	var out []string
 	for _, l := range []string{"go", "javascript", "java", "python", "ruby", "php", "csharp",
 		"rust", "kotlin", "scala", "swift", "c", "cpp"} {
-		if _, err := datadir.Read("adapters/" + l + ".vyql"); err == nil {
+		if _, err := datadir.ReadVYQLDir("bindings/" + l); err == nil {
 			out = append(out, l)
 		}
 	}
 	return out
+}
+
+func bindingDefinitionSources(lang string) ([]parser.V2DefinitionSource, error) {
+	files, err := datadir.ReadVYQLDir("bindings/" + lang)
+	if err != nil {
+		return nil, err
+	}
+	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + lang); err == nil {
+		files = append(files, extra...)
+	}
+	sources := make([]parser.V2DefinitionSource, 0, len(files))
+	for _, file := range files {
+		sources = append(sources, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
+	}
+	return sources, nil
 }
 
 // ── vyql validate-binding ──────────────────────────────────────────────────────────

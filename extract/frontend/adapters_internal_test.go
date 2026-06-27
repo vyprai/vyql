@@ -160,17 +160,13 @@ func TestFrontendEntryVariableNamesComeFromData(t *testing.T) {
 
 func frontendSourceVarNeedles(t *testing.T) []string {
 	t.Helper()
-	files, err := filepath.Glob(filepath.Join(datadir.Root(), "adapters", "*.vyql"))
+	sources, err := datadir.ReadVYQLDirExcept("bindings", "packages")
 	if err != nil {
 		t.Fatal(err)
 	}
 	seen := map[string]bool{}
-	for _, file := range files {
-		raw, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		decls, err := parseV2DefinitionsForTest(string(raw))
+	for _, source := range sources {
+		decls, err := parseV2DefinitionsForTest(string(source.Data))
 		if err != nil {
 			t.Fatal(err)
 		}

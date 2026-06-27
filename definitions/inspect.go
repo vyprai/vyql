@@ -110,7 +110,7 @@ func Inspect(opts InspectOptions) (Catalog, error) {
 		}
 	}
 	if wantKind(opts.Kind, "bindings") {
-		if err := inspectDeclDir(&cat, "adapters"); err != nil {
+		if err := inspectDeclDir(&cat, "bindings"); err != nil {
 			return cat, err
 		}
 	}

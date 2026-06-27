@@ -50,9 +50,9 @@ func CallEffectsFor(tech, path, method string) []nir.CallEffect {
 
 func loadCallFlowProfiles() {
 	callFlowProfiles = map[string][]callFlowSpec{}
-	files, err := datadir.ReadVYQLDirExcept("adapters", "packages")
+	files, err := datadir.ReadVYQLDirExcept("bindings", "packages")
 	if err != nil {
-		panic("frontend: read adapters: " + err.Error())
+		panic("frontend: read bindings: " + err.Error())
 	}
 	decls, err := parseV2AdapterSources(files)
 	if err != nil {

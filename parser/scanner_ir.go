@@ -152,7 +152,7 @@ func (t *ThreatDecl) QualifiedName() string {
 }
 
 // ReviewDecl attaches review/triage presentation metadata to a concept. The
-// scanner still labels concepts through adapters/rules; this declaration only
+// scanner still labels concepts through bindings/rules; this declaration only
 // controls `vyql scan --flags` categorization, expected checks, and reader guidance.
 type ReviewDecl struct {
 	Concept string

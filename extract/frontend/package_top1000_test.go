@@ -44,9 +44,9 @@ type topPackage struct {
 
 func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 	var sources topPackageSources
-	mustReadJSON(t, "adapters/packages/top1000.sources.json", &sources)
+	mustReadJSON(t, "bindings/packages/top1000.sources.json", &sources)
 	var snapshot topPackageSnapshot
-	mustReadJSON(t, "adapters/packages/top1000.snapshot.json", &snapshot)
+	mustReadJSON(t, "bindings/packages/top1000.snapshot.json", &snapshot)
 
 	if sources.Schema != 1 || snapshot.Schema != 1 {
 		t.Fatalf("unexpected schema: sources=%d snapshot=%d", sources.Schema, snapshot.Schema)
@@ -104,7 +104,7 @@ func TestTop1000PackageCoverageSnapshot(t *testing.T) {
 
 func TestGeneratedPackageAdapterSourceRejectsLegacySyntax(t *testing.T) {
 	source := datadir.Source{
-		Name: "adapters/packages/generated/javascript/legacy.vyql",
+		Name: "bindings/packages/generated/javascript/legacy.vyql",
 		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
 	}
 
@@ -112,7 +112,7 @@ func TestGeneratedPackageAdapterSourceRejectsLegacySyntax(t *testing.T) {
 	if err == nil {
 		t.Fatal("generated package adapter accepted legacy syntax")
 	}
-	if !strings.Contains(err.Error(), "invalid generated package adapter adapters/packages/generated/javascript/legacy.vyql") {
+	if !strings.Contains(err.Error(), "invalid generated package adapter bindings/packages/generated/javascript/legacy.vyql") {
 		t.Fatalf("generated adapter error = %v, want generated file context", err)
 	}
 
@@ -131,7 +131,7 @@ func mustReadJSON(t *testing.T, rel string, dst any) {
 
 func supportedPackageCatalogLanguages(t *testing.T) []string {
 	t.Helper()
-	root := filepath.Join(datadir.Root(), "adapters", "packages")
+	root := filepath.Join(datadir.Root(), "bindings", "packages")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatalf("read package catalog dir: %v", err)
@@ -155,7 +155,7 @@ func supportedPackageCatalogLanguages(t *testing.T) []string {
 		t.Fatalf("supported package catalogs = %d (%v), want 22", len(out), out)
 	}
 	for _, lang := range out {
-		if _, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("adapters", "packages", lang))); err != nil {
+		if _, err := datadir.ReadVYQLDir(filepath.ToSlash(filepath.Join("bindings", "packages", lang))); err != nil {
 			t.Fatalf("missing catalog for %s: %v", lang, err)
 		}
 	}

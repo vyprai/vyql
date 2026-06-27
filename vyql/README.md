@@ -15,7 +15,7 @@ vyql/
     misconfig.vyql  mobile.vyql  numeric.vyql  path.vyql  concurrency.vyql
     request_forgery.vyql  resource.vyql  runtime.vyql  sca.vyql  secrets.vyql
     smartcontract.vyql
-  adapters/     framework->concept binding modules (`binding ...`) split by technology
+  bindings/     framework->concept binding modules (`binding ...`) split by technology
     bash.vyql  c.vyql  config.vyql  cpp.vyql  csharp.vyql  dart.vyql
     elixir.vyql  go.vyql  groovy.vyql  java.vyql  javascript.vyql
     kotlin.vyql  lua.vyql  objc.vyql  perl.vyql  php.vyql  pii.vyql
@@ -45,7 +45,7 @@ vyql/
   and the output formatters. Go supplies primitive predicates and execution; v2
   `mechanic` and `policy` declarations define the security semantics.
 
-### Binding Syntax (`adapters/<tech>/.../*.vyql`)
+### Binding Syntax (`bindings/<tech>/.../*.vyql`)
 
 ```vyql
 module bindings.python.flask;
@@ -75,7 +75,7 @@ matching code.
   it up (or point `-rules` at a file/dir).
 - **Concepts / threat kinds** — edit `ontology/concepts.vyql`
   (`concept X : kind { … }`) and `ontology/threatkinds.vyql` (`threat X { … }`).
-- **Bindings** — edit `adapters/<tech>/.../*.vyql` (`binding ...`) to grow
+- **Bindings** — edit `bindings/<tech>/.../*.vyql` (`binding ...`) to grow
   framework/source/sink/check coverage.
 - After any edit, `cd go && go test -count=1 ./...` validates that every concept, threat-kind, and
   CWE/CAPEC id resolves and that every rule type-checks.
