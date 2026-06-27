@@ -118,3 +118,26 @@ func TestIdentityPolicyDedupIsCanonical(t *testing.T) {
 		t.Fatalf("dedup survivor should be canonical high-evidence finding: gotA=%#v gotB=%#v", gotA[1], gotB[1])
 	}
 }
+
+func TestSortStringsLinearOrdersKeys(t *testing.T) {
+	got := []string{
+		"rule=R|loc=b.go:2|concept=code.SqlExecution",
+		"rule=R|loc=a.go:10|concept=code.CommandExecution",
+		"rule=R|loc=a.go:1|concept=code.CommandExecution",
+		"",
+		"rule=R|loc=a.go:1|concept=code.Asset",
+	}
+	sortStringsLinear(got)
+	want := []string{
+		"",
+		"rule=R|loc=a.go:10|concept=code.CommandExecution",
+		"rule=R|loc=a.go:1|concept=code.Asset",
+		"rule=R|loc=a.go:1|concept=code.CommandExecution",
+		"rule=R|loc=b.go:2|concept=code.SqlExecution",
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("sorted[%d] = %q, want %q (all=%v)", i, got[i], want[i], got)
+		}
+	}
+}

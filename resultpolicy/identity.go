@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -66,12 +65,54 @@ func (p IdentityPolicy) Dedup(fs []*findings.Finding) []*findings.Finding {
 		byKey[key] = f
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sortStringsLinear(keys)
 	out := make([]*findings.Finding, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, byKey[key])
 	}
 	return out
+}
+
+func sortStringsLinear(xs []string) {
+	if len(xs) < 2 {
+		return
+	}
+	aux := make([]string, len(xs))
+	msdStringSort(xs, aux, 0, len(xs), 0)
+}
+
+func msdStringSort(xs, aux []string, lo, hi, depth int) {
+	if hi-lo < 2 {
+		return
+	}
+	var count [258]int
+	for i := lo; i < hi; i++ {
+		count[stringRadixAt(xs[i], depth)+1]++
+	}
+	for r := 0; r < 257; r++ {
+		count[r+1] += count[r]
+	}
+	next := count
+	for i := lo; i < hi; i++ {
+		c := stringRadixAt(xs[i], depth)
+		aux[next[c]] = xs[i]
+		next[c]++
+	}
+	copy(xs[lo:hi], aux[:hi-lo])
+	for c := 1; c <= 256; c++ {
+		start := lo + count[c]
+		end := lo + count[c+1]
+		if end-start > 1 {
+			msdStringSort(xs, aux, start, end, depth+1)
+		}
+	}
+}
+
+func stringRadixAt(s string, depth int) int {
+	if depth >= len(s) {
+		return 0
+	}
+	return int(s[depth]) + 1
 }
 
 func compareFindingsForDedup(a, b *findings.Finding) int {
@@ -140,7 +181,6 @@ func bindingsStableKey(bindings []findings.Binding) string {
 	for _, b := range bindings {
 		parts = append(parts, b.Name+"="+b.Concept+"@"+b.Loc+"#"+b.NodeID)
 	}
-	sort.Strings(parts)
 	return strings.Join(parts, ";")
 }
 
