@@ -1003,15 +1003,104 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	}
 
 	cveSpecs := readCVERankSpecFiles(t)
-	uniqueSpecRanks := map[int]bool{}
+	specRanksByRank := map[int][]string{}
 	for _, path := range cveSpecs {
 		rank, ok := cveRankFromSpecName(filepath.Base(path))
-		if ok {
-			uniqueSpecRanks[rank] = true
+		if !ok {
+			t.Fatalf("CVE spec file has invalid rank name: %s", filepath.Base(path))
 		}
+		if _, ok := ledgerByRank[rank]; !ok {
+			t.Fatalf("CVE spec %s references rank %d which is not present in cve-1000 ledger", filepath.Base(path), rank)
+		}
+		specRanksByRank[rank] = append(specRanksByRank[rank], filepath.Base(path))
+	}
+	uniqueSpecRanks := map[int]bool{}
+	for rank, names := range specRanksByRank {
+		uniqueSpecRanks[rank] = true
+		if len(names) > 1 && !cve1000AllowedDuplicateSpecRanks[rank] {
+			sort.Strings(names)
+			t.Fatalf("CVE rank %d has %d spec files but is not in the duplicate-spec allowlist: %s", rank, len(names), strings.Join(names, ", "))
+		}
+	}
+	for rank := range cve1000AllowedDuplicateSpecRanks {
+		if len(specRanksByRank[rank]) < 2 {
+			t.Fatalf("CVE duplicate-spec allowlist rank %d is stale; found %d spec file(s)", rank, len(specRanksByRank[rank]))
+		}
+	}
+	if len(cveSpecs) < 787 || len(uniqueSpecRanks) < 781 {
+		t.Fatalf("CVE runnable rank specs regressed: files=%d unique_ranks=%d, want at least files=787 unique_ranks=781", len(cveSpecs), len(uniqueSpecRanks))
+	}
+
+	var missingRunnable, staleNoSpecExceptions, skipWithSpecs []string
+	for rank, row := range ledgerByRank {
+		fields := strings.SplitN(row, "\t", 6)
+		status := fields[4]
+		hasSpec := uniqueSpecRanks[rank]
+		switch {
+		case status == "SKIP" && hasSpec:
+			skipWithSpecs = append(skipWithSpecs, fmt.Sprintf("%d", rank))
+		case status != "SKIP" && !hasSpec && !cve1000AcceptedNoSpecRanks[rank]:
+			missingRunnable = append(missingRunnable, fmt.Sprintf("%d:%s", rank, status))
+		}
+	}
+	for rank := range cve1000AcceptedNoSpecRanks {
+		row, ok := ledgerByRank[rank]
+		if !ok {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:missing-ledger", rank))
+			continue
+		}
+		fields := strings.SplitN(row, "\t", 6)
+		if fields[4] == "SKIP" {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:skip-status", rank))
+			continue
+		}
+		if uniqueSpecRanks[rank] {
+			staleNoSpecExceptions = append(staleNoSpecExceptions, fmt.Sprintf("%d:now-has-spec", rank))
+		}
+	}
+	if len(skipWithSpecs) > 0 {
+		sort.Strings(skipWithSpecs)
+		t.Fatalf("CVE SKIP ranks must not have runnable specs; remove skip or spec: %s", strings.Join(skipWithSpecs, ", "))
+	}
+	if len(missingRunnable) > 0 {
+		sort.Strings(missingRunnable)
+		t.Fatalf("CVE non-SKIP ledger ranks without runnable specs must be listed in cve1000AcceptedNoSpecRanks: %s", strings.Join(missingRunnable, ", "))
+	}
+	if len(staleNoSpecExceptions) > 0 {
+		sort.Strings(staleNoSpecExceptions)
+		t.Fatalf("CVE no-spec exception list is stale; remove or fix: %s", strings.Join(staleNoSpecExceptions, ", "))
 	}
 	t.Logf("cve-1000 ledger: pool=%d ledger_rows=%d unique_ranks=%d statuses=%v cve_specs=%d unique_spec_ranks=%d",
 		len(poolRows), len(ledgerRows), len(covered), statuses, len(cveSpecs), len(uniqueSpecRanks))
+}
+
+var cve1000AllowedDuplicateSpecRanks = map[int]bool{
+	474: true,
+	495: true,
+	795: true,
+	835: true,
+	853: true,
+	955: true,
+}
+
+// cve1000AcceptedNoSpecRanks is the explicit burn-down list for non-SKIP ledger
+// rows that are currently verified only by the CVE prep/eval ledger rather than a
+// runnable cve_rank*.test.vyql spec. Adding a runnable rank spec must remove the
+// rank here; new non-SKIP ledger rows without specs fail the gate.
+var cve1000AcceptedNoSpecRanks = map[int]bool{
+	0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true, 10: true, 11: true, 12: true, 13: true, 14: true, 15: true,
+	16: true, 17: true, 18: true, 19: true, 20: true, 21: true, 22: true, 23: true, 24: true, 25: true, 26: true, 27: true, 28: true, 29: true, 30: true, 31: true,
+	32: true, 33: true, 34: true, 35: true, 36: true, 37: true, 38: true, 39: true, 40: true, 41: true, 42: true, 43: true, 44: true, 45: true, 46: true, 47: true,
+	48: true, 49: true, 50: true, 51: true, 52: true, 53: true, 54: true, 55: true, 56: true, 57: true, 58: true, 59: true, 60: true, 61: true, 62: true, 63: true,
+	64: true, 65: true, 66: true, 67: true, 68: true, 69: true, 70: true, 71: true, 72: true, 73: true, 74: true, 75: true, 76: true, 77: true, 78: true, 79: true,
+	80: true, 81: true, 82: true, 83: true, 84: true, 85: true, 86: true, 87: true, 88: true, 89: true, 90: true, 91: true, 92: true, 93: true, 94: true, 95: true,
+	96: true, 97: true, 98: true, 99: true, 100: true, 101: true, 102: true, 103: true, 104: true, 105: true, 106: true, 107: true, 108: true, 109: true, 110: true, 111: true,
+	112: true, 113: true, 114: true, 115: true, 116: true, 117: true, 118: true, 119: true, 120: true, 121: true, 122: true, 123: true, 124: true, 127: true, 128: true, 131: true,
+	132: true, 133: true, 134: true, 135: true, 136: true, 137: true, 144: true, 145: true, 160: true, 170: true, 177: true, 183: true, 184: true, 199: true, 208: true, 217: true,
+	218: true, 230: true, 231: true, 289: true, 293: true, 302: true, 312: true, 325: true, 329: true, 338: true, 339: true, 342: true, 345: true, 459: true, 461: true, 463: true,
+	465: true, 466: true, 489: true, 511: true, 516: true, 522: true, 531: true, 537: true, 538: true, 540: true, 543: true, 544: true, 547: true, 556: true, 561: true, 566: true,
+	568: true, 573: true, 574: true, 583: true, 588: true, 591: true, 592: true, 597: true, 609: true, 641: true, 643: true, 710: true, 717: true, 720: true, 721: true, 789: true,
+	791: true, 800: true, 819: true, 824: true, 829: true, 996: true,
 }
 
 func nonemptyTSVRows(src string) []string {
