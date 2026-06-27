@@ -606,7 +606,7 @@ func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
 module bindings.javascript.test;
 
 binding secretComparison {
-  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:parseOut" and node.token contains "selector:data.x-csrf-token" and node.token contains "identifier:providedToken" and not (node.token contains "call_path:crypto.timingSafeEqual")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "parseOut" and node.context.selector contains "data.x-csrf-token" and node.context.identifier contains "providedToken" and not (node.context.callPath contains "crypto.timingSafeEqual")
   emit issue custom.SecretComparison at node
 }
 `)

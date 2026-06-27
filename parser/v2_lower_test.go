@@ -1259,7 +1259,7 @@ func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.perl.migration;
 binding cleartextChannel {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")
+  query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.context.literal contains "http://" and not (node.context.literal contains "127.0")
   emit issue code.CleartextChannel at node
 }
 `)
@@ -1283,8 +1283,40 @@ binding cleartextChannel {
 	if got := m.Flag.Predicates[0]; got.Property != "path" || got.Op != "match" || got.Values[0] != "getstore" {
 		t.Fatalf("path predicate wrong: %+v", got)
 	}
-	if got := m.Flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || !got.Negative || got.Values[0] != "127.0" {
-		t.Fatalf("negative token predicate wrong: %+v", got)
+	if got := m.Flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || !got.Negative || got.Values[0] != "literal:127.0" {
+		t.Fatalf("negative context literal predicate wrong: %+v", got)
+	}
+}
+
+func TestV2PresenceNodeContextFieldPrefixes(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.migration;
+matcher sensitiveName {
+  containsAny: ["token", "secret"]
+}
+binding contextFields {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
+	if flag.Scope != "function" || len(flag.Predicates) != 4 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "lang=javascript" {
+		t.Fatalf("language predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "call_path:parseOut" || got.Values[1] != "call_path:crypto.timingSafeEqual" {
+		t.Fatalf("callPath predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "selector:data.x-csrf-token" {
+		t.Fatalf("selector predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[3]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "identifier:token" || got.Values[1] != "identifier:secret" {
+		t.Fatalf("matcher predicate wrong: %+v", got)
 	}
 }
 

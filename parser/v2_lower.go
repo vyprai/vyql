@@ -1098,6 +1098,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		if !ok {
 			return BindingPresencePredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
 		}
+		value = prefixV2PresenceValue(field, value)
 		pred := BindingPresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg}
 		switch {
 		case prop == "path":
@@ -1116,6 +1117,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		if !ok {
 			return BindingPresencePredicate{}, fmt.Errorf("%s in predicate requires a string list", field)
 		}
+		values = prefixV2PresenceValues(field, values)
 		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg}, nil
 	case "is":
 		matcherName, ok := v2MatcherRef(x.Right)
@@ -1135,7 +1137,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		if matcher.Op == "" || len(matcher.Values) == 0 {
 			return BindingPresencePredicate{}, fmt.Errorf("matcher %s: empty matcher", matcherName)
 		}
-		return BindingPresencePredicate{Subject: subject, Property: prop, Op: matcher.Op, Values: matcher.Values, Negative: neg}, nil
+		return BindingPresencePredicate{Subject: subject, Property: prop, Op: matcher.Op, Values: prefixV2PresenceValues(field, matcher.Values), Negative: neg}, nil
 	default:
 		return BindingPresencePredicate{}, fmt.Errorf("unsupported operator %q", x.Op)
 	}
@@ -1168,6 +1170,7 @@ func lowerV2PresenceCall(alias, defaultSubject string, x V2CallExpr, neg bool) (
 	if !ok {
 		return BindingPresencePredicate{}, fmt.Errorf("containsAny second arg must be a string list")
 	}
+	values = prefixV2PresenceValues(field, values)
 	return BindingPresencePredicate{Subject: subject, Property: prop, Op: "contains_any", Values: values, Negative: neg}, nil
 }
 
@@ -1199,6 +1202,11 @@ func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 	if rest, ok := strings.CutPrefix(field, "prop."); ok {
 		return defaultSubject, rest, true
 	}
+	if _, ok := strings.CutPrefix(field, "context."); ok {
+		if v2PresenceValuePrefix(field) != "" {
+			return defaultSubject, "tokens", true
+		}
+	}
 	switch field {
 	case "path":
 		return defaultSubject, "path", true
@@ -1210,6 +1218,66 @@ func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 		return defaultSubject, field, true
 	default:
 		return "", "", false
+	}
+}
+
+func prefixV2PresenceValue(field, value string) string {
+	prefix := v2PresenceValuePrefix(field)
+	if prefix == "" || strings.HasPrefix(value, prefix) {
+		return value
+	}
+	return prefix + value
+}
+
+func prefixV2PresenceValues(field string, values []string) []string {
+	prefix := v2PresenceValuePrefix(field)
+	if prefix == "" {
+		return values
+	}
+	out := make([]string, len(values))
+	for i, value := range values {
+		out[i] = value
+		if !strings.HasPrefix(value, prefix) {
+			out[i] = prefix + value
+		}
+	}
+	return out
+}
+
+func v2PresenceValuePrefix(field string) string {
+	if !strings.HasPrefix(field, "context.") {
+		return ""
+	}
+	field = strings.TrimPrefix(field, "context.")
+	switch field {
+	case "language":
+		return "lang="
+	case "callPath":
+		return "call_path:"
+	case "call":
+		return "call:"
+	case "functionName":
+		return "function_name:"
+	case "className":
+		return "class_name:"
+	case "classBase":
+		return "class_base:"
+	case "selector":
+		return "selector:"
+	case "literal":
+		return "literal:"
+	case "identifier":
+		return "identifier:"
+	case "expr":
+		return "expr:"
+	case "annotation":
+		return "annotation:"
+	case "prop":
+		return "prop:"
+	case "index":
+		return "index:"
+	default:
+		return ""
 	}
 }
 
