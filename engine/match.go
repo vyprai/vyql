@@ -20,7 +20,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	for _, cl := range cr.Rule.Clauses {
 		switch cl.Kind {
 		case "where":
-			where = cl.Where
+			where = mergeWhere(where, cl.Where)
 		case "unless":
 			switch ex := cl.Unless.(type) {
 			case parser.EndpointCoveredBy:
@@ -186,6 +186,16 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 		return !ok, nil
 	case parser.And:
 		return e.evalWhere(a, env)
+	case parser.Or:
+		var witnesses []string
+		for _, part := range flattenOr(a) {
+			ok, w := e.evalAtom(part, env)
+			if ok {
+				witnesses = append(witnesses, w...)
+				return true, witnesses
+			}
+		}
+		return false, nil
 	case parser.SolverCall:
 		return e.evalSolverCall(a, env)
 	case parser.HoldsAssetKind:

@@ -111,6 +111,51 @@ rule ComposedMatch {
 	}
 }
 
+func TestMatchComposesRepeatedWhereClauses(t *testing.T) {
+	src := `
+module test;
+rule RepeatedWhere {
+  issue custom.WorkItem as w
+  where w.kind == api
+  where w.tier == prod
+}
+`
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "ok", Type: "custom.WorkItem", Props: map[string]string{"kind": "api", "tier": "prod"}})
+	s.AddLabel("ok", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "wrong-tier", Type: "custom.WorkItem", Props: map[string]string{"kind": "api", "tier": "dev"}})
+	s.AddLabel("wrong-tier", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "wrong-kind", Type: "custom.WorkItem", Props: map[string]string{"kind": "worker", "tier": "prod"}})
+	s.AddLabel("wrong-kind", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 1 {
+		t.Fatalf("repeated where clauses should compose as AND, got %d", counts[0])
+	}
+}
+
+func TestMatchSupportsWhereOrExpression(t *testing.T) {
+	src := `
+module test;
+rule EitherKind {
+  issue custom.WorkItem as w
+  where w.kind == api or w.kind == worker
+}
+`
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "api", Type: "custom.WorkItem", Props: map[string]string{"kind": "api"}})
+	s.AddLabel("api", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "worker", Type: "custom.WorkItem", Props: map[string]string{"kind": "worker"}})
+	s.AddLabel("worker", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "batch", Type: "custom.WorkItem", Props: map[string]string{"kind": "batch"}})
+	s.AddLabel("batch", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 2 {
+		t.Fatalf("or where expression should match two candidates, got %d", counts[0])
+	}
+}
+
 func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
 	rule := `
 module test;

@@ -203,9 +203,33 @@ func (e *Engine) whereAssetKinds(r *parser.Rule) map[string]bool {
 
 func flattenAnd(e parser.Expr) []parser.Expr {
 	if a, ok := e.(parser.And); ok {
-		return a.Parts
+		var out []parser.Expr
+		for _, part := range a.Parts {
+			out = append(out, flattenAnd(part)...)
+		}
+		return out
 	}
 	return []parser.Expr{e}
+}
+
+func flattenOr(e parser.Expr) []parser.Expr {
+	if a, ok := e.(parser.Or); ok {
+		var out []parser.Expr
+		for _, part := range a.Parts {
+			out = append(out, flattenOr(part)...)
+		}
+		return out
+	}
+	return []parser.Expr{e}
+}
+
+func mergeWhere(existing, next parser.Expr) parser.Expr {
+	if existing == nil {
+		return next
+	}
+	parts := append([]parser.Expr{}, flattenAnd(existing)...)
+	parts = append(parts, flattenAnd(next)...)
+	return parser.And{Parts: parts}
 }
 
 // crossDomainContext surfaces ontology-configured graph context around a finding.

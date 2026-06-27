@@ -3057,6 +3057,27 @@ func lowerV2RuleWhereBinary(x V2BinaryExpr, names v2NameResolver) (Expr, error) 
 			parts = append(parts, right)
 		}
 		return And{Parts: parts}, nil
+	case "or":
+		left, err := lowerV2RuleWhereExpr(x.Left, names)
+		if err != nil {
+			return nil, err
+		}
+		right, err := lowerV2RuleWhereExpr(x.Right, names)
+		if err != nil {
+			return nil, err
+		}
+		var parts []Expr
+		if l, ok := left.(Or); ok {
+			parts = append(parts, l.Parts...)
+		} else {
+			parts = append(parts, left)
+		}
+		if r, ok := right.(Or); ok {
+			parts = append(parts, r.Parts...)
+		} else {
+			parts = append(parts, right)
+		}
+		return Or{Parts: parts}, nil
 	case "==", "!=":
 		ref, ok := v2RuleWhereRef(x.Left)
 		if !ok {

@@ -1959,9 +1959,13 @@ rule Confidence {
   issue code.Review as r
   where r.confidence == high
 }
+rule ReviewOrSecret {
+  issue code.Review as r
+  where r.category == review or r.category == secret
+}
 `)
-	if len(decls) != 5 {
-		t.Fatalf("decls = %d, want 5", len(decls))
+	if len(decls) != 6 {
+		t.Fatalf("decls = %d, want 6", len(decls))
 	}
 	toxic := decls[0].(*Rule)
 	and, ok := toxic.Clauses[0].Where.(And)
@@ -1986,6 +1990,11 @@ rule Confidence {
 	conf := decls[4].(*Rule)
 	if got, ok := conf.Clauses[0].Where.(Cmp); !ok || got.Ref.String() != "r.confidence" || got.Op != "==" || got.Value != "high" {
 		t.Fatalf("confidence where = %#v, want Cmp", conf.Clauses[0].Where)
+	}
+	disj := decls[5].(*Rule)
+	or, ok := disj.Clauses[0].Where.(Or)
+	if !ok || len(or.Parts) != 2 {
+		t.Fatalf("or where = %#v, want two-part Or", disj.Clauses[0].Where)
 	}
 }
 

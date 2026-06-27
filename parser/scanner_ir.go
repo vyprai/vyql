@@ -275,6 +275,7 @@ func (r Ref) String() string {
 }
 
 type And struct{ Parts []Expr }
+type Or struct{ Parts []Expr }
 type Not struct{ Inner Expr }
 
 // Arg is a solver-call argument (a ref, optionally bound `as name`).
@@ -314,6 +315,7 @@ type NotIn struct {
 }
 
 func (And) isExpr()            {}
+func (Or) isExpr()             {}
 func (Not) isExpr()            {}
 func (SolverCall) isExpr()     {}
 func (HoldsAssetKind) isExpr() {}
