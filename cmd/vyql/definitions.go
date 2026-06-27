@@ -186,7 +186,7 @@ func v2UnstableMetaStrings(meta map[string]any) (owner, reason string) {
 
 func cmdDefinitionsCheckV2(args []string) error {
 	fs := flag.NewFlagSet("definitions check-v2", flag.ExitOnError)
-	in := fs.String("in", "", "v2 .vyql file or directory to verify without v1 fallback")
+	in := fs.String("in", "", "v2 .vyql file or directory to verify")
 	_ = fs.Parse(args)
 	if *in == "" {
 		return fmt.Errorf("definitions check-v2 requires -in <file|dir>")
@@ -226,7 +226,7 @@ func checkV2Sources(sources []parser.V2Source) (int, error) {
 	if err := parser.ValidateV2Corpus(sources); err != nil {
 		return 0, fmt.Errorf("v2 corpus validation failed: %w", err)
 	}
-	if _, err := parser.LowerV2SourcesToRuntime(sources); err != nil {
+	if _, err := parser.LowerRuntimeSources(sources); err != nil {
 		return 0, fmt.Errorf("v2 lower failed: %w", err)
 	}
 	return len(sources), nil

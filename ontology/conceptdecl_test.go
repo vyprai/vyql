@@ -38,7 +38,7 @@ concept Deserialization : sink {
 }
 
 // Multi-module v2 concept text and a neutralizing `check` both parse,
-// and a loaded ontology type-checks `sanitized_by` correctly.
+// and a loaded ontology type-checks v2 path coveredBy controls correctly.
 func TestConceptDeclDottedAndTyping(t *testing.T) {
 	src := `
 module code;

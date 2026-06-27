@@ -62,7 +62,7 @@ func ThreatKinds() []ThreatKind {
 		if err != nil {
 			panic("ontology: read ontology/threatkinds.vyql: " + err.Error())
 		}
-		decls, err := parser.ParseV2RuntimeSources(v2RuntimeSources(files))
+		decls, err := parser.ParseRuntimeSources(runtimeSources(files))
 		if err != nil {
 			panic("ontology: invalid threat-kind corpus: " + err.Error())
 		}
@@ -81,10 +81,10 @@ func ThreatKinds() []ThreatKind {
 	return threatKinds
 }
 
-func v2RuntimeSources(files []datadir.Source) []parser.V2RuntimeSource {
-	out := make([]parser.V2RuntimeSource, 0, len(files))
+func runtimeSources(files []datadir.Source) []parser.RuntimeSource {
+	out := make([]parser.RuntimeSource, 0, len(files))
 	for _, file := range files {
-		out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+		out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 	}
 	return out
 }

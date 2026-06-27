@@ -1,8 +1,7 @@
 // Package engine compiles and evaluates VyQL rules (docs/03, /05), ported from
 // poc/vyql/engine.py. The hard boundary enforced here: every concept a rule
 // references must resolve in the ontology, endpoints are kind-checked, and
-// `unless sanitized_by`/`guarded_by` are typed against control<->threat<->sink
-// typing at COMPILE time.
+// v2 coveredBy controls are typed against control<->threat<->sink at COMPILE time.
 package engine
 
 import (
@@ -153,7 +152,7 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 					continue
 				}
 				switch ex := cl.Unless.(type) {
-				case parser.SanitizedBy:
+				case parser.PathCoveredBy:
 					if err := requireConcept(onto, ex.Concept, "sanitizer of "+r.QualifiedName()); err != nil {
 						return nil, err
 					}
@@ -165,8 +164,8 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 						cr.KillControls[c] = true
 					}
 					cr.NeutralizedThreats[threat] = true
-				case parser.GuardedBy:
-					// guarded_by on a typed sink is threat-typed too (docs/06)
+				case parser.EndpointCoveredBy:
+					// Endpoint coverage on a typed sink is threat-typed too (docs/06).
 					if err := requireConcept(onto, ex.Concept, "guard of "+r.QualifiedName()); err != nil {
 						return nil, err
 					}
@@ -215,11 +214,11 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 				continue
 			}
 			switch ex := cl.Unless.(type) {
-			case parser.SanitizedBy:
+			case parser.PathCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}
-			case parser.GuardedBy:
+			case parser.EndpointCoveredBy:
 				if err := requireConcept(onto, ex.Concept, "control of "+r.QualifiedName()); err != nil {
 					return nil, err
 				}

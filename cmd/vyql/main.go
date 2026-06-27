@@ -298,7 +298,7 @@ func compiledRulesFor(rulesSrc string) (compiledRuleSet, error) {
 	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
 		return cached.(compiledRuleSet), nil
 	}
-	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(rulesSrc), lowerNonCoreV2RuntimeSource)
+	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(rulesSrc), lowerNonCoreRuntimeSource)
 	if err != nil {
 		return compiledRuleSet{}, fmt.Errorf("rule parse: %w", err)
 	}
@@ -484,30 +484,30 @@ func loadRuleSourcesUnder(path string) (string, error) {
 	return sb.String(), err
 }
 
-func v2RuntimeSourcesForRules(rulesSrc string) []parser.V2RuntimeSource {
-	var out []parser.V2RuntimeSource
+func runtimeSourcesForRules(rulesSrc string) []parser.RuntimeSource {
+	var out []parser.RuntimeSource
 	if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 		for _, file := range files {
-			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
 	if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
 		for _, file := range files {
-			out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+			out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
 	if !strings.Contains(rulesSrc, "module mechanics.") {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
-	out = append(out, parser.V2RuntimeSourcesFromText("rules", rulesSrc)...)
+	out = append(out, parser.RuntimeSourcesFromText("rules", rulesSrc)...)
 	return out
 }
 
-func lowerNonCoreV2RuntimeSource(src parser.V2RuntimeSource) bool {
+func lowerNonCoreRuntimeSource(src parser.RuntimeSource) bool {
 	return !strings.HasPrefix(src.Name, "ontology/")
 }
 

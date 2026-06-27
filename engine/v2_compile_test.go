@@ -10,7 +10,7 @@ import (
 )
 
 func TestCompileLoweredV2Rule(t *testing.T) {
-	decls, err := parser.ParseV2Runtime(`
+	decls, err := parser.ParseRuntime(`
 module rules.injection;
 rule SqlInjection {
   meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
@@ -19,7 +19,7 @@ rule SqlInjection {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	compiled, errs := CompileRules(decls, ontology.Seed())
 	if len(errs) > 0 {
@@ -38,7 +38,7 @@ rule SqlInjection {
 }
 
 func TestLoweredV2ConfidenceClauseFiltersFindings(t *testing.T) {
-	decls, err := parser.ParseV2Runtime(`
+	decls, err := parser.ParseRuntime(`
 module rules.review;
 rule HighConfidenceReview {
   issue custom.Review as r
@@ -46,7 +46,7 @@ rule HighConfidenceReview {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	onto := ontology.New()
 	onto.Add(ontology.Concept{Name: "Review", Package: "custom", Kind: "issue"})
@@ -75,7 +75,7 @@ rule HighConfidenceReview {
 }
 
 func TestLoweredV2FindingFingerprintStableAcrossStores(t *testing.T) {
-	decls, err := parser.ParseV2Runtime(`
+	decls, err := parser.ParseRuntime(`
 module rules.injection;
 rule SqlInjection {
   meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
@@ -83,7 +83,7 @@ rule SqlInjection {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	onto := ontology.Seed()
 	compiled, errs := CompileRules(decls, onto)
@@ -114,7 +114,7 @@ rule SqlInjection {
 }
 
 func TestCompileUsesAuthoredRuleVerbEndpointKinds(t *testing.T) {
-	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+	decls := parseRuntimeSourcesForCompileTest(t, []parser.RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb taint {
@@ -149,7 +149,7 @@ rule SourceToAsset {
 }
 
 func TestCompileRejectsEndpointKindsFromAuthoredRuleVerbMechanic(t *testing.T) {
-	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+	decls := parseRuntimeSourcesForCompileTest(t, []parser.RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb taint {
@@ -181,7 +181,7 @@ rule SourceToSink {
 }
 
 func TestCompileRequiresLoadedRuleVerbWhenMechanicsAreAuthoritative(t *testing.T) {
-	decls := parseV2RuntimeSourcesForCompileTest(t, []parser.V2RuntimeSource{
+	decls := parseRuntimeSourcesForCompileTest(t, []parser.RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb flow {
@@ -212,7 +212,7 @@ rule SourceToSink {
 	}
 }
 
-func parseV2RuntimeSourcesForCompileTest(t *testing.T, raw []parser.V2RuntimeSource) []parser.Decl {
+func parseRuntimeSourcesForCompileTest(t *testing.T, raw []parser.RuntimeSource) []parser.Decl {
 	t.Helper()
 	sources := make([]parser.V2Source, 0, len(raw))
 	for _, src := range raw {
@@ -222,9 +222,9 @@ func parseV2RuntimeSourcesForCompileTest(t *testing.T, raw []parser.V2RuntimeSou
 		}
 		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
 	}
-	decls, err := parser.LowerV2SourcesToRuntime(sources)
+	decls, err := parser.LowerRuntimeSources(sources)
 	if err != nil {
-		t.Fatalf("LowerV2SourcesToRuntime: %v", err)
+		t.Fatalf("LowerRuntimeSources: %v", err)
 	}
 	return decls
 }

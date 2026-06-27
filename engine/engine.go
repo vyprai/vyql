@@ -537,7 +537,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			continue
 		}
 		switch ex := cl.Unless.(type) {
-		case parser.GuardedBy:
+		case parser.EndpointCoveredBy:
 			guards = append(guards, ex.Concept)
 		case parser.DominatesCoveredBy:
 			dominanceGuards = append(dominanceGuards, ex.Concept)
@@ -547,7 +547,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			sameScopeGuards = append(sameScopeGuards, ex.Concept)
 		case parser.GlobalCoveredBy:
 			globalGuards = append(globalGuards, ex.Concept)
-		case parser.SanitizedBy:
+		case parser.PathCoveredBy:
 			sanitizer = ex.Concept
 		}
 	}
@@ -571,7 +571,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			} else {
 				detail += "none found anywhere on flows"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "sanitized_by " + sanitizer, Satisfied: false, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: "path coveredBy " + sanitizer, Satisfied: false, Detail: detail})
 		}
 		// A character-filter on a still-LIVE path is, by definition, not provably sound
 		// for this sink (a sound one would have killed the flow). Surface it as an
@@ -589,7 +589,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			if ok {
 				detail = "guard covers sink"
 			}
-			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok, Detail: detail})
+			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok, Detail: detail})
 			suppressed = suppressed || ok
 		}
 		for _, g := range dominanceGuards {
@@ -947,7 +947,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		}
 	}
 	// (2) B1: a guard-control-labelled node that DOMINATES the sink. This is what makes
-	// `guarded_by` work on real code: adapters label the check with the control concept,
+	// endpoint coveredBy work on real code: adapters label the check with the control concept,
 	// and the structured CFG lets us
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free

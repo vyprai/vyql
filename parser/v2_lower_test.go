@@ -6,7 +6,7 @@ import (
 )
 
 func TestV2LoweringToRuntimeDecls(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module core;
 concept SqlParameterization : check { neutralizes: [code.SqlExecution] }
 `, `
@@ -70,7 +70,7 @@ rule SqlInjection {
 	if flow.Verb != "taint" || flow.Src.Concept != "code.HttpInput" || flow.Src.Binding != "input" || flow.Dst.Binding != "sqlSink" {
 		t.Fatalf("flow lowering wrong: %+v", flow)
 	}
-	if sb, ok := rule.Clauses[0].Unless.(SanitizedBy); !ok || sb.Concept != "core.SqlParameterization" {
+	if sb, ok := rule.Clauses[0].Unless.(PathCoveredBy); !ok || sb.Concept != "core.SqlParameterization" {
 		t.Fatalf("coveredBy lowering wrong: %+v", rule.Clauses[0])
 	}
 }
@@ -130,12 +130,12 @@ rule IssueAsFlow {
 	if err != nil {
 		t.Fatalf("ParseV2 rules: %v", err)
 	}
-	_, err = LowerV2SourcesToRuntime([]V2Source{
+	_, err = LowerRuntimeSources([]V2Source{
 		{Name: "mechanics.vyql", Program: mechanics},
 		{Name: "rules.vyql", Program: rules},
 	})
 	if err == nil || !strings.Contains(err.Error(), "rules.vyql") {
-		t.Fatalf("LowerV2SourcesToRuntime error = %v, want contextual lowering failure", err)
+		t.Fatalf("LowerRuntimeSources error = %v, want contextual lowering failure", err)
 	}
 }
 
@@ -153,8 +153,8 @@ func TestSplitV2ModuleChunks(t *testing.T) {
 	}
 }
 
-func TestParseV2RuntimeSourcesValidatesCorpus(t *testing.T) {
-	_, err := ParseV2RuntimeSources([]V2RuntimeSource{
+func TestParseRuntimeSourcesValidatesCorpus(t *testing.T) {
+	_, err := ParseRuntimeSources([]RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb issue {
@@ -190,12 +190,12 @@ rule BadCoverage {
 `},
 	})
 	if err == nil || !strings.Contains(err.Error(), `coverage mode "endpoint" not declared in concept covers [path]`) {
-		t.Fatalf("ParseV2RuntimeSources error = %v, want corpus coverage validation", err)
+		t.Fatalf("ParseRuntimeSources error = %v, want corpus coverage validation", err)
 	}
 }
 
-func TestParseV2RuntimeSourcesSelectedLowersOnlySelectedSources(t *testing.T) {
-	decls, err := ParseV2RuntimeSourcesSelected([]V2RuntimeSource{
+func TestParseRuntimeSourcesSelectedLowersOnlySelectedSources(t *testing.T) {
+	decls, err := ParseRuntimeSourcesSelected([]RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb flow {
@@ -216,11 +216,11 @@ rule SelectedOnly {
   flow code.HttpInput -> code.SqlExecution
 }
 `},
-	}, func(src V2RuntimeSource) bool {
+	}, func(src RuntimeSource) bool {
 		return src.Name == "rules.vyql"
 	})
 	if err != nil {
-		t.Fatalf("ParseV2RuntimeSourcesSelected: %v", err)
+		t.Fatalf("ParseRuntimeSourcesSelected: %v", err)
 	}
 	if len(decls) != 1 {
 		t.Fatalf("decl count = %d, want only selected rule decl: %+v", len(decls), decls)
@@ -231,7 +231,7 @@ rule SelectedOnly {
 }
 
 func TestV2RuntimePreservesMechanicsAndPolicies(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module mechanics.sast;
 mechanic ruleVerb taint {
   solver: dataflow.taint
@@ -247,7 +247,7 @@ policy resultIdentity default {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	if len(decls) != 2 {
 		t.Fatalf("decls = %d, want mechanic + policy: %+v", len(decls), decls)
@@ -274,8 +274,8 @@ policy resultIdentity default {
 	}
 }
 
-func TestParseV2RuntimeSourcesSelectedPreservesSelectedMechanicsAndPolicies(t *testing.T) {
-	decls, err := ParseV2RuntimeSourcesSelected([]V2RuntimeSource{
+func TestParseRuntimeSourcesSelectedPreservesSelectedMechanicsAndPolicies(t *testing.T) {
+	decls, err := ParseRuntimeSourcesSelected([]RuntimeSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.sast;
 mechanic ruleVerb taint {
@@ -305,11 +305,11 @@ rule SelectedOnly {
   taint code.HttpInput -> code.SqlExecution
 }
 `},
-	}, func(src V2RuntimeSource) bool {
+	}, func(src RuntimeSource) bool {
 		return src.Name == "mechanics.vyql" || src.Name == "policy.vyql"
 	})
 	if err != nil {
-		t.Fatalf("ParseV2RuntimeSourcesSelected: %v", err)
+		t.Fatalf("ParseRuntimeSourcesSelected: %v", err)
 	}
 	if len(decls) != 2 {
 		t.Fatalf("decls = %d, want selected mechanic + policy: %+v", len(decls), decls)
@@ -323,7 +323,7 @@ rule SelectedOnly {
 }
 
 func TestV2LoweringUsesLocalPatternWhere(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module bindings.javascript.express;
 pattern requestBodyCall as call {
   node: call
@@ -345,7 +345,7 @@ binding requestBody {
 }
 
 func TestV2LoweringRewritesPatternBindAliases(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module bindings.javascript.sql;
 pattern dbCall as call {
   node: call
@@ -410,7 +410,7 @@ func TestV2BindingTechnologyScansModuleSegments(t *testing.T) {
 }
 
 func TestV2LoweringAllowsImportedBuiltinCallExprPattern(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module bindings.javascript.express;
 uses patterns.javascript.callExpr as jsCall;
 binding requestBody {
@@ -438,14 +438,14 @@ binding routeSource {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	_, err = LowerV2ToRuntime(prog)
+	_, err = lowerProgramToRuntime(prog)
 	if err == nil || !strings.Contains(err.Error(), "pattern routeExpr is not declared") {
-		t.Fatalf("LowerV2ToRuntime error = %v, want missing pattern diagnostic", err)
+		t.Fatalf("lowerProgramToRuntime error = %v, want missing pattern diagnostic", err)
 	}
 }
 
 func TestV2LoweringResolvesUsesAliasesToRuntimeConcepts(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module bindings.javascript.express;
 uses code.HttpInput as Input;
 binding requestBody {
@@ -483,7 +483,7 @@ rule SqlInjectionAlias {
 	if flow.Src.Concept != "code.HttpInput" || flow.Dst.Concept != "code.SqlExecution" {
 		t.Fatalf("alias in rule endpoints did not lower: %+v", flow)
 	}
-	if gb, ok := rule.Clauses[0].Unless.(GuardedBy); !ok || gb.Concept != "core.SqlParameterization" {
+	if gb, ok := rule.Clauses[0].Unless.(EndpointCoveredBy); !ok || gb.Concept != "core.SqlParameterization" {
 		t.Fatalf("alias in coveredBy did not lower: %+v", rule.Clauses[0])
 	}
 	where, ok := rule.Clauses[1].Where.(And)
@@ -499,7 +499,7 @@ rule SqlInjectionAlias {
 }
 
 func TestV2LoweringSupportsSameReceiverCoveredBy(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module rules.aliases;
 rule SameReceiverCoverage {
   taint code.HttpInput as input -> code.SqlExecution as sink
@@ -507,7 +507,7 @@ rule SameReceiverCoverage {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	rule := decls[0].(*Rule)
 	if _, ok := rule.Clauses[0].Unless.(SameReceiverCoveredBy); !ok {
@@ -584,7 +584,7 @@ func TestV2DependencyRequirementLowersToLegacyPackageGate(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			decls, err := ParseV2Runtime(`
+			decls, err := ParseRuntime(`
 module bindings.javascript.express;
 binding requestBody {
   requires {
@@ -595,7 +595,7 @@ binding requestBody {
 }
 `)
 			if err != nil {
-				t.Fatalf("ParseV2Runtime: %v", err)
+				t.Fatalf("ParseRuntime: %v", err)
 			}
 			adapter := decls[0].(*AdapterDecl)
 			if got := adapter.Mappings[0].Packages; !stringSlicesEqual(got, tc.want) {
@@ -664,7 +664,7 @@ func TestV2RequirementLoweringRejectsUnsupportedSemantics(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ParseV2Runtime(`
+			_, err := ParseRuntime(`
 module bindings.javascript.express;
 binding requestBody {
   requires {
@@ -675,7 +675,7 @@ binding requestBody {
 }
 `)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("ParseV2Runtime error = %v, want %q", err, tc.want)
+				t.Fatalf("ParseRuntime error = %v, want %q", err, tc.want)
 			}
 		})
 	}
@@ -705,7 +705,7 @@ rule Two {
 }
 
 func TestV2ArgAnySinkLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.bash.migration;
 binding catPath {
   query pattern callExpr where callee.path ~= "cat"
@@ -713,7 +713,7 @@ binding catPath {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
@@ -725,7 +725,7 @@ binding catPath {
 }
 
 func TestV2ExactPathSinkLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.javascript.migration;
 binding jqueryRoot {
   query pattern callExpr where callee.path == "$"
@@ -733,7 +733,7 @@ binding jqueryRoot {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
@@ -745,7 +745,7 @@ binding jqueryRoot {
 }
 
 func TestV2CollectionSinkLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding subprocessCall {
   query pattern callExpr where callee.path ~= "subprocess.call"
@@ -761,7 +761,7 @@ binding execAll {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "python" || len(adapter.Mappings) != 3 {
@@ -779,7 +779,7 @@ binding execAll {
 }
 
 func TestV2ReceiverConstraintLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.java.migration;
 binding servletParam {
   query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "HttpServletRequest"
@@ -795,7 +795,7 @@ binding urlOpen {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "java" || len(adapter.Mappings) != 3 {
@@ -813,7 +813,7 @@ binding urlOpen {
 }
 
 func TestV2PropagateValueLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.c.migration;
 binding decodeOutParam {
   query call as c where c.callee.method == "decode"
@@ -825,7 +825,7 @@ binding parseResult {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "c" || len(adapter.Mappings) != 2 {
@@ -846,7 +846,7 @@ func TestV2PropagateValueRejectsUnsupportedShape(t *testing.T) {
 		`propagate value from args[0] to call.result`,
 	}
 	for _, output := range cases {
-		_, err := ParseV2Runtime(`
+		_, err := ParseRuntime(`
 module bindings.c.migration;
 binding badFlow {
   query pattern callExpr where callee.method == "decode"
@@ -860,7 +860,7 @@ binding badFlow {
 }
 
 func TestV2ReceiverTypeFactLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.go.migration;
 binding sqlOpenType {
   query pattern callExpr where callee.path ~= "sql.Open"
@@ -870,7 +870,7 @@ binding sqlOpenType {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "go" || len(adapter.Mappings) != 1 {
@@ -882,7 +882,7 @@ binding sqlOpenType {
 }
 
 func TestV2ValueGuardLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding yamlLoad {
   query pattern callExpr where callee.path == "yaml.load" and args.any.literal contains "Loader" and not args.any.literal contains "SafeLoader"
@@ -903,7 +903,7 @@ binding unsafeMarker {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if len(adapter.Mappings) != 3 {
@@ -921,7 +921,7 @@ binding unsafeMarker {
 }
 
 func TestV2AssumptionCheckLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding startsWithGuard {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
@@ -947,7 +947,7 @@ binding normpathSanitizer {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if len(adapter.Mappings) != 2 {
@@ -962,7 +962,7 @@ binding normpathSanitizer {
 }
 
 func TestV2AdvisoryCheckLowersToNonSuppressingMark(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding possiblePathValidation {
   query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
@@ -976,7 +976,7 @@ binding possiblePathValidation {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if len(adapter.Mappings) != 1 {
@@ -992,7 +992,7 @@ binding possiblePathValidation {
 }
 
 func TestV2GlobalCheckLowersToExplicitGlobalEvidence(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding globalHardening {
   query pattern callExpr where callee.method == "enableHardening"
@@ -1002,7 +1002,7 @@ binding globalHardening {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if len(adapter.Mappings) != 1 {
@@ -1015,7 +1015,7 @@ binding globalHardening {
 }
 
 func TestV2ParamSourceLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.library.migration;
 binding externalEntryInput {
   query param as param
@@ -1023,7 +1023,7 @@ binding externalEntryInput {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "library" || len(adapter.Mappings) != 1 {
@@ -1035,7 +1035,7 @@ binding externalEntryInput {
 }
 
 func TestV2ReceiverCheckLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.python.migration;
 binding relativeTo {
   query pattern callExpr where callee.method == "relative_to"
@@ -1047,7 +1047,7 @@ binding relativeTo {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "python" || len(adapter.Mappings) != 1 {
@@ -1059,7 +1059,7 @@ binding relativeTo {
 }
 
 func TestV2CharFilterCheckLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.ruby.migration;
 binding gsubFilter {
   query pattern callExpr where callee.method == "gsub" and call.filter.global == true
@@ -1072,7 +1072,7 @@ binding gsubFilter {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "ruby" || len(adapter.Mappings) != 1 {
@@ -1084,7 +1084,7 @@ binding gsubFilter {
 }
 
 func TestV2NonGlobalCharFilterCheckLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.javascript.migration;
 binding replaceFilter {
   query pattern callExpr where callee.method == "replace"
@@ -1097,7 +1097,7 @@ binding replaceFilter {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
@@ -1109,7 +1109,7 @@ binding replaceFilter {
 }
 
 func TestV2UnstableAnalysisAssumeGuardRejected(t *testing.T) {
-	_, err := ParseV2Runtime(`
+	_, err := ParseRuntime(`
 module bindings.java.migration;
 binding containmentCheck {
   unstable: {
@@ -1128,15 +1128,15 @@ binding containmentCheck {
 }
 `)
 	if err == nil {
-		t.Fatal("ParseV2Runtime succeeded for unstable.analysisAssumeGuard")
+		t.Fatal("ParseRuntime succeeded for unstable.analysisAssumeGuard")
 	}
 	if !strings.Contains(err.Error(), `unsupported unstable query family "unstable.analysisAssumeGuard"`) {
-		t.Fatalf("ParseV2Runtime error = %v", err)
+		t.Fatalf("ParseRuntime error = %v", err)
 	}
 }
 
 func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.perl.migration;
 binding cleartextChannel {
   query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")
@@ -1144,7 +1144,7 @@ binding cleartextChannel {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	if len(decls) != 1 {
 		t.Fatalf("decls = %d, want 1", len(decls))
@@ -1169,7 +1169,7 @@ binding cleartextChannel {
 }
 
 func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.bash.crypto;
 binding weakRandom {
   query pattern presenceNode where node.path ~= "RANDOM"
@@ -1177,7 +1177,7 @@ binding weakRandom {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
@@ -1196,7 +1196,7 @@ binding weakRandom {
 }
 
 func TestV2PresenceNodeExactPathLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.dart.crypto;
 binding weakRandom {
   query pattern presenceNode where node.path == "Random"
@@ -1204,7 +1204,7 @@ binding weakRandom {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
 	if flag == nil || len(flag.Predicates) != 1 {
@@ -1216,7 +1216,7 @@ binding weakRandom {
 }
 
 func TestV2PresenceNodeMethodPackagesAndMultipleEmits(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.ruby.logging;
 binding logWrite {
   requires {
@@ -1228,7 +1228,7 @@ binding logWrite {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "ruby" || len(adapter.Mappings) != 2 {
@@ -1245,7 +1245,7 @@ binding logWrite {
 }
 
 func TestV2PresenceNodePreservesAdvisoryCheckMetadata(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.go.memory;
 binding memoryBounds {
   query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne"
@@ -1259,7 +1259,7 @@ binding memoryBounds {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	m := decls[0].(*AdapterDecl).Mappings[0]
 	if m.Kind != "flag" || !m.Advisory || m.About != "code.BufferAccess" || m.Coverage != "sameScope" {
@@ -1268,7 +1268,7 @@ binding memoryBounds {
 }
 
 func TestV2ImportedPresenceNodePatternLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.lua.crypto;
 uses patterns.core.presenceNode;
 binding weakHash {
@@ -1277,7 +1277,7 @@ binding weakHash {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
 	if flag == nil || len(flag.Predicates) != 1 {
@@ -1289,7 +1289,7 @@ binding weakHash {
 }
 
 func TestV2PresenceNodeRejectsUnknownPredicates(t *testing.T) {
-	_, err := ParseV2Runtime(`
+	_, err := ParseRuntime(`
 module bindings.javascript.web;
 binding unsupported {
   query pattern presenceNode where node.receiver == "req"
@@ -1305,7 +1305,7 @@ binding unsupported {
 }
 
 func TestV2PresenceNodeOperandAndPseudoSubjectLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.javascript.migration;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, ["token", "secret"]))
@@ -1313,7 +1313,7 @@ binding secretCompare {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
@@ -1332,7 +1332,7 @@ binding secretCompare {
 }
 
 func TestV2PresenceNodeSnakeCasePseudoSubjectLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.javascript.migration;
 binding secretCompare {
   query pattern presenceNode where node.kind == "binop" and not (containsAny(node.scope_call.any, [scmp])) and containsAny(node.flow_to.op, [return])
@@ -1340,7 +1340,7 @@ binding secretCompare {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
 	if got := flag.Predicates[0]; got.Subject != "scope_call" || got.Property != "any" || !got.Negative {
@@ -1352,7 +1352,7 @@ binding secretCompare {
 }
 
 func TestV2RuleWhereLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module rules.migrated;
 rule ToxicWorkloadExposure {
   issue identity.WorkloadIdentity as w
@@ -1376,7 +1376,7 @@ rule Confidence {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	if len(decls) != 5 {
 		t.Fatalf("decls = %d, want 5", len(decls))
@@ -1408,7 +1408,7 @@ rule Confidence {
 }
 
 func TestV2RuleConfidenceClauseLowersToRuntimeFloor(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module rules.review;
 rule HighConfidenceReview {
   issue code.Review as r
@@ -1416,7 +1416,7 @@ rule HighConfidenceReview {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	rule := decls[0].(*Rule)
 	if got := rule.Meta["confidence_floor"]; got != "high" {
@@ -1425,7 +1425,7 @@ rule HighConfidenceReview {
 }
 
 func TestV2RawSemanticQueryLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module rules.migrated;
 rule FileToctou {
   query concept as first where first.concept == code.FileCheck reaches concept as second where second.concept == code.FileUse select second
@@ -1436,7 +1436,7 @@ rule InvalidRefundTransition {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	order := decls[0].(*Rule).Body.(*OrderStmt)
 	if order.First.Concept != "code.FileCheck" || order.First.Binding != "first" || order.Second.Concept != "code.FileUse" || order.Second.Binding != "second" {
@@ -1459,7 +1459,7 @@ binding unsupported {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	if _, err := LowerV2ToRuntime(prog); err == nil {
+	if _, err := lowerProgramToRuntime(prog); err == nil {
 		t.Fatal("unsupported binding query lowered without diagnostic")
 	}
 }
@@ -1477,13 +1477,13 @@ binding unsupported {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	if _, err := LowerV2ToRuntime(prog); err == nil {
+	if _, err := lowerProgramToRuntime(prog); err == nil {
 		t.Fatal("unsupported binding predicate lowered without diagnostic")
 	}
 }
 
 func TestV2ConcreteCoverageChecksLowerWithExplicitCoverageMode(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	decls, err := ParseRuntime(`
 module bindings.java.xml;
 binding endpointHardening {
   query pattern callExpr where callee.method == "setFeature"
@@ -1511,7 +1511,7 @@ binding dominatingHardening {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
 	adapter := decls[0].(*AdapterDecl)
 	if len(adapter.Mappings) != 4 {
@@ -1533,7 +1533,7 @@ binding dominatingHardening {
 }
 
 func TestV2RuleSupportedCoveredByModesLowerToLegacyClauseKinds(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module rules.xml;
 rule UnhardenedXmlParser {
   issue code.XmlParserCreate as parser
@@ -1569,8 +1569,8 @@ rule LockNotReleased {
 		}
 		switch rule.Name {
 		case "UnhardenedXmlParser":
-			if _, ok := rule.Clauses[0].Unless.(GuardedBy); !ok {
-				t.Fatalf("endpoint coveredBy did not lower to GuardedBy: %+v", rule.Clauses[0])
+			if _, ok := rule.Clauses[0].Unless.(EndpointCoveredBy); !ok {
+				t.Fatalf("endpoint coveredBy did not lower to EndpointCoveredBy: %+v", rule.Clauses[0])
 			}
 		case "SameReceiverParser":
 			if _, ok := rule.Clauses[0].Unless.(SameReceiverCoveredBy); !ok {
@@ -1599,7 +1599,7 @@ rule LockNotReleased {
 }
 
 func TestV2LoweringPreservesRequiredProfileClause(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module rules.injection;
 rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
@@ -1627,7 +1627,7 @@ rule SqlInjection {
 }
 
 func TestV2AdapterMetadataLowersToRuntimeAdapterMeta(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module bindings.textpattern.migration;
 pattern adapterMetadata {
   adapter: {
@@ -1656,12 +1656,12 @@ pattern adapterMetadata {
 }
 
 func TestV2UnstableAdapterMetadataRejected(t *testing.T) {
-	_, err := ParseV2Runtime(`
+	_, err := ParseRuntime(`
 module bindings.textpattern.migration;
 pattern adapterMetadata {
   unstable: {
     owner: "test"
-    reason: "old adapter metadata bridge"
+    reason: "unstable adapter metadata"
     adapter: "textpattern"
     meta: {
       cross_language: true
@@ -1670,15 +1670,15 @@ pattern adapterMetadata {
 }
 `)
 	if err == nil {
-		t.Fatal("ParseV2Runtime accepted unstable adapter metadata")
+		t.Fatal("ParseRuntime accepted unstable adapter metadata")
 	}
 	if !strings.Contains(err.Error(), "unstable adapter metadata must use stable adapter item") {
-		t.Fatalf("ParseV2Runtime error = %v", err)
+		t.Fatalf("ParseRuntime error = %v", err)
 	}
 }
 
 func TestV2ConceptFieldsLowerToRuntimeFieldNames(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module code;
 concept SqlExecution : sink {
   vulnerableTo: [injection.SqlInjection]
@@ -1695,7 +1695,7 @@ concept SqlExecution : sink {
 }
 
 func TestV2RuntimeSupportsGrantAssumeRulesAndObservationConcepts(t *testing.T) {
-	decls := parseV2RuntimeFiles(t, `
+	decls := parseRuntimeFiles(t, `
 module custom;
 concept External : principal {}
 concept Elevated : privilege {
@@ -1745,13 +1745,13 @@ rule ExternalGrant {
 	}
 }
 
-func parseV2RuntimeFiles(t *testing.T, srcs ...string) []Decl {
+func parseRuntimeFiles(t *testing.T, srcs ...string) []Decl {
 	t.Helper()
 	var out []Decl
 	for _, src := range srcs {
-		decls, err := ParseV2Runtime(src)
+		decls, err := ParseRuntime(src)
 		if err != nil {
-			t.Fatalf("ParseV2Runtime: %v", err)
+			t.Fatalf("ParseRuntime: %v", err)
 		}
 		out = append(out, decls...)
 	}

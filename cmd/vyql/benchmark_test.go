@@ -158,7 +158,7 @@ func testNameOf(loc string) string {
 
 func benchmarkCategories(t *testing.T, rules string) map[string]string {
 	t.Helper()
-	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForRules(rules), lowerNonCoreV2RuntimeSource)
+	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesForRules(rules), lowerNonCoreRuntimeSource)
 	if err != nil {
 		t.Fatalf("parse rules: %v", err)
 	}

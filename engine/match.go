@@ -6,7 +6,7 @@ import (
 	"github.com/vyprai/vyql/solvers"
 )
 
-// evalMatch evaluates `match <concept> as id where <expr> unless guarded_by C`.
+// evalMatch evaluates concept/transition match rules with v2 where and coveredBy clauses.
 // Composes solver calls in `where` through the engine.
 func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.MatchStmt)
@@ -23,7 +23,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 			where = cl.Where
 		case "unless":
 			switch ex := cl.Unless.(type) {
-			case parser.GuardedBy:
+			case parser.EndpointCoveredBy:
 				guards = append(guards, ex.Concept)
 			case parser.DominatesCoveredBy:
 				dominanceGuards = append(dominanceGuards, ex.Concept)
@@ -54,7 +54,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		var ne []findings.NegationEvidence
 		for _, g := range guards {
 			ok := e.endpointGuarded(node, g)
-			ne = append(ne, findings.NegationEvidence{Clause: "guarded_by " + g, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		for _, g := range dominanceGuards {

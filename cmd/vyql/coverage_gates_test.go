@@ -243,9 +243,9 @@ func collectRuleConceptRefs(r *parser.Rule, refs map[string]bool) {
 	for _, cl := range r.Clauses {
 		collectExprConceptRefs(cl.Where, refs)
 		switch ex := cl.Unless.(type) {
-		case parser.SanitizedBy:
+		case parser.PathCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
-		case parser.GuardedBy:
+		case parser.EndpointCoveredBy:
 			addCoverageConceptRef(refs, ex.Concept)
 		case parser.ClosedBy:
 			addCoverageConceptRef(refs, ex.Concept)
@@ -402,7 +402,7 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 }
 
 // T2.3 — every CONTROL concept WIRED in an adapter must be consumed by some rule's
-// `unless sanitized_by`/`guarded_by`; a wired control no rule reads is INERT (neutralizes
+// coveredBy clause; a wired control no rule reads is INERT (neutralizes
 // nothing). This is the gate that catches the OutputEncoding-style mistake. (A control
 // defined-but-not-wired is just unused vocabulary and is fine.)
 func TestControlsWiredAreConsumedGate(t *testing.T) {
@@ -418,9 +418,9 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 			}
 			for _, clause := range rule.Clauses {
 				switch ex := clause.Unless.(type) {
-				case parser.SanitizedBy:
+				case parser.PathCoveredBy:
 					consumed[shortConceptName(ex.Concept)] = true
-				case parser.GuardedBy:
+				case parser.EndpointCoveredBy:
 					consumed[shortConceptName(ex.Concept)] = true
 				case parser.ClosedBy:
 					consumed[shortConceptName(ex.Concept)] = true

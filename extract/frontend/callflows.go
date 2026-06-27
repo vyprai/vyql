@@ -54,7 +54,7 @@ func loadCallFlowProfiles() {
 	if err != nil {
 		panic("frontend: read adapters: " + err.Error())
 	}
-	decls, err := parseV2RuntimeAdapterSources(files)
+	decls, err := parseRuntimeAdapterSources(files)
 	if err != nil {
 		panic("frontend: parse adapter call-flow corpus: " + err.Error())
 	}

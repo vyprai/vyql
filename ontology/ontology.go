@@ -280,10 +280,10 @@ func (o *Ontology) field(name, which string) []string {
 	return nil
 }
 
-// CheckSanitizerTyping returns the neutralized threat kind if
-// `unless sanitized_by control` is well-typed for `taint source -> sink`, else
-// an error. This makes `taint HTTP_INPUT -> SQL_EXECUTION unless sanitized_by
-// HTML_ESCAPE` a compile error (docs/06).
+// CheckSanitizerTyping returns the neutralized threat kind when a v2 path or
+// endpoint coveredBy control is well-typed for `taint source -> sink`, else an
+// error. This makes an HTML_ESCAPE control on a SQL_EXECUTION sink a compile
+// error (docs/06).
 func (o *Ontology) CheckSanitizerTyping(source, sink, control string) (string, error) {
 	sinkThreats := set(o.SinkThreats(sink))
 	neutralized := set(o.ControlNeutralizes(control))

@@ -1,29 +1,26 @@
-// Package parser implements the VyQL rule-layer parser (docs/05), ported from
-// poc/vyql/parser.py. It parses `rule`, `query`, and `state_machine`
-// declarations into an AST consumed by the engine.
+// Package parser implements the VyQL v2 definition parser and materializes
+// authored definitions into the runtime declarations consumed by the scanner.
 package parser
 
 // --- declarations --------------------------------------------------------
 
-// Decl is a top-level declaration (Rule or StateMachine).
+// Decl is a scanner runtime declaration materialized from a VyQL v2 definition.
 type Decl interface{ isDecl() }
 
-// Rule is a `rule`/`query` declaration. Name is the short PascalCase rule name;
-// Package is the enclosing `module <namespace>` (if any). QualifiedName joins
-// them (vendor.category.RuleName).
+// Rule is a runtime finding/query rule. Name is the short PascalCase rule name;
+// Package is the enclosing v2 module. QualifiedName joins them as
+// module.RuleName.
 type Rule struct {
 	Name    string
 	Package string
 	Meta    map[string]any // values are string or []string
 	Body    Stmt
 	Clauses []Clause
-	IsQuery bool
 }
 
 func (*Rule) isDecl() {}
 
-// QualifiedName returns the namespaced rule id. If the rule name is already
-// dotted (legacy), it is returned as-is.
+// QualifiedName returns the namespaced rule id.
 func (r *Rule) QualifiedName() string {
 	if r.Package == "" || containsDot(r.Name) {
 		return r.Name
@@ -40,12 +37,10 @@ func containsDot(s string) bool {
 	return false
 }
 
-// ConceptDecl is an ontology concept declaration. The kind is a type
-// annotation in the header — `concept SomeConcept : sink { ... }` — not a
-// redundant body field. Name is the short PascalCase name; Package is the
-// enclosing `module <namespace>` (or the prefix if the header name is dotted).
-// Fields holds the kind-dependent typing/standards attributes (values are
-// string or []string), e.g. vulnerable_to, neutralizes, refines, cwe.
+// ConceptDecl is an ontology concept declaration. Kind is the v2 concept kind
+// such as source, sink, check, issue, fact, asset, exposure, principal,
+// privilege, or state. Fields holds kind-dependent typing and standards
+// attributes such as vulnerable_to, neutralizes, refines, and cwe.
 type ConceptDecl struct {
 	Name    string
 	Package string
@@ -63,9 +58,9 @@ func (c *ConceptDecl) QualifiedName() string {
 	return c.Package + "." + c.Name
 }
 
-// AdapterDecl is an `adapter <tech> { … }` declaration (docs/07): the
-// framework→concept content. Each mapping labels a source (input call path) or a
-// sink (call method/path) with a concept.
+// AdapterDecl is the runtime binding set for one technology. V2 binding
+// declarations in modules such as bindings.javascript.express lower into these
+// framework-to-concept mappings.
 type AdapterDecl struct {
 	Name     string
 	Meta     map[string]any
@@ -74,31 +69,31 @@ type AdapterDecl struct {
 
 func (*AdapterDecl) isDecl() {}
 
-// AdapterMapping is one `source`/`sink`/`type`/`control` line in an adapter.
+// AdapterMapping is one runtime binding action produced from a v2 binding.
 type AdapterMapping struct {
 	Kind             string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
 	Pattern          string   // the callee path / method token (a string literal or dotted name)
 	Concept          string   // the concept it maps to (qualified); for "type", the type name
 	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
 	ArgIndex         int      // which argument position is targeted (default 0; `arg N`)
-	ValMatches       []string // `val "substr"` (repeatable, AND) — fire only when every substr is in some arg/option literal
-	ValAbsents       []string // `nval "substr"` (repeatable, AND) — fire only when no arg/option literal contains any substr
-	Packages         []string // inherited from `package "name" { ... }` — fire only when import/SBOM package evidence is present
-	Collection       bool     // `collection` — also flag a Seq/collection-literal arg
-	CollectionFirst  bool     // `collection first` — target element 0 of a Seq/collection arg when present
-	CollectionIndex  int      // `collection N` / `collection first` target index; defaults to 0 when CollectionFirst is set
-	Exact            bool     // exact path match (used by `sink exact` and `mark exact`)
-	About            string   // for `assume`: the sink concept this unsound neutralizer purports to cover (qualified)
-	FlowDestArg      int      // for `flow`: destination out-param argument index
-	FlowSourceArg    int      // for `flow`: first source argument index; -1 when source is the call result
-	FlowSourceResult bool     // for `flow`: call result flows into destination out-param
+	ValMatches       []string // required argument/option literal substrings (AND)
+	ValAbsents       []string // forbidden argument/option literal substrings (AND)
+	Packages         []string // dependency requirements required for the binding to fire
+	Collection       bool     // also flag a Seq/collection-literal arg
+	CollectionFirst  bool     // target element 0 of a Seq/collection arg when present
+	CollectionIndex  int      // collection target index; defaults to 0 when CollectionFirst is set
+	Exact            bool     // exact path match
+	About            string   // advisory/check target concept
+	FlowDestArg      int      // value-propagation destination out-param argument index
+	FlowSourceArg    int      // value-propagation source argument index; -1 when source is the call result
+	FlowSourceResult bool     // call result flows into destination out-param
 	Advisory         bool     // advisory check evidence; must not suppress findings
 	Coverage         string   // v2 coverage mode for advisory check evidence
 	Flag             *AdapterFlag
 }
 
-// AdapterFlag is an AST/graph-shaped presence annotation:
-// `flag <concept> on <node-kind> { ... }` or `flag <concept> in <scope> { ... }`.
+// AdapterFlag is an AST/graph-shaped presence annotation produced by v2
+// presenceNode bindings.
 type AdapterFlag struct {
 	NodeKind   string
 	Scope      string
@@ -119,8 +114,7 @@ type AdapterFlagOperand struct {
 	Predicates []AdapterFlagPredicate
 }
 
-// ThreatDecl is a `threat <ns>.<Name> { cwe: [...] }` weakness-class declaration
-// (docs/06 typing vocabulary).
+// ThreatDecl is a weakness-class declaration from the v2 typing vocabulary.
 type ThreatDecl struct {
 	Name    string
 	Package string
@@ -146,11 +140,8 @@ type ReviewDecl struct {
 
 func (*ReviewDecl) isDecl() {}
 
-// ProfileDecl is an application-archetype threat-modelling profile
-// (`profile <name> { title:…  detect:[…]  entrypoints:[…]  packs:[…] }`). It
-// selects the trust boundary (active entry-point source concepts), the relevant
-// rule packs, and the fingerprints used to auto-detect the archetype. Fields are
-// string or []string (same value model as ConceptDecl).
+// ProfileDecl is an application-archetype threat-modelling profile. It selects
+// trust boundaries, relevant rule packs, and auto-detection fingerprints.
 type ProfileDecl struct {
 	Name   string
 	Fields map[string]any
@@ -158,19 +149,9 @@ type ProfileDecl struct {
 
 func (*ProfileDecl) isDecl() {}
 
-// StateMachine is a `state_machine` declaration.
-type StateMachine struct {
-	Name        string
-	States      []string
-	Initial     string
-	Transitions [][2]string // (from, to)
-}
-
-func (*StateMachine) isDecl() {}
-
 // --- statements (rule body) ----------------------------------------------
 
-// Stmt is a rule body: FlowStmt or MatchStmt.
+// Stmt is a runtime rule body.
 type Stmt interface{ isStmt() }
 
 // Endpoint is a flow endpoint: a concept with an optional binding.
@@ -179,7 +160,8 @@ type Endpoint struct {
 	Binding string // "" = none
 }
 
-// FlowStmt is `taint|flow|reach|grant|assume A -> B`.
+// FlowStmt invokes a two-endpoint solver capability such as taint, flow,
+// reachability, grant, or assume.
 type FlowStmt struct {
 	Verb string
 	Src  Endpoint
@@ -188,9 +170,8 @@ type FlowStmt struct {
 
 func (*FlowStmt) isStmt() {}
 
-// OrderStmt is `order <conceptA> before <conceptB>` (B2 type-state / temporal): it fires
-// when an A-operation can reach a B-operation on a CFG path (order-A < order-B, comparable
-// regions). Models reentrancy (external_call before state_write), TOCTOU, etc.
+// OrderStmt fires when one concept instance can reach another on a CFG path.
+// It models type-state and temporal checks such as reentrancy and TOCTOU.
 type OrderStmt struct {
 	First  Endpoint
 	Second Endpoint
@@ -199,7 +180,7 @@ type OrderStmt struct {
 
 func (*OrderStmt) isStmt() {}
 
-// MatchStmt is `match <target> as id`.
+// MatchStmt fires on an existing concept or transition fact.
 type MatchStmt struct {
 	TargetKind string // "concept" | "transition" (action concepts are "concept")
 	Concept    string
@@ -213,19 +194,18 @@ func (*MatchStmt) isStmt() {}
 
 // --- clauses -------------------------------------------------------------
 
-// Clause is a where/unless/along clause.
+// Clause is a runtime where/unless clause.
 type Clause struct {
-	Kind   string    // "where" | "unless" | "along"
+	Kind   string    // "where" | "unless"
 	Where  Expr      // for where
 	Unless Exception // for unless
-	Along  []string  // for along
 }
 
-// Exception is an unless exception.
+// Exception is a v2 coverage exception.
 type Exception interface{ isException() }
 
-type SanitizedBy struct{ Concept string }
-type GuardedBy struct{ Concept string }
+type PathCoveredBy struct{ Concept string }
+type EndpointCoveredBy struct{ Concept string }
 type SameReceiverCoveredBy struct{ Concept string }
 type SameScopeCoveredBy struct{ Concept string }
 type GlobalCoveredBy struct{ Concept string }
@@ -233,8 +213,8 @@ type DominatesCoveredBy struct{ Concept string }
 type ClosedBy struct{ Concept string } // post-dominance: a release on every path to exit
 type ExprException struct{ Expr Expr }
 
-func (SanitizedBy) isException()           {}
-func (GuardedBy) isException()             {}
+func (PathCoveredBy) isException()         {}
+func (EndpointCoveredBy) isException()     {}
 func (SameReceiverCoveredBy) isException() {}
 func (SameScopeCoveredBy) isException()    {}
 func (GlobalCoveredBy) isException()       {}

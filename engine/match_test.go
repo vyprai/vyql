@@ -34,7 +34,7 @@ func compileEval(t *testing.T, src string, s usg.Store) []int {
 func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.ParseV2Runtime(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse v2: %v", err)
 	}
@@ -451,7 +451,7 @@ rule XxeUnhardened {
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 	g.AddEdge(usg.Edge{Type: "PROTECTS", Src: "hardening", Dst: "parser"})
 
-	decls, err := parser.ParseV2Runtime(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -483,7 +483,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.ParseV2Runtime(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

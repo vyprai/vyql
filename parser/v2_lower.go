@@ -6,40 +6,61 @@ import (
 	"strings"
 )
 
-// ParseV2Runtime parses v2 source and lowers it into the scanner runtime
-// declaration model.
-func ParseV2Runtime(src string) ([]Decl, error) {
+// ParseRuntime parses runtime definitions for the current scanner. Runtime
+// definitions are VyQL v2 modules; v1 syntax is rejected instead of translated.
+func ParseRuntime(src string) ([]Decl, error) {
+	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
+		programs := make([]*V2Program, 0, len(chunks))
+		mechanics := runtimeMechanics{}
+		for _, chunk := range chunks {
+			prog, err := ParseV2(chunk)
+			if err != nil {
+				return nil, err
+			}
+			programs = append(programs, prog)
+			mechanics.merge(runtimeMechanicsFromProgram(prog))
+		}
+		var out []Decl
+		for _, prog := range programs {
+			decls, err := lowerProgramToRuntimeWithMechanics(prog, mechanics)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, decls...)
+		}
+		return out, nil
+	}
 	prog, err := ParseV2(src)
 	if err != nil {
 		return nil, err
 	}
-	return LowerV2ToRuntime(prog)
+	return lowerProgramToRuntime(prog)
 }
 
-type V2RuntimeSource struct {
+type RuntimeSource struct {
 	Name   string
 	Source string
 }
 
-func V2RuntimeSourcesFromText(name, src string) []V2RuntimeSource {
+func RuntimeSourcesFromText(name, src string) []RuntimeSource {
 	chunks := splitV2ModuleChunks(src)
 	if len(chunks) == 0 {
-		return []V2RuntimeSource{{Name: name, Source: src}}
+		return []RuntimeSource{{Name: name, Source: src}}
 	}
-	out := make([]V2RuntimeSource, 0, len(chunks))
+	out := make([]RuntimeSource, 0, len(chunks))
 	for i, chunk := range chunks {
-		out = append(out, V2RuntimeSource{Name: fmt.Sprintf("%s#module%d", name, i+1), Source: chunk})
+		out = append(out, RuntimeSource{Name: fmt.Sprintf("%s#module%d", name, i+1), Source: chunk})
 	}
 	return out
 }
 
-func ParseV2RuntimeSources(raw []V2RuntimeSource) ([]Decl, error) {
-	return ParseV2RuntimeSourcesSelected(raw, nil)
+func ParseRuntimeSources(raw []RuntimeSource) ([]Decl, error) {
+	return ParseRuntimeSourcesSelected(raw, nil)
 }
 
-// ParseV2RuntimeSourcesSelected validates the full v2 corpus but only lowers
+// ParseRuntimeSourcesSelected validates the full v2 corpus but only lowers
 // sources accepted by keep. A nil keep function lowers every source.
-func ParseV2RuntimeSourcesSelected(raw []V2RuntimeSource, keep func(V2RuntimeSource) bool) ([]Decl, error) {
+func ParseRuntimeSourcesSelected(raw []RuntimeSource, keep func(RuntimeSource) bool) ([]Decl, error) {
 	sources := make([]V2Source, 0, len(raw))
 	keepSource := make([]bool, 0, len(raw))
 	for _, src := range raw {
@@ -53,46 +74,7 @@ func ParseV2RuntimeSourcesSelected(raw []V2RuntimeSource, keep func(V2RuntimeSou
 	if err := ValidateV2Corpus(sources); err != nil {
 		return nil, fmt.Errorf("v2 corpus validation failed: %w", err)
 	}
-	return lowerV2SourcesToRuntimeSelected(sources, keepSource)
-}
-
-// ParseV2RuntimeMulti parses one or more concatenated v2 modules and lowers
-// them into the scanner runtime declaration model without falling back to v1.
-func ParseV2RuntimeMulti(src string) ([]Decl, error) {
-	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
-		programs := make([]*V2Program, 0, len(chunks))
-		mechanics := v2RuntimeMechanics{}
-		for _, chunk := range chunks {
-			prog, err := ParseV2(chunk)
-			if err != nil {
-				return nil, err
-			}
-			programs = append(programs, prog)
-			mechanics.merge(v2RuntimeMechanicsFromProgram(prog))
-		}
-		var out []Decl
-		for _, prog := range programs {
-			decls, err := lowerV2ToRuntimeWithMechanics(prog, mechanics)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, decls...)
-		}
-		return out, nil
-	}
-	return ParseV2Runtime(src)
-}
-
-// ParseRuntimeStrict parses runtime definitions as v2 only. It accepts
-// concatenated v2 modules but never falls back to legacy v1 syntax.
-func ParseRuntimeStrict(src string) ([]Decl, error) {
-	return ParseV2RuntimeMulti(src)
-}
-
-// ParseRuntime parses definitions for the current scanner runtime. Production
-// runtime definitions are v2-only and never fall back to legacy v1 syntax.
-func ParseRuntime(src string) ([]Decl, error) {
-	return ParseRuntimeStrict(src)
+	return lowerRuntimeSourcesSelected(sources, keepSource)
 }
 
 func splitV2ModuleChunks(src string) []string {
@@ -125,21 +107,21 @@ func splitV2ModuleChunks(src string) []string {
 	return chunks
 }
 
-// LowerV2ToRuntime lowers v2 declarations into the scanner runtime structs.
-// It materializes authored v2 definitions into the scanner runtime model.
-func LowerV2ToRuntime(prog *V2Program) ([]Decl, error) {
-	return lowerV2ToRuntimeWithMechanics(prog, v2RuntimeMechanicsFromProgram(prog))
+// lowerProgramToRuntime materializes authored v2 definitions into the scanner
+// runtime declaration model.
+func lowerProgramToRuntime(prog *V2Program) ([]Decl, error) {
+	return lowerProgramToRuntimeWithMechanics(prog, runtimeMechanicsFromProgram(prog))
 }
 
-func LowerV2SourcesToRuntime(sources []V2Source) ([]Decl, error) {
-	return lowerV2SourcesToRuntimeSelected(sources, nil)
+func LowerRuntimeSources(sources []V2Source) ([]Decl, error) {
+	return lowerRuntimeSourcesSelected(sources, nil)
 }
 
-func lowerV2SourcesToRuntimeSelected(sources []V2Source, keep []bool) ([]Decl, error) {
-	mechanics := v2RuntimeMechanics{}
+func lowerRuntimeSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
+	mechanics := runtimeMechanics{}
 	outCap := 0
 	for _, src := range sources {
-		mechanics.merge(v2RuntimeMechanicsFromProgram(src.Program))
+		mechanics.merge(runtimeMechanicsFromProgram(src.Program))
 	}
 	for i, src := range sources {
 		if keep != nil && !keep[i] {
@@ -154,7 +136,7 @@ func lowerV2SourcesToRuntimeSelected(sources []V2Source, keep []bool) ([]Decl, e
 		if keep != nil && !keep[i] {
 			continue
 		}
-		decls, err := lowerV2ToRuntimeWithMechanics(src.Program, mechanics)
+		decls, err := lowerProgramToRuntimeWithMechanics(src.Program, mechanics)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", src.Name, err)
 		}
@@ -163,11 +145,11 @@ func lowerV2SourcesToRuntimeSelected(sources []V2Source, keep []bool) ([]Decl, e
 	return out, nil
 }
 
-type v2RuntimeMechanics struct {
+type runtimeMechanics struct {
 	ruleSolvers map[string]string
 }
 
-func (m *v2RuntimeMechanics) merge(other v2RuntimeMechanics) {
+func (m *runtimeMechanics) merge(other runtimeMechanics) {
 	if len(other.ruleSolvers) == 0 {
 		return
 	}
@@ -179,8 +161,8 @@ func (m *v2RuntimeMechanics) merge(other v2RuntimeMechanics) {
 	}
 }
 
-func v2RuntimeMechanicsFromProgram(prog *V2Program) v2RuntimeMechanics {
-	out := v2RuntimeMechanics{ruleSolvers: map[string]string{}}
+func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
+	out := runtimeMechanics{ruleSolvers: map[string]string{}}
 	if prog == nil {
 		return out
 	}
@@ -196,7 +178,7 @@ func v2RuntimeMechanicsFromProgram(prog *V2Program) v2RuntimeMechanics {
 	return out
 }
 
-func lowerV2ToRuntimeWithMechanics(prog *V2Program, mechanics v2RuntimeMechanics) ([]Decl, error) {
+func lowerProgramToRuntimeWithMechanics(prog *V2Program, mechanics runtimeMechanics) ([]Decl, error) {
 	if prog == nil {
 		return nil, nil
 	}
@@ -1545,7 +1527,7 @@ func v2SinkLocationParts(location string) (v2SinkLocationInfo, error) {
 	return out, nil
 }
 
-func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2RuntimeMechanics) (*Rule, error) {
+func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics) (*Rule, error) {
 	out := &Rule{Name: r.Name, Package: r.Module, Meta: r.Meta}
 	solver := mechanics.ruleSolvers[r.Body.Verb]
 	if solver == "" {
@@ -1600,7 +1582,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2RuntimeMechani
 		case "unless":
 			switch cl.Coverage {
 			case "path":
-				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: SanitizedBy{Concept: names.concept(cl.Concept)}})
+				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: PathCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "dominates":
 				concept := names.concept(cl.Concept)
 				unless := Exception(DominatesCoveredBy{Concept: concept})
@@ -1609,7 +1591,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2RuntimeMechani
 				}
 				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: unless})
 			case "endpoint":
-				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: GuardedBy{Concept: names.concept(cl.Concept)}})
+				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: EndpointCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "sameReceiver":
 				out.Clauses = append(out.Clauses, Clause{Kind: "unless", Unless: SameReceiverCoveredBy{Concept: names.concept(cl.Concept)}})
 			case "sameScope":

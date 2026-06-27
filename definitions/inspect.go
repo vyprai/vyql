@@ -146,7 +146,7 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	if !info.IsDir() {
 		return nil
 	}
-	var sources []parser.V2RuntimeSource
+	var sources []parser.RuntimeSource
 	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -158,7 +158,7 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 		if err != nil {
 			return err
 		}
-		sources = append(sources, parser.V2RuntimeSource{Name: relPath(path), Source: string(b)})
+		sources = append(sources, parser.RuntimeSource{Name: relPath(path), Source: string(b)})
 		return nil
 	})
 	if err != nil {
@@ -168,7 +168,7 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	decls, err := parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesWithCore(sources), func(src parser.V2RuntimeSource) bool {
+	decls, err := parser.ParseRuntimeSourcesSelected(runtimeSourcesWithCore(sources), func(src parser.RuntimeSource) bool {
 		return selected[src.Name]
 	})
 	if err != nil {
@@ -180,29 +180,29 @@ func inspectDeclDir(cat *Catalog, rel string) error {
 	return nil
 }
 
-func v2RuntimeSourcesWithCore(sources []parser.V2RuntimeSource) []parser.V2RuntimeSource {
+func runtimeSourcesWithCore(sources []parser.RuntimeSource) []parser.RuntimeSource {
 	hasOntology, hasMechanics := false, false
 	for _, source := range sources {
 		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
 		hasMechanics = hasMechanics || strings.HasPrefix(source.Name, "mechanics/")
 	}
-	out := make([]parser.V2RuntimeSource, 0, len(sources)+32)
+	out := make([]parser.RuntimeSource, 0, len(sources)+32)
 	if !hasOntology {
 		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
 	if !hasMechanics {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}

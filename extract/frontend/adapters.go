@@ -624,7 +624,7 @@ func ontologyConceptDetails() map[string]map[string]string {
 		if err != nil {
 			panic("frontend: read ontology: " + err.Error())
 		}
-		decls, err := parseV2RuntimeAdapterSources(files)
+		decls, err := parseRuntimeAdapterSources(files)
 		if err != nil {
 			panic("frontend: parse ontology detail corpus: " + err.Error())
 		}
@@ -774,7 +774,7 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 		if err != nil {
 			return nil, err
 		}
-		decls, err := parseV2RuntimeAdapterSources([]datadir.Source{{
+		decls, err := parseRuntimeAdapterSources([]datadir.Source{{
 			Name: filepath.ToSlash(file),
 			Data: b,
 		}})
@@ -956,7 +956,7 @@ func loadDecl(tech string) *parser.AdapterDecl {
 	if extra, err := datadir.ReadVYQL("adapters/packages/" + tech + ".vyql"); err == nil {
 		sources = append(sources, extra...)
 	}
-	decls, err := parseV2RuntimeAdapterSources(sources)
+	decls, err := parseRuntimeAdapterSources(sources)
 	if err != nil {
 		panic("frontend: invalid adapter corpus for " + tech + ": " + err.Error())
 	}
@@ -986,8 +986,8 @@ type adapterDeclCacheKey struct {
 	tech string
 }
 
-func v2RuntimeSourcesForAdapter(sources []datadir.Source) []parser.V2RuntimeSource {
-	out := make([]parser.V2RuntimeSource, 0, len(sources)+32)
+func runtimeSourcesForAdapter(sources []datadir.Source) []parser.RuntimeSource {
+	out := make([]parser.RuntimeSource, 0, len(sources)+32)
 	hasOntology, hasMechanics := false, false
 	for _, source := range sources {
 		hasOntology = hasOntology || strings.HasPrefix(source.Name, "ontology/")
@@ -996,34 +996,34 @@ func v2RuntimeSourcesForAdapter(sources []datadir.Source) []parser.V2RuntimeSour
 	if !hasOntology {
 		if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 		if files, err := datadir.ReadVYQLDir("ontology/threatkinds"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
 	if !hasMechanics {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
-				out = append(out, parser.V2RuntimeSource{Name: file.Name, Source: string(file.Data)})
+				out = append(out, parser.RuntimeSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
 	for _, source := range sources {
-		out = append(out, parser.V2RuntimeSource{Name: source.Name, Source: string(source.Data)})
+		out = append(out, parser.RuntimeSource{Name: source.Name, Source: string(source.Data)})
 	}
 	return out
 }
 
-func parseV2RuntimeAdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
+func parseRuntimeAdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
 	selected := make(map[string]bool, len(sources))
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	return parser.ParseV2RuntimeSourcesSelected(v2RuntimeSourcesForAdapter(sources), func(src parser.V2RuntimeSource) bool {
+	return parser.ParseRuntimeSourcesSelected(runtimeSourcesForAdapter(sources), func(src parser.RuntimeSource) bool {
 		return selected[src.Name]
 	})
 }
@@ -1431,7 +1431,7 @@ func sinkBestKey(sk sinkSpec) string {
 }
 
 // controlAdapter labels control concepts (transforms/validators) on the calls that
-// apply them, so `unless sanitized_by` can suppress a sanitized flow (docs/07).
+// apply them, so v2 path coveredBy controls can suppress a sanitized flow (docs/07).
 func (spec adapterSpec) controlAdapter() adapters.Adapter {
 	return adapters.Adapter{
 		Name: spec.Name + ".controls", Technology: spec.Technology, Specificity: 2,
@@ -3031,7 +3031,7 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 	}
 	byName := map[string]*parser.AdapterDecl{}
 	var order []string
-	decls, err := parseV2RuntimeAdapterSources(sources)
+	decls, err := parseRuntimeAdapterSources(sources)
 	if err != nil {
 		return nil, fmt.Errorf("frontend: parse auto adapter corpus: %w", err)
 	}
