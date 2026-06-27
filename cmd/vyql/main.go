@@ -1,6 +1,6 @@
 // Command vyql is the VyQL command-line scanner. It runs the full pipeline on
 // real source: native frontend (go/ast) -> NIR -> shared lowering with
-// import/type resolution -> framework adapters -> rule evaluation -> findings,
+// import/type resolution -> framework bindings -> rule evaluation -> findings,
 // rendered as a human report or SARIF 2.1.0.
 //
 // Usage:
@@ -81,12 +81,12 @@ func main() {
 		err = cmdQuery(args)
 	case "graph":
 		err = cmdGraph(args)
-	case "adapters":
-		err = cmdAdapters(args)
+	case "bindings":
+		err = cmdBindings(args)
 	case "definitions":
 		err = cmdDefinitions(args)
-	case "validate-adapter":
-		err = cmdValidateAdapter(args)
+	case "validate-binding":
+		err = cmdValidateBinding(args)
 	case "diff":
 		err = cmdDiff(args)
 	default:
@@ -112,7 +112,7 @@ func cmdScan(args []string) error {
 	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
-	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
+	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -121,9 +121,9 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
-	oldOverlay := scanAdapterOverlay
-	scanAdapterOverlay = strings.TrimSpace(*adapterOverlay)
-	defer func() { scanAdapterOverlay = oldOverlay }()
+	oldOverlay := scanBindingOverlay
+	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
+	defer func() { scanBindingOverlay = oldOverlay }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:    *stats,
 		IncludeFlags: *allResults,
@@ -226,9 +226,9 @@ func profileNames() string {
 	return strings.Join(names, " | ")
 }
 
-// scanPaths runs the full pipeline (extract → lower → adapters → compile →
+// scanPaths runs the full pipeline (extract → lower → bindings → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
-// is routed to its real frontend and the matching framework adapters.
+// is routed to its real frontend and the matching framework bindings.
 func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*findings.Finding, scanStats, usg.Store, error) {
 	return scanPathsWithProfile(paths, ruleSources, "")
 }
@@ -629,11 +629,11 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")
-	fmt.Fprintln(os.Stderr, "  match      list every node an adapter labelled (what matched which concept)")
+	fmt.Fprintln(os.Stderr, "  match      list every node a binding labelled (what matched which concept)")
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
-	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/advisory vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews; check-v2 verifies v2 definitions")
-	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
+	fmt.Fprintln(os.Stderr, "  bindings   list a binding set's source/sink/check/issue/advisory vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/bindings/reviews; check-v2 verifies v2 definitions")
+	fmt.Fprintln(os.Stderr, "  validate-binding parse and summarize a VyQL binding file   [-file binding.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

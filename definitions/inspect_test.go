@@ -6,18 +6,18 @@ import (
 	"github.com/vyprai/vyql/parser"
 )
 
-func TestInspectFindsShippedAdaptersAndRules(t *testing.T) {
+func TestInspectFindsShippedBindingsAndRules(t *testing.T) {
 	cat, err := Inspect(InspectOptions{Kind: "all", Query: "UrlFetch", Language: "python", Max: 20})
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
-	if cat.Stats.Concepts == 0 || cat.Stats.Rules == 0 || cat.Stats.Adapters == 0 {
+	if cat.Stats.Concepts == 0 || cat.Stats.Rules == 0 || cat.Stats.Bindings == 0 {
 		t.Fatalf("unexpected empty stats: %#v", cat.Stats)
 	}
-	if len(cat.Adapters) == 0 {
-		t.Fatalf("expected python UrlFetch adapter mappings, got %#v", cat)
+	if len(cat.Bindings) == 0 {
+		t.Fatalf("expected python UrlFetch binding mappings, got %#v", cat)
 	}
-	for _, m := range cat.Adapters {
+	for _, m := range cat.Bindings {
 		if m.Language != "python" {
 			t.Fatalf("language filter leaked %q mapping: %#v", m.Language, m)
 		}

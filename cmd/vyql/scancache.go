@@ -31,7 +31,7 @@ type cachedScan struct {
 
 // scanFingerprint hashes everything a scan's output depends on: the binary (cache salt — a
 // rebuild invalidates), the rule source, the active profile, every file under the vyql/ data
-// dir (adapters/packs/ontology), and every file under the scan paths. Uses size+mtime (a
+// dir (bindings/packs/ontology), and every file under the scan paths. Uses size+mtime (a
 // stat, not a read), the conventional incremental-build change signal.
 func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile string) string {
 	h := sha256.New()
@@ -42,8 +42,8 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 	io.WriteString(h, profile)
 	io.WriteString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
-	if overlay := scanAdapterOverlay; overlay != "" {
-		io.WriteString(h, "\x00adapter-overlay\x00")
+	if overlay := scanBindingOverlay; overlay != "" {
+		io.WriteString(h, "\x00binding-overlay\x00")
 		statWalk(h, overlay)
 	}
 	for _, p := range paths {

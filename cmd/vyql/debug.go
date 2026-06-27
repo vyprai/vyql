@@ -277,7 +277,7 @@ func cmdExplain(args []string) error {
 }
 
 // ── vyql match ──────────────────────────────────────────────────────────────────────
-// Show every node an adapter labelled — what matched which concept, and via which adapter.
+// Show every node a binding labelled — what matched which concept.
 // Groups by concept role (source/sink/control/other) so a missing concept label shows up
 // as absent.
 
@@ -439,29 +439,29 @@ func cmdGraph(args []string) error {
 	return printUSG(g)
 }
 
-// ── vyql adapters ───────────────────────────────────────────────────────────────────
-// List the source/sink/control/mark/filter/advisory vocabulary an adapter recognizes, so you
+// ── vyql bindings ───────────────────────────────────────────────────────────────────
+// List the source/sink/check/issue/filter/advisory vocabulary a binding set recognizes, so you
 // don't have to grep the .vyql — and can see at a glance whether an API is modelled.
 
-func cmdAdapters(args []string) error {
-	fs := flag.NewFlagSet("adapters", flag.ExitOnError)
-	lang := fs.String("lang", "", "technology/adapter to list (e.g. go, javascript, java, python)")
+func cmdBindings(args []string) error {
+	fs := flag.NewFlagSet("bindings", flag.ExitOnError)
+	lang := fs.String("lang", "", "technology binding set to list (e.g. go, javascript, java, python)")
 	_ = fs.Parse(args)
 	if *lang == "" {
-		fmt.Println("usage: vyql adapters -lang <go|javascript|java|python|...>")
-		fmt.Println("available adapters:")
-		for _, n := range adapterNames() {
+		fmt.Println("usage: vyql bindings -lang <go|javascript|java|python|...>")
+		fmt.Println("available bindings:")
+		for _, n := range bindingNames() {
 			fmt.Println("  " + n)
 		}
 		return nil
 	}
 	data, err := datadir.Read("adapters/" + *lang + ".vyql")
 	if err != nil {
-		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
+		return fmt.Errorf("no binding set for %q (%v)", *lang, err)
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("adapter.vyql", string(data))), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))), lowerNonCoreV2DefinitionSource)
 	if err != nil {
-		return fmt.Errorf("adapter parse: %w", err)
+		return fmt.Errorf("binding parse: %w", err)
 	}
 	byKind := map[string][]string{}
 	for _, d := range decls {
@@ -470,7 +470,7 @@ func cmdAdapters(args []string) error {
 			continue
 		}
 		for _, m := range ad.Mappings {
-			kind := adapterDisplayKind(m.Kind)
+			kind := bindingDisplayKind(m.Kind)
 			arrow := ""
 			if m.Concept != "" {
 				arrow = " → " + m.Concept
@@ -495,14 +495,14 @@ func cmdAdapters(args []string) error {
 	return nil
 }
 
-func adapterDisplayKind(mappingKind string) string {
+func bindingDisplayKind(mappingKind string) string {
 	if strings.HasPrefix(mappingKind, "advisory_") {
 		return "advisory"
 	}
 	return strings.SplitN(mappingKind, "_", 2)[0]
 }
 
-func adapterNames() []string {
+func bindingNames() []string {
 	var out []string
 	for _, l := range []string{"go", "javascript", "java", "python", "ruby", "php", "csharp",
 		"rust", "kotlin", "scala", "swift", "c", "cpp"} {
@@ -513,12 +513,12 @@ func adapterNames() []string {
 	return out
 }
 
-// ── vyql validate-adapter ──────────────────────────────────────────────────────────
-// Parse an adapter file through the real VyQL parser and emit a compact public summary.
+// ── vyql validate-binding ──────────────────────────────────────────────────────────
+// Parse a binding file through the real VyQL parser and emit a compact public summary.
 
-func cmdValidateAdapter(args []string) error {
-	fs := flag.NewFlagSet("validate-adapter", flag.ExitOnError)
-	file := fs.String("file", "", "adapter .vyql file to parse; reads stdin when empty")
+func cmdValidateBinding(args []string) error {
+	fs := flag.NewFlagSet("validate-binding", flag.ExitOnError)
+	file := fs.String("file", "", "binding .vyql file to parse; reads stdin when empty")
 	_ = fs.Parse(args)
 	var data []byte
 	var err error
@@ -530,9 +530,9 @@ func cmdValidateAdapter(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("adapter.vyql", string(data))), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("binding.vyql", string(data))), lowerNonCoreV2DefinitionSource)
 	if err != nil {
-		return fmt.Errorf("adapter parse: %w", err)
+		return fmt.Errorf("binding parse: %w", err)
 	}
 	type mappingSummary struct {
 		Kind     string   `json:"kind"`
@@ -540,7 +540,7 @@ func cmdValidateAdapter(args []string) error {
 		Concept  string   `json:"concept,omitempty"`
 		Packages []string `json:"packages,omitempty"`
 	}
-	type adapterSummary struct {
+	type bindingSummary struct {
 		Name          string           `json:"name"`
 		MappingCount  int              `json:"mapping_count"`
 		PackageBlocks []string         `json:"package_blocks,omitempty"`
@@ -548,14 +548,14 @@ func cmdValidateAdapter(args []string) error {
 	}
 	summary := struct {
 		OK       bool             `json:"ok"`
-		Adapters []adapterSummary `json:"adapters"`
+		Bindings []bindingSummary `json:"bindings"`
 	}{OK: true}
 	for _, d := range decls {
 		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
-		item := adapterSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
+		item := bindingSummary{Name: ad.Name, MappingCount: len(ad.Mappings)}
 		packageSeen := map[string]bool{}
 		for _, m := range ad.Mappings {
 			item.Mappings = append(item.Mappings, mappingSummary{
@@ -572,10 +572,10 @@ func cmdValidateAdapter(args []string) error {
 			}
 		}
 		sort.Strings(item.PackageBlocks)
-		summary.Adapters = append(summary.Adapters, item)
+		summary.Bindings = append(summary.Bindings, item)
 	}
-	if len(summary.Adapters) == 0 {
-		return fmt.Errorf("adapter parse: no v2 binding set found")
+	if len(summary.Bindings) == 0 {
+		return fmt.Errorf("binding parse: no v2 binding set found")
 	}
 	out, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {

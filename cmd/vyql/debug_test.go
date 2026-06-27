@@ -37,8 +37,8 @@ func TestDebugConceptClassificationUsesPassedOntology(t *testing.T) {
 	}
 }
 
-func TestValidateAdapterRunsV2CorpusValidation(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "adapter.vyql")
+func TestValidateBindingRunsV2CorpusValidation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "binding.vyql")
 	if err := os.WriteFile(path, []byte(`
 module bindings.python.test;
 binding bad {
@@ -48,13 +48,13 @@ binding bad {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err := cmdValidateAdapter([]string{"-file", path})
+	err := cmdValidateBinding([]string{"-file", path})
 	if err == nil || !strings.Contains(err.Error(), "unknown concept custom.MissingSink") {
-		t.Fatalf("cmdValidateAdapter error = %v, want corpus validation", err)
+		t.Fatalf("cmdValidateBinding error = %v, want corpus validation", err)
 	}
 }
 
-func TestAdapterDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
+func TestBindingDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
 	cases := map[string]string{
 		"advisory_guard_method":   "advisory",
 		"advisory_sanitizer_path": "advisory",
@@ -64,8 +64,8 @@ func TestAdapterDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
 		"type":                    "type",
 	}
 	for in, want := range cases {
-		if got := adapterDisplayKind(in); got != want {
-			t.Fatalf("adapterDisplayKind(%q) = %q, want %q", in, got, want)
+		if got := bindingDisplayKind(in); got != want {
+			t.Fatalf("bindingDisplayKind(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

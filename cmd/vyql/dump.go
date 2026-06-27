@@ -15,9 +15,9 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-var scanAdapterOverlay string
+var scanBindingOverlay string
 
-// buildGraph runs extract → lower → adapters → SCA and returns the analysis graph (the
+// buildGraph runs extract → lower → bindings → SCA and returns the analysis graph (the
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
 // Returns a nil store when recognized files produced nothing to analyze.
 func buildGraph(paths []string) (usg.Store, scanStats, error) {
@@ -33,7 +33,7 @@ func lowerCache() lowering.DeltaCache {
 	return nil
 }
 
-// buildGraphWith runs extract → lower → adapters → SCA against an explicit lowering cache
+// buildGraphWith runs extract → lower → bindings → SCA against an explicit lowering cache
 // (nil = no caching / full lowering). Threading the cache makes the incremental path testable
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
@@ -59,12 +59,12 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
 			return nil, stats, err
 		}
-		tk.mark("sca+adapters")
+		tk.mark("sca+bindings")
 		return g, stats, nil
 	}
 	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
 	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
-	// identical), so adapters/taint/rules below are untouched. Benefits every command that
+	// identical), so bindings/taint/rules below are untouched. Benefits every command that
 	// builds a graph (scan, trace, query, graph, …).
 	var g usg.Store
 	var fresh map[string]bool
@@ -78,26 +78,26 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		return nil, stats, err
 	}
 	tk.mark("lower")
-	// SCA runs before adapter apply so SBOM/manifest packages join the import evidence
-	// that gates package-aware adapters (the generated catalog included).
+	// SCA runs before binding apply so SBOM/manifest packages join the import evidence
+	// that gates package-aware bindings (the generated catalog included).
 	applySCA(g, paths)
-	// Dynamic, dependency-gated package adapters: load the generated per-package catalog
+	// Dynamic, dependency-gated package bindings: load the generated per-package catalog
 	// only for packages this project actually depends on, then apply alongside the static
-	// framework adapters.
+	// framework bindings.
 	deps := frontend.DependencyEvidence(g)
 	for _, lang := range stats.languages {
 		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
 	}
-	if overlay := strings.TrimSpace(scanAdapterOverlay); overlay != "" {
+	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
 		extra, err := frontend.OverlayAdapters(overlay, stats.languages)
 		if err != nil {
-			return nil, stats, fmt.Errorf("adapter overlay: %w", err)
+			return nil, stats, fmt.Errorf("binding overlay: %w", err)
 		}
 		ads = append(ads, extra...)
 	}
 	tk.mark("sca+pkg")
-	// Adapter labeling: incremental (reuse unchanged modules' cached labels) when caching is
-	// on, else a full pass. Both produce identical labels — adapter precedence is per-node.
+	// Binding labeling: incremental (reuse unchanged modules' cached labels) when caching is
+	// on, else a full pass. Both produce identical labels — binding precedence is per-node.
 	if incremental {
 		relabel, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache)
 		if err != nil {
@@ -125,7 +125,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
 		return nil, stats, err
 	}
-	tk.mark("adapters")
+	tk.mark("bindings")
 	return g, stats, nil
 }
 

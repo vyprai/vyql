@@ -875,6 +875,17 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"`package \"name\"",
 		"`flag <concept> on|in",
 	}
+	legacyCLISurface := []string{
+		"case \"adapters\"",
+		"case \"validate-adapter\"",
+		"cmdAdapters",
+		"cmdValidateAdapter",
+		"adapter-overlay",
+		"usage: vyql adapters",
+		"validate-adapter parse",
+		"json:\"adapters",
+		"definition kind: all | concepts | rules | adapters",
+	}
 	securityConceptNames := []string{
 		"ResourceRelease",
 		"LockRelease",
@@ -908,6 +919,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 			}
 		}
 		for _, snippet := range legacyAuthoredSyntax {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyCLISurface {
 			if strings.Contains(src, snippet) {
 				usesLegacy = true
 				break

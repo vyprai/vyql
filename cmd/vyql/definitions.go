@@ -38,8 +38,8 @@ func cmdDefinitions(args []string) error {
 		return cmdDefinitionsShowMechanic(args[1:])
 	}
 	fs := flag.NewFlagSet("definitions", flag.ExitOnError)
-	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | adapters | reviews")
-	lang := fs.String("lang", "", "adapter language filter, e.g. python, javascript, go")
+	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | bindings | reviews")
+	lang := fs.String("lang", "", "binding language filter, e.g. python, javascript, go")
 	query := fs.String("query", "", "case-insensitive substring filter across names, concepts, patterns, packages, CWE, and text")
 	max := fs.Int("max", 80, "maximum rows per section")
 	format := fs.String("format", "text", "output format: text | json")
@@ -103,8 +103,8 @@ type v2RefView struct {
 
 func cmdDefinitionsSearch(args []string) error {
 	fs := flag.NewFlagSet("definitions search", flag.ExitOnError)
-	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | adapters | reviews | packs")
-	lang := fs.String("lang", "", "adapter language filter, e.g. python, javascript, go")
+	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | bindings | reviews | packs")
+	lang := fs.String("lang", "", "binding language filter, e.g. python, javascript, go")
 	max := fs.Int("max", 80, "maximum rows per section")
 	format := fs.String("format", "text", "output format: text | json")
 	_ = fs.Parse(args)
@@ -900,7 +900,7 @@ func vyqlFilesUnder(root string) ([]string, error) {
 
 func printDefinitions(cat definitions.Catalog) {
 	fmt.Printf("VyQL definitions: %s\n", cat.Root)
-	fmt.Printf("loaded: concepts=%d rules=%d adapters=%d reviews=%d\n", cat.Stats.Concepts, cat.Stats.Rules, cat.Stats.Adapters, cat.Stats.Reviews)
+	fmt.Printf("loaded: concepts=%d rules=%d bindings=%d reviews=%d\n", cat.Stats.Concepts, cat.Stats.Rules, cat.Stats.Bindings, cat.Stats.Reviews)
 	if len(cat.Concepts) > 0 {
 		fmt.Printf("\n== concepts (%d shown) ==\n", len(cat.Concepts))
 		for _, c := range cat.Concepts {
@@ -933,9 +933,9 @@ func printDefinitions(cat definitions.Catalog) {
 			fmt.Printf("  %s  (%s)\n", strings.Join(parts, " "), r.Source)
 		}
 	}
-	if len(cat.Adapters) > 0 {
-		fmt.Printf("\n== adapters (%d shown) ==\n", len(cat.Adapters))
-		for _, m := range cat.Adapters {
+	if len(cat.Bindings) > 0 {
+		fmt.Printf("\n== bindings (%d shown) ==\n", len(cat.Bindings))
+		for _, m := range cat.Bindings {
 			parts := []string{m.Language, m.Kind}
 			if m.Pattern != "" {
 				parts = append(parts, fmt.Sprintf("%q", m.Pattern))
