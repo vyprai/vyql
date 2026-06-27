@@ -587,11 +587,8 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 	t.Logf("checked %d shipped v2 definition files", checked)
 }
 
-func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
-	builtInMechanicDecls := []*regexp.Regexp{
-		regexp.MustCompile(`^\s*mechanic\s+ruleVerb\s+(?:taint|reach|grant|issue|fact|query|assume)\b`),
-		regexp.MustCompile(`^\s*mechanic\s+coverage\s+(?:path|endpoint|sameReceiver|sameScope|dominates|postDominates|global|assume)\b`),
-	}
+func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
+	authoredMechanicDecl := regexp.MustCompile(`^\s*mechanic\s+\S+\s+\S+\b`)
 	var hits []string
 	root := filepath.Join(datadir.Root(), "mechanics")
 	if _, err := os.Stat(root); err != nil {
@@ -610,7 +607,7 @@ func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 				return err
 			}
 			src := string(data)
-			if !strings.Contains(src, "mechanic ruleVerb") && !strings.Contains(src, "mechanic coverage") {
+			if !strings.Contains(src, "mechanic ") {
 				return nil
 			}
 			rel, _ := filepath.Rel(datadir.Root(), path)
@@ -633,12 +630,9 @@ func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 		src := string(data)
 		for _, line := range strings.Split(src, "\n") {
 			trimmed := strings.TrimSpace(line)
-			for _, re := range builtInMechanicDecls {
-				if re.MatchString(line) {
-					rel, _ := filepath.Rel(datadir.Root(), path)
-					hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
-					break
-				}
+			if authoredMechanicDecl.MatchString(line) {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
 			}
 			if strings.HasPrefix(trimmed, "assume ") ||
 				strings.HasPrefix(trimmed, "analysisRole:") ||
@@ -1017,9 +1011,18 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	if len(ledgerRows) != len(poolRows) {
 		t.Fatalf("cve-1000 ledger rows = %d, want exactly %d pool rows", len(ledgerRows), len(poolRows))
 	}
+	poolFieldsByRank := make([][]string, len(poolRows))
+	for rank, row := range poolRows {
+		fields := strings.Split(row, "\t")
+		if len(fields) < 7 {
+			t.Fatalf("pool row %d has %d fields, want at least 7: %q", rank+1, len(fields), row)
+		}
+		poolFieldsByRank[rank] = fields
+	}
 	covered := make(map[int]bool, len(poolRows))
 	ledgerByRank := make(map[int]string, len(poolRows))
 	statuses := map[string]int{}
+	usedCVEOverrides := map[int]bool{}
 	for i, row := range ledgerRows {
 		fields := strings.SplitN(row, "\t", 6)
 		if len(fields) != 6 {
@@ -1031,6 +1034,19 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 		}
 		if rank < 0 || rank >= len(poolRows) {
 			t.Fatalf("ledger row %d rank %d outside pool range 0..%d", i+1, rank, len(poolRows)-1)
+		}
+		poolFields := poolFieldsByRank[rank]
+		if !cve1000LedgerRepoMatches(fields[1], poolFields) {
+			t.Fatalf("ledger row %d rank %d repo = %q, want pool repo %q, owner %q, or owner/repo", i+1, rank, fields[1], poolFields[0], poolFields[1])
+		}
+		if fields[2] != "" && poolFields[6] != "" && fields[2] != poolFields[6] {
+			t.Fatalf("ledger row %d rank %d language = %q, want pool language %q", i+1, rank, fields[2], poolFields[6])
+		}
+		if fields[3] != poolFields[3] {
+			if cve1000AcceptedLedgerCVEMetadataOverrides[rank] != fields[3] {
+				t.Fatalf("ledger row %d rank %d CVE = %q, want pool CVE %q", i+1, rank, fields[3], poolFields[3])
+			}
+			usedCVEOverrides[rank] = true
 		}
 		status := fields[4]
 		switch status {
@@ -1053,6 +1069,15 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
+	}
+	wantStatuses := map[string]int{"ATTENTION": 99, "CAUGHT": 105, "FIXED": 775, "SKIP": 21}
+	if !intMapsEqual(statuses, wantStatuses) {
+		t.Fatalf("cve-1000 ledger statuses = %v, want %v", statuses, wantStatuses)
+	}
+	for rank, cve := range cve1000AcceptedLedgerCVEMetadataOverrides {
+		if !usedCVEOverrides[rank] {
+			t.Fatalf("CVE ledger metadata override rank %d (%s) is stale; remove it or fix the ledger/pool pair", rank, cve)
+		}
 	}
 
 	cveSpecs := readCVERankSpecFiles(t)
@@ -1136,6 +1161,13 @@ var cve1000AllowedDuplicateSpecRanks = map[int]bool{
 	955: true,
 }
 
+// cve1000AcceptedLedgerCVEMetadataOverrides is the explicit burn-down list for
+// existing ledger rows whose reviewed CVE differs from the selected pool row.
+// New CVE mismatches fail the gate; fixing this row must remove the exception.
+var cve1000AcceptedLedgerCVEMetadataOverrides = map[int]string{
+	15: "CVE-2010-0684",
+}
+
 // cve1000AcceptedNoSpecRanks is the explicit burn-down list for non-SKIP ledger
 // rows that are currently verified only by the CVE prep/eval ledger rather than a
 // runnable cve_rank*.test.vyql spec. Adding a runnable rank spec must remove the
@@ -1165,6 +1197,27 @@ func nonemptyTSVRows(src string) []string {
 		}
 	}
 	return rows
+}
+
+func intMapsEqual(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, av := range a {
+		if b[key] != av {
+			return false
+		}
+	}
+	return true
+}
+
+func cve1000LedgerRepoMatches(ledgerRepo string, poolFields []string) bool {
+	if len(poolFields) < 2 {
+		return false
+	}
+	project := poolFields[0]
+	owner := poolFields[1]
+	return ledgerRepo == project || ledgerRepo == owner || ledgerRepo == owner+"/"+project
 }
 
 func readCVERankSpecFiles(t *testing.T) []string {
