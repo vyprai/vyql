@@ -1032,14 +1032,14 @@ binding bad {
 			want: "query relation step references call needs native production v2 lowering",
 		},
 		{
-			name: "composed pattern use plus node not implemented",
+			name: "composed pattern use plus node is cartesian composition",
 			src: `module patterns.javascript.composed;
 pattern base { node: call }
 pattern composed {
   use base as b
   node: call
 }`,
-			want: "composed pattern use with additional node needs native production v2 lowering",
+			want: "composed pattern use with additional node is an arbitrary Cartesian composition",
 		},
 		{
 			name: "unknown requirement",

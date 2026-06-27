@@ -1451,7 +1451,7 @@ func validateV2Pattern(pat *V2PatternDecl) []error {
 		}
 	}
 	if useCount > 0 && nodeCount > 0 {
-		errs = append(errs, fmt.Errorf("pattern %s: composed pattern use with additional node needs native production v2 lowering", pat.Name))
+		errs = append(errs, fmt.Errorf("pattern %s: composed pattern use with additional node is an arbitrary Cartesian composition; connect subpatterns with stable query relations instead", pat.Name))
 	}
 	return errs
 }
