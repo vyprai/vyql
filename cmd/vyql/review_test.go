@@ -1,8 +1,10 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
@@ -28,6 +30,62 @@ func TestCollectReviewItemsDeduplicatesSameCallSite(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("review items = %d, want 1", len(got))
 	}
+}
+
+func TestReviewDisplayPolicyLoadsScanAll(t *testing.T) {
+	prog, err := parser.ParseV2(`
+module policies.core;
+policy display default {
+  scanAll: [findings, flags, checks, advisoryEvidence, requirementDiagnostics]
+  flagSort: [severity, category, location, concept]
+  includeNearbyChecks: true
+  nearbyCheckLimit: 5
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	policy, err := reviewDisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	if err != nil {
+		t.Fatalf("reviewDisplayPolicyFromDecl: %v", err)
+	}
+	want := []string{"findings", "flags", "checks", "advisoryEvidence", "requirementDiagnostics"}
+	if !stringSlicesEqual(policy.scanAll, want) {
+		t.Fatalf("scanAll = %#v, want %#v", policy.scanAll, want)
+	}
+}
+
+func TestReviewDisplayPolicyRequiresScanAll(t *testing.T) {
+	prog, err := parser.ParseV2(`
+module policies.core;
+policy display default {
+  flagSort: [severity]
+  includeNearbyChecks: true
+  nearbyCheckLimit: 5
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	_, err = reviewDisplayPolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	if err == nil {
+		t.Fatal("reviewDisplayPolicyFromDecl succeeded, want missing scanAll diagnostic")
+	}
+	if !strings.Contains(err.Error(), "scanAll") {
+		t.Fatalf("reviewDisplayPolicyFromDecl error = %v, want scanAll diagnostic", err)
+	}
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCollectReviewItemsHandlesNilStore(t *testing.T) {

@@ -46,6 +46,7 @@ type reviewConceptInfo struct {
 }
 
 type reviewDisplayPolicy struct {
+	scanAll             []string
 	flagSort            []string
 	includeNearbyChecks bool
 	nearbyCheckLimit    int
@@ -198,6 +199,11 @@ func reviewDisplayPolicyFromDecl(p *parser.V2PolicyDecl) (reviewDisplayPolicy, e
 			continue
 		}
 		switch item.Key[0] {
+		case "scanAll":
+			out.scanAll = reviewPolicyStringList(item.Value)
+			if len(out.scanAll) == 0 {
+				return reviewDisplayPolicy{}, fmt.Errorf("policy display default: scanAll must be a non-empty string list")
+			}
 		case "flagSort":
 			out.flagSort = reviewPolicyStringList(item.Value)
 			if len(out.flagSort) == 0 {
@@ -219,6 +225,9 @@ func reviewDisplayPolicyFromDecl(p *parser.V2PolicyDecl) (reviewDisplayPolicy, e
 	}
 	if len(out.flagSort) == 0 {
 		return reviewDisplayPolicy{}, fmt.Errorf("policy display default: missing flagSort")
+	}
+	if len(out.scanAll) == 0 {
+		return reviewDisplayPolicy{}, fmt.Errorf("policy display default: missing scanAll")
 	}
 	return out, nil
 }
