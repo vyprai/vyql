@@ -1611,6 +1611,66 @@ concept PublicRouteObservation : observation {}
 	}
 }
 
+func TestValidateV2RejectsInvalidSourcePolicyMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "unknown source policy",
+			src: `
+module code;
+concept ExternalInput : source {
+  sourcePolicy: maybe
+}
+`,
+			want: `unknown sourcePolicy "maybe"`,
+		},
+		{
+			name: "source policy on non source",
+			src: `
+module code;
+concept ExternalSink : sink {
+  sourcePolicy: caller_conditional
+}
+`,
+			want: `sourcePolicy is only valid on source concepts`,
+		},
+		{
+			name: "unknown source confidence",
+			src: `
+module code;
+concept ExternalInput : source {
+  sourceConfidence: certain
+}
+`,
+			want: `unknown sourceConfidence "certain"`,
+		},
+		{
+			name: "unknown review confidence",
+			src: `
+module code;
+concept ExternalInput : source {
+  reviewConfidence: certain
+}
+`,
+			want: `unknown reviewConfidence "certain"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseV2(tt.src)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want metadata diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateV2CorpusRejectsUnknownModelReferences(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module injection;

@@ -45,6 +45,8 @@ var (
 	v2GoOwnedMechanicNames     = map[string]bool{"assume": true}
 	v2FidelityLevels           = map[string]bool{"syntactic": true, "resolved": true, "semantic": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
+	v2ReviewConfidenceLevels   = map[string]bool{"low": true, "medium": true, "high": true, "possibility": true}
+	v2SourcePolicies           = map[string]bool{"direct": true, "caller_conditional": true}
 	v2CoverageSolversByMode    = map[string][]string{
 		"path":          {"solver.pathCovered"},
 		"endpoint":      {"solver.sameEndpoint"},
@@ -840,6 +842,33 @@ func validateV2Concept(c *V2ConceptDecl) []error {
 					errs = append(errs, fmt.Errorf("concept %s: unknown internal role %q", c.Name, role))
 				}
 			}
+		}
+	}
+	if raw, ok := c.Fields["sourcePolicy"]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			errs = append(errs, fmt.Errorf("concept %s: sourcePolicy must be a string", c.Name))
+		} else if !v2SourcePolicies[value] {
+			errs = append(errs, fmt.Errorf("concept %s: unknown sourcePolicy %q", c.Name, value))
+		}
+		if c.Kind != "source" {
+			errs = append(errs, fmt.Errorf("concept %s: sourcePolicy is only valid on source concepts", c.Name))
+		}
+	}
+	if raw, ok := c.Fields["sourceConfidence"]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			errs = append(errs, fmt.Errorf("concept %s: sourceConfidence must be a string", c.Name))
+		} else if !v2ConfidenceLevels[value] {
+			errs = append(errs, fmt.Errorf("concept %s: unknown sourceConfidence %q", c.Name, value))
+		}
+	}
+	if raw, ok := c.Fields["reviewConfidence"]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			errs = append(errs, fmt.Errorf("concept %s: reviewConfidence must be a string", c.Name))
+		} else if !v2ReviewConfidenceLevels[value] {
+			errs = append(errs, fmt.Errorf("concept %s: unknown reviewConfidence %q", c.Name, value))
 		}
 	}
 	if raw, ok := c.Fields["covers"]; ok {
