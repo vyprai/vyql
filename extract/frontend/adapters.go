@@ -3216,6 +3216,9 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 			if path == "" {
 				continue
 			}
+			if pred.Op == "exists" {
+				return true
+			}
 			if pred.Op == "equals" || pred.Op == "equals_any" {
 				if flagValuePredicate(pred, path) {
 					return true
@@ -3236,7 +3239,7 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 		}
 		return false
 	case "method":
-		if pred.Op == "contains" || pred.Op == "starts_with" || pred.Op == "ends_with" || pred.Op == "equals" || pred.Op == "equals_any" {
+		if pred.Op == "exists" || pred.Op == "contains" || pred.Op == "starts_with" || pred.Op == "ends_with" || pred.Op == "equals" || pred.Op == "equals_any" {
 			return flagValuePredicate(pred, n.Prop("method"))
 		}
 		return containsStr(pred.Values, n.Prop("method"))
@@ -3275,6 +3278,9 @@ func flagContextTokenValuePredicate(pred flagPredicate, text string) bool {
 }
 
 func contextTokenValuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
+	if op == "exists" {
+		return contextTokenExistsPredicate(values, text)
+	}
 	if op == "equals" || op == "equals_any" {
 		if contextTokenEqualsPredicate(op, values, text) {
 			return true
@@ -3291,6 +3297,34 @@ func contextTokenValuePredicateLowerValues(op string, values, valuesLower []stri
 		}
 	}
 	return valuePredicateLowerValues(op, values, valuesLower, text)
+}
+
+func contextTokenExistsPredicate(values []string, text string) bool {
+	if len(values) == 0 {
+		return text != ""
+	}
+	tokens := contextTokensByPrefix(text)
+	for _, value := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(value)
+		if !ok {
+			if value == "" && text != "" {
+				return true
+			}
+			continue
+		}
+		if want == "" {
+			if len(tokens[prefix]) > 0 {
+				return true
+			}
+			continue
+		}
+		for _, got := range tokens[prefix] {
+			if got == want {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func contextTokenEqualsPredicate(op string, values []string, text string) bool {
@@ -3531,6 +3565,11 @@ func flagValuePredicate(pred flagPredicate, text string) bool {
 
 func valuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
 	switch op {
+	case "exists":
+		if len(values) == 0 {
+			return text != ""
+		}
+		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
 	case "equals":
 		for _, v := range values {
 			if text == v {

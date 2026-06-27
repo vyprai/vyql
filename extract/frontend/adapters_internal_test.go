@@ -118,6 +118,22 @@ func TestPathEqualsAnyPredicateIsExact(t *testing.T) {
 	}
 }
 
+func TestExistsPredicatesMatchPresentFields(t *testing.T) {
+	if !flagPredicateHit(newFlagPredicate("node", "path", "exists", nil, false, false), usg.Node{Props: map[string]string{"callee_path": "source.value"}}) {
+		t.Fatal("path exists should match a non-empty callee_path")
+	}
+	if flagPredicateHit(newFlagPredicate("node", "method", "exists", nil, false, false), usg.Node{Props: map[string]string{"method": ""}}) {
+		t.Fatal("method exists should not match an empty method")
+	}
+	tokens := "function_name:validateRedirect\x00literal:/admin.html"
+	if !contextTokenValuePredicate("exists", []string{"function_name:"}, tokens) {
+		t.Fatal("context exists should match a present token prefix")
+	}
+	if contextTokenValuePredicate("exists", []string{"decorator_path:"}, tokens) {
+		t.Fatal("context exists should not match a missing token prefix")
+	}
+}
+
 func TestFrontendDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

@@ -775,6 +775,9 @@ func (p *v2Parser) parseV2Compare(stop func(tok) bool) V2Expr {
 		op = p.next().val
 	case p.atWord("contains") && p.looksLikeV2ContainsRelationStep():
 		return left
+	case p.atWord("exists"):
+		p.next()
+		return V2BinaryExpr{Op: "exists", Left: left}
 	case p.atWord("in"), p.atWord("contains"), p.atWord("startsWith"), p.atWord("endsWith"), p.atWord("matches"), p.atWord("is"):
 		op = p.next().val
 	case p.atWord("not") && p.peek2().kind == tWord && p.peek2().val == "in":

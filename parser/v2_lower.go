@@ -1497,6 +1497,13 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
 	switch x.Op {
+	case "exists":
+		value := prefixV2PresenceValue(field, "")
+		values := []string(nil)
+		if value != "" {
+			values = []string{value}
+		}
+		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "exists", Values: values, Negative: neg}, nil
 	case "~=", "==", "!=", "contains", "startsWith", "endsWith":
 		value, ok := v2LiteralString(x.Right)
 		if !ok {

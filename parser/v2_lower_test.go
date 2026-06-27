@@ -2214,6 +2214,29 @@ binding negativeFields {
 	}
 }
 
+func TestV2PresenceNodeExistsOperator(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.native;
+binding presentFields {
+  query pattern presenceNode where node.path exists and node.context.functionName exists
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
+	if len(flag.Predicates) != 2 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "path" || got.Op != "exists" || got.Negative || len(got.Values) != 0 {
+		t.Fatalf("path exists predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "exists" || got.Negative || len(got.Values) != 1 || got.Values[0] != "function_name:" {
+		t.Fatalf("context exists predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodePatternLowersToFlag(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.bash.crypto;

@@ -551,6 +551,7 @@ pattern sensitiveHandler as handler {
   where callee.path startsWith "app."
   where callee.path endsWith ".get"
   where callee.path matches "^app\\."
+  where callee.receiver exists
   where operands.any.identifier is secretTokenName
   where scope.hasCall(path: "escapeHtml")
 }
@@ -559,18 +560,18 @@ pattern sensitiveHandler as handler {
 		t.Fatalf("ParseV2: %v", err)
 	}
 	pat := prog.Decls[0].(*V2PatternDecl)
-	if len(pat.Items) != 6 {
-		t.Fatalf("pattern items = %d, want 6", len(pat.Items))
+	if len(pat.Items) != 7 {
+		t.Fatalf("pattern items = %d, want 7", len(pat.Items))
 	}
-	for i, want := range []string{"startsWith", "endsWith", "matches", "is"} {
+	for i, want := range []string{"startsWith", "endsWith", "matches", "exists", "is"} {
 		expr, ok := pat.Items[i+1].Expr.(V2BinaryExpr)
 		if !ok || expr.Op != want {
 			t.Fatalf("where %d expr = %+v, want %s binary", i+1, pat.Items[i+1].Expr, want)
 		}
 	}
-	call, ok := pat.Items[5].Expr.(V2CallExpr)
+	call, ok := pat.Items[6].Expr.(V2CallExpr)
 	if !ok || call.Name != "scope.hasCall" || len(call.NamedArgs) != 1 {
-		t.Fatalf("named call expr = %+v", pat.Items[5].Expr)
+		t.Fatalf("named call expr = %+v", pat.Items[6].Expr)
 	}
 	if call.NamedArgs[0].Name != "path" {
 		t.Fatalf("named arg = %+v, want path", call.NamedArgs[0])
