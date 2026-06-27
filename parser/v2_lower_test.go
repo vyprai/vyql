@@ -1641,6 +1641,60 @@ binding routeParams {
 	}
 }
 
+func TestV2ContainsAnySupportsNodeValueFields(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding sqlLiteral {
+  query stringLiteral as lit where containsAny(lit.value, ["SELECT", "UPDATE"])
+  emit issue code.SqlLiteral at lit
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	mappings := decls[0].(*BindingSet).Mappings
+	if len(mappings) != 2 {
+		t.Fatalf("mappings = %#v, want two value alternatives", mappings)
+	}
+	seen := map[string]bool{}
+	for _, got := range mappings {
+		if got.Kind != "mark" || got.NodeType != "code.Literal" || len(got.ValMatches) != 1 {
+			t.Fatalf("literal containsAny mapping wrong: %+v", got)
+		}
+		seen[got.ValMatches[0]] = true
+	}
+	if !seen["SELECT"] || !seen["UPDATE"] {
+		t.Fatalf("literal containsAny values missing from mappings: %+v", seen)
+	}
+}
+
+func TestV2ContainsAnySupportsAssignmentTokenFields(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.assignments;
+binding secretAssignment {
+  query assignment as a where containsAny(a.item, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"])
+  emit issue code.SecretValue at a
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	mappings := decls[0].(*BindingSet).Mappings
+	if len(mappings) != 2 {
+		t.Fatalf("mappings = %#v, want two assignment alternatives", mappings)
+	}
+	seen := map[string]bool{}
+	for _, got := range mappings {
+		if got.Kind != "mark" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 2 {
+			t.Fatalf("assignment containsAny mapping wrong: %+v", got)
+		}
+		seen[got.ValMatches[1]] = true
+	}
+	if !seen["assign_item:viewer_scopes:CONFIG_READ"] || !seen["assign_item:guest_scopes:CONFIG_READ"] {
+		t.Fatalf("assignment containsAny values missing from mappings: %+v", seen)
+	}
+}
+
 func TestV2ReceiverTypeFactLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.native;

@@ -2115,6 +2115,12 @@ func lowerV2CallShapeCall(binding string, call V2CallExpr, neg bool, family stri
 	switch field {
 	case "args.any.literal", "call.args.any.literal":
 		return lowerV2ContainsAnyValueShapes(binding, field, values, "", neg)
+	case "node.value", "node.name", "node.module":
+		return lowerV2ContainsAnyValueShapes(binding, field, values, "", neg)
+	case "assignment.any", "assignment.target", "assignment.value", "assignment.targetValue",
+		"assignment.call", "assignment.callMethod", "assignment.item", "assignment.literal":
+		prefix, _ := v2AssignmentTokenPrefix(field)
+		return lowerV2ContainsAnyValueShapes(binding, field, values, prefix, neg)
 	default:
 		return nil, fmt.Errorf("binding %s: containsAny field %q is not implemented in scanner IR lowering", binding, fieldRef.Name)
 	}
