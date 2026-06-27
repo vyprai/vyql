@@ -678,6 +678,22 @@ func TestShippedDefinitionsDoNotUseLegacyV1Syntax(t *testing.T) {
 	}
 }
 
+func TestShippedProfilesUseV2DetectPredicates(t *testing.T) {
+	files := readDataFiles(t, "profiles", ".vyql")
+	legacyDetect := regexp.MustCompile(`detect:\s*\[\s*"[^"]+:[^"]*"`)
+	var hits []string
+	for path, src := range files {
+		if legacyDetect.MatchString(src) {
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel))
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("profile detect must use v2 requirement predicates, not legacy fingerprint strings:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
 	files := readDataFiles(t, "tests", ".test.vyql")
 	legacyLinePatterns := legacyV1DefinitionLinePatterns()

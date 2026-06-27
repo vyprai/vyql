@@ -141,6 +141,52 @@ func TestParseV2ProgramContract(t *testing.T) {
 	}
 }
 
+func TestParseV2ProfileDetectPredicates(t *testing.T) {
+	prog, err := ParseV2(`module profiles;
+profile web {
+  detect: [
+    any(dependency("flask"), dependency("django"), file("config/routes.rb")),
+    project.has("ext:.py")
+  ]
+  entrypoints: [code.HttpInput, core.UserControlledData]
+}`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	if len(prog.Decls) != 1 {
+		t.Fatalf("decls = %d, want 1", len(prog.Decls))
+	}
+	profile, ok := prog.Decls[0].(*V2ProfileDecl)
+	if !ok {
+		t.Fatalf("decl = %T, want profile", prog.Decls[0])
+	}
+	detect, ok := profile.Fields["detect"].([]V2Expr)
+	if !ok || len(detect) != 2 {
+		t.Fatalf("detect = %#v, want two v2 expressions", profile.Fields["detect"])
+	}
+	call, ok := detect[0].(V2CallExpr)
+	if !ok || call.Name != "any" || len(call.Args) != 3 {
+		t.Fatalf("first detect expr = %#v, want any(...) call", detect[0])
+	}
+	entrypoints, ok := profile.Fields["entrypoints"].([]string)
+	if !ok || !stringListFieldEqual(entrypoints, []string{"code.HttpInput", "core.UserControlledData"}) {
+		t.Fatalf("entrypoints = %#v", profile.Fields["entrypoints"])
+	}
+}
+
+func TestValidateV2RejectsLegacyProfileDetectStrings(t *testing.T) {
+	_, err := ParseV2(`module profiles;
+profile web {
+  detect: ["dep:flask"]
+}`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want legacy detect string rejection")
+	}
+	if !strings.Contains(err.Error(), "detect entries must be requirement predicate calls") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestParseV2PackTypedReferences(t *testing.T) {
 	prog, err := ParseV2(`
 module packs.web;

@@ -20,9 +20,15 @@ import (
 type Profile struct {
 	Name        string
 	Title       string
-	Priority    int      // tie-breaker when profiles have the same detection score
-	Detect      []string // fingerprints: "dep:x" | "file:rel" | "ext:.x"
-	Entrypoints []string // active source concept short names ("DomInput"); empty = all
+	Priority    int          // tie-breaker when profiles have the same detection score
+	Detect      []DetectExpr // v2 project-fact predicates; top-level entries are implicit all(...)
+	Entrypoints []string     // active source concept names; empty = all
+}
+
+type DetectExpr struct {
+	Op    string
+	Value string
+	Args  []DetectExpr
 }
 
 // ActiveSources returns the set of active source concepts as "code.X", or nil
@@ -65,11 +71,15 @@ func loadSources(files []datadir.Source) ([]Profile, error) {
 		if !ok {
 			continue
 		}
+		detect, err := detectExprs(pd.Fields["detect"])
+		if err != nil {
+			return genericProfiles(), fmt.Errorf("profile %s: %w", pd.Name, err)
+		}
 		out = append(out, Profile{
 			Name:        pd.Name,
 			Title:       str(pd.Fields["title"]),
 			Priority:    intField(pd.Fields["priority"]),
-			Detect:      list(pd.Fields["detect"]),
+			Detect:      detect,
 			Entrypoints: list(pd.Fields["entrypoints"]),
 		})
 	}
@@ -91,6 +101,86 @@ func v2DefinitionSources(files []datadir.Source) []parser.V2DefinitionSource {
 	return out
 }
 
+func detectExprs(raw any) ([]DetectExpr, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	exprs, ok := raw.([]parser.V2Expr)
+	if !ok {
+		return nil, fmt.Errorf("detect must use v2 requirement predicate expressions")
+	}
+	out := make([]DetectExpr, 0, len(exprs))
+	for _, expr := range exprs {
+		d, err := detectExpr(expr)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+func detectExpr(expr parser.V2Expr) (DetectExpr, error) {
+	call, ok := expr.(parser.V2CallExpr)
+	if !ok {
+		return DetectExpr{}, fmt.Errorf("detect entry must be a requirement predicate call")
+	}
+	if len(call.NamedArgs) != 0 {
+		return DetectExpr{}, fmt.Errorf("detect requirement %s does not support named arguments", call.Name)
+	}
+	switch call.Name {
+	case "all", "any":
+		if len(call.Args) == 0 {
+			return DetectExpr{}, fmt.Errorf("detect requirement %s needs at least one child", call.Name)
+		}
+		out := DetectExpr{Op: call.Name, Args: make([]DetectExpr, 0, len(call.Args))}
+		for _, arg := range call.Args {
+			child, err := detectExpr(arg)
+			if err != nil {
+				return DetectExpr{}, err
+			}
+			out.Args = append(out.Args, child)
+		}
+		return out, nil
+	case "not":
+		if len(call.Args) != 1 {
+			return DetectExpr{}, fmt.Errorf("detect requirement not needs exactly one child")
+		}
+		child, err := detectExpr(call.Args[0])
+		if err != nil {
+			return DetectExpr{}, err
+		}
+		return DetectExpr{Op: call.Name, Args: []DetectExpr{child}}, nil
+	case "dependency", "file", "framework", "import", "language", "project.has":
+		values, err := detectStringArgs(call)
+		if err != nil {
+			return DetectExpr{}, err
+		}
+		if len(values) != 1 {
+			return DetectExpr{}, fmt.Errorf("detect requirement %s needs exactly one string argument", call.Name)
+		}
+		return DetectExpr{Op: call.Name, Value: values[0]}, nil
+	default:
+		return DetectExpr{}, fmt.Errorf("unknown detect requirement %q", call.Name)
+	}
+}
+
+func detectStringArgs(call parser.V2CallExpr) ([]string, error) {
+	out := make([]string, 0, len(call.Args))
+	for _, arg := range call.Args {
+		lit, ok := arg.(parser.V2LiteralExpr)
+		if !ok {
+			return nil, fmt.Errorf("detect requirement %s expects string arguments", call.Name)
+		}
+		s, ok := lit.Value.(string)
+		if !ok || s == "" {
+			return nil, fmt.Errorf("detect requirement %s expects non-empty string arguments", call.Name)
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
 // ByName returns the named profile (ok=false if absent).
 func ByName(profiles []Profile, name string) (Profile, bool) {
 	for _, p := range profiles {
@@ -102,12 +192,17 @@ func ByName(profiles []Profile, name string) (Profile, bool) {
 }
 
 // Detect picks the best-matching profile for a project rooted at the given paths,
-// by counting fingerprint hits; ties use the data-defined profile priority, then
-// the order profiles are listed.
+// by counting satisfied v2 project-fact predicates; ties use the data-defined
+// profile priority, then the order profiles are listed.
 // Returns the generic profile when nothing matches.
 func Detect(paths []string, profiles []Profile) Profile {
-	manifests := readManifests(paths)
-	exts := collectExts(paths)
+	ctx := detectContext{
+		paths:               paths,
+		manifests:           readManifests(paths),
+		exts:                collectExts(paths),
+		npmPublishable:      npmPublishable(paths),
+		manifestPublishable: manifestPublishable(paths),
+	}
 	best := Profile{Name: "generic", Title: "Generic application (no archetype detected)"}
 	bestScore := 0
 	for _, p := range profiles {
@@ -116,37 +211,81 @@ func Detect(paths []string, profiles []Profile) Profile {
 		}
 		score := 0
 		for _, d := range p.Detect {
-			kind, val, _ := strings.Cut(d, ":")
-			switch kind {
-			case "dep":
-				if depMatch(manifests, val) {
-					score++
-				}
-			case "file":
-				if fileExists(paths, val) {
-					score++
-				}
-			case "npm":
-				if val == "publishable" && npmPublishable(paths) {
-					// A publishable package manifest is a stronger archetype signal than
-					// incidental docs/demo frontend files inside the same repository.
-					score += 2
-				}
-			case "manifest":
-				if val == "publishable" && manifestPublishable(paths) {
-					score += 2 // a non-npm/python ecosystem publish manifest (gem/crate/composer/pod)
-				}
-			case "ext":
-				if exts[strings.ToLower(val)] {
-					score++
-				}
+			part := ctx.score(d)
+			if part == 0 {
+				score = 0
+				break
 			}
+			score += part
 		}
 		if score > bestScore || (score == bestScore && score > 0 && p.Priority > best.Priority) {
 			best, bestScore = p, score
 		}
 	}
 	return best
+}
+
+type detectContext struct {
+	paths               []string
+	manifests           string
+	exts                map[string]bool
+	npmPublishable      bool
+	manifestPublishable bool
+}
+
+func (c detectContext) score(expr DetectExpr) int {
+	switch expr.Op {
+	case "all":
+		score := 0
+		for _, child := range expr.Args {
+			part := c.score(child)
+			if part == 0 {
+				return 0
+			}
+			score += part
+		}
+		return score
+	case "any":
+		score := 0
+		for _, child := range expr.Args {
+			score += c.score(child)
+		}
+		return score
+	case "not":
+		if len(expr.Args) != 1 || c.score(expr.Args[0]) != 0 {
+			return 0
+		}
+		return 1
+	case "dependency", "framework", "import":
+		if depMatch(c.manifests, expr.Value) {
+			return 1
+		}
+	case "language":
+		if languagePresent(c.exts, expr.Value) {
+			return 1
+		}
+	case "file":
+		if fileExists(c.paths, expr.Value) {
+			return 1
+		}
+	case "project.has":
+		switch {
+		case expr.Value == "npm:publishable":
+			if c.npmPublishable {
+				return 2
+			}
+		case expr.Value == "manifest:publishable":
+			if c.manifestPublishable {
+				return 2
+			}
+		case strings.HasPrefix(expr.Value, "ext:"):
+			ext := strings.TrimPrefix(expr.Value, "ext:")
+			if c.exts[strings.ToLower(ext)] {
+				return 1
+			}
+		}
+	}
+	return 0
 }
 
 // manifestPublishable reports whether the project has a publishable package manifest:
@@ -287,13 +426,43 @@ func collectExts(paths []string) map[string]bool {
 	out := map[string]bool{}
 	for _, p := range paths {
 		_ = filepath.WalkDir(p, func(path string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() {
+			if err == nil {
 				out[strings.ToLower(filepath.Ext(path))] = true
 			}
 			return nil
 		})
 	}
 	return out
+}
+
+func languagePresent(exts map[string]bool, language string) bool {
+	for _, ext := range languageExts[strings.ToLower(language)] {
+		if exts[ext] {
+			return true
+		}
+	}
+	return false
+}
+
+var languageExts = map[string][]string{
+	"c":           {".c", ".h"},
+	"cpp":         {".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"},
+	"csharp":      {".cs"},
+	"dart":        {".dart"},
+	"elixir":      {".ex", ".exs"},
+	"go":          {".go"},
+	"groovy":      {".groovy"},
+	"java":        {".java"},
+	"javascript":  {".js", ".jsx", ".mjs", ".cjs"},
+	"kotlin":      {".kt", ".kts"},
+	"objective-c": {".m", ".mm"},
+	"php":         {".php"},
+	"python":      {".py"},
+	"ruby":        {".rb"},
+	"rust":        {".rs"},
+	"scala":       {".scala"},
+	"swift":       {".swift"},
+	"typescript":  {".ts", ".tsx", ".mts", ".cts"},
 }
 
 func fileExists(paths []string, rel string) bool {

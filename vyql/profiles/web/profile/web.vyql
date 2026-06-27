@@ -1,8 +1,8 @@
 module profiles;
 
 profile web {
-  detect: ["dep:flask", "dep:django", "dep:rails", "dep:express", "dep:laravel", "dep:spring-boot-starter-web", "file:config/routes.rb"]
-  entrypoints: [HttpInput, HttpHeader, Cookie, FileUpload, PatternOptionInput, SecretValue, DatabaseRead, DomInput, ComputedSizeValue, ArchiveEntryName]
+  detect: [any(dependency("flask"), dependency("django"), dependency("rails"), dependency("express"), dependency("laravel"), dependency("spring-boot-starter-web"), file("config/routes.rb"))]
+  entrypoints: [code.HttpInput, code.HttpHeader, code.Cookie, code.FileUpload, code.PatternOptionInput, code.SecretValue, code.DatabaseRead, code.DomInput, code.ComputedSizeValue, code.ArchiveEntryName]
   priority: "80"
   title: "Server-rendered web application"
 }

@@ -80,6 +80,8 @@ func ValidateV2(prog *V2Program) error {
 				errs = append(errs, fmt.Errorf("policy %s: unknown policy kind %q", x.Name, x.Kind))
 			}
 			errs = append(errs, validateV2Policy(x)...)
+		case *V2ProfileDecl:
+			errs = append(errs, validateV2Profile(x)...)
 		case *V2PackDecl:
 			errs = append(errs, validateV2Pack(x)...)
 		}
@@ -1533,6 +1535,68 @@ func validateV2Requirement(ctx string, req V2Requirement) []error {
 	for _, arg := range req.Args {
 		if child, ok := arg.(V2Requirement); ok {
 			errs = append(errs, validateV2Requirement(ctx, child)...)
+		}
+	}
+	return errs
+}
+
+func validateV2Profile(p *V2ProfileDecl) []error {
+	raw, ok := p.Fields["detect"]
+	if !ok {
+		return nil
+	}
+	exprs, ok := raw.([]V2Expr)
+	if !ok {
+		return []error{fmt.Errorf("profile %s: detect must use v2 requirement predicate expressions", p.Name)}
+	}
+	if len(exprs) == 0 {
+		return []error{fmt.Errorf("profile %s: detect must not be empty", p.Name)}
+	}
+	var errs []error
+	for _, expr := range exprs {
+		errs = append(errs, validateV2ProfileDetectExpr("profile "+p.Name+" detect", expr)...)
+	}
+	return errs
+}
+
+func validateV2ProfileDetectExpr(ctx string, expr V2Expr) []error {
+	call, ok := expr.(V2CallExpr)
+	if !ok {
+		return []error{fmt.Errorf("%s: detect entries must be requirement predicate calls", ctx)}
+	}
+	if call.Name == "soft" {
+		return []error{fmt.Errorf("%s: soft requirement is not valid for profile activation", ctx)}
+	}
+	if !v2RequirementPrimitives[call.Name] && !v2RequirementCombinators[call.Name] {
+		return []error{fmt.Errorf("%s: unknown requirement %q", ctx, call.Name)}
+	}
+	if len(call.NamedArgs) != 0 {
+		return []error{fmt.Errorf("%s: requirement %s does not support named arguments in profile activation", ctx, call.Name)}
+	}
+	var errs []error
+	switch call.Name {
+	case "all", "any":
+		if len(call.Args) == 0 {
+			errs = append(errs, fmt.Errorf("%s: requirement %s expects at least one child requirement", ctx, call.Name))
+		}
+		for _, arg := range call.Args {
+			errs = append(errs, validateV2ProfileDetectExpr(ctx, arg)...)
+		}
+	case "not":
+		if len(call.Args) != 1 {
+			errs = append(errs, fmt.Errorf("%s: requirement not expects exactly one child requirement", ctx))
+		}
+		for _, arg := range call.Args {
+			errs = append(errs, validateV2ProfileDetectExpr(ctx, arg)...)
+		}
+	default:
+		if len(call.Args) == 0 {
+			errs = append(errs, fmt.Errorf("%s: requirement %s requires at least one string argument", ctx, call.Name))
+		}
+		for _, arg := range call.Args {
+			if _, ok := v2LiteralString(arg); !ok {
+				errs = append(errs, fmt.Errorf("%s: requirement %s expects string arguments", ctx, call.Name))
+			}
 		}
 	}
 	return errs

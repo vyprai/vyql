@@ -1,8 +1,8 @@
 module profiles;
 
 profile cli {
-  detect: ["dep:cobra", "dep:click", "dep:argparse", "dep:clap", "dep:commander", "dep:yargs", "dep:picocli", "dep:thor"]
-  entrypoints: [CliArgument, EnvVariable, StdinInput, ConfigFileInput, StoredDataRead, ExternalApiResponse, PatternOptionInput, SecretValue, ComputedSizeValue, ArchiveEntryName]
+  detect: [any(dependency("cobra"), dependency("click"), dependency("argparse"), dependency("clap"), dependency("commander"), dependency("yargs"), dependency("picocli"), dependency("thor"))]
+  entrypoints: [code.CliArgument, code.EnvVariable, code.StdinInput, code.ConfigFileInput, code.StoredDataRead, code.ExternalApiResponse, code.PatternOptionInput, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
   priority: "20"
   title: "Command-line tool"
 }

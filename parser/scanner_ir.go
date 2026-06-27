@@ -161,7 +161,7 @@ type ReviewDecl struct {
 func (*ReviewDecl) isDecl() {}
 
 // ProfileDecl is an application-archetype threat-modelling profile. It selects
-// trust boundaries, relevant rule packs, and auto-detection fingerprints.
+// trust boundaries, relevant rule packs, and auto-detection predicates.
 type ProfileDecl struct {
 	Name   string
 	Fields map[string]any

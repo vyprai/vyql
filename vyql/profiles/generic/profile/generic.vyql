@@ -1,7 +1,7 @@
 module profiles;
 
 profile generic {
-  entrypoints: [HttpInput, HttpHeader, HttpRequest, Cookie, FileUpload, SecretValue, DatabaseRead, StoredDataRead, ExternalApiResponse, MessageInput, IntentInput, PasteboardInput, CliArgument, EnvVariable, StdinInput, ConfigFileInput, PatternOptionInput, ComputedSizeValue, ArchiveEntryName]
+  entrypoints: [code.HttpInput, code.HttpHeader, code.HttpRequest, code.Cookie, code.FileUpload, code.SecretValue, code.DatabaseRead, code.StoredDataRead, code.ExternalApiResponse, code.MessageInput, code.IntentInput, code.PasteboardInput, code.CliArgument, code.EnvVariable, code.StdinInput, code.ConfigFileInput, code.PatternOptionInput, code.ComputedSizeValue, code.ArchiveEntryName]
   priority: "0"
   title: "Generic application (no archetype detected)"
 }

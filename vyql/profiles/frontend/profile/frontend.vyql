@@ -1,8 +1,8 @@
 module profiles;
 
 profile frontend {
-  detect: ["dep:react", "dep:vue", "dep:@angular/core", "dep:svelte", "dep:preact", "file:angular.json", "ext:.jsx", "ext:.tsx", "ext:.vue", "ext:.svelte"]
-  entrypoints: [DomInput, HttpInput, HttpHeader, Cookie, FileUpload, PatternOptionInput, SecretValue, ComputedSizeValue, ArchiveEntryName]
+  detect: [any(dependency("react"), dependency("vue"), dependency("@angular/core"), dependency("svelte"), dependency("preact"), file("angular.json"), project.has("ext:.jsx"), project.has("ext:.tsx"), project.has("ext:.vue"), project.has("ext:.svelte"))]
+  entrypoints: [code.DomInput, code.HttpInput, code.HttpHeader, code.Cookie, code.FileUpload, code.PatternOptionInput, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
   priority: "70"
   title: "Frontend / single-page app (browser)"
 }

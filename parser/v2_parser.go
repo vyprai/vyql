@@ -431,7 +431,7 @@ func (p *v2Parser) parseV2Review() *V2ReviewDecl {
 
 func (p *v2Parser) parseV2Profile() *V2ProfileDecl {
 	p.expectWord("profile")
-	return &V2ProfileDecl{Name: p.parseQName(), Fields: p.parseV2FieldBlock()}
+	return &V2ProfileDecl{Name: p.parseQName(), Fields: p.parseV2ProfileFieldBlock()}
 }
 
 func (p *v2Parser) parseV2Pack() *V2PackDecl {
@@ -621,6 +621,36 @@ func (p *v2Parser) parseV2PackFieldBlock() map[string]any {
 		p.consumeV2Separators()
 	}
 	p.expect(tRBrace, "}")
+	return out
+}
+
+func (p *v2Parser) parseV2ProfileFieldBlock() map[string]any {
+	p.expect(tLBrace, "{")
+	out := map[string]any{}
+	for !p.at(tRBrace) {
+		key := p.expect(tWord, "field name").val
+		p.expect(tColon, ":")
+		if key == "detect" && p.at(tLBrack) {
+			out[key] = p.parseV2ProfileDetectList()
+		} else {
+			out[key] = p.parseV2FieldValue()
+		}
+		p.consumeV2Separators()
+	}
+	p.expect(tRBrace, "}")
+	return out
+}
+
+func (p *v2Parser) parseV2ProfileDetectList() []V2Expr {
+	p.expect(tLBrack, "[")
+	var out []V2Expr
+	for !p.at(tRBrack) {
+		out = append(out, p.parseV2ExprUntil(func(t tok) bool { return t.kind == tComma || t.kind == tRBrack }))
+		if p.at(tComma) {
+			p.next()
+		}
+	}
+	p.expect(tRBrack, "]")
 	return out
 }
 

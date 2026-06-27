@@ -85,8 +85,8 @@ func TestLoadSourcesParsesV2Profiles(t *testing.T) {
 profile sample {
   title: "Sample"
   priority: "12"
-  detect: ["dep:sample", "file:sample.toml"]
-  entrypoints: [HttpInput, core.UserControlledData]
+  detect: [any(dependency("sample"), file("sample.toml"))]
+  entrypoints: [code.HttpInput, core.UserControlledData]
 }`),
 	}})
 	if err != nil {
@@ -99,12 +99,28 @@ profile sample {
 	if got.Name != "sample" || got.Title != "Sample" || got.Priority != 12 {
 		t.Fatalf("profile header wrong: %#v", got)
 	}
-	if len(got.Detect) != 2 || got.Detect[0] != "dep:sample" || got.Detect[1] != "file:sample.toml" {
+	if len(got.Detect) != 1 || got.Detect[0].Op != "any" || len(got.Detect[0].Args) != 2 {
 		t.Fatalf("detect = %#v", got.Detect)
 	}
 	active := got.ActiveSources()
 	if !active["code.HttpInput"] || !active["core.UserControlledData"] {
 		t.Fatalf("active sources = %#v", active)
+	}
+}
+
+func TestLoadSourcesRejectsLegacyDetectFingerprints(t *testing.T) {
+	_, err := loadSources([]datadir.Source{{
+		Name: "profiles/legacy.vyql",
+		Data: []byte(`module profiles;
+profile legacy {
+  detect: ["dep:legacy"]
+}`),
+	}})
+	if err == nil {
+		t.Fatal("loadSources succeeded, want legacy detect rejection")
+	}
+	if !strings.Contains(err.Error(), "detect entries must be requirement predicate calls") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
