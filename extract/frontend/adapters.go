@@ -847,11 +847,11 @@ func AdaptersFor(tech string) []adapters.Adapter {
 	return out
 }
 
-// OverlayAdapters loads repo-local adapter overlays from root. Files may live
+// OverlayBindings loads repo-local binding overlays from root. Files may live
 // directly under root or under root/bindings. The overlay is intentionally
 // explicit and opt-in; parse errors are returned so a bad generated file does
 // not silently change scan behavior.
-func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
+func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
 	if strings.TrimSpace(root) == "" {
 		return nil, nil
 	}
@@ -892,7 +892,7 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 				continue
 			}
 			if len(allowed) > 0 && !allowed[ad.Name] {
-				return nil, fmt.Errorf("overlay adapter %s declares %q, which is not present in this scan", file, ad.Name)
+				return nil, fmt.Errorf("overlay binding %s declares %q, which is not present in this scan", file, ad.Name)
 			}
 			spec := specFromBindingSet(ad)
 			spec.Name = "overlay." + spec.Name

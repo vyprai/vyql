@@ -89,7 +89,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		ads = append(ads, frontend.GeneratedPackageAdaptersFor(lang, deps)...)
 	}
 	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
-		extra, err := frontend.OverlayAdapters(overlay, stats.languages)
+		extra, err := frontend.OverlayBindings(overlay, stats.languages)
 		if err != nil {
 			return nil, stats, fmt.Errorf("binding overlay: %w", err)
 		}

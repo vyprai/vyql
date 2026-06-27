@@ -1979,7 +1979,7 @@ func TestSinkBestMatchKeepsCollectionAndScalarTargets(t *testing.T) {
 	}
 }
 
-func TestOverlayAdaptersLoadV2Binding(t *testing.T) {
+func TestOverlayBindingsLoadV2Binding(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "overlay.vyql")
 	if err := os.WriteFile(path, []byte(`
@@ -1992,12 +1992,12 @@ binding cursorExecuteQuery {
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ads, err := OverlayAdapters(dir, []string{"python"})
+	ads, err := OverlayBindings(dir, []string{"python"})
 	if err != nil {
-		t.Fatalf("OverlayAdapters: %v", err)
+		t.Fatalf("OverlayBindings: %v", err)
 	}
 	if len(ads) == 0 {
-		t.Fatal("OverlayAdapters returned no adapters for v2 binding")
+		t.Fatal("OverlayBindings returned no graph labelers for v2 binding")
 	}
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
@@ -2015,7 +2015,7 @@ binding cursorExecuteQuery {
 		}
 	}
 	if strings.Join(got, ",") != "arg0:custom.SqlExecution" {
-		t.Fatalf("v2 overlay adapter labels = %v, want arg0:custom.SqlExecution", got)
+		t.Fatalf("v2 overlay binding labels = %v, want arg0:custom.SqlExecution", got)
 	}
 }
 
