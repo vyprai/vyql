@@ -91,6 +91,249 @@ rule CustomFlow {
 	}
 }
 
+func TestV2CoversV1AdapterCapabilityLedger(t *testing.T) {
+	decls := parseIRFiles(t, `
+module bindings.javascript.v1capability;
+binding sourcePath {
+  query pattern callExpr where callee.path ~= "request.body"
+  emit source code.HttpInput at call.result
+}
+binding sourceMethodReceiver {
+  query pattern callExpr where callee.method == "getParameter" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}
+binding sourceParam {
+  query param as param
+  emit source code.HttpInput at param
+}
+binding sinkMethodArg {
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+binding sinkPathAny {
+  query pattern callExpr where callee.path ~= "child_process.exec"
+  emit sink code.CommandExecution at args.any
+}
+binding sinkReceiver {
+  query pattern callExpr where callee.method == "openConnection"
+  emit sink code.UrlFetch at callee.receiver
+}
+binding issueAtCall {
+  query pattern callExpr where callee.method == "dangerous"
+  emit issue code.AuthenticationRequiredOp at call
+}
+binding presenceIssue {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "Random" and node.token contains "seed" and not (node.token contains "SecureRandom")
+  emit issue code.WeakRandomValue at node
+}
+binding checkPath {
+  query pattern callExpr where callee.method == "escape"
+  emit check core.SqlParameterization at args[0] {
+    covers path { from: args[0] to: call }
+  }
+}
+binding checkEndpoint {
+  query pattern callExpr where callee.path ~= "requireAuth"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint { anchor: call }
+  }
+}
+binding checkSameReceiver {
+  query pattern callExpr where callee.method == "relative_to"
+  emit check core.PathCanonicalization at callee.receiver {
+    covers sameReceiver { anchor: callee.receiver }
+  }
+}
+binding checkGlobal {
+  query pattern callExpr where callee.method == "enableHardening"
+  emit check core.XmlHardening at args[0] {
+    covers global {}
+  }
+}
+binding advisoryGuard {
+  query pattern callExpr where callee.method == "startswith" and args.any.literal contains "safe"
+  emit check core.PathCanonicalization at call {
+    advisory: true
+    about: code.FilePathAccess
+    covers dominates { from: call to: candidate }
+  }
+}
+binding charFilter {
+  query pattern callExpr where callee.method == "replace" and call.filter.global == true
+  emit check threat.CharFilter at call {
+    covers path { from: call to: candidate }
+  }
+}
+binding packageScoped {
+  requires {
+    dependency("express", range: ">=4 <6")
+    language("javascript")
+    soft(import("express"))
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.HttpInput at call.result
+}
+binding typeFact {
+  query pattern callExpr where callee.path ~= "sql.Open"
+  emit fact runtime.ReceiverType at call.result {
+    about: sql.DB
+  }
+}
+binding localFact {
+  query pattern callExpr where callee.method == "route"
+  emit fact runtime.HttpRequest at args[0]
+}
+binding outParamFlow {
+  query pattern callExpr where callee.method == "decode"
+  propagate value from args[0] to args[1].pointee
+}
+binding identityFlow {
+  query pattern callExpr where callee.method == "alias"
+  propagate identity from args[0] to args[1].pointee
+}
+binding receiverFlow {
+  query pattern callExpr where callee.method == "setOption"
+  propagate receiver from callee.receiver to call.result
+}
+`)
+	adapter := decls[0].(*BindingSet)
+	seen := map[string]BindingAction{}
+	for _, m := range adapter.Mappings {
+		key := m.Kind
+		switch {
+		case strings.HasPrefix(m.Kind, "control") && m.Coverage != "":
+			key += ":" + m.Coverage
+		case strings.HasPrefix(m.Kind, "mark") && m.Coverage == "global":
+			key += ":global"
+		case strings.HasPrefix(m.Kind, "advisory_"):
+			key = m.Kind
+		case m.Kind == "flow_method":
+			switch {
+			case m.FlowReceiver:
+				key += ":receiver"
+			case m.FlowIdentity:
+				key += ":identity"
+			default:
+				key += ":value"
+			}
+		}
+		seen[key] = m
+	}
+	for _, want := range []string{
+		"source", "source_receiver", "source_param",
+		"sink_method", "sink_path", "sink_receiver",
+		"mark_method", "flag",
+		"control_method_arg:path", "control:endpoint", "control_receiver_method:sameReceiver", "mark_method_arg:global",
+		"advisory_guard_method", "filter_method",
+		"type", "fact_method_arg",
+		"flow_method:value", "flow_method:identity", "flow_method:receiver",
+	} {
+		if _, ok := seen[want]; !ok {
+			t.Fatalf("v1 capability ledger missing lowered %s; mappings: %+v", want, adapter.Mappings)
+		}
+	}
+	if got := seen["source_receiver"]; got.Pattern != "getParameter" || got.Constraint != "Request" {
+		t.Fatalf("receiver-constrained source did not preserve method and type: %+v", got)
+	}
+	if got := seen["flag"]; got.Flag == nil || len(got.Flag.Predicates) < 3 || got.Flag.Predicates[2].Negative != true {
+		t.Fatalf("presence/flag predicates did not preserve positive and negative tests: %+v", got)
+	}
+	for _, m := range adapter.Mappings {
+		if m.Pattern == "json" {
+			if m.Requirement == nil || m.Requirement.Op != "all" || !stringSlicesEqual(m.Packages, []string{"express"}) {
+				t.Fatalf("dependency/language/soft import requirement did not lower: %+v", m)
+			}
+		}
+	}
+}
+
+func TestV2CoversV1RuleCapabilityLedger(t *testing.T) {
+	decls := parseIRFiles(t, `
+module rules.v1capability;
+rule TaintRule {
+  taint code.HttpInput as input -> code.SqlExecution as sink
+  where sink is code.SqlExecution and input != sink
+  unless sink.path coveredBy core.SqlParameterization
+  with confidence >= high
+}
+rule IssueRule {
+  issue code.WeakCipher as cipher
+  unless cipher.global coveredBy core.CryptoPolicy
+}
+rule FactRule {
+  fact runtime.HttpRequest as req
+  where req in [runtime.HttpRequest, runtime.Connection]
+}
+rule ReachRule {
+  reach cloud.Internet -> cloud.Database
+  unless cloud.Database.endpoint coveredBy core.NetworkPolicy
+}
+rule GrantRule {
+  grant cloud.User -> cloud.AdminPrivilege
+  unless cloud.AdminPrivilege.sameScope coveredBy core.LeastPrivilege
+}
+rule DominatesRule {
+  issue code.OwnerFieldClear as clear
+  unless clear.dominates coveredBy core.ResourceRelease
+}
+rule PostDominatesRule {
+  issue code.LockAcquire as lock
+  unless lock.postDominates coveredBy core.LockRelease
+}
+rule SameReceiverRule {
+  taint code.HttpInput as input -> code.FilePathAccess as sink
+  unless sink.sameReceiver coveredBy core.PathCanonicalization
+}
+`)
+	seenVerbs := map[string]bool{}
+	seenCoverage := map[string]bool{}
+	for _, d := range decls {
+		r, ok := d.(*Rule)
+		if !ok {
+			continue
+		}
+		switch body := r.Body.(type) {
+		case *FlowStmt:
+			seenVerbs[body.Verb] = true
+		case *MatchStmt:
+			switch r.Name {
+			case "IssueRule":
+				seenVerbs["issue"] = true
+			case "FactRule":
+				seenVerbs["fact"] = true
+			}
+		}
+		for _, cl := range r.Clauses {
+			switch cl.Unless.(type) {
+			case PathCoveredBy:
+				seenCoverage["path"] = true
+			case EndpointCoveredBy:
+				seenCoverage["endpoint"] = true
+			case SameReceiverCoveredBy:
+				seenCoverage["sameReceiver"] = true
+			case SameScopeCoveredBy:
+				seenCoverage["sameScope"] = true
+			case GlobalCoveredBy:
+				seenCoverage["global"] = true
+			case DominatesCoveredBy:
+				seenCoverage["dominates"] = true
+			case PostDominatesCoveredBy:
+				seenCoverage["postDominates"] = true
+			}
+		}
+	}
+	for _, verb := range []string{"taint", "reach", "grant", "issue", "fact"} {
+		if !seenVerbs[verb] {
+			t.Fatalf("v1 rule capability ledger missing verb %s in %+v", verb, seenVerbs)
+		}
+	}
+	for _, coverage := range []string{"path", "endpoint", "sameReceiver", "sameScope", "global", "dominates", "postDominates"} {
+		if !seenCoverage[coverage] {
+			t.Fatalf("v1 rule capability ledger missing coverage %s in %+v", coverage, seenCoverage)
+		}
+	}
+}
+
 func TestLowerV2DefinitionSourcesValidatesCorpus(t *testing.T) {
 	rules, err := ParseV2(`
 module rules.test;
