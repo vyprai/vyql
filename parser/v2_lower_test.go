@@ -501,6 +501,9 @@ binding parameterizedQuery {
 	if got.Kind != "control_method" || got.Coverage != "path" {
 		t.Fatalf("check emission did not lower with builtin coverage mechanic: %+v", got)
 	}
+	if got.CoverageDetail["from"] != "args[0]" || got.CoverageDetail["to"] != "call" {
+		t.Fatalf("coverage metadata was not preserved: %+v", got.CoverageDetail)
+	}
 }
 
 func TestParseV2DefinitionsCompilesV2BindingSet(t *testing.T) {
@@ -2014,6 +2017,24 @@ binding dominatingHardening {
 		}
 		if !want[got.Coverage] {
 			t.Fatalf("unexpected or missing coverage mode in mapping: %+v", got)
+		}
+		switch got.Coverage {
+		case "endpoint":
+			if got.CoverageDetail["anchor"] != "call" {
+				t.Fatalf("endpoint coverage detail = %#v, want anchor call", got.CoverageDetail)
+			}
+		case "sameReceiver":
+			if got.CoverageDetail["anchor"] != "callee.receiver" {
+				t.Fatalf("sameReceiver coverage detail = %#v, want anchor callee.receiver", got.CoverageDetail)
+			}
+		case "sameScope":
+			if got.CoverageDetail["anchor"] != "call.scope" {
+				t.Fatalf("sameScope coverage detail = %#v, want anchor call.scope", got.CoverageDetail)
+			}
+		case "dominates":
+			if got.CoverageDetail["from"] != "call" || got.CoverageDetail["to"] != "candidate" {
+				t.Fatalf("dominates coverage detail = %#v, want from call/to candidate", got.CoverageDetail)
+			}
 		}
 		delete(want, got.Coverage)
 	}

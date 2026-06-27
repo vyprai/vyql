@@ -744,6 +744,7 @@ type advisoryNeutralizerSpec struct {
 	ByMethod    bool
 	Mode        string // "guard" (must dominate the sink) | "sanitizer" (must lie on the path)
 	About       string // the sink concept it purports to cover
+	Detail      map[string]string
 	ValMatches  []string
 	ValAbsents  []string
 	ArgCountSet bool
@@ -913,8 +914,15 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 					if !valCondsDirectForNode(n, as.ValMatches, as.ValAbsents) {
 						continue
 					}
+					detail := cloneStringMap(as.Detail)
+					if detail == nil {
+						detail = map[string]string{}
+					}
+					detail["mode"] = as.Mode
+					detail["about"] = as.About
+					detail["pattern"] = as.Pattern
 					out = append(out, adapters.Mapping{NodeID: id, Concept: concept,
-						Detail: map[string]string{"mode": as.Mode, "about": as.About, "pattern": as.Pattern}})
+						Detail: detail})
 					break
 				}
 			}
@@ -1190,7 +1198,7 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.AdvisoryNeutralizers = append(s.AdvisoryNeutralizers, advisoryNeutralizerSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
 				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
+				Detail: adapterMappingDetail(mp), ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		}
 	}
 	return s
@@ -1208,7 +1216,7 @@ func adapterMetaBool(meta map[string]any, key string) bool {
 }
 
 func adapterMappingDetail(mp parser.BindingAction) map[string]string {
-	if !mp.Advisory && mp.About == "" && mp.Coverage == "" {
+	if !mp.Advisory && mp.About == "" && mp.Coverage == "" && len(mp.CoverageDetail) == 0 {
 		return nil
 	}
 	out := map[string]string{}
@@ -1220,6 +1228,22 @@ func adapterMappingDetail(mp parser.BindingAction) map[string]string {
 	}
 	if mp.Coverage != "" {
 		out["coverage"] = mp.Coverage
+	}
+	for k, v := range mp.CoverageDetail {
+		if v != "" {
+			out["coverage."+k] = v
+		}
+	}
+	return out
+}
+
+func cloneStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
 	}
 	return out
 }

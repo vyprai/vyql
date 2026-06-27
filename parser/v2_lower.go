@@ -747,7 +747,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 				}
-				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = append(out, m)
 			case action.Kind == "emit issue":
 				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
@@ -794,15 +794,16 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 		return BindingAction{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
 	}
 	return shape.mapping(BindingAction{
-		Kind:        shape.markKind(),
-		Pattern:     shape.Pattern,
-		Exact:       shape.Exact,
-		Concept:     action.Concept,
-		Coverage:    "global",
-		ValMatches:  shape.ValMatches,
-		ValAbsents:  shape.ValAbsents,
-		Packages:    pkgs,
-		Requirement: req,
+		Kind:           shape.markKind(),
+		Pattern:        shape.Pattern,
+		Exact:          shape.Exact,
+		Concept:        action.Concept,
+		Coverage:       "global",
+		CoverageDetail: lowerV2CoverageDetail(action.Covers[0]),
+		ValMatches:     shape.ValMatches,
+		ValAbsents:     shape.ValAbsents,
+		Packages:       pkgs,
+		Requirement:    req,
 	}), nil
 }
 
@@ -815,17 +816,18 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 	}
 	kind := shape.markKind()
 	return shape.mapping(BindingAction{
-		Kind:        kind,
-		Pattern:     shape.Pattern,
-		Exact:       shape.Exact,
-		Concept:     action.Concept,
-		About:       action.About,
-		Advisory:    true,
-		Coverage:    action.Covers[0].Mode,
-		ValMatches:  shape.ValMatches,
-		ValAbsents:  shape.ValAbsents,
-		Packages:    pkgs,
-		Requirement: req,
+		Kind:           kind,
+		Pattern:        shape.Pattern,
+		Exact:          shape.Exact,
+		Concept:        action.Concept,
+		About:          action.About,
+		Advisory:       true,
+		Coverage:       action.Covers[0].Mode,
+		CoverageDetail: lowerV2CoverageDetail(action.Covers[0]),
+		ValMatches:     shape.ValMatches,
+		ValAbsents:     shape.ValAbsents,
+		Packages:       pkgs,
+		Requirement:    req,
 	}), nil
 }
 
@@ -975,6 +977,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 			return nil, true, fmt.Errorf("binding %s: presenceNode emit location must be %q", b.Name, alias)
 		}
 		coverage := ""
+		var coverageDetail map[string]string
 		if len(action.Covers) > 1 {
 			return nil, true, fmt.Errorf("binding %s: presenceNode supports at most one coverage mode", b.Name)
 		}
@@ -983,17 +986,19 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 				return nil, true, err
 			}
 			coverage = action.Covers[0].Mode
+			coverageDetail = lowerV2CoverageDetail(action.Covers[0])
 		}
 		flag := *fl
 		out = append(out, BindingAction{
-			Kind:        "flag",
-			Concept:     action.Concept,
-			About:       action.About,
-			Advisory:    action.Advisory != nil && *action.Advisory,
-			Coverage:    coverage,
-			Packages:    pkgs,
-			Requirement: req,
-			Flag:        &flag,
+			Kind:           "flag",
+			Concept:        action.Concept,
+			About:          action.About,
+			Advisory:       action.Advisory != nil && *action.Advisory,
+			Coverage:       coverage,
+			CoverageDetail: coverageDetail,
+			Packages:       pkgs,
+			Requirement:    req,
+			Flag:           &flag,
 		})
 	}
 	return out, true, nil
@@ -1551,6 +1556,40 @@ func v2LiteralIntList(expr V2Expr) ([]int, bool) {
 	return out, true
 }
 
+func lowerV2CoverageDetail(cov V2Coverage) map[string]string {
+	if len(cov.Items) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(cov.Items))
+	for k, v := range cov.Items {
+		s, ok := v2CoverageItemString(v)
+		if ok && s != "" {
+			out[k] = s
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func v2CoverageItemString(v any) (string, bool) {
+	switch x := v.(type) {
+	case string:
+		return x, true
+	case []string:
+		return strings.Join(x, ","), true
+	case bool:
+		return strconv.FormatBool(x), true
+	case int:
+		return strconv.Itoa(x), true
+	case V2LiteralExpr:
+		return v2CoverageItemString(x.Value)
+	default:
+		return "", false
+	}
+}
+
 func validateV2ConcreteCheck(binding string, action V2BindingOutput) error {
 	if action.Advisory != nil && *action.Advisory {
 		return fmt.Errorf("binding %s: advisory checks must lower through advisory coverage support", binding)
@@ -1618,13 +1657,15 @@ func lowerV2AdvisoryNeutralizerCheck(binding string, shape v2CallShape, action V
 		kind = "advisory_" + mode + "_method"
 	}
 	return shape.mapping(BindingAction{
-		Kind:        kind,
-		Pattern:     shape.Pattern,
-		About:       action.About,
-		ValMatches:  shape.ValMatches,
-		ValAbsents:  shape.ValAbsents,
-		Packages:    pkgs,
-		Requirement: req,
+		Kind:           kind,
+		Pattern:        shape.Pattern,
+		About:          action.About,
+		Coverage:       action.Covers[0].Mode,
+		CoverageDetail: lowerV2CoverageDetail(action.Covers[0]),
+		ValMatches:     shape.ValMatches,
+		ValAbsents:     shape.ValAbsents,
+		Packages:       pkgs,
+		Requirement:    req,
 	}), true, nil
 }
 

@@ -2364,22 +2364,25 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 
-	spec := adapterSpec{
-		Name:       "neutral",
-		Technology: "neutral",
-		Controls: []controlSpec{{
-			Concept:  "custom.Control",
-			Pattern:  "normalize",
-			ByMethod: true,
-			Detail:   map[string]string{"coverage": "sameScope"},
+	spec := specFromBindingSet(&parser.BindingSet{
+		Name: "neutral",
+		Mappings: []parser.BindingAction{{
+			Kind:           "control_method",
+			Concept:        "custom.Control",
+			Pattern:        "normalize",
+			Coverage:       "sameScope",
+			CoverageDetail: map[string]string{"anchor": "call.scope"},
 		}},
-	}
+	})
 	got := spec.controlAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
 		t.Fatalf("control mapping wrong: %+v", got)
 	}
 	if got[0].Detail["coverage"] != "sameScope" {
 		t.Fatalf("coverage detail not preserved: %+v", got[0])
+	}
+	if got[0].Detail["coverage.anchor"] != "call.scope" {
+		t.Fatalf("coverage item detail not preserved: %+v", got[0])
 	}
 }
 

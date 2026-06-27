@@ -96,6 +96,7 @@ type BindingAction struct {
 	FlowReceiver     bool   // receiver propagates to call result for fluent APIs
 	Advisory         bool   // advisory check evidence; must not suppress findings
 	Coverage         string // v2 coverage mode for advisory check evidence
+	CoverageDetail   map[string]string
 	Flag             *BindingPresence
 }
 
