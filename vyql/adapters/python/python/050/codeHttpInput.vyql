@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding httpInput50 {
-  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "name=delete_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "delete()" and not args.any.literal contains "current_user.id!=user_id"
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.context.name contains "delete_auth_token" and args.any.literal contains "RemoteAuthToken.user_id==user_id" and args.any.literal contains "delete()" and not args.any.literal contains "current_user.id!=user_id"
   emit source code.HttpInput at call.result
 }

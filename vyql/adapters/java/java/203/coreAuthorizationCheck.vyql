@@ -1,7 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding authorizationCheck203 {
-  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "annotation:RequiresPermissions"
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.annotation contains "RequiresPermissions"
   emit check core.AuthorizationCheck at call {
     covers endpoint {
       anchor: call

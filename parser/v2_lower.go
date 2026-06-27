@@ -1269,18 +1269,34 @@ func v2PresenceValuePrefix(field string) string {
 		return "call:"
 	case "callArg":
 		return "call_arg:"
+	case "callMethod":
+		return "call_method:"
 	case "callOrder":
 		return "call_order:"
+	case "entryKind":
+		return "entry_kind:"
+	case "functionParamType":
+		return "function_param_type:"
 	case "functionName":
 		return "function_name:"
+	case "functionVisibility":
+		return "function_visibility:"
+	case "category":
+		return "category:"
+	case "vulnerable":
+		return "vulnerable:"
 	case "className":
 		return "class_name:"
 	case "classBase":
 		return "class_base:"
 	case "classAttribute":
 		return "class_attribute:"
+	case "classAnnotation":
+		return "class_annotation:"
 	case "methodAttribute":
 		return "method_attribute:"
+	case "attrName":
+		return "attr_name:"
 	case "selector":
 		return "selector:"
 	case "literal":
@@ -1359,6 +1375,12 @@ func v2PresenceValuePrefix(field string) string {
 		return "repr:"
 	case "serdeAttr":
 		return "serde_attr:"
+	case "noNetwork":
+		return "no_network:"
+	case "resolveEntities":
+		return "resolve_entities:"
+	case "value":
+		return "value:"
 	case "switchCase":
 		return "switch_case:"
 	case "varName":
@@ -1638,6 +1660,22 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return nil, fmt.Errorf("binding %s: unsupported query predicate left side %T", binding, cmp.Left)
 	}
 	field := v2CallQueryField(left.Name)
+	if _, prefix, ok := v2ArgsAnyContextField(field); ok {
+		if cmp.Op != "contains" {
+			return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
+		}
+		value, ok := v2LiteralString(cmp.Right)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
+		}
+		if !strings.HasPrefix(value, prefix) {
+			value = prefix + value
+		}
+		if cmpNeg {
+			return []v2CallShape{{ValAbsents: []string{value}}}, nil
+		}
+		return []v2CallShape{{ValMatches: []string{value}}}, nil
+	}
 	switch field {
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
 		"callee.analysis", "call.callee.analysis":
@@ -1687,6 +1725,34 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return []v2CallShape{{}}, nil
 	default:
 		return nil, fmt.Errorf("binding %s: query predicate %q is not implemented in scanner IR lowering", binding, left.Name)
+	}
+}
+
+func v2ArgsAnyContextField(field string) (string, string, bool) {
+	for _, prefix := range []string{"args.any.context.", "call.args.any.context."} {
+		if rest, ok := strings.CutPrefix(field, prefix); ok {
+			if valuePrefix := v2ArgsAnyContextValuePrefix(rest); valuePrefix != "" {
+				return rest, valuePrefix, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func v2ArgsAnyContextValuePrefix(field string) string {
+	switch field {
+	case "firstParam":
+		return "first_param:"
+	case "hasParamType":
+		return "has_param_type:"
+	case "noNetwork":
+		return "no_network="
+	case "resolveEntities":
+		return "resolve_entities="
+	case "value":
+		return "value="
+	default:
+		return v2PresenceValuePrefix("context." + field)
 	}
 }
 

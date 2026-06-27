@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding httpInput17 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "entry_kind:function_param" and args.any.literal contains "function_name:resolve" and args.any.literal contains "param_name:args"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "function_param" and args.any.context.functionName contains "resolve" and args.any.context.paramName contains "args"
   emit source code.HttpInput at call.result
 }

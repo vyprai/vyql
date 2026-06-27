@@ -1,6 +1,6 @@
 module bindings.kotlin.migration.m304d1620;
 
 binding httpInput6 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "class_annotation:RestController"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "RestController"
   emit source code.HttpInput at call.result
 }

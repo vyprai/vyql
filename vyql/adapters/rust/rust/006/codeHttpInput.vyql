@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding httpInput6 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "attr_name:delete"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.attrName contains "delete"
   emit source code.HttpInput at call.result
 }

@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding htmlRender465 {
-  query pattern callExpr where callee.analysis ~= "function.return" and args.any.literal contains "decorator_method:options" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.decoratorMethod contains "options" and not args.any.literal contains "abort" and not args.any.literal contains "jsonify" and not args.any.literal contains "redirect" and not args.any.literal contains "render_template" and not args.any.literal contains "render_template_string" and not args.any.literal contains "send_file" and not args.any.literal contains "send_from_directory" and not args.any.literal contains "url_for" and not args.any.literal contains "FileResponse" and not args.any.literal contains "Response" and not args.any.literal contains "HttpResponse" and not args.any.literal contains "make_response"
   emit sink code.HtmlRender at args[0]
 }

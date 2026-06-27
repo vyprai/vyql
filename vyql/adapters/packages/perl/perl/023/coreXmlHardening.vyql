@@ -4,7 +4,7 @@ binding xmlHardening23 {
   requires {
     dependency("XML::LibXML")
   }
-  query pattern callExpr where callee.path ~= "XML.LibXML.load_xml" and args.any.literal contains "no_network=true"
+  query pattern callExpr where callee.path ~= "XML.LibXML.load_xml" and args.any.context.noNetwork contains "true"
   emit check core.XmlHardening at call {
     covers sameReceiver {
       anchor: callee.receiver

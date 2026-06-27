@@ -1,6 +1,6 @@
 module bindings.solidity.migration.m88e544d8;
 
 binding httpInput2 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "function_visibility:implicit_public"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.functionVisibility contains "implicit_public"
   emit source code.HttpInput at call.result
 }

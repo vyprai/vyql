@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding httpInput12 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "annotation:OPTIONS"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "OPTIONS"
   emit source code.HttpInput at call.result
 }

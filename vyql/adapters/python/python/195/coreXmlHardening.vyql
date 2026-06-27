@@ -1,7 +1,7 @@
 module bindings.python.migration.m21017d75;
 
 binding xmlHardening195 {
-  query pattern callExpr where callee.path ~= "XMLParser" and args.any.literal contains "resolve_entities=False"
+  query pattern callExpr where callee.path ~= "XMLParser" and args.any.context.resolveEntities contains "False"
   emit check core.XmlHardening at call {
     covers endpoint {
       anchor: call

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding redirectTarget92 {
-  query pattern callExpr where callee.analysis ~= "function.return" and args.any.literal contains "function_name:determineTargetUrl" and args.any.literal contains "SimpleUrlAuthenticationSuccessHandler"
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.functionName contains "determineTargetUrl" and args.any.literal contains "SimpleUrlAuthenticationSuccessHandler"
   emit sink code.RedirectTargetSink at args[0]
 }

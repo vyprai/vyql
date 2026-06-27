@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding httpInput8 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "decorator_method:websocket" and not args.any.literal contains "param_name:self" and not args.any.literal contains "param_name:cls"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.decoratorMethod contains "websocket" and not args.any.context.paramName contains "self" and not args.any.context.paramName contains "cls"
   emit source code.HttpInput at call.result
 }

@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding httpInput3 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "annotation:PutMapping"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "PutMapping"
   emit source code.HttpInput at call.result
 }

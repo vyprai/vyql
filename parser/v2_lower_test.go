@@ -810,7 +810,7 @@ func TestV2AnalysisCallAliasLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.http;
 binding controllerParam {
-  query pattern callExpr where callee.analysis == "parameter.entry" and args.any.literal contains "annotation:GetMapping"
+  query pattern callExpr where callee.analysis == "parameter.entry" and args.any.context.annotation contains "GetMapping" and not args.any.context.paramType contains "Parser"
   emit source code.HttpInput at call.result
 }
 `)
@@ -821,7 +821,7 @@ binding controllerParam {
 	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
-	if got := adapter.Mappings[0]; got.Kind != "source" || got.Pattern != "analysis.parameter.entry" || got.ValMatches[0] != "annotation:GetMapping" {
+	if got := adapter.Mappings[0]; got.Kind != "source" || got.Pattern != "analysis.parameter.entry" || got.ValMatches[0] != "annotation:GetMapping" || got.ValAbsents[0] != "param_type:Parser" {
 		t.Fatalf("analysis alias lowering wrong: %+v", got)
 	}
 }

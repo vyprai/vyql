@@ -1,7 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding pathAccessCheck177 {
-  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "call_path:strings.Contains" and args.any.literal contains "literal:bad path" and args.any.literal contains "call_path:isSymbolLink" and args.any.literal contains "call_path:ioutil.ReadFile"
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.callPath contains "strings.Contains" and args.any.context.literal contains "bad path" and args.any.context.callPath contains "isSymbolLink" and args.any.context.callPath contains "ioutil.ReadFile"
   emit check core.PathAccessCheck at call {
     covers endpoint {
       anchor: call

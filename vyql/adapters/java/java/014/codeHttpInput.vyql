@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding httpInput14 {
-  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "annotation:Post"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.annotation contains "Post"
   emit source code.HttpInput at call.result
 }
