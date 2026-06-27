@@ -620,6 +620,11 @@ func TestV2RequirementLowersToPackageHintsAndRequirementTree(t *testing.T) {
 			wantOp:   "import",
 		},
 		{
+			name:   "project fact",
+			req:    `project.has("npm:publishable")`,
+			wantOp: "project.has",
+		},
+		{
 			name:     "soft nested any",
 			req:      `soft(any(dependency("express"), import("koa")))`,
 			wantPkgs: []string{"express", "koa"},
@@ -677,11 +682,6 @@ func TestV2RequirementLoweringRejectsMalformedCombinators(t *testing.T) {
 			name: "empty all",
 			req:  `all()`,
 			want: "at least one child",
-		},
-		{
-			name: "project has needs native evidence",
-			req:  `project.has("custom")`,
-			want: "project.has requirement needs native v2 project evidence evaluation",
 		},
 	}
 	for _, tc := range cases {

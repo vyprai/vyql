@@ -335,6 +335,12 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 	g.AddNode(usg.Node{ID: "pkg:npm/express@4.18.2", Type: "sbom.PackageVersion", Props: map[string]string{
 		"name": "express", "version": "4.18.2",
 	}})
+	g.AddNode(usg.Node{ID: "fact:npm:publishable", Type: "project.Fact", Props: map[string]string{
+		"key": "npm:publishable",
+	}})
+	g.AddNode(usg.Node{ID: "fact:manifest", Type: "project.Fact", Props: map[string]string{
+		"family": "manifest", "value": "publishable",
+	}})
 	g.AddNode(usg.Node{ID: "call", Type: "code.Call", Loc: "app.js:3", Props: map[string]string{
 		"callee_path": "handler", "method": "handler",
 	}})
@@ -352,6 +358,13 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 		{name: "import uses import evidence", req: parser.BindingRequirement{Op: "import", Value: "express"}, want: true},
 		{name: "language uses scan technology evidence", req: parser.BindingRequirement{Op: "language", Value: "javascript"}, want: true},
 		{name: "file uses lazy file evidence", req: parser.BindingRequirement{Op: "file", Value: "app.js"}, want: true},
+		{name: "project.has uses explicit project fact key", req: parser.BindingRequirement{Op: "project.has", Value: "npm:publishable"}, want: true},
+		{name: "project.has uses family value fact", req: parser.BindingRequirement{Op: "project.has", Value: "manifest:publishable"}, want: true},
+		{name: "project.has uses dependency evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "dependency:express"}, want: true},
+		{name: "project.has uses import evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "import:express"}, want: true},
+		{name: "project.has uses language evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "language:javascript"}, want: true},
+		{name: "project.has uses file evidence fallback", req: parser.BindingRequirement{Op: "project.has", Value: "file:app.js"}, want: true},
+		{name: "project.has rejects absent fact", req: parser.BindingRequirement{Op: "project.has", Value: "repository:vendored"}, want: false},
 		{name: "all combines children", req: parser.BindingRequirement{Op: "all", Args: []parser.BindingRequirement{
 			{Op: "dependency", Value: "koa"},
 			{Op: "import", Value: "express"},

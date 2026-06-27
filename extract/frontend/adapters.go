@@ -1806,6 +1806,7 @@ type requirementGate struct {
 	imports    *packageGate
 	versions   map[string][]string
 	languages  map[string]bool
+	project    map[string]bool
 	files      map[string]bool
 	filesBuilt bool
 	store      usg.Store
@@ -1832,11 +1833,13 @@ func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[s
 			}
 		}
 	}
+	imports := importEvidence(s, tech, crossLang)
 	return &requirementGate{
 		packages:  newPackageGate(packages),
-		imports:   newPackageGate(importEvidence(s, tech, crossLang)),
+		imports:   newPackageGate(imports),
 		versions:  dependencyVersionEvidence(s),
 		languages: langs,
+		project:   projectFactEvidence(s),
 		store:     s,
 		tech:      tech,
 		crossLang: crossLang,
@@ -1878,7 +1881,7 @@ func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementE
 		name, version, _ := strings.Cut(req.Value, "\x00")
 		return requirementEffect{Allowed: name == "nir" && (version == "" || version == "2.0")}
 	case "project.has":
-		return requirementEffect{Allowed: false}
+		return requirementEffect{Allowed: g.hasProjectFact(req.Value)}
 	case "all":
 		out := requirementEffect{Allowed: true}
 		for _, child := range req.Args {
@@ -1976,6 +1979,67 @@ func dependencyVersionEvidence(s usg.Store) map[string][]string {
 		addPackageVersionEvidence(out, n.Prop("name"), version)
 	}
 	return out
+}
+
+func projectFactEvidence(s usg.Store) map[string]bool {
+	out := map[string]bool{}
+	ids, _ := s.NodesOfType("project.Fact")
+	for _, id := range ids {
+		n, ok, _ := s.GetNode(id)
+		if !ok {
+			continue
+		}
+		addProjectFactEvidence(out, n.Prop("key"))
+		addProjectFactEvidence(out, n.Prop("name"))
+		addProjectFactEvidence(out, n.Prop("fact"))
+		family := strings.TrimSpace(n.Prop("family"))
+		name := strings.TrimSpace(n.Prop("value"))
+		if name == "" {
+			name = strings.TrimSpace(n.Prop("name"))
+		}
+		if family != "" && name != "" {
+			addProjectFactEvidence(out, family+":"+name)
+		}
+	}
+	return out
+}
+
+func addProjectFactEvidence(out map[string]bool, raw string) {
+	key := normalizeProjectFactKey(raw)
+	if key != "" {
+		out[key] = true
+	}
+}
+
+func normalizeProjectFactKey(raw string) string {
+	return strings.ToLower(strings.TrimSpace(filepath.ToSlash(raw)))
+}
+
+func (g *requirementGate) hasProjectFact(raw string) bool {
+	key := normalizeProjectFactKey(raw)
+	if key == "" {
+		return false
+	}
+	if g.project[key] {
+		return true
+	}
+	family, value, ok := strings.Cut(key, ":")
+	if ok {
+		switch family {
+		case "dependency", "package", "dep", "npm", "pypi", "go", "maven", "nuget", "gem", "cargo":
+			return g.packages.inEvidence(value)
+		case "import":
+			return g.imports.inEvidence(value)
+		case "framework":
+			return g.packages.inEvidence(value)
+		case "language", "lang":
+			return g.languages[value]
+		case "file":
+			g.ensureFiles()
+			return g.files[filepath.ToSlash(value)]
+		}
+	}
+	return false
 }
 
 func addPackageVersionEvidence(out map[string][]string, raw, version string) {
