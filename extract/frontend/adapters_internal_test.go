@@ -464,6 +464,63 @@ func TestV2SoftRequirementDowngradesMappingConfidence(t *testing.T) {
 	}
 }
 
+func TestV2SoftRequirementReportsEvidenceStates(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*usg.InMemStore)
+		req   parser.BindingRequirement
+		want  string
+	}{
+		{
+			name: "missing",
+			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+				{Op: "dependency", Value: "missing"},
+			}},
+			want: "missing",
+		},
+		{
+			name: "unknown version",
+			setup: func(g *usg.InMemStore) {
+				g.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+					"module": "express", "package": "express",
+				}})
+			},
+			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+				{Op: "dependency", Value: "express", Range: ">=4 <6"},
+			}},
+			want: "unknown",
+		},
+		{
+			name: "conflicting version",
+			setup: func(g *usg.InMemStore) {
+				g.AddNode(usg.Node{ID: "pkg:npm/express@3.0.0", Type: "sbom.PackageVersion", Props: map[string]string{
+					"name": "express", "version": "3.0.0",
+				}})
+			},
+			req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+				{Op: "dependency", Value: "express", Range: ">=4 <6"},
+			}},
+			want: "conflicting",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := usg.NewInMemStore()
+			if tt.setup != nil {
+				tt.setup(g)
+			}
+			gate := newRequirementGate(g, "javascript", false, packageEvidence(g, "javascript", false))
+			got := gate.evalEffect(tt.req)
+			if !got.Allowed {
+				t.Fatalf("soft requirement should allow mapping: %+v", got)
+			}
+			if got.State != tt.want || got.Detail["requirement_state"] != tt.want {
+				t.Fatalf("effect = %+v, want state %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestV2AnyRequirementPrefersHardSatisfiedEvidence(t *testing.T) {
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "pkg:npm/express@4.18.2", Type: "sbom.PackageVersion", Props: map[string]string{

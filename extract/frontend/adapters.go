@@ -2028,9 +2028,17 @@ type requirementGate struct {
 
 type requirementEffect struct {
 	Allowed             bool
+	State               string
 	ConfidenceDowngrade int
 	Detail              map[string]string
 }
+
+const (
+	requirementStateSatisfied   = "satisfied"
+	requirementStateMissing     = "missing"
+	requirementStateUnknown     = "unknown"
+	requirementStateConflicting = "conflicting"
+)
 
 func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[string]bool) *requirementGate {
 	langs := map[string]bool{}
@@ -2064,7 +2072,10 @@ func (g *requirementGate) allowed(packages []string, req *parser.BindingRequirem
 
 func (g *requirementGate) effect(packages []string, req *parser.BindingRequirement) requirementEffect {
 	if req == nil {
-		return requirementEffect{Allowed: g.packages.allowed(packages)}
+		if g.packages.allowed(packages) {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	}
 	return g.evalEffect(*req)
 }
@@ -2076,30 +2087,60 @@ func (g *requirementGate) eval(req parser.BindingRequirement) bool {
 func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementEffect {
 	switch req.Op {
 	case "":
-		return requirementEffect{Allowed: true}
+		return requirementEffect{Allowed: true, State: requirementStateSatisfied}
 	case "dependency", "framework":
 		if req.Range != "" {
-			return requirementEffect{Allowed: g.dependencyVersionSatisfies(req.Value, req.Range)}
+			return g.dependencyVersionEffect(req.Value, req.Range)
 		}
-		return requirementEffect{Allowed: g.packages.inEvidence(req.Value)}
+		if g.packages.inEvidence(req.Value) {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	case "import":
-		return requirementEffect{Allowed: g.imports.inEvidence(req.Value)}
+		if g.imports.inEvidence(req.Value) {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	case "language":
-		return requirementEffect{Allowed: g.languages[strings.ToLower(req.Value)]}
+		if g.languages[strings.ToLower(req.Value)] {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		state := requirementStateUnknown
+		if len(g.languages) > 0 {
+			state = requirementStateConflicting
+		}
+		return requirementEffect{Allowed: false, State: state}
 	case "file":
 		g.ensureFiles()
-		return requirementEffect{Allowed: g.files[filepath.ToSlash(req.Value)]}
+		if g.files[filepath.ToSlash(req.Value)] {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		state := requirementStateMissing
+		if len(g.files) == 0 {
+			state = requirementStateUnknown
+		}
+		return requirementEffect{Allowed: false, State: state}
 	case "schema":
 		name, version, _ := strings.Cut(req.Value, "\x00")
-		return requirementEffect{Allowed: name == "nir" && (version == "" || version == "2.0")}
+		if name == "nir" && (version == "" || version == "2.0") {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		state := requirementStateMissing
+		if name == "nir" {
+			state = requirementStateConflicting
+		}
+		return requirementEffect{Allowed: false, State: state}
 	case "project.has":
-		return requirementEffect{Allowed: g.hasProjectFact(req.Value)}
+		if g.hasProjectFact(req.Value) {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	case "all":
-		out := requirementEffect{Allowed: true}
+		out := requirementEffect{Allowed: true, State: requirementStateSatisfied}
 		for _, child := range req.Args {
 			eff := g.evalEffect(child)
 			if !eff.Allowed {
-				return requirementEffect{Allowed: false}
+				return eff
 			}
 			out = mergeRequirementEffects(out, eff)
 		}
@@ -2113,42 +2154,100 @@ func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementE
 					best = eff
 					found = true
 				}
+			} else if !found {
+				best = preferRequirementFailure(best, eff)
 			}
 		}
 		if found {
 			return best
 		}
-		return requirementEffect{Allowed: false}
+		if best.State == "" {
+			best.State = requirementStateMissing
+		}
+		return best
 	case "not":
-		return requirementEffect{Allowed: len(req.Args) == 1 && !g.evalEffect(req.Args[0]).Allowed}
+		if len(req.Args) != 1 {
+			return requirementEffect{Allowed: false, State: requirementStateConflicting}
+		}
+		child := g.evalEffect(req.Args[0])
+		switch child.State {
+		case requirementStateMissing, requirementStateConflicting:
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		case requirementStateUnknown:
+			return requirementEffect{Allowed: false, State: requirementStateUnknown}
+		default:
+			return requirementEffect{Allowed: !child.Allowed, State: requirementStateSatisfied}
+		}
 	case "soft":
 		if len(req.Args) != 1 {
-			return requirementEffect{Allowed: false}
+			return requirementEffect{Allowed: false, State: requirementStateConflicting}
 		}
 		child := g.evalEffect(req.Args[0])
 		if child.Allowed {
-			return requirementEffect{Allowed: true}
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		state := child.State
+		if state == "" {
+			state = requirementStateMissing
 		}
 		return requirementEffect{
 			Allowed:             true,
+			State:               state,
 			ConfidenceDowngrade: 1,
 			Detail: map[string]string{
-				"requirement_state": "missing",
-				"requirement":       "soft evidence missing",
+				"requirement_state": state,
+				"requirement":       "soft evidence " + state,
 			},
 		}
 	default:
-		return requirementEffect{Allowed: false}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	}
 }
 
 func mergeRequirementEffects(a, b requirementEffect) requirementEffect {
 	out := a
+	out.State = mergeRequirementState(out.State, b.State)
 	if b.ConfidenceDowngrade > out.ConfidenceDowngrade {
 		out.ConfidenceDowngrade = b.ConfidenceDowngrade
 	}
 	out.Detail = mergeMappingDetail(out.Detail, b.Detail)
 	return out
+}
+
+func mergeRequirementState(a, b string) string {
+	if a == "" || a == requirementStateSatisfied {
+		if b == "" {
+			return a
+		}
+		return b
+	}
+	if b == "" || b == requirementStateSatisfied {
+		return a
+	}
+	if requirementStateRank(b) > requirementStateRank(a) {
+		return b
+	}
+	return a
+}
+
+func preferRequirementFailure(a, b requirementEffect) requirementEffect {
+	if a.State == "" || requirementStateRank(b.State) > requirementStateRank(a.State) {
+		return b
+	}
+	return a
+}
+
+func requirementStateRank(state string) int {
+	switch state {
+	case requirementStateConflicting:
+		return 3
+	case requirementStateUnknown:
+		return 2
+	case requirementStateMissing:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (e requirementEffect) apply(conf string, detail map[string]string) (string, map[string]string) {
@@ -2305,14 +2404,28 @@ func addPackageVersionEvidence(out map[string][]string, raw, version string) {
 }
 
 func (g *requirementGate) dependencyVersionSatisfies(pkg, expr string) bool {
+	return g.dependencyVersionEffect(pkg, expr).Allowed
+}
+
+func (g *requirementGate) dependencyVersionEffect(pkg, expr string) requirementEffect {
+	hasPackage := g.packages.inEvidence(pkg)
+	hasVersion := false
 	for _, key := range packageEvidenceKeys(pkg) {
 		for _, version := range g.versions[key] {
+			hasVersion = true
 			if versionSatisfiesRange(version, expr) {
-				return true
+				return requirementEffect{Allowed: true, State: requirementStateSatisfied}
 			}
 		}
 	}
-	return false
+	switch {
+	case hasVersion:
+		return requirementEffect{Allowed: false, State: requirementStateConflicting}
+	case hasPackage:
+		return requirementEffect{Allowed: false, State: requirementStateUnknown}
+	default:
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
+	}
 }
 
 func packageEvidenceKeys(raw string) []string {
