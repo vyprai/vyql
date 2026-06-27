@@ -15,7 +15,7 @@ vyql/
     misconfig.vyql  mobile.vyql  numeric.vyql  path.vyql  concurrency.vyql
     request_forgery.vyql  resource.vyql  runtime.vyql  sca.vyql  secrets.vyql
     smartcontract.vyql
-  adapters/     framework->concept bindings (`binding ...`) split by technology
+  adapters/     framework->concept binding modules (`binding ...`) split by technology
     bash.vyql  c.vyql  config.vyql  cpp.vyql  csharp.vyql  dart.vyql
     elixir.vyql  go.vyql  groovy.vyql  java.vyql  javascript.vyql
     kotlin.vyql  lua.vyql  objc.vyql  perl.vyql  php.vyql  pii.vyql
@@ -34,7 +34,7 @@ vyql/
 
 ### Definitions (VyQL) vs reference-data / config (JSON) vs engine (Go)
 
-- **Definitions are VyQL.** Concepts, threat kinds, adapters, and rules are
+- **Definitions are VyQL.** Concepts, threat kinds, bindings, and rules are
   hand-authored declarations — they live here as `*.vyql`.
 - **Reference data stays JSON.** The CWE/CAPEC catalogs are a MITRE
   *import* (1500+ machine-generated entries, regenerated from the official CSVs,

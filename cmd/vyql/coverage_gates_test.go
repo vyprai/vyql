@@ -968,6 +968,39 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 	}
 }
 
+func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	docs := []string{"README.md", "go/README.md", "vyql/README.md", "CLAUDE.md"}
+	forbidden := []string{
+		"concepts, threat-kinds, adapters",
+		"pattern  →  concept  →  adapter",
+		"per-language **adapters**",
+		"framework/config/SCA/secret adapters",
+		"adapter-content change",
+		"adapter precedence / conflict resolution / provenance",
+		"framework/config adapters",
+		"adapter files",
+		"Concepts, threat kinds, adapters",
+	}
+	var hits []string
+	for _, rel := range docs {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		src := string(data)
+		for _, snippet := range forbidden {
+			if strings.Contains(src, snippet) {
+				hits = append(hits, rel+": "+snippet)
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("public docs must describe v2 authored content as bindings, not adapters:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func TestDefinitionsDoNotUseLegacyFlagBridge(t *testing.T) {
 	var hits []string
 	for path, src := range readDataFiles(t, "adapters", ".vyql") {
