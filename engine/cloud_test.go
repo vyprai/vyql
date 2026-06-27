@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -51,7 +50,7 @@ func markerAdapter(name, prop string, acceptedValues ...string) adapters.Adapter
 
 func TestMarkedAssetThreeAdapters(t *testing.T) {
 	onto := solverContractOntology()
-	decls, err := parser.ParseV2Definitions(assetMarkerRule)
+	decls, err := parseV2DefinitionsForTest(assetMarkerRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

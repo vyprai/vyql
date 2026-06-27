@@ -158,7 +158,7 @@ func frontendSourceVarNeedles(t *testing.T) []string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		decls, err := parser.ParseV2Definitions(string(raw))
+		decls, err := parseV2DefinitionsForTest(string(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -247,7 +247,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.ParseV2Definitions(string(raw))
+		decls, err := parseV2DefinitionsForTest(string(raw))
 		if err != nil {
 			return err
 		}
@@ -505,7 +505,7 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 }
 
 func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding secretComparison {
@@ -574,7 +574,7 @@ binding secretComparison {
 }
 
 func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.test;
 
 binding worldAccess {
@@ -642,7 +642,7 @@ binding worldAccess {
 }
 
 func TestContextFlagIndexesScopedContextAndMatchesOrderedSelectorScope(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.test;
 
 binding shareInfoLeak {
@@ -703,7 +703,7 @@ binding shareInfoLeak {
 }
 
 func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding secretComparison {
@@ -744,7 +744,7 @@ binding secretComparison {
 }
 
 func TestContextFlagAstScopedLiteralAndSubscriptPredicates(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding prototypeMerge {
@@ -799,7 +799,7 @@ binding prototypeMerge {
 }
 
 func TestContextFlagAstScopedSelectorContainsAny(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.test;
 
 binding lockOpen {
@@ -854,7 +854,7 @@ binding lockOpen {
 }
 
 func TestContextFlagAstScopedBinaryPredicate(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.test;
 
 binding emptyPayloadCheck {
@@ -914,7 +914,7 @@ binding emptyPayloadCheck {
 }
 
 func TestCContextFlagMatchesICMPEchoLengthUnderflowTokens(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.c.test;
 
 binding icmpEchoPayloadLengthUnderflow {
@@ -962,7 +962,7 @@ binding icmpEchoPayloadLengthUnderflow {
 }
 
 func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.test;
 
 binding lockNoFollow {
@@ -1005,7 +1005,7 @@ binding lockNoFollow {
 }
 
 func TestContextFlagAstScopedCallArgPredicates(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.php.test;
 
 binding directJsonEncode {
@@ -1061,7 +1061,7 @@ binding directJsonEncode {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectArgumentNodes(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding gitCloneWrapper {
@@ -1094,7 +1094,7 @@ binding gitCloneWrapper {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNestedCallArguments(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.test;
 
 binding bulkMailRecipients {
@@ -1128,7 +1128,7 @@ binding bulkMailRecipients {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNamePath(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.go.test;
 
 binding bulkMailRecipients {
@@ -1175,7 +1175,7 @@ binding bulkMailRecipients {
 }
 
 func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.test;
 
 binding unhardenedXmlParser {
@@ -1216,7 +1216,7 @@ binding unhardenedXmlParser {
 }
 
 func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.php.test;
 
 binding passwordOnlySessionHash {
@@ -1263,7 +1263,7 @@ binding passwordOnlySessionHash {
 }
 
 func TestContextFlagIgnoresUnscopedParamsFromOtherFunctions(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding remoteUrlDebugLog {
@@ -1320,7 +1320,7 @@ binding remoteUrlDebugLog {
 }
 
 func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.php.test;
 
 binding directJsonEncode {
@@ -1346,7 +1346,7 @@ binding directJsonEncode {
 }
 
 func TestContextFlagStructuredTokenEqualsUsesTokenBoundary(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.ruby.test;
 
 binding exactParse {
@@ -1384,7 +1384,7 @@ binding exactParse {
 }
 
 func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.php.test;
 
 binding scopedLiteral {
@@ -1429,7 +1429,7 @@ binding scopedLiteral {
 }
 
 func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.ruby.test;
 
 binding railsSecretToken {
@@ -1473,7 +1473,7 @@ binding railsSecretToken {
 }
 
 func TestModuleContextFlagStructuredPredicatesUseAstNodes(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.c.test;
 
 binding pathBasedSandboxExposeBindRace {
@@ -1545,7 +1545,7 @@ binding pathBasedSandboxExposeBindRace {
 }
 
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.cpp.test;
 
 binding pointerAddOverflow {
@@ -1595,7 +1595,7 @@ binding pointerAddOverflow {
 }
 
 func TestAstFlagCallOperandMatchesTransitiveFlow(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding remoteUrlDebugLog {
@@ -1646,7 +1646,7 @@ binding remoteUrlDebugLog {
 }
 
 func TestAstFlagCallOperandFallsBackToIncomingArgFlow(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.test;
 
 binding zipCompressedSizeRead {
@@ -1864,7 +1864,7 @@ binding cursorExecuteQuery {
 }
 
 func TestV2ArgsCountPredicateFiltersSinkMappings(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.db;
 concept custom.SqlExecution : sink {}
 binding executeParameterized {

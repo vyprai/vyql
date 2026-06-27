@@ -370,6 +370,10 @@ func builtinV2PresenceNodePattern() *V2PatternDecl {
 }
 
 func lowerV2FieldNames(fields map[string]any) map[string]any {
+	return LowerV2FieldNames(fields)
+}
+
+func LowerV2FieldNames(fields map[string]any) map[string]any {
 	if fields == nil {
 		return nil
 	}
@@ -1758,7 +1762,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 	out := &Rule{Name: r.Name, Package: r.Module, Meta: r.Meta}
 	solver := mechanics.ruleSolvers[r.Body.Verb]
 	if solver == "" {
-		solver = v2DefaultSolverForRuleVerb(r.Body.Verb)
+		return nil, fmt.Errorf("rule %s: no loaded mechanic ruleVerb %q", r.Name, r.Body.Verb)
 	}
 	switch solver {
 	case "dataflow.taint", "dataflow.flow", "graph.reach":
@@ -1871,27 +1875,6 @@ func appendStringField(raw any, value string) []string {
 		return []string{xs, value}
 	default:
 		return []string{value}
-	}
-}
-
-func v2DefaultSolverForRuleVerb(verb string) string {
-	switch verb {
-	case "taint":
-		return "dataflow.taint"
-	case "flow":
-		return "dataflow.flow"
-	case "reach":
-		return "graph.reach"
-	case "grant":
-		return "graph.grant"
-	case "assume":
-		return "graph.assume"
-	case "issue", "fact":
-		return "fact.exists"
-	case "query":
-		return "query.semantic"
-	default:
-		return ""
 	}
 }
 

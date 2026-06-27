@@ -1,11 +1,9 @@
 package engine
 
 import (
+	"github.com/vyprai/vyql/usg"
 	"strings"
 	"testing"
-
-	"github.com/vyprai/vyql/parser"
-	"github.com/vyprai/vyql/usg"
 )
 
 func TestGuardedByEndpoint(t *testing.T) {
@@ -179,7 +177,7 @@ rule AliasFlow {
   unless sink.path coveredBy custom.Transform
 }
 `
-	decls, err := parser.ParseV2Definitions(rule)
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

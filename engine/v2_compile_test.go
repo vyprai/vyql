@@ -10,7 +10,7 @@ import (
 )
 
 func TestCompileLoweredV2Rule(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module rules.injection;
 rule SqlInjection {
   meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
@@ -38,7 +38,7 @@ rule SqlInjection {
 }
 
 func TestLoweredV2ConfidenceClauseFiltersFindings(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module rules.review;
 rule HighConfidenceReview {
   issue custom.Review as r
@@ -75,7 +75,7 @@ rule HighConfidenceReview {
 }
 
 func TestLoweredV2FindingFingerprintStableAcrossStores(t *testing.T) {
-	decls, err := parser.ParseV2Definitions(`
+	decls, err := parseV2DefinitionsForTest(`
 module rules.injection;
 rule SqlInjection {
   meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
@@ -181,7 +181,7 @@ rule SourceToSink {
 }
 
 func TestCompileRequiresLoadedRuleVerbWhenMechanicsAreAuthoritative(t *testing.T) {
-	decls := parseV2DefinitionSourcesForCompileTest(t, []parser.V2DefinitionSource{
+	raw := []parser.V2DefinitionSource{
 		{Name: "mechanics.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb flow {
@@ -202,13 +202,18 @@ rule SourceToSink {
   taint custom.Input -> custom.Sink
 }
 `},
-	})
-	onto := ontology.New()
-	onto.Add(ontology.Concept{Name: "Input", Package: "custom", Kind: "source"})
-	onto.Add(ontology.Concept{Name: "Sink", Package: "custom", Kind: "sink"})
-	_, errs := CompileRules(decls, onto)
-	if len(errs) != 1 || !strings.Contains(errs[0].Msg, `no loaded mechanic ruleVerb`) {
-		t.Fatalf("CompileRules errors = %+v, want missing ruleVerb mechanic", errs)
+	}
+	sources := make([]parser.V2Source, 0, len(raw))
+	for _, src := range raw {
+		prog, err := parser.ParseV2(src.Source)
+		if err != nil {
+			t.Fatalf("ParseV2 %s: %v", src.Name, err)
+		}
+		sources = append(sources, parser.V2Source{Name: src.Name, Program: prog})
+	}
+	_, err := parser.LowerV2DefinitionSources(sources)
+	if err == nil || !strings.Contains(err.Error(), `no loaded mechanic ruleVerb "taint"`) {
+		t.Fatalf("LowerV2DefinitionSources error = %v, want missing ruleVerb mechanic", err)
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"github.com/vyprai/vyql/adapters"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -24,7 +23,7 @@ rule Sql {
 func evalSQLI(t *testing.T, store usg.Store) []*finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.ParseV2Definitions(sqliRule)
+	decls, err := parseV2DefinitionsForTest(sqliRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

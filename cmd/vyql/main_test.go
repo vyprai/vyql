@@ -311,7 +311,7 @@ func TestDefaultPacksCompile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	decls, err := parser.ParseV2Definitions(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

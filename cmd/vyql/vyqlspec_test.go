@@ -13,7 +13,6 @@ import (
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -209,7 +208,7 @@ func TestVyqlSpecs(t *testing.T) {
 	// compile the shipped packs once — `graph` specs evaluate them over a synthetic
 	// asset/identity graph (the code specs scan source instead).
 	onto := ontology.Seed()
-	decls, err := parser.ParseV2Definitions(rules)
+	decls, err := parseV2DefinitionsForTest(rules)
 	if err != nil {
 		t.Fatalf("parse packs: %v", err)
 	}

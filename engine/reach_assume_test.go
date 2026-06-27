@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -19,7 +18,7 @@ rule ReachAsset {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseV2Definitions(src)
+	decls, _ := parseV2DefinitionsForTest(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -60,7 +59,7 @@ rule ActorToCapability {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseV2Definitions(src)
+	decls, _ := parseV2DefinitionsForTest(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -98,7 +97,7 @@ rule ActorToCapability {
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.ParseV2Definitions(src)
+	decls, _ := parseV2DefinitionsForTest(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -138,7 +137,7 @@ rule ExternalToElevated {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.ParseV2Definitions(src)
+	decls, _ := parseV2DefinitionsForTest(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

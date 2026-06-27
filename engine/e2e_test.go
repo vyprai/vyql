@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/adapters"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -42,7 +41,7 @@ rule ComposedMatch {
   where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
-	decls, err := parser.ParseV2Definitions(rules)
+	decls, err := parseV2DefinitionsForTest(rules)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

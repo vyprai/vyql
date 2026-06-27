@@ -55,7 +55,7 @@ func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 			t.Fatalf("no %s sources under vyql/%s", suffix, sub)
 		}
 		for _, source := range sources {
-			decls, err := parser.ParseV2Definitions(string(source.Data))
+			decls, err := parseV2DefinitionsForTest(string(source.Data))
 			if err != nil {
 				t.Fatalf("parse %s: %v", source.Name, err)
 			}
@@ -65,7 +65,11 @@ func parseDataDecls(t *testing.T, sub, suffix string) map[string][]parser.Decl {
 	}
 	files := readDataFiles(t, sub, suffix)
 	for f, c := range files {
-		decls, err := parser.ParseV2Definitions(c)
+		parse := parseV2DefinitionsForTest
+		if sub == "mechanics" {
+			parse = parser.ParseV2Definitions
+		}
+		decls, err := parse(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -78,7 +82,7 @@ func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id ->
 	t.Helper()
 	out := map[string]string{}
 	for f, c := range files {
-		decls, err := parser.ParseV2Definitions(c)
+		decls, err := parseV2DefinitionsForTest(c)
 		if err != nil {
 			t.Fatalf("parse %s: %v", filepath.Base(f), err)
 		}
@@ -718,7 +722,7 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
 	sourceCount, sinkCount := 0, 0
 	for _, sub := range subs {
 		for path, src := range readDataFiles(t, sub, ".vyql") {
-			decls, err := parser.ParseV2Definitions(src)
+			decls, err := parseV2DefinitionsForTest(src)
 			if err != nil {
 				t.Fatalf("parse %s: %v", path, err)
 			}

@@ -16,7 +16,7 @@ import (
 func runRule(t *testing.T, src string, build func(s usg.Store)) ([]int, []CompileError) {
 	t.Helper()
 	onto := testOntology()
-	decls, err := parser.ParseV2Definitions(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -217,7 +217,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 		if err != nil {
 			return err
 		}
-		decls, err := parser.ParseV2Definitions(string(raw))
+		decls, err := parseV2DefinitionsForTest(string(raw))
 		if err != nil {
 			return err
 		}

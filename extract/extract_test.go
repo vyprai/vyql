@@ -12,7 +12,6 @@ import (
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -53,7 +52,7 @@ rule Sql {
 func runRule(t *testing.T, src string, g usg.Store) []*findings.Finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.ParseV2Definitions(src)
+	decls, err := parseV2DefinitionsForTest(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

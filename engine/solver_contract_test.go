@@ -8,14 +8,13 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
 func fireOne(t *testing.T, rule string, build func(*usg.InMemStore)) findingView {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.ParseV2Definitions(rule)
+	decls, err := parseV2DefinitionsForTest(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -36,7 +35,7 @@ func scanFindingKeys(t *testing.T, paths []string, cache lowering.DeltaCache) []
 	if g == nil {
 		return nil
 	}
-	decls, err := parser.ParseV2Definitions(syntheticIncrementalRules)
+	decls, err := parseV2DefinitionsForTest(syntheticIncrementalRules)
 	if err != nil {
 		t.Fatalf("rule parse: %v", err)
 	}

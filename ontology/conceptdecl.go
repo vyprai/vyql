@@ -58,14 +58,21 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 // `package` declarations) into Concepts. Non-concept declarations are ignored,
 // so a file may mix concepts with rules.
 func LoadConceptText(src string) ([]Concept, error) {
-	decls, err := parser.ParseV2Definitions(src)
-	if err != nil {
-		return nil, err
-	}
 	var out []Concept
-	for _, d := range decls {
-		if cd, ok := d.(*parser.ConceptDecl); ok {
-			out = append(out, ConceptFromDecl(cd))
+	for _, source := range parser.V2DefinitionSourcesFromText("concepts", src) {
+		prog, err := parser.ParseV2(source.Source)
+		if err != nil {
+			return nil, err
+		}
+		for _, decl := range prog.Decls {
+			if cd, ok := decl.(*parser.V2ConceptDecl); ok {
+				out = append(out, ConceptFromDecl(&parser.ConceptDecl{
+					Name:    cd.Name,
+					Package: cd.Module,
+					Kind:    cd.Kind,
+					Fields:  parser.LowerV2FieldNames(cd.Fields),
+				}))
+			}
 		}
 	}
 	return out, nil

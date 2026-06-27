@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/ontology"
-	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -51,7 +50,7 @@ func buildContextGraph(exposed, important bool) usg.Store {
 
 func TestCrossDomainContext(t *testing.T) {
 	onto := contextTestOntology()
-	decls, err := parser.ParseV2Definitions(flowRule)
+	decls, err := parseV2DefinitionsForTest(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -125,7 +124,7 @@ rule Flow {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.ParseV2Definitions(src)
+	decls, _ := parseV2DefinitionsForTest(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

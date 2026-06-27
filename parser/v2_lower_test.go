@@ -499,16 +499,13 @@ rule SqlInjectionAlias {
 }
 
 func TestV2LoweringSupportsSameReceiverCoveredBy(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.aliases;
 rule SameReceiverCoverage {
   taint code.HttpInput as input -> code.SqlExecution as sink
   unless sink.sameReceiver coveredBy core.SqlParameterization
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
 	rule := decls[0].(*Rule)
 	if _, ok := rule.Clauses[0].Unless.(SameReceiverCoveredBy); !ok {
 		t.Fatalf("sameReceiver coveredBy did not preserve coverage mode: %+v", rule.Clauses[0])
@@ -682,7 +679,7 @@ binding requestBody {
 }
 
 func TestParseV2DefinitionsSplitsConcatenatedV2Modules(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.one;
 rule One {
   issue code.First as first
@@ -693,9 +690,6 @@ rule Two {
   issue code.Second as second
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
 	if len(decls) != 2 {
 		t.Fatalf("decls = %d, want 2: %+v", len(decls), decls)
 	}
@@ -1410,7 +1404,7 @@ binding secretCompare {
 }
 
 func TestV2RuleWhereLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.migrated;
 rule ToxicWorkloadExposure {
   issue identity.WorkloadIdentity as w
@@ -1433,9 +1427,6 @@ rule Confidence {
   where r.confidence == high
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
 	if len(decls) != 5 {
 		t.Fatalf("decls = %d, want 5", len(decls))
 	}
@@ -1466,16 +1457,13 @@ rule Confidence {
 }
 
 func TestV2RuleConfidenceClauseLowersToRuntimeFloor(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.review;
 rule HighConfidenceReview {
   issue code.Review as r
   with confidence >= high
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
 	rule := decls[0].(*Rule)
 	if got := rule.Meta["confidence_floor"]; got != "high" {
 		t.Fatalf("confidence floor = %#v, want high", got)
@@ -1483,7 +1471,7 @@ rule HighConfidenceReview {
 }
 
 func TestV2RawSemanticQueryLowering(t *testing.T) {
-	decls, err := ParseV2Definitions(`
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.migrated;
 rule FileToctou {
   query concept as first where first.concept == code.FileCheck reaches concept as second where second.concept == code.FileUse select second
@@ -1493,9 +1481,6 @@ rule InvalidRefundTransition {
   query state as t where t.machine == Order and t.from == "*" and t.to == Refunded select t
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Definitions: %v", err)
-	}
 	order := decls[0].(*Rule).Body.(*OrderStmt)
 	if order.First.Concept != "code.FileCheck" || order.First.Binding != "first" || order.Second.Concept != "code.FileUse" || order.Second.Binding != "second" {
 		t.Fatalf("order lowering wrong: %+v", order)
@@ -1831,17 +1816,49 @@ rule ExternalGrant {
 	}
 }
 
+const v2CoreMechanicsForLoweringTest = `
+module mechanics.core;
+mechanic ruleVerb taint { solver: dataflow.taint }
+mechanic ruleVerb flow { solver: dataflow.flow }
+mechanic ruleVerb reach { solver: graph.reach }
+mechanic ruleVerb grant { solver: graph.grant }
+mechanic ruleVerb assume { solver: graph.assume }
+mechanic ruleVerb issue { solver: fact.exists }
+mechanic ruleVerb fact { solver: fact.exists }
+mechanic ruleVerb query { solver: query.semantic }
+`
+
+func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
+	t.Helper()
+	return parseRuntimeFiles(t, src)
+}
+
 func parseRuntimeFiles(t *testing.T, srcs ...string) []Decl {
 	t.Helper()
-	var out []Decl
-	for _, src := range srcs {
-		decls, err := ParseV2Definitions(src)
-		if err != nil {
-			t.Fatalf("ParseV2Definitions: %v", err)
+	sources := []V2Source{parseV2SourceForLoweringTest(t, "mechanics/core.vyql", v2CoreMechanicsForLoweringTest)}
+	keep := []bool{false}
+	for i, src := range srcs {
+		for _, raw := range V2DefinitionSourcesFromText("test", src) {
+			source := parseV2SourceForLoweringTest(t, raw.Name, raw.Source)
+			source.Name = "test/module" + string(rune('A'+i)) + "/" + raw.Name
+			sources = append(sources, source)
+			keep = append(keep, true)
 		}
-		out = append(out, decls...)
 	}
-	return out
+	decls, err := lowerV2DefinitionSourcesSelected(sources, keep)
+	if err != nil {
+		t.Fatalf("lowerV2DefinitionSourcesSelected: %v", err)
+	}
+	return decls
+}
+
+func parseV2SourceForLoweringTest(t *testing.T, name, src string) V2Source {
+	t.Helper()
+	prog, err := ParseV2(src)
+	if err != nil {
+		t.Fatalf("ParseV2 %s: %v", name, err)
+	}
+	return V2Source{Name: name, Program: prog}
 }
 
 func stringSlicesEqual(a, b []string) bool {
