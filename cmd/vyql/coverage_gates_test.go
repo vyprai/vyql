@@ -566,8 +566,27 @@ func TestNoDuplicateNamesGate(t *testing.T) {
 	}
 }
 
-// T0.5 — every adapter loads (parses + builds its sink/source/control/mark specs) without
-// panicking, for every adapter shipped under vyql/adapters/.
+// V2 migration gate — every shipped definition file must be production v2.
+// This is intentionally corpus-wide rather than layer-specific: it catches
+// legacy v1 files left in less common directories such as profiles, review
+// metadata, generated package bindings, or future definition roots.
+func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
+	files, err := vyqlFilesUnder(datadir.Root())
+	if err != nil {
+		t.Fatalf("collect shipped definition files: %v", err)
+	}
+	checked, err := checkV2DefinitionFiles(files)
+	if err != nil {
+		t.Fatalf("shipped definition corpus must be v2-only: %v", err)
+	}
+	if checked < 30000 {
+		t.Fatalf("checked only %d v2 definition files; want the full shipped corpus", checked)
+	}
+	t.Logf("checked %d shipped v2 definition files", checked)
+}
+
+// T0.5 — every adapter loads (parses v2 bindings and builds graph-labeling actions)
+// without panicking, for every adapter shipped under vyql/adapters/.
 func TestAllAdaptersLoadGate(t *testing.T) {
 	root := filepath.Join(datadir.Root(), "adapters")
 	entries, err := os.ReadDir(root)
