@@ -2844,6 +2844,44 @@ func TestLowerV2ProgramRejectsParsedGoOwnedMechanic(t *testing.T) {
 	}
 }
 
+func TestLowerV2DefinitionSourcesRejectsParsedExtensionMechanics(t *testing.T) {
+	cases := []struct {
+		name string
+		decl *V2MechanicDecl
+		want string
+	}{
+		{
+			name: "context",
+			decl: &V2MechanicDecl{Kind: "context", Name: "internetExposure"},
+			want: "mechanic context.internetExposure is recognized by the v2 contract but is not implemented by the current runtime",
+		},
+		{
+			name: "ruleVerb",
+			decl: &V2MechanicDecl{Kind: "ruleVerb", Name: "observe"},
+			want: "mechanic ruleVerb.observe is an extension rule verb, which is not implemented by the current runtime",
+		},
+		{
+			name: "coverage",
+			decl: &V2MechanicDecl{Kind: "coverage", Name: "customDominates"},
+			want: "mechanic coverage.customDominates is not a built-in coverage mode and extension coverage mechanics are not implemented by the current runtime",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LowerV2DefinitionSources([]V2Source{{
+				Name: "mechanics/custom.vyql",
+				Program: &V2Program{
+					Module: "mechanics.custom",
+					Decls:  []V2Decl{tc.decl},
+				},
+			}})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("LowerV2DefinitionSources error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 const v2CorePoliciesForLoweringTest = `
 module policies.core;
 policy resultLifecycle default {

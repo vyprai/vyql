@@ -92,6 +92,20 @@ func validateV2ProgramMechanicBoundary(sourceName string, prog *V2Program) error
 		if builtins[key] != "" {
 			errs = append(errs, fmt.Errorf("%s: duplicate v2 mechanic %s.%s; first declared in <builtin>", sourceName, m.Kind, m.Name))
 		}
+		if !v2MechanicKinds[m.Kind] {
+			errs = append(errs, fmt.Errorf("%s: mechanic %s.%s has unknown mechanic kind %q", sourceName, m.Kind, m.Name, m.Kind))
+			continue
+		}
+		if !v2ImplementedMechanicKinds[m.Kind] {
+			errs = append(errs, fmt.Errorf("%s: mechanic %s.%s is recognized by the v2 contract but is not implemented by the current runtime", sourceName, m.Kind, m.Name))
+			continue
+		}
+		if m.Kind == "ruleVerb" && !v2BuiltInRuleVerbs[m.Name] {
+			errs = append(errs, fmt.Errorf("%s: mechanic ruleVerb.%s is an extension rule verb, which is not implemented by the current runtime", sourceName, m.Name))
+		}
+		if m.Kind == "coverage" && !v2CoverageModes[m.Name] {
+			errs = append(errs, fmt.Errorf("%s: mechanic coverage.%s is not a built-in coverage mode and extension coverage mechanics are not implemented by the current runtime", sourceName, m.Name))
+		}
 	}
 	return errors.Join(errs...)
 }
