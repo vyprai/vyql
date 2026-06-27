@@ -115,6 +115,69 @@ binding requestBody {
 	}
 }
 
+func TestConvertV1TokenFlagToCallValuePattern(t *testing.T) {
+	res, err := ConvertV1ToV2(`
+adapter ruby {
+  flag code.InsecureCookie on any {
+    path "set_cookie"
+    literal "false"
+    not literal "secure"
+  }
+  flag code.HardcodedSecret in module {
+    token contains "lang=ruby"
+    token contains "assign:config.secret_token="
+  }
+}
+`, "legacy.vyql")
+	if err != nil {
+		t.Fatalf("ConvertV1ToV2: %v", err)
+	}
+	var stable string
+	blocked := 0
+	for _, f := range res.Files {
+		if strings.Contains(f.Source, "binding insecureCookie") {
+			stable = f.Source
+		}
+		if strings.Contains(f.Source, "TODO_v2Migrate") {
+			blocked++
+		}
+	}
+	if !strings.Contains(stable, `query pattern callExpr where callee.path ~= "set_cookie" and args.any.literal contains "false" and not args.any.literal contains "secure"`) {
+		t.Fatalf("literal-token flag did not become callExpr value pattern:\n%s", stable)
+	}
+	if strings.Contains(stable, "unstable.legacyFlag") || strings.Contains(stable, "unstable:") {
+		t.Fatalf("stable value flag retained unstable bridge metadata:\n%s", stable)
+	}
+	if _, err := ParseV2Runtime(stable); err != nil {
+		t.Fatalf("ParseV2Runtime stable flag: %v\n%s", err, stable)
+	}
+	if blocked != 1 {
+		t.Fatalf("metadata-token flag should become one blocking migration stub; files=%+v", res.Files)
+	}
+}
+
+func TestConvertV1TokenFlagCheckRequiresStableCoverageMigration(t *testing.T) {
+	res, err := ConvertV1ToV2WithConceptKinds(`
+adapter go {
+  flag core.MemoryBoundsCheck on any {
+    path "__binop.ne"
+    literal "Count"
+    literal "0"
+  }
+}
+`, "legacy.vyql", map[string]string{"core.MemoryBoundsCheck": "check"})
+	if err != nil {
+		t.Fatalf("ConvertV1ToV2WithConceptKinds: %v", err)
+	}
+	if len(res.Files) != 1 {
+		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
+	}
+	src := res.Files[0].Source
+	if !strings.Contains(src, "TODO_v2Migrate") {
+		t.Fatalf("check-kind token flag should require stable coverage migration:\n%s", src)
+	}
+}
+
 func TestConvertV1ToV2UnsupportedConstructsProduceBlockingStubs(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter javascript {
@@ -132,8 +195,8 @@ rule NeedsAlong {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", true) {
-		t.Fatalf("ledger missing resolved flag: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", false) {
+		t.Fatalf("ledger missing unresolved flag: %+v", res.Ledger)
 	}
 	if !migrationLedgerHas(res.Ledger, "along", false) {
 		t.Fatalf("ledger missing unresolved along clause: %+v", res.Ledger)
@@ -147,8 +210,8 @@ rule NeedsAlong {
 			}
 		}
 	}
-	if blocking != 1 {
-		t.Fatalf("blocking stubs = %d, want 1; files=%+v", blocking, res.Files)
+	if blocking != 2 {
+		t.Fatalf("blocking stubs = %d, want 2; files=%+v", blocking, res.Files)
 	}
 }
 
@@ -309,7 +372,7 @@ adapter javascript {
 	}
 }
 
-func TestConvertV1ToV2LegacyFlagPredicatesUseUnstableQuery(t *testing.T) {
+func TestConvertV1ToV2UnsupportedLegacyFlagPredicatesProduceBlockingStub(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter perl {
   flag code.CleartextChannel on any {
@@ -326,29 +389,15 @@ adapter perl {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if _, err := ParseV2(src); err != nil {
-		t.Fatalf("converted legacy flag did not parse as v2: %v\n%s", err, src)
+	if !strings.Contains(src, "TODO_v2Migrate") {
+		t.Fatalf("unsupported legacy flag should produce blocking stub:\n%s", src)
 	}
-	for _, want := range []string{
-		`owner: "migration"`,
-		`reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"`,
-		"query unstable.legacyFlag as node where",
-		`node.kind == "any"`,
-		`node.path ~= "getstore"`,
-		`node.token contains "http://"`,
-		`not (node.token contains "127.0")`,
-		"emit issue code.CleartextChannel at node",
-	} {
-		if !strings.Contains(src, want) {
-			t.Fatalf("converted legacy flag missing %q:\n%s", want, src)
-		}
-	}
-	if !migrationLedgerHas(res.Ledger, "flag", true) {
-		t.Fatalf("ledger missing resolved legacy flag conversion: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", false) {
+		t.Fatalf("ledger missing unresolved legacy flag conversion: %+v", res.Ledger)
 	}
 }
 
-func TestConvertV1ToV2AnalysisPathFlagUsesLegacyQuery(t *testing.T) {
+func TestConvertV1ToV2AnalysisPathFlagProducesBlockingStub(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter sca {
   flag sbom.VulnerableDependency on any {
@@ -359,18 +408,15 @@ adapter sca {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", true) {
-		t.Fatalf("ledger missing resolved analysis flag: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", false) {
+		t.Fatalf("ledger missing unresolved analysis flag: %+v", res.Ledger)
 	}
-	if len(res.Files) != 1 || strings.Contains(res.Files[0].Source, "TODO_v2Migrate") {
-		t.Fatalf("analysis path flag produced blocking stub: %+v", res.Files)
-	}
-	if _, err := ParseV2(res.Files[0].Source); err != nil {
-		t.Fatalf("converted analysis flag did not parse as v2: %v\n%s", err, res.Files[0].Source)
+	if len(res.Files) != 1 || !strings.Contains(res.Files[0].Source, "TODO_v2Migrate") {
+		t.Fatalf("analysis path flag should produce blocking stub: %+v", res.Files)
 	}
 }
 
-func TestConvertV1ToV2ComplexFlagUsesExtendedLegacyQuery(t *testing.T) {
+func TestConvertV1ToV2ComplexFlagProducesBlockingStub(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter javascript {
   flag code.SecretComparisonReview on binop {
@@ -390,27 +436,15 @@ adapter javascript {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if _, err := ParseV2(src); err != nil {
-		t.Fatalf("converted complex flag did not parse as v2: %v\n%s", err, src)
+	if !strings.Contains(src, "TODO_v2Migrate") {
+		t.Fatalf("complex flag should produce blocking stub:\n%s", src)
 	}
-	for _, want := range []string{
-		`owner: "migration"`,
-		`reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"`,
-		"query unstable.legacyFlag as node where",
-		`node.op in ["==", "==="]`,
-		`operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, [token, secret]))`,
-		`not (containsAny(node.scopeCall.any, [scmp, timingSafeEqual]))`,
-	} {
-		if !strings.Contains(src, want) {
-			t.Fatalf("converted complex flag missing %q:\n%s", want, src)
-		}
-	}
-	if !migrationLedgerHas(res.Ledger, "flag", true) {
-		t.Fatalf("ledger missing resolved flag conversion: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", false) {
+		t.Fatalf("ledger missing unresolved flag conversion: %+v", res.Ledger)
 	}
 }
 
-func TestConvertV1ToV2LegacyFlagQuotesInvalidBareValues(t *testing.T) {
+func TestConvertV1ToV2OperandFlagProducesBlockingStub(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter go {
   flag code.SecretComparisonReview on binop {
@@ -424,11 +458,11 @@ adapter go {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
 	src := res.Files[0].Source
-	if _, err := ParseV2(src); err != nil {
-		t.Fatalf("converted leading-dot values did not parse as v2: %v\n%s", err, src)
+	if !strings.Contains(src, "TODO_v2Migrate") {
+		t.Fatalf("operand flag should produce blocking stub:\n%s", src)
 	}
-	if !strings.Contains(src, `containsAny(operand.key, [".Password", ".Token"])`) {
-		t.Fatalf("leading-dot values were not quoted:\n%s", src)
+	if !migrationLedgerHas(res.Ledger, "flag", false) {
+		t.Fatalf("ledger missing unresolved operand flag: %+v", res.Ledger)
 	}
 }
 
@@ -517,8 +551,8 @@ rule RuntimeObservation {
 		"concept MixedThingSink : sink",
 		"taint core.Input -> code.MixedThingSink",
 		"issue code.MixedThing as m",
-		"emit issue code.MixedThing at node",
-		"emit sink code.MixedThingSink at node",
+		"emit issue code.MixedThing at call",
+		"emit sink code.MixedThingSink at call",
 		"concept GuardedThing : issue",
 		"concept GuardedThingSink : sink",
 		"issue code.GuardedThing as g",
@@ -850,7 +884,7 @@ adapter javascript {
 	}
 }
 
-func TestConvertV1ToV2AnalysisAssumeUsesUnstableQuery(t *testing.T) {
+func TestConvertV1ToV2AnalysisAssumeProducesBlockingStub(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter java {
   assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
@@ -863,23 +897,11 @@ adapter java {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if _, err := ParseV2(src); err != nil {
-		t.Fatalf("converted analysis assume file did not parse as v2: %v\n%s", err, src)
+	if !strings.Contains(src, "TODO_v2Migrate") {
+		t.Fatalf("analysis assume should produce blocking stub:\n%s", src)
 	}
-	for _, want := range []string{
-		`owner: "migration"`,
-		`reason: "v1 analysis assume evidence reads implementation analysis nodes not yet promoted to stable v2 facts"`,
-		`query unstable.analysisAssumeGuard as call where call.path == "analysis.guard.containment_check"`,
-		"emit check core.Assumption at call",
-		"advisory: true",
-		"about: code.FilePathAccess",
-	} {
-		if !strings.Contains(src, want) {
-			t.Fatalf("converted analysis assume missing %q:\n%s", want, src)
-		}
-	}
-	if !migrationLedgerHas(res.Ledger, "assume", true) {
-		t.Fatalf("ledger missing resolved analysis assume conversion: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "assume_guard_path", false) {
+		t.Fatalf("ledger missing unresolved analysis assume conversion: %+v", res.Ledger)
 	}
 }
 
@@ -935,7 +957,7 @@ adapter javascript {
 	}
 }
 
-func TestConvertV1ToV2AnalysisAssumeNoLongerBlocksMigration(t *testing.T) {
+func TestConvertV1ToV2AnalysisAssumeBlocksMigrationUntilStableFacts(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter python {
   assume guard path "analysis.guard.containment_check" -> code.FilePathAccess
@@ -944,15 +966,15 @@ adapter python {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	if !migrationLedgerHas(res.Ledger, "assume", true) {
-		t.Fatalf("ledger missing resolved analysis assume: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "assume_guard_path", false) {
+		t.Fatalf("ledger missing unresolved analysis assume: %+v", res.Ledger)
 	}
-	if len(res.Files) != 1 || strings.Contains(res.Files[0].Source, "TODO_v2Migrate") {
-		t.Fatalf("analysis assume produced blocking stub: %+v", res.Files)
+	if len(res.Files) != 1 || !strings.Contains(res.Files[0].Source, "TODO_v2Migrate") {
+		t.Fatalf("analysis assume should produce blocking stub: %+v", res.Files)
 	}
 }
 
-func TestConvertV1ToV2AdapterMetadataBridge(t *testing.T) {
+func TestConvertV1ToV2AdapterMetadataBlocksUntilStableDeclaration(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter textpattern {
   meta {
@@ -966,32 +988,19 @@ adapter textpattern {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	var metaSource string
+	if len(res.Files) != 2 {
+		t.Fatalf("files = %d, want metadata TODO plus mapping TODO: %+v", len(res.Files), res.Files)
+	}
 	for _, f := range res.Files {
-		if strings.Contains(f.Source, "pattern adapterMetadata") {
-			metaSource = f.Source
-			break
+		if !strings.Contains(f.Source, "TODO_v2Migrate") {
+			t.Fatalf("metadata-backed migration should block until stable v2 facts exist:\n%s", f.Source)
+		}
+		if _, err := ParseV2(f.Source); err == nil {
+			t.Fatalf("blocking stub parsed successfully:\n%s", f.Source)
 		}
 	}
-	if metaSource == "" {
-		t.Fatalf("metadata bridge file not emitted: %+v", res.Files)
-	}
-	if _, err := ParseV2(metaSource); err != nil {
-		t.Fatalf("metadata bridge did not parse as v2: %v\n%s", err, metaSource)
-	}
-	decls, err := ParseV2Runtime(metaSource)
-	if err != nil {
-		t.Fatalf("metadata bridge did not lower: %v\n%s", err, metaSource)
-	}
-	ad := decls[0].(*AdapterDecl)
-	if ad.Name != "textpattern" || ad.Meta["text_pattern_event"] != "analysis.text_pattern.credential_literal" {
-		t.Fatalf("lowered metadata wrong: %+v", ad)
-	}
-	if got, ok := ad.Meta["text_pattern_extensions"].([]string); !ok || len(got) != 2 || got[0] != ".go" {
-		t.Fatalf("lowered metadata list wrong: %#v", ad.Meta["text_pattern_extensions"])
-	}
-	if !migrationLedgerHas(res.Ledger, "adapter meta", true) {
-		t.Fatalf("ledger missing adapter meta conversion: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "adapter meta", false) {
+		t.Fatalf("ledger missing unresolved adapter metadata: %+v", res.Ledger)
 	}
 }
 
@@ -1037,9 +1046,10 @@ adapter java {
   }
 }
 `,
-			resolved: []string{"adapter meta", "source_param", "type"},
+			resolved:   []string{"source_param", "type"},
+			unresolved: []string{"adapter meta"},
 			want: []string{
-				"pattern adapterMetadata",
+				"TODO_v2Migrate javaAdapterMetadata",
 				"query param as param",
 				"callee.method == \"getParameter\" and callee.receiver.type == \"HttpServletRequest\"",
 				"emit sink code.SqlExecution at args[1]",
@@ -1089,12 +1099,11 @@ adapter javascript {
   }
 }
 `,
-			resolved: []string{"flag"},
+			resolved:   []string{"flag"},
+			unresolved: []string{"flag"},
 			want: []string{
 				"emit issue code.CleartextChannel",
-				"query unstable.legacyFlag as node",
-				"operand(node",
-				"not (containsAny(node.scopeCall.any",
+				"TODO_v2Migrate",
 			},
 		},
 		{

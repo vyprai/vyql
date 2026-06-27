@@ -798,7 +798,13 @@ func (c *v2Migrator) convertRule(r *Rule) (string, bool) {
 func (c *v2Migrator) convertAdapter(a *AdapterDecl) {
 	module := "bindings." + a.Name + ".migration." + v2MigrationModuleSuffix(c.file)
 	if len(a.Meta) > 0 {
-		c.addFile(a.Name+".000.adapterMetadata", module, c.convertAdapterMeta(module, a))
+		src, ok := c.convertAdapterMeta(module, a)
+		name := a.Name + ".000.adapterMetadata"
+		if ok {
+			c.addFile(name, module, src)
+		} else {
+			c.addFile(name+".unresolved", module, src)
+		}
 	}
 	for i, m := range a.Mappings {
 		src, ok := c.convertAdapterMapping(module, a.Name, i, m)
@@ -811,19 +817,10 @@ func (c *v2Migrator) convertAdapter(a *AdapterDecl) {
 	}
 }
 
-func (c *v2Migrator) convertAdapterMeta(module string, a *AdapterDecl) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "module %s;\n\n", module)
-	fmt.Fprintf(&b, "pattern adapterMetadata {\n")
-	fmt.Fprintf(&b, "  unstable: {\n")
-	fmt.Fprintf(&b, "    owner: \"migration\"\n")
-	fmt.Fprintf(&b, "    reason: \"v1 adapter metadata has no stable v2 declaration form yet\"\n")
-	fmt.Fprintf(&b, "    adapter: %q\n", a.Name)
-	fmt.Fprintf(&b, "    meta: %s\n", v2MetadataValue(a.Meta))
-	fmt.Fprintf(&b, "  }\n")
-	fmt.Fprintf(&b, "}\n")
-	c.record(a.Name, "adapter meta", "v1 adapter metadata converted through unstable adapter metadata bridge", true, "unstable adapter metadata")
-	return b.String()
+func (c *v2Migrator) convertAdapterMeta(module string, a *AdapterDecl) (string, bool) {
+	reason := "adapter metadata requires stable v2 declaration support"
+	c.unresolved(a.Name, "adapter meta", reason, "")
+	return c.todoFile(module, a.Name+"AdapterMetadata", reason), false
 }
 
 func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m AdapterMapping) (string, bool) {
@@ -839,14 +836,21 @@ func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m Ad
 	}
 	fmt.Fprintf(&b, "binding %s%d {\n", strings.ToLower(bindingName[:1])+bindingName[1:], idx)
 	writeV2PackageRequires(&b, m.Packages)
-	legacyFlagExpr, legacyFlag := v2LegacyFlagPredicate(m)
-	analysisAssume := strings.HasPrefix(m.Kind, "assume") && strings.HasPrefix(m.Pattern, "analysis.")
-	if legacyFlag {
-		writeV2UnstableMetadata(&b, "migration", "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts")
-		fmt.Fprintf(&b, "  query unstable.legacyFlag as node where %s\n", legacyFlagExpr)
-	} else if analysisAssume {
-		writeV2UnstableMetadata(&b, "migration", "v1 analysis assume evidence reads implementation analysis nodes not yet promoted to stable v2 facts")
-		fmt.Fprintf(&b, "  query unstable.analysisAssumeGuard as call where call.path == %q\n", m.Pattern)
+	_, legacyFlag := v2LegacyFlagPredicate(m)
+	simpleFlagExpr, simpleFlag := v2SimpleFlagPredicate(m)
+	callValueFlagExpr, callValueFlag := "", false
+	if c.kindPlan.ConceptKinds[m.Concept] != "check" {
+		callValueFlagExpr, callValueFlag = v2CallValueFlagPredicate(m)
+	}
+	if m.Kind == "flag" && legacyFlag && !simpleFlag && !callValueFlag {
+		reason := "flag predicates require reviewed stable v2 patterns/matchers"
+		c.unresolved(adapter, "flag", reason, "")
+		return c.todoFile(module, fmt.Sprintf("%s%d", adapter, idx), reason), false
+	}
+	if simpleFlag {
+		fmt.Fprintf(&b, "  query pattern callExpr where %s\n", simpleFlagExpr)
+	} else if callValueFlag {
+		fmt.Fprintf(&b, "  query pattern callExpr where %s\n", callValueFlagExpr)
 	} else if m.Kind == "source_param" {
 		fmt.Fprintf(&b, "  query param as param\n")
 	} else {
@@ -904,45 +908,26 @@ func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m Ad
 		c.writeAliasEmits(&b, m.Concept, "call")
 		c.record(adapter, "mark", "v1 mark converted to v2 issue; confirm concept kind is issue", true, "emit issue")
 	case "flag":
-		if legacyFlag {
-			c.writeLegacyFlagPrimaryEmit(&b, m.Concept, "node")
-			c.writeAliasEmits(&b, m.Concept, "node")
-			c.record(adapter, "flag", "v1 flag converted through unstable legacyFlag query; promote predicates to stable patterns", true, "unstable.legacyFlag")
-		} else {
-			fmt.Fprintf(&b, "  emit issue %s at call\n", c.refForKind(m.Concept, "issue"))
-			c.writeAliasEmits(&b, m.Concept, "call")
-			c.record(adapter, "flag", "simple v1 flag converted to v2 issue; confirm concept kind and pattern family", true, "emit issue")
-		}
+		fmt.Fprintf(&b, "  emit issue %s at call\n", c.refForKind(m.Concept, "issue"))
+		c.writeAliasEmits(&b, m.Concept, "call")
+		c.record(adapter, "flag", "v1 flag converted to v2 issue; confirm concept kind and pattern family", true, "emit issue")
 	case "assume_guard_path", "assume_guard_method", "assume_sanitizer_path", "assume_sanitizer_method":
 		fmt.Fprintf(&b, "  emit check %s at call {\n", c.refForKind("core.Assumption", "check"))
 		fmt.Fprintf(&b, "    advisory: true\n")
 		fmt.Fprintf(&b, "    about: %s\n", m.About)
-		if !analysisAssume {
-			mode := "path"
-			if strings.Contains(m.Kind, "guard") {
-				mode = "dominates"
-			}
-			fmt.Fprintf(&b, "    covers %s {\n", mode)
-			fmt.Fprintf(&b, "      from: call\n")
-			fmt.Fprintf(&b, "      to: call\n")
-			fmt.Fprintf(&b, "    }\n")
+		mode := "path"
+		if strings.Contains(m.Kind, "guard") {
+			mode = "dominates"
 		}
+		fmt.Fprintf(&b, "    covers %s {\n", mode)
+		fmt.Fprintf(&b, "      from: call\n")
+		fmt.Fprintf(&b, "      to: call\n")
+		fmt.Fprintf(&b, "    }\n")
 		fmt.Fprintf(&b, "  }\n")
-		if analysisAssume {
-			c.record(adapter, "assume", "v1 analysis.* assume converted through unstable analysis assume query; promote to stable facts", true, "unstable.analysisAssumeGuard")
-		} else {
-			c.record(adapter, "assume", "v1 assume converted to advisory core.Assumption check; review coverage/about semantics", true, "advisory check")
-		}
+		c.record(adapter, "assume", "v1 assume converted to advisory core.Assumption check; review coverage/about semantics", true, "advisory check")
 	}
 	fmt.Fprintf(&b, "}\n")
 	return b.String(), true
-}
-
-func writeV2UnstableMetadata(b *strings.Builder, owner, reason string) {
-	fmt.Fprintf(b, "  unstable: {\n")
-	fmt.Fprintf(b, "    owner: %q\n", owner)
-	fmt.Fprintf(b, "    reason: %q\n", reason)
-	fmt.Fprintf(b, "  }\n")
 }
 
 func unsupportedAdapterMappingReason(m AdapterMapping) string {
@@ -951,7 +936,7 @@ func unsupportedAdapterMappingReason(m AdapterMapping) string {
 		if _, ok := v2SimpleFlagPredicate(m); ok {
 			return ""
 		}
-		if _, ok := v2LegacyFlagPredicate(m); ok {
+		if _, ok := v2CallValueFlagPredicate(m); ok {
 			return ""
 		}
 		return "flag predicates require reviewed stable v2 patterns/matchers"
@@ -960,6 +945,9 @@ func unsupportedAdapterMappingReason(m AdapterMapping) string {
 	case strings.HasPrefix(m.Kind, "flow"):
 		return ""
 	case strings.HasPrefix(m.Kind, "assume"):
+		if strings.HasPrefix(m.Pattern, "analysis.") {
+			return "analysis-derived assumptions require stable v2 facts"
+		}
 		return ""
 	case strings.HasPrefix(m.Kind, "filter"):
 		return ""
@@ -1031,16 +1019,6 @@ func (c *v2Migrator) writeAliasEmits(b *strings.Builder, concept, location strin
 		fmt.Fprintf(b, "  emit %s %s at %s\n", kind, alias, loc)
 		c.record(concept, "concept kind alias emit", "v1 emitted concept also feeds "+kind+" semantics; generated typed alias "+alias, true, "emit "+kind)
 	}
-}
-
-func (c *v2Migrator) writeLegacyFlagPrimaryEmit(b *strings.Builder, concept, location string) {
-	if c.kindPlan.ConceptKinds[concept] == "check" {
-		fmt.Fprintf(b, "  emit check %s at %s {\n", c.refForKind(concept, "check"), location)
-		fmt.Fprintf(b, "    advisory: true\n")
-		fmt.Fprintf(b, "  }\n")
-		return
-	}
-	fmt.Fprintf(b, "  emit issue %s at %s\n", c.refForKind(concept, "issue"), location)
 }
 
 func (c *v2Migrator) writeIssueMirrorEmit(b *strings.Builder, concept, location string) {
@@ -1161,6 +1139,77 @@ func v2SimpleFlagPredicate(m AdapterMapping) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func v2CallValueFlagPredicate(m AdapterMapping) (string, bool) {
+	if m.Flag == nil || len(m.Flag.Operands) != 0 || m.Flag.Scope != "" {
+		return "", false
+	}
+	kind := m.Flag.NodeKind
+	if kind == "" {
+		kind = "any"
+	}
+	if kind != "any" && kind != "call" {
+		return "", false
+	}
+	var callee string
+	var vals []string
+	var nvals []string
+	for _, p := range m.Flag.Predicates {
+		if p.Subject != "node" || len(p.Values) != 1 {
+			return "", false
+		}
+		value := p.Values[0]
+		switch p.Property {
+		case "path":
+			if p.Negative || p.Op != "match" || strings.HasPrefix(value, "analysis.") || callee != "" {
+				return "", false
+			}
+			op := "~="
+			if p.Exact {
+				op = "=="
+			}
+			callee = fmt.Sprintf("callee.path %s %q", op, value)
+		case "method":
+			if p.Negative || p.Op != "equals" || callee != "" {
+				return "", false
+			}
+			callee = fmt.Sprintf("callee.method == %q", value)
+		case "tokens":
+			value, ok := v2CallValueFlagLiteral(value)
+			if p.Op != "contains" || !ok {
+				return "", false
+			}
+			if p.Negative {
+				nvals = append(nvals, value)
+			} else {
+				vals = append(vals, value)
+			}
+		default:
+			return "", false
+		}
+	}
+	if callee == "" || len(vals)+len(nvals) == 0 {
+		return "", false
+	}
+	parts := []string{callee}
+	for _, v := range vals {
+		parts = append(parts, fmt.Sprintf("args.any.literal contains %q", v))
+	}
+	for _, v := range nvals {
+		parts = append(parts, fmt.Sprintf("not args.any.literal contains %q", v))
+	}
+	return strings.Join(parts, " and "), true
+}
+
+func v2CallValueFlagLiteral(value string) (string, bool) {
+	if literal, ok := strings.CutPrefix(value, "literal:"); ok {
+		if literal != "" && !strings.ContainsAny(literal, ":=") {
+			return literal, true
+		}
+		return "", false
+	}
+	return "", false
 }
 
 func v2LegacyFlagPredicate(m AdapterMapping) (string, bool) {
