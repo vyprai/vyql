@@ -498,8 +498,8 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	if b.Query.Expr != nil && b.Query.Expr.Family == "unstable.legacyFlag" {
 		return lowerV2LegacyFlagBinding(b, names)
 	}
-	if b.Query.Expr != nil && b.Query.Expr.Family == "unstable.analysisAssumeGuard" {
-		return lowerV2AnalysisAssumeBinding(b, names)
+	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
+		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
 	if b.Query.Expr != nil && b.Query.Expr.Family == "param" {
 		return lowerV2ParamSourceBinding(b, names)
@@ -887,31 +887,6 @@ func rewriteV2PatternRefName(name string, binds map[string]string) (string, bool
 		return target + "." + rest, true
 	}
 	return target, true
-}
-
-func lowerV2AnalysisAssumeBinding(b *V2BindingDecl, names v2NameResolver) ([]AdapterMapping, error) {
-	if b.Query.Expr.Alias != "call" || len(b.Query.Expr.Steps) != 0 {
-		return nil, fmt.Errorf("binding %s: analysis assume lowering requires unstable.analysisAssumeGuard as call", b.Name)
-	}
-	pattern, ok := lowerV2AnalysisPathPredicate("call", b.Query.Expr.Where)
-	if !ok {
-		return nil, fmt.Errorf("binding %s: analysis assume query requires call.path == string", b.Name)
-	}
-	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
-	if err != nil {
-		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
-	}
-	var out []AdapterMapping
-	for _, action := range b.Outputs {
-		action.Concept = names.concept(action.Concept)
-		action.About = names.concept(action.About)
-		advisory := action.Advisory != nil && *action.Advisory
-		if action.Kind != "emit check" || action.Concept != "core.Assumption" || action.Location != "call" || !advisory || action.About == "" {
-			return nil, fmt.Errorf("binding %s: analysis assume query only supports advisory core.Assumption checks with about", b.Name)
-		}
-		out = append(out, AdapterMapping{Kind: "assume_guard_path", Pattern: pattern, About: action.About, Packages: pkgs})
-	}
-	return out, nil
 }
 
 func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]AdapterMapping, error) {

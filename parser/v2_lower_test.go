@@ -1108,30 +1108,30 @@ binding replaceFilter {
 	}
 }
 
-func TestV2AnalysisAssumeGuardLowering(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+func TestV2UnstableAnalysisAssumeGuardRejected(t *testing.T) {
+	_, err := ParseV2Runtime(`
 module bindings.java.migration;
 binding containmentCheck {
   unstable: {
     owner: "test"
-    reason: "exercise transitional analysis assume lowering"
+    reason: "obsolete private query family should not lower"
   }
   query unstable.analysisAssumeGuard as call where call.path == "analysis.guard.containment_check"
   emit check core.Assumption at call {
     advisory: true
     about: code.FilePathAccess
+    covers dominates {
+      from: call
+      to: call
+    }
   }
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
+	if err == nil {
+		t.Fatal("ParseV2Runtime succeeded for unstable.analysisAssumeGuard")
 	}
-	adapter := decls[0].(*AdapterDecl)
-	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
-		t.Fatalf("adapter lowering wrong: %+v", adapter)
-	}
-	if got := adapter.Mappings[0]; got.Kind != "assume_guard_path" || got.Pattern != "analysis.guard.containment_check" || got.About != "code.FilePathAccess" {
-		t.Fatalf("analysis assume lowering wrong: %+v", got)
+	if !strings.Contains(err.Error(), `unsupported unstable query family "unstable.analysisAssumeGuard"`) {
+		t.Fatalf("ParseV2Runtime error = %v", err)
 	}
 }
 

@@ -1,13 +1,13 @@
 module bindings.java.migration.m420f6b67;
 
 binding binding448 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 analysis assume evidence reads implementation analysis nodes not yet promoted to stable v2 facts"
-  }
-  query unstable.analysisAssumeGuard as call where call.path == "analysis.guard.containment_check"
+  query pattern callExpr where callee.path == "analysis.guard.containment_check"
   emit check core.Assumption at call {
     advisory: true
     about: code.FilePathAccess
+    covers dominates {
+      from: call
+      to: call
+    }
   }
 }
