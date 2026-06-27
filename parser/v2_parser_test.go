@@ -331,6 +331,89 @@ binding bounded {
 	}
 }
 
+func TestParseV2BindingOutputKindEnums(t *testing.T) {
+	prog, err := ParseV2(`
+module sample;
+concept Input : source {}
+concept Target : sink {}
+concept Guard : check { covers: [path] }
+concept Finding : issue {}
+concept Fact : fact {}
+concept Asset : asset {}
+concept Exposure : exposure {}
+concept Principal : principal {}
+concept Privilege : privilege {}
+concept State : state {}
+concept Observation : observation {}
+pattern callExpr { node: call }
+binding outputs {
+  query pattern callExpr
+  emit source Input at call.result
+  emit sink Target at args[0]
+  emit check Guard at call {
+    covers path { from: call; to: args[0] }
+  }
+  emit issue Finding at call
+  emit fact Fact at call
+  emit fact Asset at call
+  emit fact Exposure at call
+  emit fact Principal at call
+  emit fact Privilege at call
+  emit fact State at call
+  emit fact Observation at call
+  propagate value from args[0] to args[1]
+  propagate taint from args[0] to args[1]
+  propagate identity from args[0] to args[1]
+  propagate receiver from args[0] to args[1]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	binding := prog.Decls[len(prog.Decls)-1].(*V2BindingDecl)
+	if got := len(binding.Outputs); got != 15 {
+		t.Fatalf("binding outputs = %d, want 15", got)
+	}
+}
+
+func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "emit",
+			body: `emit label Input at call`,
+			want: `unknown emit kind "label"`,
+		},
+		{
+			name: "propagate",
+			body: `propagate alias from args[0] to args[1]`,
+			want: `unknown propagate kind "alias"`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseV2(`
+module sample;
+concept Input : source {}
+pattern callExpr { node: call }
+binding bad {
+  query pattern callExpr
+  ` + tc.body + `
+}
+`)
+			if err == nil {
+				t.Fatal("ParseV2 succeeded, want unknown output kind error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ParseV2 error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseV2PatternOperatorsAndNamedCallArgs(t *testing.T) {
 	prog, err := ParseV2(`
 module patterns.javascript;

@@ -32,7 +32,9 @@ var (
 	v2PolicyKinds            = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
 	v2MechanicCapabilities   = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "dataflow.flow": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds        = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
+	v2EmitKinds              = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
 	v2FactEmitKinds          = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
+	v2PropagateKinds         = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
 	v2ConfidenceLevels       = map[string]bool{"low": true, "medium": true, "high": true}
 	v2CoverageSolversByMode  = map[string][]string{
 		"path":          {"solver.pathCovered"},
@@ -1236,6 +1238,18 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		errs = append(errs, fmt.Errorf("binding %s: binding requires at least one emit or propagate output", b.Name))
 	}
 	for _, out := range b.Outputs {
+		if strings.HasPrefix(out.Kind, "emit ") {
+			kind := strings.TrimPrefix(out.Kind, "emit ")
+			if !v2EmitKinds[kind] {
+				errs = append(errs, fmt.Errorf("binding %s: unknown emit kind %q", b.Name, kind))
+			}
+		}
+		if strings.HasPrefix(out.Kind, "propagate ") {
+			kind := strings.TrimPrefix(out.Kind, "propagate ")
+			if !v2PropagateKinds[kind] {
+				errs = append(errs, fmt.Errorf("binding %s: unknown propagate kind %q", b.Name, kind))
+			}
+		}
 		errs = append(errs, validateV2EmitConceptKind("binding "+b.Name, out.Kind, out.Concept, conceptKinds)...)
 		if out.Kind == "emit check" {
 			advisory := out.Advisory != nil && *out.Advisory
