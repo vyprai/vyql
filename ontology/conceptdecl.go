@@ -48,6 +48,7 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		ContextConfirmFlagProp:  str(d.Fields, "context_confirm_flag_prop"),
 		ContextConfirmFlagValue: str(d.Fields, "context_confirm_flag_value"),
 		ContextConfirmLabel:     str(d.Fields, "context_confirm_label"),
+		InternalRoles:           list(d.Fields, "internal_roles"),
 		ExcludedChars:           str(d.Fields, "excluded_chars"),
 	}
 	return c

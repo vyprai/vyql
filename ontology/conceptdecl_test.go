@@ -1,7 +1,12 @@
 package ontology
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -92,6 +97,7 @@ concept AdminPrivilege : privilege {
 module core;
 concept CharFilter : check {
   covers: [path]
+  internalRoles: [char_filter]
 }
 `}
 	var got []Concept
@@ -108,21 +114,59 @@ concept CharFilter : check {
 	if got[0].GrantMinLevel != "ADMIN" {
 		t.Fatalf("grantMinLevel = %q, want ADMIN", got[0].GrantMinLevel)
 	}
+	if !reflect.DeepEqual(got[1].InternalRoles, []string{InternalConceptRoleCharFilter}) {
+		t.Fatalf("internalRoles = %v, want [%s]", got[1].InternalRoles, InternalConceptRoleCharFilter)
+	}
 }
 
 func TestOntologyResolvesGoOwnedInternalConceptRoles(t *testing.T) {
 	o := Seed()
-	for role, want := range map[string]string{
-		InternalConceptRoleAttributeSink:      "code.ProtoPollute",
-		InternalConceptRoleCharFilter:         "threat.CharFilter",
-		InternalConceptRoleDomInput:           "code.DomInput",
-		InternalConceptRolePathAccessCheck:    "core.PathAccessCheck",
-		InternalConceptRoleProcessArgVector:   "core.ProcessArgVector",
-		InternalConceptRoleSameReceiverGuard:  "core.XmlHardening",
-		InternalConceptRoleSameReceiverTarget: "code.XmlParserCreate",
+	for role, want := range map[string][]string{
+		InternalConceptRoleAttributeSink:      {"code.ProtoPollute"},
+		InternalConceptRoleCharFilter:         {"threat.CharFilter"},
+		InternalConceptRoleDomInput:           {"code.DomInput"},
+		InternalConceptRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
+		InternalConceptRoleProcessArgVector:   {"core.ProcessArgVector"},
+		InternalConceptRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
+		InternalConceptRoleSameReceiverTarget: {"code.XmlParserCreate"},
 	} {
-		if got := o.ConceptsWithInternalConceptRole(role); !got[want] {
-			t.Fatalf("role %s concepts = %v, want %s", role, got, want)
+		got := mapKeys(o.ConceptsWithInternalConceptRole(role))
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("role %s concepts = %v, want %v", role, got, want)
 		}
 	}
+}
+
+func TestInternalConceptRolesAreDataBacked(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(file), "ontology.go"))
+	if err != nil {
+		t.Fatalf("read ontology.go: %v", err)
+	}
+	src := string(raw)
+	for _, forbidden := range []string{
+		"code.ProtoPollute",
+		"threat.CharFilter",
+		"code.DomInput",
+		"core.PathAccessCheck",
+		"core.ProcessArgVector",
+		"core.XmlHardening",
+		"code.XmlParserCreate",
+	} {
+		if strings.Contains(src, forbidden) {
+			t.Fatalf("ontology.go must not hardcode internal role concept %q", forbidden)
+		}
+	}
+}
+
+func mapKeys(values map[string]bool) []string {
+	out := make([]string, 0, len(values))
+	for value := range values {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }

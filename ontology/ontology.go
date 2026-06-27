@@ -8,6 +8,7 @@ package ontology
 import (
 	"fmt"
 	"sort"
+	"sync"
 )
 
 // Concept is the unit of the controlled vocabulary. Loaded from
@@ -50,6 +51,7 @@ type Concept struct {
 	ContextConfirmFlagProp  string   `json:"context_confirm_flag_prop,omitempty"`
 	ContextConfirmFlagValue string   `json:"context_confirm_flag_value,omitempty"`
 	ContextConfirmLabel     string   `json:"context_confirm_label,omitempty"`
+	InternalRoles           []string `json:"internal_roles,omitempty"`
 	// ExcludedChars: for sinks, the characters that MUST be absent for taint to be
 	// neutralized — lets a character-filter (allowlist replace) be proven a sound
 	// sanitizer when its output alphabet excludes all of them.
@@ -68,37 +70,39 @@ const (
 	InternalConceptRoleSameReceiverTarget = "same_receiver_guard_target"
 )
 
-var internalConceptRoleConcepts = map[string][]string{
-	InternalConceptRoleAttributeSink:      {"code.ProtoPollute"},
-	InternalConceptRoleCharFilter:         {"threat.CharFilter"},
-	InternalConceptRoleDomInput:           {"code.DomInput"},
-	InternalConceptRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
-	InternalConceptRoleProcessArgVector:   {"core.ProcessArgVector"},
-	InternalConceptRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
-	InternalConceptRoleSameReceiverTarget: {"code.XmlParserCreate"},
+var internalConceptRoles = []string{
+	InternalConceptRoleAttributeSink,
+	InternalConceptRoleCharFilter,
+	InternalConceptRoleDomInput,
+	InternalConceptRolePathAccessCheck,
+	InternalConceptRoleProcessArgVector,
+	InternalConceptRoleSameReceiverGuard,
+	InternalConceptRoleSameReceiverTarget,
 }
+
+var (
+	internalRoleConceptsOnce sync.Once
+	internalRoleConcepts     map[string]bool
+)
 
 // InternalConceptRoles returns the Go-owned internal concept-role names.
 func InternalConceptRoles() []string {
-	out := make([]string, 0, len(internalConceptRoleConcepts))
-	for role := range internalConceptRoleConcepts {
-		out = append(out, role)
-	}
-	sort.Strings(out)
+	out := append([]string(nil), internalConceptRoles...)
 	return out
 }
 
 // IsInternalConceptRoleConcept reports whether concept is used only by a
 // Go-owned internal concept role.
 func IsInternalConceptRoleConcept(concept string) bool {
-	for _, concepts := range internalConceptRoleConcepts {
-		for _, candidate := range concepts {
-			if candidate == concept {
-				return true
+	internalRoleConceptsOnce.Do(func() {
+		internalRoleConcepts = map[string]bool{}
+		for _, c := range Seed().AllConcepts() {
+			if len(c.InternalRoles) > 0 {
+				internalRoleConcepts[c.QualifiedName()] = true
 			}
 		}
-	}
-	return false
+	})
+	return internalRoleConcepts[concept]
 }
 
 // QualifiedName returns the namespaced id `<package>.<Name>`.
@@ -162,9 +166,12 @@ func (o *Ontology) ConceptsWithInternalConceptRole(role string) map[string]bool 
 	if role == "" {
 		return out
 	}
-	for _, concept := range internalConceptRoleConcepts[role] {
-		if _, ok := o.concepts[concept]; ok {
-			out[concept] = true
+	for _, concept := range o.concepts {
+		for _, candidate := range concept.InternalRoles {
+			if candidate == role {
+				out[concept.QualifiedName()] = true
+				break
+			}
 		}
 	}
 	return out

@@ -2,6 +2,7 @@ module code;
 
 concept DomInput : source {
   cwe: [CWE_20]
+  internalRoles: [dom_input]
   refines: core.UserControlledData
   taint: [taint.UntrustedData]
 }

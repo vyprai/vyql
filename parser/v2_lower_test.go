@@ -93,6 +93,12 @@ rule CustomFlow {
 
 func TestV2CoversV1AdapterCapabilityLedger(t *testing.T) {
 	decls := parseIRFiles(t, `
+module threat;
+concept CharFilter : check {
+  covers: [path]
+  internalRoles: [char_filter]
+}
+`, `
 module bindings.javascript.v1capability;
 binding sourcePath {
   query pattern callExpr where callee.path ~= "request.body"
@@ -196,7 +202,7 @@ binding receiverFlow {
   propagate receiver from callee.receiver to call.result
 }
 `)
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	seen := map[string]BindingAction{}
 	for _, m := range adapter.Mappings {
 		key := m.Kind
@@ -500,7 +506,7 @@ binding requestBody {
   emit source code.HttpInput at call.result
 }
 `)
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -521,7 +527,7 @@ binding execute {
   emit sink code.SqlExecution at args[0]
 }
 `)
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -583,7 +589,7 @@ binding requestBody {
   emit source code.HttpInput at call.result
 }
 `)
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -976,7 +982,7 @@ binding catPath {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -996,7 +1002,7 @@ binding jqueryRoot {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1016,7 +1022,7 @@ binding controllerParam {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -2084,7 +2090,15 @@ binding relativeTo {
 }
 
 func TestV2CharFilterCheckLowering(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "ontology/threat/char_filter.vyql", Source: `
+module threat;
+concept CharFilter : check {
+  covers: [path]
+  internalRoles: [char_filter]
+}
+`},
+		{Name: "bindings/ruby/native.vyql", Source: `
 module bindings.ruby.native;
 binding gsubFilter {
   query pattern callExpr where callee.method == "gsub" and call.filter.global == true
@@ -2095,11 +2109,12 @@ binding gsubFilter {
     }
   }
 }
-`)
+`},
+	})
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if adapter.Name != "ruby" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -2109,7 +2124,15 @@ binding gsubFilter {
 }
 
 func TestV2NonGlobalCharFilterCheckLowering(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "ontology/threat/char_filter.vyql", Source: `
+module threat;
+concept CharFilter : check {
+  covers: [path]
+  internalRoles: [char_filter]
+}
+`},
+		{Name: "bindings/javascript/native.vyql", Source: `
 module bindings.javascript.native;
 binding replaceFilter {
   query pattern callExpr where callee.method == "replace"
@@ -2120,11 +2143,12 @@ binding replaceFilter {
     }
   }
 }
-`)
+`},
+	})
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*BindingSet)
+	adapter := firstBindingSetForTest(t, decls)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -3282,6 +3306,17 @@ func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 
 func parseV2DefinitionsForTest(src string) ([]Decl, error) {
 	return parseV2DefinitionSourcesForTest(V2DefinitionSourcesFromText("test.vyql", src))
+}
+
+func firstBindingSetForTest(t *testing.T, decls []Decl) *BindingSet {
+	t.Helper()
+	for _, decl := range decls {
+		if set, ok := decl.(*BindingSet); ok {
+			return set
+		}
+	}
+	t.Fatalf("no binding set lowered: %+v", decls)
+	return nil
 }
 
 func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, error) {

@@ -31,6 +31,7 @@ var (
 	v2CoverageModes            = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true, "global": true}
 	v2BuiltInRuleVerbs         = map[string]bool{"taint": true, "reach": true, "grant": true, "issue": true, "fact": true, "query": true}
 	v2ConceptKinds             = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
+	v2InternalConceptRoles     = map[string]bool{"attribute_sink": true, "char_filter": true, "dom_input": true, "path_access_check": true, "process_arg_vector": true, "same_receiver_guard": true, "same_receiver_guard_target": true}
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2ImplementedMechanicKinds = map[string]bool{"ruleVerb": true, "coverage": true}
 	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
@@ -828,6 +829,18 @@ func validateV2Concept(c *V2ConceptDecl) []error {
 	}
 	if _, ok := c.Fields["analysisRole"]; ok {
 		errs = append(errs, fmt.Errorf("concept %s: analysisRole is a Go-owned language mechanic and must not be authored in VyQL", c.Name))
+	}
+	if raw, ok := c.Fields["internalRoles"]; ok {
+		values, ok := raw.([]string)
+		if !ok {
+			errs = append(errs, fmt.Errorf("concept %s: internalRoles must be a string list", c.Name))
+		} else {
+			for _, role := range values {
+				if !v2InternalConceptRoles[role] {
+					errs = append(errs, fmt.Errorf("concept %s: unknown internal role %q", c.Name, role))
+				}
+			}
+		}
 	}
 	if raw, ok := c.Fields["covers"]; ok {
 		values, ok := raw.([]string)

@@ -1536,6 +1536,21 @@ concept CharFilter : check {
 	}
 }
 
+func TestParseV2RejectsUnknownInternalRole(t *testing.T) {
+	_, err := ParseV2(`
+module core;
+concept CharFilter : check {
+  internalRoles: [custom_runtime_hook]
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want internalRoles validation error")
+	}
+	if !strings.Contains(err.Error(), `unknown internal role "custom_runtime_hook"`) {
+		t.Fatalf("error = %v, want unknown internal role diagnostic", err)
+	}
+}
+
 func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module code;

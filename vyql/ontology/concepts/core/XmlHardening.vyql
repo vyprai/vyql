@@ -4,5 +4,6 @@ concept XmlHardening : check {
   applies: path
   covers: [endpoint, sameReceiver, path]
   cwe: [CWE_611]
+  internalRoles: [same_receiver_guard]
   neutralizes: [deserialization.Xxe]
 }

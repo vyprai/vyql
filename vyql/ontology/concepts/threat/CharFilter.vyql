@@ -2,4 +2,5 @@ module threat;
 
 concept CharFilter : check {
   covers: [path]
+  internalRoles: [char_filter]
 }

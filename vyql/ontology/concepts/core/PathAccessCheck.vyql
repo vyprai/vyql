@@ -4,5 +4,6 @@ concept PathAccessCheck : check {
   applies: endpoint
   covers: [endpoint, path]
   cwe: [CWE_22, CWE_98]
+  internalRoles: [path_access_check]
   neutralizes: [path.PathTraversal, path.FileInclusion]
 }

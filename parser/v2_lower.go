@@ -144,6 +144,7 @@ type v2Mechanics struct {
 	coverageModes map[string]bool
 	policies      map[string]bool
 	matchers      map[string]v2MatcherSpec
+	conceptRoles  map[string]map[string]bool
 }
 
 type v2MatcherSpec struct {
@@ -177,10 +178,25 @@ func (m *v2Mechanics) merge(other v2Mechanics) {
 	for name, matcher := range other.matchers {
 		m.matchers[name] = matcher
 	}
+	if len(other.conceptRoles) != 0 && m.conceptRoles == nil {
+		m.conceptRoles = make(map[string]map[string]bool, len(other.conceptRoles))
+	}
+	for role, concepts := range other.conceptRoles {
+		if m.conceptRoles[role] == nil {
+			m.conceptRoles[role] = map[string]bool{}
+		}
+		for concept := range concepts {
+			m.conceptRoles[role][concept] = true
+		}
+	}
+}
+
+func (m v2Mechanics) conceptHasRole(concept, role string) bool {
+	return m.conceptRoles != nil && m.conceptRoles[role] != nil && m.conceptRoles[role][concept]
 }
 
 func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
-	out := v2Mechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}, matchers: map[string]v2MatcherSpec{}}
+	out := v2Mechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}, matchers: map[string]v2MatcherSpec{}, conceptRoles: map[string]map[string]bool{}}
 	if prog == nil {
 		return out
 	}
@@ -202,6 +218,21 @@ func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
 			_, fq := v2DeclNames(prog.Module, x)
 			if fq != "" {
 				out.matchers[fq] = spec
+			}
+		case *V2ConceptDecl:
+			roles, _ := x.Fields["internalRoles"].([]string)
+			if len(roles) == 0 {
+				roles, _ = x.Fields["internal_roles"].([]string)
+			}
+			if len(roles) == 0 {
+				continue
+			}
+			_, fq := v2DeclNames(prog.Module, x)
+			for _, role := range roles {
+				if out.conceptRoles[role] == nil {
+					out.conceptRoles[role] = map[string]bool{}
+				}
+				out.conceptRoles[role][fq] = true
 			}
 		}
 	}
@@ -566,6 +597,8 @@ func lowerV2FieldName(name string) string {
 		return "context_confirm_flag_value"
 	case "contextConfirmLabel":
 		return "context_confirm_label"
+	case "internalRoles":
+		return "internal_roles"
 	case "excludedChars":
 		return "excluded_chars"
 	case "reviewCategory":
@@ -742,7 +775,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
-				if action.Concept == "threat.CharFilter" {
+				if mechanics.conceptHasRole(action.Concept, "char_filter") {
 					if action.Location != "call" {
 						return nil, fmt.Errorf("binding %s: CharFilter check must be emitted at call", b.Name)
 					}
