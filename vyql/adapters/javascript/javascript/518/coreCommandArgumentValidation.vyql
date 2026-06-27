@@ -1,7 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding commandArgumentValidation518 {
-  query pattern callExpr where callee.path ~= "analysis.javascript.command_argument_regex_guard"
+  query pattern callExpr where callee.analysis ~= "javascript.command_argument_regex_guard"
   emit check core.CommandArgumentValidation at call {
     covers endpoint {
       anchor: call

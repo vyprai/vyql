@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding dspaceJspuiAutocompleteLabelXss17 {
-  query pattern presenceNode where node.path ~= "analysis.config.dspace_jspui_autocomplete_label_xss"
+  query pattern presenceNode where node.analysis ~= "config.dspace_jspui_autocomplete_label_xss"
   emit issue code.DspaceJspuiAutocompleteLabelXss at node
 }

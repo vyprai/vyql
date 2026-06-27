@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding httpInput42 {
-  query pattern callExpr where callee.path ~= "analysis.function.context.source" and args.any.literal contains "traceback.format_exc" and args.any.literal contains "<pre" and not args.any.literal contains "cgi.escape" and not args.any.literal contains "html.escape" and not args.any.literal contains "markupsafe.escape"
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "traceback.format_exc" and args.any.literal contains "<pre" and not args.any.literal contains "cgi.escape" and not args.any.literal contains "html.escape" and not args.any.literal contains "markupsafe.escape"
   emit source code.HttpInput at call.result
 }

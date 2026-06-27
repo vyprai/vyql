@@ -1,7 +1,7 @@
 module bindings.python.migration.m21017d75;
 
 binding pathAccessCheck550 {
-  query pattern callExpr where callee.path ~= "analysis.path.access_check" and args.any.literal contains "path.resolve.parents"
+  query pattern callExpr where callee.analysis ~= "path.access_check" and args.any.literal contains "path.resolve.parents"
   emit check core.PathAccessCheck at call {
     covers endpoint {
       anchor: call

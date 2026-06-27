@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding debuggableApp2 {
-  query pattern presenceNode where node.path ~= "analysis.config.android.debuggable_enabled"
+  query pattern presenceNode where node.analysis ~= "config.android.debuggable_enabled"
   emit issue code.DebuggableApp at node
 }

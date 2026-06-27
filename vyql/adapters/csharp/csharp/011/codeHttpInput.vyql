@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding httpInput11 {
-  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "class_name:" and args.any.literal contains "Controller" and args.any.literal contains "function_visibility:public" and not args.any.literal contains "method_attribute:NonAction"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "class_name:" and args.any.literal contains "Controller" and args.any.literal contains "function_visibility:public" and not args.any.literal contains "method_attribute:NonAction"
   emit source code.HttpInput at call.result
 }

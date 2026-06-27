@@ -1,6 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding sharedOtaHandlerMissingAuthentication39 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.module.context" and node.token contains "classWebServerBase" and node.token contains "voidadd_handler(AsyncWebHandler*handler)" and node.token contains "handlers_.push_back(handler)" and node.token contains "classOTARequestHandler" and node.token contains "voidhandleUpload(AsyncWebServerRequest*request" and not (node.token contains "AuthMiddlewareHandler") and not (node.token contains "request->authenticate") and not (node.token contains "check_auth")
+  query pattern presenceNode where node.kind == "any" and node.analysis == "module.context" and node.token contains "classWebServerBase" and node.token contains "voidadd_handler(AsyncWebHandler*handler)" and node.token contains "handlers_.push_back(handler)" and node.token contains "classOTARequestHandler" and node.token contains "voidhandleUpload(AsyncWebServerRequest*request" and not (node.token contains "AuthMiddlewareHandler") and not (node.token contains "request->authenticate") and not (node.token contains "check_auth")
   emit issue code.SharedOtaHandlerMissingAuthentication at node
 }

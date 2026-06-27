@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding privilegedWorkflowUntrustedCodeExecution14 {
-  query pattern presenceNode where node.path ~= "analysis.config.github_actions.privileged_pr_framework_execution"
+  query pattern presenceNode where node.analysis ~= "config.github_actions.privileged_pr_framework_execution"
   emit issue code.PrivilegedWorkflowUntrustedCodeExecution at node
 }

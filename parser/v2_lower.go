@@ -1205,6 +1205,9 @@ func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 	if field == "context.scopeCall" || field == "context.inScopeCall" {
 		return "scope_call", "any", true
 	}
+	if field == "analysis" {
+		return defaultSubject, "path", true
+	}
 	if _, ok := strings.CutPrefix(field, "context."); ok {
 		if v2PresenceValuePrefix(field) != "" {
 			return defaultSubject, "tokens", true
@@ -1248,6 +1251,9 @@ func prefixV2PresenceValues(field string, values []string) []string {
 }
 
 func v2PresenceValuePrefix(field string) string {
+	if field == "analysis" {
+		return "analysis."
+	}
 	if !strings.HasPrefix(field, "context.") {
 		return ""
 	}
@@ -1633,7 +1639,8 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 	}
 	field := v2CallQueryField(left.Name)
 	switch field {
-	case "callee.method", "call.callee.method", "callee.path", "call.callee.path":
+	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
+		"callee.analysis", "call.callee.analysis":
 		return lowerV2CalleeShapes(binding, strings.TrimPrefix(field, "call."), cmp, cmpNeg)
 	case "callee.receiver.type", "call.callee.receiver.type":
 		if cmpNeg {
@@ -1688,7 +1695,13 @@ func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v
 		return nil, fmt.Errorf("binding %s: negated callee predicate is not implemented in scanner IR lowering", binding)
 	}
 	var values []string
-	exact := field == "callee.path" && (cmp.Op == "==" || cmp.Op == "in")
+	shapeField := field
+	valuePrefix := ""
+	if field == "callee.analysis" {
+		shapeField = "callee.path"
+		valuePrefix = "analysis."
+	}
+	exact := shapeField == "callee.path" && (cmp.Op == "==" || cmp.Op == "in")
 	switch cmp.Op {
 	case "==", "~=":
 		pat, ok := v2LiteralString(cmp.Right)
@@ -1707,7 +1720,10 @@ func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v
 	}
 	out := make([]v2CallShape, 0, len(values))
 	for _, value := range values {
-		out = append(out, v2CallShape{Field: field, Pattern: value, Exact: exact})
+		if valuePrefix != "" && !strings.HasPrefix(value, valuePrefix) {
+			value = valuePrefix + value
+		}
+		out = append(out, v2CallShape{Field: shapeField, Pattern: value, Exact: exact})
 	}
 	return out, nil
 }
@@ -1784,6 +1800,7 @@ func v2CallQueryField(name string) string {
 func v2IsKnownCallQueryField(name string) bool {
 	switch name {
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
+		"callee.analysis", "call.callee.analysis",
 		"callee.receiver.type", "call.callee.receiver.type",
 		"args.any.literal", "call.args.any.literal",
 		"args.count", "call.args.count",

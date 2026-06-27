@@ -1,7 +1,7 @@
 module bindings.config.migration.m2b6375a9;
 
 binding htmlEscape24 {
-  query pattern callExpr where callee.path ~= "analysis.template.jelly.escape"
+  query pattern callExpr where callee.analysis ~= "template.jelly.escape"
   emit check core.HtmlEscape at call {
     covers path {
       from: call

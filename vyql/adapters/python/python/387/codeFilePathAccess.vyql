@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding filePathAccess387 {
-  query pattern callExpr where callee.path ~= "analysis.function.context.sink" and args.any.literal contains "name=get_text" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "open(os.path.join(output_dir,toc_item.name.decode('utf-8')),'wb')" and not args.any.literal contains "get_safe_path"
+  query pattern callExpr where callee.analysis ~= "function.context.sink" and args.any.literal contains "name=get_text" and args.any.literal contains "toc_item.name.decode('utf-8')" and args.any.literal contains "open(os.path.join(output_dir,toc_item.name.decode('utf-8')),'wb')" and not args.any.literal contains "get_safe_path"
   emit sink code.FilePathAccess at args[0]
 }

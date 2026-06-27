@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding httpInput6 {
-  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "decorator_method:options" and not args.any.literal contains "param_name:self" and not args.any.literal contains "param_name:cls"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "decorator_method:options" and not args.any.literal contains "param_name:self" and not args.any.literal contains "param_name:cls"
   emit source code.HttpInput at call.result
 }

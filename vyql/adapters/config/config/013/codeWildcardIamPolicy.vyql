@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding wildcardIamPolicy13 {
-  query pattern presenceNode where node.path ~= "analysis.config.terraform.wildcard_iam"
+  query pattern presenceNode where node.analysis ~= "config.terraform.wildcard_iam"
   emit issue code.WildcardIamPolicy at node
 }

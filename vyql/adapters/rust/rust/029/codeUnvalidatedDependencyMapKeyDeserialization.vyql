@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding unvalidatedDependencyMapKeyDeserialization29 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.rust.serde_field" and node.token contains "derive:Deserialize" and node.token contains "semantic:dependency_map" and containsAny(node.context.field, ["depend", "package", "plugin"]) and containsAny(node.context.fieldType, ["Map", "Dependencies", "Packages", "Plugins"]) and not (node.context.serdeAttr contains "deserialize_with")
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.serde_field" and node.token contains "derive:Deserialize" and node.token contains "semantic:dependency_map" and containsAny(node.context.field, ["depend", "package", "plugin"]) and containsAny(node.context.fieldType, ["Map", "Dependencies", "Packages", "Plugins"]) and not (node.context.serdeAttr contains "deserialize_with")
   emit issue code.UnvalidatedDependencyMapKeyDeserialization at node
 }

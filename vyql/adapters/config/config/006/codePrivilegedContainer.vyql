@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding privilegedContainer6 {
-  query pattern presenceNode where node.path ~= "analysis.config.container.root_user"
+  query pattern presenceNode where node.analysis ~= "config.container.root_user"
   emit issue code.PrivilegedContainer at node
 }

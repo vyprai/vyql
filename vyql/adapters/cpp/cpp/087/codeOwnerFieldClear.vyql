@@ -1,6 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding ownerFieldClear87 {
-  query pattern presenceNode where node.path ~= "analysis.field.clear_null"
+  query pattern presenceNode where node.analysis ~= "field.clear_null"
   emit issue code.OwnerFieldClear at node
 }

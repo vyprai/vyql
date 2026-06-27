@@ -1,7 +1,7 @@
 module bindings.python.migration.m21017d75;
 
 binding binding558 {
-  query pattern callExpr where callee.path == "analysis.guard.containment_check"
+  query pattern callExpr where callee.analysis == "guard.containment_check"
   emit check core.Assumption at call {
     advisory: true
     about: code.FilePathAccess

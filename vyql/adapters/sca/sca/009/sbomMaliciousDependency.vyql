@@ -1,6 +1,6 @@
 module bindings.sca.migration.mc40a837e;
 
 binding maliciousDependency9 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.sca.package" and node.context.advisoryCwe contains "CWE-506"
+  query pattern presenceNode where node.kind == "any" and node.analysis == "sca.package" and node.context.advisoryCwe contains "CWE-506"
   emit issue sbom.MaliciousDependency at node
 }

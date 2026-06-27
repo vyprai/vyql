@@ -1,6 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding erbHrefUrlHtmlEscapeOnly159 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "analysis.erb.html_escaped_url_href" and node.token contains "template=erb" and node.token contains "attr=href" and node.token contains "value=url-like"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "erb.html_escaped_url_href" and node.token contains "template=erb" and node.token contains "attr=href" and node.token contains "value=url-like"
   emit issue code.ErbHrefUrlHtmlEscapeOnly at node
 }

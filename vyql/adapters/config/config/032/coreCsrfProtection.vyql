@@ -1,7 +1,7 @@
 module bindings.config.migration.m2b6375a9;
 
 binding csrfProtection32 {
-  query pattern callExpr where callee.path ~= "analysis.template.xwiki_velocity.csrf_check"
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.csrf_check"
   emit check core.CsrfProtection at call {
     covers endpoint {
       anchor: call

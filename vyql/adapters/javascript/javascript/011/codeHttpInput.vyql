@@ -1,6 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding httpInput11 {
-  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "decorator_method:All"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "decorator_method:All"
   emit source code.HttpInput at call.result
 }

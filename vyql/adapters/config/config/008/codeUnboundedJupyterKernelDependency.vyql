@@ -1,6 +1,6 @@
 module bindings.config.migration.m2b6375a9;
 
 binding unboundedJupyterKernelDependency8 {
-  query pattern presenceNode where node.path ~= "analysis.config.python.jupyter_kernel_dependency_unbounded"
+  query pattern presenceNode where node.analysis ~= "config.python.jupyter_kernel_dependency_unbounded"
   emit issue code.UnboundedJupyterKernelDependency at node
 }

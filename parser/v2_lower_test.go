@@ -806,6 +806,26 @@ binding jqueryRoot {
 	}
 }
 
+func TestV2AnalysisCallAliasLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.http;
+binding controllerParam {
+  query pattern callExpr where callee.analysis == "parameter.entry" and args.any.literal contains "annotation:GetMapping"
+  emit source code.HttpInput at call.result
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "java" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "source" || got.Pattern != "analysis.parameter.entry" || got.ValMatches[0] != "annotation:GetMapping" {
+		t.Fatalf("analysis alias lowering wrong: %+v", got)
+	}
+}
+
 func TestV2CollectionSinkLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;
@@ -1259,7 +1279,7 @@ func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.perl.migration;
 binding cleartextChannel {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.context.literal contains "http://" and not (node.context.literal contains "127.0")
+  query pattern presenceNode where node.kind == "any" and node.analysis == "text_pattern.credential_literal" and node.context.literal contains "http://" and not (node.context.literal contains "127.0")
   emit issue code.CleartextChannel at node
 }
 `)
@@ -1280,8 +1300,8 @@ binding cleartextChannel {
 	if m.Flag.NodeKind != "any" || len(m.Flag.Predicates) != 3 {
 		t.Fatalf("presenceNode shape wrong: %+v", m.Flag)
 	}
-	if got := m.Flag.Predicates[0]; got.Property != "path" || got.Op != "match" || got.Values[0] != "getstore" {
-		t.Fatalf("path predicate wrong: %+v", got)
+	if got := m.Flag.Predicates[0]; got.Property != "path" || got.Op != "match" || !got.Exact || got.Values[0] != "analysis.text_pattern.credential_literal" {
+		t.Fatalf("analysis path predicate wrong: %+v", got)
 	}
 	if got := m.Flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || !got.Negative || got.Values[0] != "literal:127.0" {
 		t.Fatalf("negative context literal predicate wrong: %+v", got)

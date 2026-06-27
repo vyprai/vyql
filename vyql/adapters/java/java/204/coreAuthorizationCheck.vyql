@@ -1,7 +1,7 @@
 module bindings.java.migration.m420f6b67;
 
 binding authorizationCheck204 {
-  query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "annotation:PreAuthorize"
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "annotation:PreAuthorize"
   emit check core.AuthorizationCheck at call {
     covers endpoint {
       anchor: call

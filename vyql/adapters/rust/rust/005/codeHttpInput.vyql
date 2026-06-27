@@ -1,6 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding httpInput5 {
-  query pattern callExpr where callee.path ~= "analysis.parameter.entry" and args.any.literal contains "attr_name:put"
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.literal contains "attr_name:put"
   emit source code.HttpInput at call.result
 }

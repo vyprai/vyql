@@ -1,6 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding failurePathOwnedBufferFree62 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "analysis.lifetime.release_then_return" and node.token contains "release=delete" and node.token contains "return=false" and node.token contains "storage=nonlocal"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "lifetime.release_then_return" and node.token contains "release=delete" and node.token contains "return=false" and node.token contains "storage=nonlocal"
   emit issue code.FailurePathOwnedBufferFree at node
 }

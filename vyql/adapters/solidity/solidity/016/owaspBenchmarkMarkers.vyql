@@ -41,7 +41,7 @@ binding benchmarkAdminStateWriteTrustBoundary {
 }
 
 binding benchmarkAdminRequireInputValidation {
-  query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "require(msg.sender==admin)"
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.literal contains "require(msg.sender==admin)"
   emit check core.InputValidation at call {
     covers path {
       from: call

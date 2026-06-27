@@ -1,6 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding httpInput15 {
-  query pattern callExpr where callee.path ~= "analysis.property.entry" and args.any.literal contains "property_attribute:BindProperty" and args.any.literal contains "SupportsGet" and args.any.literal contains "true"
+  query pattern callExpr where callee.analysis ~= "property.entry" and args.any.literal contains "property_attribute:BindProperty" and args.any.literal contains "SupportsGet" and args.any.literal contains "true"
   emit source code.HttpInput at call.result
 }
