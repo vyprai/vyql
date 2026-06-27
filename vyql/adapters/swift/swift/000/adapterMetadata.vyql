@@ -1,10 +1,8 @@
 module bindings.swift.migration.m388f23d0;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "swift"
+  adapter: {
+    name: "swift"
     meta: {
       fidelity: "resolved"
       match: "contains"

@@ -1626,14 +1626,12 @@ rule SqlInjection {
 	}
 }
 
-func TestV2UnstableAdapterMetadataLowersToRuntimeAdapterMeta(t *testing.T) {
+func TestV2AdapterMetadataLowersToRuntimeAdapterMeta(t *testing.T) {
 	decls := parseV2RuntimeFiles(t, `
 module bindings.textpattern.migration;
 pattern adapterMetadata {
-  unstable: {
-    owner: "test"
-    reason: "exercise transitional adapter metadata lowering"
-    adapter: "textpattern"
+  adapter: {
+    name: "textpattern"
     meta: {
       cross_language: true
       text_pattern_event: "analysis.text_pattern.credential_literal"
@@ -1654,6 +1652,28 @@ pattern adapterMetadata {
 	}
 	if got, ok := ad.Meta["text_pattern_extensions"].([]string); !ok || len(got) != 2 || got[1] != ".py" {
 		t.Fatalf("adapter metadata list wrong: %#v", ad.Meta["text_pattern_extensions"])
+	}
+}
+
+func TestV2UnstableAdapterMetadataRejected(t *testing.T) {
+	_, err := ParseV2Runtime(`
+module bindings.textpattern.migration;
+pattern adapterMetadata {
+  unstable: {
+    owner: "test"
+    reason: "old adapter metadata bridge"
+    adapter: "textpattern"
+    meta: {
+      cross_language: true
+    }
+  }
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Runtime accepted unstable adapter metadata")
+	}
+	if !strings.Contains(err.Error(), "unstable adapter metadata must use stable adapter item") {
+		t.Fatalf("ParseV2Runtime error = %v", err)
 	}
 }
 

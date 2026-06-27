@@ -1,10 +1,8 @@
 module bindings.bash.migration.m59952d5d;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "bash"
+  adapter: {
+    name: "bash"
     meta: {
       fidelity: "resolved"
       source_var_event: "shell_input"

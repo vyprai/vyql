@@ -2124,6 +2124,18 @@ func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestAdapterMetadataCrossLanguageAcceptsBoolAndString(t *testing.T) {
+	for _, meta := range []map[string]any{
+		{"cross_language": true},
+		{"cross_language": "true"},
+	} {
+		spec := specFromDecl(&parser.AdapterDecl{Name: "sample", Meta: meta})
+		if !spec.crossLang {
+			t.Fatalf("cross_language metadata not honored: %#v", meta)
+		}
+	}
+}
+
 func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{

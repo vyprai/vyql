@@ -1,10 +1,8 @@
 module bindings.config.migration.m2b6375a9;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "config"
+  adapter: {
+    name: "config"
     meta: {
       config_directive_value_events: ["dockerfile|USER|root|exact|analysis.config.container.root_user", "dockerfile|USER|0|exact|analysis.config.container.root_user", "dockerfile|USER|root:|prefix|analysis.config.container.root_user", "dockerfile|USER|0:|prefix|analysis.config.container.root_user"]
       config_dot_template_rules: ["_limit.jst|must be number|maximum;exclusiveMaximum;$schemaExcl|$schemaExcl|analysis.template.dot.schema_codegen_unvalidated", "_limititems.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "_limitlength.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "_limitproperties.jst|def.numberKeyword|$schemaValue|$schemaValue|analysis.template.dot.schema_codegen_unvalidated", "definitions.def|def.numberKeyword|def.$dataNotType|def.$dataNotType|analysis.template.dot.schema_codegen_unvalidated", "index.html|Thelpers.encode(item.message)|common.notifications.template;item.message;refresh_notifications|msg = t.format('@(Navigation has been saved)', item.message)|analysis.config.totaljs_admin_notification_message_xss"]

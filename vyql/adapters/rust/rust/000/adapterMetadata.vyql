@@ -1,10 +1,8 @@
 module bindings.rust.migration.mdc4f74cd;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "rust"
+  adapter: {
+    name: "rust"
     meta: {
       fidelity: "resolved"
       match: "contains"

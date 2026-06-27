@@ -1003,7 +1003,7 @@ adapter python {
 	}
 }
 
-func TestConvertV1ToV2AdapterMetadataBlocksUntilStableDeclaration(t *testing.T) {
+func TestConvertV1ToV2AdapterMetadataBecomesStablePattern(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter textpattern {
   meta {
@@ -1018,31 +1018,35 @@ adapter textpattern {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
 	if len(res.Files) != 2 {
-		t.Fatalf("files = %d, want metadata TODO plus stable mapping: %+v", len(res.Files), res.Files)
+		t.Fatalf("files = %d, want stable metadata plus stable mapping: %+v", len(res.Files), res.Files)
 	}
-	blocking := 0
+	metadata := 0
 	stable := 0
 	for _, f := range res.Files {
 		if strings.Contains(f.Source, "TODO_v2Migrate") {
-			blocking++
-			if _, err := ParseV2(f.Source); err == nil {
-				t.Fatalf("blocking stub parsed successfully:\n%s", f.Source)
-			}
-			continue
+			t.Fatalf("adapter metadata should not produce blocking stub:\n%s", f.Source)
 		}
-		stable++
-		if !strings.Contains(f.Source, `query pattern presenceNode where node.kind == "any" and node.path ~= "analysis.text_pattern.credential_literal"`) {
-			t.Fatalf("metadata-backed mapping did not become presenceNode:\n%s", f.Source)
+		if strings.Contains(f.Source, "pattern adapterMetadata") {
+			metadata++
+			if !strings.Contains(f.Source, `adapter: {`) || !strings.Contains(f.Source, `name: "textpattern"`) ||
+				!strings.Contains(f.Source, `text_pattern_event: "analysis.text_pattern.credential_literal"`) {
+				t.Fatalf("adapter metadata did not become stable pattern:\n%s", f.Source)
+			}
+		} else {
+			stable++
+			if !strings.Contains(f.Source, `query pattern presenceNode where node.kind == "any" and node.path ~= "analysis.text_pattern.credential_literal"`) {
+				t.Fatalf("metadata-backed mapping did not become presenceNode:\n%s", f.Source)
+			}
 		}
 		if _, err := ParseV2Runtime(f.Source); err != nil {
-			t.Fatalf("stable metadata-backed mapping did not lower: %v\n%s", err, f.Source)
+			t.Fatalf("stable metadata-backed file did not lower: %v\n%s", err, f.Source)
 		}
 	}
-	if blocking != 1 || stable != 1 {
-		t.Fatalf("metadata migration blocking=%d stable=%d; files=%+v", blocking, stable, res.Files)
+	if metadata != 1 || stable != 1 {
+		t.Fatalf("metadata migration metadata=%d stable=%d; files=%+v", metadata, stable, res.Files)
 	}
-	if !migrationLedgerHas(res.Ledger, "adapter meta", false) {
-		t.Fatalf("ledger missing unresolved adapter metadata: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "adapter meta", true) {
+		t.Fatalf("ledger missing resolved adapter metadata: %+v", res.Ledger)
 	}
 }
 
@@ -1088,10 +1092,10 @@ adapter java {
   }
 }
 `,
-			resolved:   []string{"source_param", "type"},
-			unresolved: []string{"adapter meta"},
+			resolved: []string{"adapter meta", "source_param", "type"},
 			want: []string{
-				"TODO_v2Migrate javaAdapterMetadata",
+				"pattern adapterMetadata",
+				`name: "java"`,
 				"query param as param",
 				"callee.method == \"getParameter\" and callee.receiver.type == \"HttpServletRequest\"",
 				"emit sink code.SqlExecution at args[1]",

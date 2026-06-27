@@ -1,10 +1,8 @@
 module bindings.library.migration.m699b14a0;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "library"
+  adapter: {
+    name: "library"
     meta: {
       auto_apply: "graph"
       cross_language: "true"

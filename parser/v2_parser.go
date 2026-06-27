@@ -163,6 +163,10 @@ func (p *v2Parser) parseV2Pattern() *V2PatternDecl {
 			p.next()
 			p.expect(tColon, ":")
 			out.Items = append(out.Items, V2PatternItem{Kind: "unstable", Meta: p.parseV2FieldBlock()})
+		case p.atWord("adapter"):
+			p.next()
+			p.expect(tColon, ":")
+			out.Items = append(out.Items, V2PatternItem{Kind: "adapter", Meta: p.parseV2FieldBlock()})
 		case p.atWord("node"):
 			p.next()
 			p.expect(tColon, ":")

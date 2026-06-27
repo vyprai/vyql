@@ -1,10 +1,8 @@
 module bindings.elixir.migration.m728b8a72;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "elixir"
+  adapter: {
+    name: "elixir"
     meta: {
       fidelity: "resolved"
     }

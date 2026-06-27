@@ -1,10 +1,8 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "csharp"
+  adapter: {
+    name: "csharp"
     meta: {
       fidelity: "resolved"
       match: "contains"

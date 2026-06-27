@@ -456,22 +456,25 @@ func lowerV2FieldName(name string) string {
 
 func lowerV2AdapterMetaPattern(p *V2PatternDecl) (string, map[string]any, error) {
 	for _, item := range p.Items {
-		if item.Kind != "unstable" {
-			continue
+		if item.Kind == "adapter" {
+			name, _ := item.Meta["name"].(string)
+			if name == "" {
+				return "", nil, fmt.Errorf("pattern %s: adapter metadata requires name", p.Name)
+			}
+			rawMeta, ok := item.Meta["meta"].(map[string]any)
+			if !ok {
+				return "", nil, fmt.Errorf("pattern %s: adapter metadata requires meta block", p.Name)
+			}
+			return name, rawMeta, nil
 		}
-		adapter, _ := item.Meta["adapter"].(string)
-		rawMeta, hasMeta := item.Meta["meta"]
-		if adapter == "" && !hasMeta {
-			continue
+		if item.Kind == "unstable" {
+			if _, hasAdapter := item.Meta["adapter"]; hasAdapter {
+				return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata must use stable adapter item", p.Name)
+			}
+			if _, hasMeta := item.Meta["meta"]; hasMeta {
+				return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata must use stable adapter item", p.Name)
+			}
 		}
-		if adapter == "" {
-			return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata requires adapter", p.Name)
-		}
-		meta, ok := rawMeta.(map[string]any)
-		if !ok {
-			return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata requires meta block", p.Name)
-		}
-		return adapter, meta, nil
 	}
 	return "", nil, nil
 }

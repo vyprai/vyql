@@ -1040,7 +1040,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
 	}
-	if cl, _ := d.Meta["cross_language"].(string); cl == "true" {
+	if adapterMetaBool(d.Meta, "cross_language") {
 		s.crossLang = true
 	}
 	matchMode := "prefix"
@@ -1135,6 +1135,17 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		}
 	}
 	return s
+}
+
+func adapterMetaBool(meta map[string]any, key string) bool {
+	switch v := meta[key].(type) {
+	case bool:
+		return v
+	case string:
+		return v == "true"
+	default:
+		return false
+	}
 }
 
 func adapterMappingDetail(mp parser.AdapterMapping) map[string]string {

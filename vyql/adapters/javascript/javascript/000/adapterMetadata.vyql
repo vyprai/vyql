@@ -1,10 +1,8 @@
 module bindings.javascript.migration.mfb63017a;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "javascript"
+  adapter: {
+    name: "javascript"
     meta: {
       fidelity: "resolved"
     }

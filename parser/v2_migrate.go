@@ -818,9 +818,18 @@ func (c *v2Migrator) convertAdapter(a *AdapterDecl) {
 }
 
 func (c *v2Migrator) convertAdapterMeta(module string, a *AdapterDecl) (string, bool) {
-	reason := "adapter metadata requires stable v2 declaration support"
-	c.unresolved(a.Name, "adapter meta", reason, "")
-	return c.todoFile(module, a.Name+"AdapterMetadata", reason), false
+	var b strings.Builder
+	fmt.Fprintf(&b, "module %s;\n\n", module)
+	fmt.Fprintf(&b, "pattern adapterMetadata {\n")
+	fmt.Fprintf(&b, "  adapter: {\n")
+	fmt.Fprintf(&b, "    name: %q\n", a.Name)
+	fmt.Fprintf(&b, "    meta: {\n")
+	writeV2MetadataFieldsIndented(&b, a.Meta, "      ")
+	fmt.Fprintf(&b, "    }\n")
+	fmt.Fprintf(&b, "  }\n")
+	fmt.Fprintf(&b, "}\n")
+	c.record(a.Name, "adapter meta", "v1 adapter metadata converted to stable v2 adapter metadata pattern", true, "adapter metadata")
+	return b.String(), true
 }
 
 func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m AdapterMapping) (string, bool) {
@@ -1457,6 +1466,17 @@ func writeV2FieldsIndented(b *strings.Builder, fields map[string]any, indent str
 	sort.Strings(keys)
 	for _, k := range keys {
 		fmt.Fprintf(b, "%s%s: %s\n", indent, v2FieldName(k), v2FieldValue(fields[k]))
+	}
+}
+
+func writeV2MetadataFieldsIndented(b *strings.Builder, fields map[string]any, indent string) {
+	keys := make([]string, 0, len(fields))
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(b, "%s%s: %s\n", indent, v2FieldName(k), v2MetadataValue(fields[k]))
 	}
 }
 

@@ -1,10 +1,8 @@
 module bindings.solidity.migration.m88e544d8;
 
 pattern adapterMetadata {
-  unstable: {
-    owner: "migration"
-    reason: "v1 adapter metadata has no stable v2 declaration form yet"
-    adapter: "solidity"
+  adapter: {
+    name: "solidity"
     meta: {
       fidelity: "resolved"
     }
