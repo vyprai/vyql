@@ -679,6 +679,10 @@ func TestShippedDefinitionsDoNotUseLegacyV1Syntax(t *testing.T) {
 func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
 	files := readDataFiles(t, "tests", ".test.vyql")
 	legacyLinePatterns := legacyV1DefinitionLinePatterns()
+	legacySpecPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`^\s*expect_evidence\s+\S+\s+assumption\s*$`),
+		regexp.MustCompile(`^\s*reject_evidence\s+\S+\s+assumption\s*$`),
+	}
 	var hits []string
 	for path, src := range files {
 		inFence := false
@@ -691,6 +695,13 @@ func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
 				continue
 			}
 			for _, pattern := range legacyLinePatterns {
+				if pattern.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+					break
+				}
+			}
+			for _, pattern := range legacySpecPatterns {
 				if pattern.MatchString(line) {
 					rel, _ := filepath.Rel(datadir.Root(), path)
 					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))

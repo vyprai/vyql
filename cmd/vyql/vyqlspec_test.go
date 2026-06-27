@@ -29,7 +29,7 @@ import (
 //	  lang   java
 //	  expect RULE-ID      # repeatable — every listed rule MUST fire
 //	  reject RULE-ID      # repeatable — every listed rule must NOT fire
-//	  expect_evidence RULE-ID assumption  # rule must carry negation evidence text
+//	  expect_evidence RULE-ID advisory    # rule must carry advisory evidence text
 //	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
 //	  expect_review some.Concept          # repeatable — review concept must appear
 //	  reject_review some.Concept          # repeatable — review concept must not appear
@@ -436,7 +436,14 @@ func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidence
 	if !ok || strings.TrimSpace(ruleID) == "" || strings.TrimSpace(text) == "" {
 		t.Fatalf("%s:%d: evidence assertion must be `expect_evidence <RULE> <text>`", src, line)
 	}
-	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: strings.TrimSpace(text)}
+	return evidenceSpec{ruleID: strings.TrimSpace(ruleID), text: normalizeEvidenceExpectation(strings.TrimSpace(text))}
+}
+
+func normalizeEvidenceExpectation(text string) string {
+	if text == "advisory" {
+		return "assumption"
+	}
+	return text
 }
 
 func parseConfidenceSpec(t *testing.T, src string, line int, rest string) confidenceSpec {
