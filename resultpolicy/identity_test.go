@@ -165,6 +165,18 @@ policy resultLifecycle default {
 	}
 }
 
+func TestLifecyclePolicyEvaluatesLoadedExpressions(t *testing.T) {
+	policy := LifecyclePolicy{items: lifecycleDefaultExprs()}
+	policy.items["flagWhen"] = parser.V2CallExpr{Name: "emitted", Args: []parser.V2Expr{parser.V2RefExpr{Name: "check"}}}
+	if policy.FlagWhenIssue(true) {
+		t.Fatal("flag lifecycle ignored loaded expression and treated emitted(check) as emitted(issue)")
+	}
+	policy.items["flagWhen"] = parser.V2LiteralExpr{Value: true}
+	if !policy.FlagWhenIssue(false) {
+		t.Fatal("flag lifecycle did not evaluate replacement literal expression")
+	}
+}
+
 func TestIdentityPolicyDedupUsesFindingKey(t *testing.T) {
 	policy := IdentityPolicy{
 		FindingKey:  []string{"rule.id", "primaryTarget.location", "primaryTarget.concept"},
