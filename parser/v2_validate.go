@@ -1217,6 +1217,9 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		errs = append(errs, validateV2Requirement("binding "+b.Name, req)...)
 	}
 	if b.Query.Expr != nil {
+		if b.Query.Expr.Family == "unstable.legacyFlag" {
+			errs = append(errs, fmt.Errorf("binding %s: legacy query family %q is not valid v2; use stable presenceNode or callExpr patterns", b.Name, b.Query.Expr.Family))
+		}
 		if strings.HasPrefix(b.Query.Expr.Family, "unstable.") && !v2UnstableMetadataOK(b.Unstable) {
 			errs = append(errs, fmt.Errorf("binding %s: unstable query family %q requires owner and reason metadata", b.Name, b.Query.Expr.Family))
 		}
@@ -1404,6 +1407,9 @@ func validateV2QueryFamilies(ctx string, q V2QueryExpr, role string) []error {
 }
 
 func v2FamilyAllowed(family, role string) bool {
+	if family == "unstable.legacyFlag" {
+		return false
+	}
 	if strings.HasPrefix(family, "unstable.") {
 		return role == "recognition"
 	}

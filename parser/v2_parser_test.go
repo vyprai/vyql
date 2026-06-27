@@ -913,10 +913,19 @@ binding bad {
 			want: "covers global must not declare",
 		},
 		{
-			name: "unstable binding query without metadata",
+			name: "legacy unstable flag query",
 			src: `module bindings.javascript.migration;
 binding bad {
   query unstable.legacyFlag as node where node.kind == "any"
+  emit issue code.Review at node
+}`,
+			want: "legacy query family",
+		},
+		{
+			name: "unstable binding query without metadata",
+			src: `module bindings.javascript.migration;
+binding bad {
+  query unstable.frameworkFlag as node where node.kind == "any"
   emit issue code.Review at node
 }`,
 			want: "requires owner and reason metadata",
