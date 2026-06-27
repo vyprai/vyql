@@ -1023,6 +1023,35 @@ func TestDefinitionsDoNotUseLegacyFlagBridge(t *testing.T) {
 	}
 }
 
+func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
+	root := testRepoRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, "vyql", "migration-ledger.json"))
+	if err != nil {
+		t.Fatalf("read migration ledger: %v", err)
+	}
+	src := string(data)
+	forbidden := []string{
+		"unstable.legacyFlag",
+		"unstable adapter metadata",
+		"adapter metadata bridge",
+		"v1 flag converted",
+		"v1 adapter metadata converted",
+	}
+	var hits []string
+	for _, snippet := range forbidden {
+		if strings.Contains(src, snippet) {
+			hits = append(hits, snippet)
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("migration ledger must describe the final v2 state, not stale bridge suggestions: %s", strings.Join(hits, ", "))
+	}
+	if !strings.Contains(src, `"status": "resolved"`) || !strings.Contains(src, "TestShippedDefinitionCorpusIsV2Only") {
+		t.Fatalf("migration ledger must record final resolved status and verification gates")
+	}
+}
+
 func sourceLanguagesForCoverage() []string {
 	out := make([]string, 0, len(languages))
 	for _, lg := range languages {
