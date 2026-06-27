@@ -76,7 +76,8 @@ rule SqlInjection {
 }
 
 func TestV2LoweringUsesAuthoredRuleVerbSolver(t *testing.T) {
-	decls, err := parseV2DefinitionsForTest(`
+	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "mechanics/test.vyql", Source: `
 module mechanics.test;
 mechanic ruleVerb flow {
   solver: dataflow.taint
@@ -84,12 +85,14 @@ mechanic ruleVerb flow {
   toKinds: [sink]
   allowedClauses: [where, coveredBy]
 }
-
+`},
+		{Name: "rules/test.vyql", Source: `
 module rules.test;
 rule CustomFlow {
   flow code.HttpInput -> code.SqlExecution
 }
-`)
+`},
+	})
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
@@ -139,17 +142,18 @@ rule IssueAsFlow {
 	}
 }
 
-func TestSplitV2ModuleChunks(t *testing.T) {
-	if got := splitV2ModuleChunks("module one;\nconcept A : source {}\n"); got != nil {
-		t.Fatalf("single module split = %#v, want nil", got)
-	}
+func TestV2DefinitionSourcesFromTextPreservesSingleSource(t *testing.T) {
 	src := "module one;\nconcept A : source {}\n\n  module two;\nconcept B : sink {}\n"
-	got := splitV2ModuleChunks(src)
-	if len(got) != 2 {
-		t.Fatalf("split chunks = %d, want 2: %#v", len(got), got)
+	got := V2DefinitionSourcesFromText("inline.vyql", src)
+	if len(got) != 1 {
+		t.Fatalf("source count = %d, want 1", len(got))
 	}
-	if !strings.HasPrefix(got[0], "module one;") || !strings.HasPrefix(got[1], "module two;") {
-		t.Fatalf("split chunks wrong: %#v", got)
+	if got[0].Name != "inline.vyql" || got[0].Source != src {
+		t.Fatalf("source = %#v, want original text and name", got[0])
+	}
+	_, err := ParseV2(got[0].Source)
+	if err == nil || !strings.Contains(err.Error(), "module declaration must appear once") {
+		t.Fatalf("ParseV2 error = %v, want duplicate module rejection", err)
 	}
 }
 

@@ -37,10 +37,10 @@ concept Deserialization : sink {
 	}
 }
 
-// Multi-module v2 concept text and a neutralizing `check` both parse,
-// and a loaded ontology type-checks v2 path coveredBy controls correctly.
+// Multi-file v2 concept text and a neutralizing `check` both parse, and a
+// loaded ontology type-checks v2 path coveredBy controls correctly.
 func TestConceptDeclDottedAndTyping(t *testing.T) {
-	src := `
+	sources := []string{`
 module code;
 concept HttpInput : source {
   taint: [taint.UntrustedData]
@@ -49,16 +49,20 @@ concept SqlExecution : sink {
   vulnerableTo: [injection.SqlInjection]
   enabledBy: [taint.UntrustedData]
 }
-
+`, `
 module core;
 concept SqlParameterization : check {
   neutralizes: [injection.SqlInjection]
   applies: path
 }
-`
-	concepts, err := LoadConceptText(src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
+`}
+	var concepts []Concept
+	for _, src := range sources {
+		loaded, err := LoadConceptText(src)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		concepts = append(concepts, loaded...)
 	}
 	o := New()
 	for _, c := range concepts {

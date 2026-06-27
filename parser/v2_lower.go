@@ -22,15 +22,7 @@ type V2DefinitionSource struct {
 }
 
 func V2DefinitionSourcesFromText(name, src string) []V2DefinitionSource {
-	chunks := splitV2ModuleChunks(src)
-	if len(chunks) == 0 {
-		return []V2DefinitionSource{{Name: name, Source: src}}
-	}
-	out := make([]V2DefinitionSource, 0, len(chunks))
-	for i, chunk := range chunks {
-		out = append(out, V2DefinitionSource{Name: fmt.Sprintf("%s#module%d", name, i+1), Source: chunk})
-	}
-	return out
+	return []V2DefinitionSource{{Name: name, Source: src}}
 }
 
 func ParseV2DefinitionSources(raw []V2DefinitionSource) ([]Decl, error) {
@@ -54,36 +46,6 @@ func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2Defi
 		return nil, fmt.Errorf("v2 corpus validation failed: %w", err)
 	}
 	return lowerV2DefinitionSourcesSelected(sources, keepSource)
-}
-
-func splitV2ModuleChunks(src string) []string {
-	var chunks []string
-	start := 0
-	for lineStart := 0; lineStart < len(src); {
-		lineEnd := lineStart
-		for lineEnd < len(src) && src[lineEnd] != '\n' {
-			lineEnd++
-		}
-		trimmed := strings.TrimSpace(src[lineStart:lineEnd])
-		if strings.HasPrefix(trimmed, "module ") && strings.HasSuffix(trimmed, ";") && lineStart > start {
-			chunk := strings.TrimSpace(src[start:lineStart])
-			if chunk != "" {
-				chunks = append(chunks, chunk)
-			}
-			start = lineStart
-		}
-		lineStart = lineEnd
-		if lineStart < len(src) && src[lineStart] == '\n' {
-			lineStart++
-		}
-	}
-	if chunk := strings.TrimSpace(src[start:]); chunk != "" {
-		chunks = append(chunks, chunk)
-	}
-	if len(chunks) <= 1 {
-		return nil
-	}
-	return chunks
 }
 
 // lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.

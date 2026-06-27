@@ -96,7 +96,7 @@ func TestCrossDomainContext(t *testing.T) {
 }
 
 func TestCrossDomainContextReachSourceComesFromOntology(t *testing.T) {
-	src := `
+	conceptsSrc := `
 module custom;
 concept PublicEdge : exposure {
   context_reach_source: true
@@ -111,20 +111,22 @@ concept PublicEdgeObservation : observation {
 }
 concept Input : source { taint: [custom.Taint] }
 concept Target : sink { vulnerable_to: [custom.Condition] }
+`
+	ruleSrc := `
 module t;
 rule Flow {
   taint custom.Input -> custom.Target
 }
 `
 	onto := ontology.New()
-	cs, err := ontology.LoadConceptText(src)
+	cs, err := ontology.LoadConceptText(conceptsSrc)
 	if err != nil {
 		t.Fatalf("load concepts: %v", err)
 	}
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parseV2DefinitionsForTest(src)
+	decls, _ := parseV2DefinitionsForTest(ruleSrc)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
