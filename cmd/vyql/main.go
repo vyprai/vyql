@@ -223,11 +223,11 @@ func profileNames() string {
 // scanPaths runs the full pipeline (extract → lower → adapters → compile →
 // evaluate) and returns the findings + a scan summary. Multi-language: each file
 // is routed to its real frontend and the matching framework adapters.
-func scanPaths(paths []string, rulesSrc string) ([]*findings.Finding, scanStats, usg.Store, error) {
-	return scanPathsWithProfile(paths, rulesSrc, "")
+func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*findings.Finding, scanStats, usg.Store, error) {
+	return scanPathsWithProfile(paths, ruleSources, "")
 }
 
-func scanPathsWithProfile(paths []string, rulesSrc, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
+func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
 	g, stats, err := buildGraph(paths)
 	if err != nil {
 		return nil, stats, nil, err
@@ -235,7 +235,7 @@ func scanPathsWithProfile(paths []string, rulesSrc, profileName string) ([]*find
 	if g == nil {
 		return nil, stats, nil, nil // recognized files, but nothing to analyze
 	}
-	rules, err := compiledRulesFor(rulesSrc)
+	rules, err := compiledRulesFor(ruleSources)
 	if err != nil {
 		return nil, stats, g, err
 	}
@@ -294,12 +294,12 @@ func stringListMeta(raw any) []string {
 	}
 }
 
-func compiledRulesFor(rulesSrc string) (compiledRuleSet, error) {
-	cacheKey := compiledRulesCacheKey{src: rulesSrc}
+func compiledRulesFor(ruleSources []parser.V2DefinitionSource) (compiledRuleSet, error) {
+	cacheKey := compiledRulesCacheKey{src: ruleSourcesKey(ruleSources)}
 	if cached, ok := compiledRulesCache.Load(cacheKey); ok {
 		return cached.(compiledRuleSet), nil
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(rulesSrc), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSources), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return compiledRuleSet{}, fmt.Errorf("rule parse: %w", err)
 	}
@@ -335,7 +335,7 @@ func (o scanRunOptions) wantsFlags() bool {
 
 func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
 	prof := applyProfile(paths, profileName)
-	src, err := loadRules(rulesPath)
+	ruleSources, err := loadRules(rulesPath)
 	if err != nil {
 		return err
 	}
@@ -358,14 +358,14 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	hit := false
 	wantsFlags := opts.wantsFlags()
 	if cache != nil && syncCollector == nil && !wantsFlags {
-		rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
+		rkey = scanFingerprint(cache.Salt(), paths, ruleSources, prof.Name)
 		if cs, ok := loadCachedScan(cache, rkey); ok {
 			all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
 		}
 	}
 	tk.mark("fingerprint")
 	if !hit {
-		all, stats, graph, err = scanPathsWithProfile(paths, src, prof.Name)
+		all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
 		if err != nil {
 			return err
 		}
@@ -424,50 +424,53 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	return nil
 }
 
-func loadRules(path string) (string, error) {
+func loadRules(path string) ([]parser.V2DefinitionSource, error) {
 	if path == "" {
 		// Default scans load authored mechanics before the standalone rule packs.
 		return loadDefaultRuleSources()
 	}
-	var sb strings.Builder
+	var out []parser.V2DefinitionSource
 	mechanics, err := loadRuleSourcesUnder(filepath.Join(datadir.Root(), "mechanics"))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	sb.WriteString(mechanics)
-	src, err := loadRuleSourcesUnder(path)
+	out = append(out, mechanics...)
+	sources, err := loadRuleSourcesUnder(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	sb.WriteString(src)
-	return sb.String(), nil
+	out = append(out, sources...)
+	return out, nil
 }
 
-func loadDefaultRuleSources() (string, error) {
-	var sb strings.Builder
+func loadDefaultRuleSources() ([]parser.V2DefinitionSource, error) {
+	var out []parser.V2DefinitionSource
 	for _, dir := range []string{
 		filepath.Join(datadir.Root(), "mechanics"),
 		filepath.Join(datadir.Root(), "packs"),
 	} {
-		src, err := loadRuleSourcesUnder(dir)
+		sources, err := loadRuleSourcesUnder(dir)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		sb.WriteString(src)
+		out = append(out, sources...)
 	}
-	return sb.String(), nil
+	return out, nil
 }
 
-func loadRuleSourcesUnder(path string) (string, error) {
+func loadRuleSourcesUnder(path string) ([]parser.V2DefinitionSource, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !info.IsDir() {
 		b, err := os.ReadFile(path)
-		return string(b), err
+		if err != nil {
+			return nil, err
+		}
+		return []parser.V2DefinitionSource{{Name: sourceNameForPath(path), Source: string(b)}}, nil
 	}
-	var sb strings.Builder
+	var out []parser.V2DefinitionSource
 	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -477,15 +480,21 @@ func loadRuleSourcesUnder(path string) (string, error) {
 			if err != nil {
 				return err
 			}
-			sb.Write(b)
-			sb.WriteString("\n")
+			out = append(out, parser.V2DefinitionSource{Name: sourceNameForPath(p), Source: string(b)})
 		}
 		return nil
 	})
-	return sb.String(), err
+	return out, err
 }
 
-func v2DefinitionSourcesForRules(rulesSrc string) []parser.V2DefinitionSource {
+func sourceNameForPath(path string) string {
+	if rel, err := filepath.Rel(datadir.Root(), path); err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) {
+		return filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(path)
+}
+
+func v2DefinitionSourcesForRules(ruleSources []parser.V2DefinitionSource) []parser.V2DefinitionSource {
 	var out []parser.V2DefinitionSource
 	if files, err := datadir.ReadVYQL("ontology/concepts.vyql"); err == nil {
 		for _, file := range files {
@@ -497,15 +506,28 @@ func v2DefinitionSourcesForRules(rulesSrc string) []parser.V2DefinitionSource {
 			out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 		}
 	}
-	if !strings.Contains(rulesSrc, "module mechanics.") {
+	if !v2SourcesContainPrefix(ruleSources, "mechanics/") {
 		if files, err := datadir.ReadVYQLDir("mechanics"); err == nil {
 			for _, file := range files {
 				out = append(out, parser.V2DefinitionSource{Name: file.Name, Source: string(file.Data)})
 			}
 		}
 	}
-	out = append(out, parser.V2DefinitionSourcesFromText("rules", rulesSrc)...)
+	out = append(out, ruleSources...)
 	return out
+}
+
+func v2SourcesContainPrefix(sources []parser.V2DefinitionSource, prefix string) bool {
+	for _, source := range sources {
+		if strings.HasPrefix(source.Name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func ruleSourcesFromText(name, src string) []parser.V2DefinitionSource {
+	return parser.V2DefinitionSourcesFromText(name, src)
 }
 
 func lowerNonCoreV2DefinitionSource(src parser.V2DefinitionSource) bool {

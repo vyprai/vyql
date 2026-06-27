@@ -27,11 +27,11 @@ rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
 }
 `
-	first, err := compiledRulesFor(rules)
+	first, err := compiledRulesFor(ruleSourcesFromText("rules/test.vyql", rules))
 	if err != nil {
 		t.Fatalf("first compile: %v", err)
 	}
-	second, err := compiledRulesFor(rules)
+	second, err := compiledRulesFor(ruleSourcesFromText("rules/test.vyql", rules))
 	if err != nil {
 		t.Fatalf("second compile: %v", err)
 	}
@@ -51,7 +51,7 @@ rule LegacyPresence {
   match code.DynamicCodeLoad as d
 }
 `
-	if _, err := compiledRulesFor(rules); err == nil {
+	if _, err := compiledRulesFor(ruleSourcesFromText("rules/test.vyql", rules)); err == nil {
 		t.Fatalf("legacy compile succeeded, want v2 grammar rejection")
 	}
 }
@@ -65,18 +65,18 @@ rule BadCoverageMode {
   unless p.endpoint coveredBy core.SqlParameterization
 }
 `
-	if _, err := compiledRulesFor(rules); err == nil || !strings.Contains(err.Error(), `coverage mode "endpoint" not declared in concept covers [path]`) {
+	if _, err := compiledRulesFor(ruleSourcesFromText("rules/test.vyql", rules)); err == nil || !strings.Contains(err.Error(), `coverage mode "endpoint" not declared in concept covers [path]`) {
 		t.Fatalf("compile = %v, want v2 corpus coverage validation", err)
 	}
 }
 
 func TestCompiledRulesForKeepsLoadedMechanicsAuthoritative(t *testing.T) {
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(`
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("rules/test.vyql", `
 module rules.test;
 rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
 }
-`), lowerNonCoreV2DefinitionSource)
+`)), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		t.Fatalf("ParseV2DefinitionSourcesSelected: %v", err)
 	}
@@ -97,7 +97,7 @@ rule WebOnly {
   require profile web
 }
 `
-	compiled, err := compiledRulesFor(rules)
+	compiled, err := compiledRulesFor(ruleSourcesFromText("rules/profiled.vyql", rules))
 	if err != nil {
 		t.Fatalf("compiledRulesFor: %v", err)
 	}
@@ -307,11 +307,11 @@ int c_header_helper(char *value);
 // The full default rule library (vyql/packs/*.vyql) must parse and type-check
 // against the ontology with zero errors.
 func TestDefaultPacksCompile(t *testing.T) {
-	src, err := loadRules("")
+	sources, err := loadRules("")
 	if err != nil {
 		t.Fatalf("loadRules: %v", err)
 	}
-	decls, err := parseV2DefinitionsForTest(src)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(sources), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -326,8 +326,18 @@ func TestDefaultPacksCompile(t *testing.T) {
 }
 
 func TestLoadRulesDefault(t *testing.T) {
-	src, err := loadRules("")
-	if err != nil || !strings.Contains(src, "rule ") {
-		t.Fatalf("default rules should load from vyql/packs, got %q err=%v", src, err)
+	sources, err := loadRules("")
+	if err != nil {
+		t.Fatalf("default rules should load from vyql/packs: %v", err)
+	}
+	foundRule := false
+	for _, source := range sources {
+		if strings.Contains(source.Source, "rule ") {
+			foundRule = true
+			break
+		}
+	}
+	if !foundRule {
+		t.Fatalf("default rules should include authored pack rules, got %d source(s)", len(sources))
 	}
 }

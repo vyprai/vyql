@@ -156,7 +156,7 @@ func testNameOf(loc string) string {
 	return ""
 }
 
-func benchmarkCategories(t *testing.T, rules string) map[string]string {
+func benchmarkCategories(t *testing.T, rules []parser.V2DefinitionSource) map[string]string {
 	t.Helper()
 	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(rules), lowerNonCoreV2DefinitionSource)
 	if err != nil {

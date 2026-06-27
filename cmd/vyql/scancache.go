@@ -12,10 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/parsecache"
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/parser"
 )
 
 // cachedScan is the gob-serialized whole-scan result stored under a scan fingerprint, so an
@@ -31,11 +33,11 @@ type cachedScan struct {
 // rebuild invalidates), the rule source, the active profile, every file under the vyql/ data
 // dir (adapters/packs/ontology), and every file under the scan paths. Uses size+mtime (a
 // stat, not a read), the conventional incremental-build change signal.
-func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) string {
+func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2DefinitionSource, profile string) string {
 	h := sha256.New()
 	h.Write(salt)
 	io.WriteString(h, "\x00rules\x00")
-	io.WriteString(h, rulesSrc)
+	io.WriteString(h, ruleSourcesKey(ruleSources))
 	io.WriteString(h, "\x00profile\x00")
 	io.WriteString(h, profile)
 	io.WriteString(h, "\x00data\x00")
@@ -49,6 +51,17 @@ func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) stri
 		statWalk(h, p)
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func ruleSourcesKey(sources []parser.V2DefinitionSource) string {
+	var b strings.Builder
+	for _, source := range sources {
+		b.WriteString(source.Name)
+		b.WriteByte('\x00')
+		b.WriteString(source.Source)
+		b.WriteByte('\x00')
+	}
+	return b.String()
 }
 
 // statWalk folds each regular file's path, size, and mtime under root into h, in WalkDir's

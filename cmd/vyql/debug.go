@@ -228,11 +228,11 @@ func cmdExplain(args []string) error {
 		return fmt.Errorf("usage: vyql explain [-rules ...] <path>...")
 	}
 	prof := applyProfile(paths, *profileName)
-	src, err := loadRules(*rulesPath)
+	ruleSources, err := loadRules(*rulesPath)
 	if err != nil {
 		return err
 	}
-	all, _, _, err := scanPathsWithProfile(paths, src, prof.Name)
+	all, _, _, err := scanPathsWithProfile(paths, ruleSources, prof.Name)
 	if err != nil {
 		return err
 	}
@@ -459,7 +459,7 @@ func cmdAdapters(args []string) error {
 	if err != nil {
 		return fmt.Errorf("no adapter for %q (%v)", *lang, err)
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(string(data)), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("adapter.vyql", string(data))), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}
@@ -523,7 +523,7 @@ func cmdValidateAdapter(args []string) error {
 	if err != nil {
 		return err
 	}
-	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(string(data)), lowerNonCoreV2DefinitionSource)
+	decls, err := parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForRules(ruleSourcesFromText("adapter.vyql", string(data))), lowerNonCoreV2DefinitionSource)
 	if err != nil {
 		return fmt.Errorf("adapter parse: %w", err)
 	}
