@@ -663,12 +663,6 @@ policy confidence default {
 func TestParseV2ValidatesPolicyContracts(t *testing.T) {
 	_, err := ParseV2(`
 module mechanics.policy;
-policy resultLifecycle default {
-  flagWhen: emitted(issue) and hasReview(concept)
-  candidateWhen: matched(rule)
-  findingWhen: candidate and not covered
-  checkWhen: emitted(check) and (hasReview(concept) or explainsFinding)
-}
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
   flagKey: [concept, location, call.path, call.method]
@@ -703,10 +697,16 @@ func TestParseV2RejectsInvalidPolicyContracts(t *testing.T) {
 		want string
 	}{
 		{
-			name: "unknown lifecycle builtin",
+			name: "unsupported lifecycle policy",
 			src: `module mechanics.policy;
 policy resultLifecycle default { findingWhen: heuristic(candidate) }`,
-			want: `unknown policy builtin "heuristic"`,
+			want: `policy kind is recognized by the v2 contract but is not implemented by the current runtime`,
+		},
+		{
+			name: "unsupported diagnostic policy",
+			src: `module mechanics.policy;
+policy diagnostic default { render: [findings] }`,
+			want: `policy kind is recognized by the v2 contract but is not implemented by the current runtime`,
 		},
 		{
 			name: "unknown confidence state",

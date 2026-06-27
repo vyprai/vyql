@@ -31,6 +31,7 @@ var (
 	v2ConceptKinds             = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
+	v2ImplementedPolicyKinds   = map[string]bool{"resultIdentity": true, "confidence": true, "priority": true, "display": true}
 	v2MechanicCapabilities     = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds          = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2EmitKinds                = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
@@ -78,6 +79,8 @@ func ValidateV2(prog *V2Program) error {
 		case *V2PolicyDecl:
 			if !v2PolicyKinds[x.Kind] {
 				errs = append(errs, fmt.Errorf("policy %s: unknown policy kind %q", x.Name, x.Kind))
+			} else if !v2ImplementedPolicyKinds[x.Kind] {
+				errs = append(errs, fmt.Errorf("policy %s %s: policy kind is recognized by the v2 contract but is not implemented by the current runtime", x.Kind, x.Name))
 			}
 			errs = append(errs, validateV2Policy(x)...)
 		case *V2ProfileDecl:
