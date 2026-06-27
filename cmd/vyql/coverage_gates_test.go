@@ -794,15 +794,66 @@ func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(datadir.Root(), "bindings", "packages", lang)); err != nil {
 				t.Fatalf("missing package catalog for %q: %v", lang, err)
 			}
-			sourceCount, sinkCount := countV2TaintEndpointMappings(t, filepath.Join("bindings", lang), filepath.Join("bindings", "packages", lang))
+			sourceCount, sinkCount, checkCount := countV2TaintEndpointMappings(t, filepath.Join("bindings", lang), filepath.Join("bindings", "packages", lang))
 			if sourceCount == 0 {
 				t.Fatalf("%q has no v2 source endpoint definitions", lang)
 			}
 			if sinkCount == 0 {
 				t.Fatalf("%q has no v2 sink endpoint definitions", lang)
 			}
+			if checkCount == 0 {
+				t.Fatalf("%q has no v2 check coverage definitions", lang)
+			}
 			if n := len(frontend.AdaptersFor(lang)); n == 0 {
 				t.Fatalf("%q frontend produced no runtime adapters", lang)
+			}
+		})
+	}
+}
+
+func TestEveryExhaustiveLanguageCoverageSpecIsBalanced(t *testing.T) {
+	for _, lang := range sourceLanguagesForCoverage() {
+		t.Run(lang, func(t *testing.T) {
+			path := filepath.Join(datadir.Root(), "tests", "coverage_"+lang+"_exhaustive.test.vyql")
+			specs := parseSpecFile(t, path)
+			if len(specs) < 4 {
+				t.Fatalf("%s has %d exhaustive specs, want at least 4", filepath.Base(path), len(specs))
+			}
+			codeSpecs, positiveSpecs, cleanSpecs := 0, 0, 0
+			totalExpect, totalReject := 0, 0
+			var problems []string
+			for _, spec := range specs {
+				if spec.lang != lang {
+					problems = append(problems, fmt.Sprintf("%s:%d %q uses lang %q, want %q", spec.src, spec.line, spec.name, spec.lang, lang))
+				}
+				if spec.graphSrc != "" {
+					problems = append(problems, fmt.Sprintf("%s:%d %q uses graph-only coverage; exhaustive language coverage must run the source frontend", spec.src, spec.line, spec.name))
+				}
+				if len(spec.files) == 0 {
+					problems = append(problems, fmt.Sprintf("%s:%d %q has no code block", spec.src, spec.line, spec.name))
+				} else {
+					codeSpecs++
+				}
+				if len(spec.expect) > 0 {
+					positiveSpecs++
+					totalExpect += len(spec.expect)
+				}
+				if len(spec.reject) > 0 {
+					cleanSpecs++
+					totalReject += len(spec.reject)
+				}
+			}
+			if len(problems) > 0 {
+				t.Fatalf("invalid exhaustive language coverage spec:\n%s", strings.Join(problems, "\n"))
+			}
+			if codeSpecs != len(specs) {
+				t.Fatalf("%s has %d/%d specs with code blocks; every exhaustive language spec must exercise the frontend", filepath.Base(path), codeSpecs, len(specs))
+			}
+			if positiveSpecs == 0 || totalExpect == 0 {
+				t.Fatalf("%s has no positive expect assertions", filepath.Base(path))
+			}
+			if cleanSpecs == 0 || totalReject == 0 {
+				t.Fatalf("%s has no clean/reject assertions", filepath.Base(path))
 			}
 		})
 	}
@@ -1121,9 +1172,9 @@ func sourceLanguagesForCoverage() []string {
 	return out
 }
 
-func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
+func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) {
 	t.Helper()
-	sourceCount, sinkCount := 0, 0
+	sourceCount, sinkCount, checkCount := 0, 0, 0
 	for _, sub := range subs {
 		for path, src := range readDataFiles(t, sub, ".vyql") {
 			decls, err := parseV2DefinitionsForTest(src)
@@ -1141,12 +1192,14 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
 						sourceCount++
 					case strings.HasPrefix(mapping.Kind, "sink"):
 						sinkCount++
+					case strings.HasPrefix(mapping.Kind, "check") && mapping.Coverage != "":
+						checkCount++
 					}
 				}
 			}
 		}
 	}
-	return sourceCount, sinkCount
+	return sourceCount, sinkCount, checkCount
 }
 
 func TestCVE1000LedgerCoverageGate(t *testing.T) {
