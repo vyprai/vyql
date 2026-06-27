@@ -28,8 +28,10 @@ var (
 	}
 	v2RequirementCombinators   = map[string]bool{"all": true, "any": true, "not": true, "soft": true}
 	v2CoverageModes            = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true, "global": true}
+	v2BuiltInRuleVerbs         = map[string]bool{"taint": true, "reach": true, "grant": true, "issue": true, "fact": true, "query": true}
 	v2ConceptKinds             = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
+	v2ImplementedMechanicKinds = map[string]bool{"ruleVerb": true, "coverage": true}
 	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
 	v2ImplementedPolicyKinds   = map[string]bool{"resultIdentity": true, "confidence": true, "priority": true, "display": true}
 	v2MechanicCapabilities     = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
@@ -74,6 +76,8 @@ func ValidateV2(prog *V2Program) error {
 		case *V2MechanicDecl:
 			if !v2MechanicKinds[x.Kind] {
 				errs = append(errs, fmt.Errorf("mechanic %s: unknown mechanic kind %q", x.Name, x.Kind))
+			} else if !v2ImplementedMechanicKinds[x.Kind] {
+				errs = append(errs, fmt.Errorf("mechanic %s %s: mechanic kind is recognized by the v2 contract but is not implemented by the current runtime", x.Kind, x.Name))
 			}
 			errs = append(errs, validateV2Mechanic(x)...)
 		case *V2PolicyDecl:
@@ -919,6 +923,9 @@ func validateV2Mechanic(m *V2MechanicDecl) []error {
 	if v2GoOwnedMechanicNames[m.Name] {
 		errs = append(errs, fmt.Errorf("mechanic %s %s: %q is a Go-owned language mechanic and must not be authored in VyQL", m.Kind, m.Name, m.Name))
 	}
+	if isV2BuiltInMechanicDecl(m) {
+		errs = append(errs, fmt.Errorf("mechanic %s %s: built-in language mechanics are implemented in Go and must not be authored in VyQL", m.Kind, m.Name))
+	}
 	switch m.Kind {
 	case "coverage":
 		if !v2CoverageModes[m.Name] {
@@ -976,6 +983,10 @@ func validateV2Mechanic(m *V2MechanicDecl) []error {
 	return errs
 }
 
+func isV2BuiltInMechanicDecl(m *V2MechanicDecl) bool {
+	return (m.Kind == "coverage" && v2CoverageModes[m.Name]) || (m.Kind == "ruleVerb" && v2BuiltInRuleVerbs[m.Name])
+}
+
 func validateV2Policy(p *V2PolicyDecl) []error {
 	var errs []error
 	switch p.Kind {
@@ -1013,13 +1024,17 @@ func validateV2ResultLifecyclePolicy(p *V2PolicyDecl) []error {
 
 func validateV2ConfidencePolicy(p *V2PolicyDecl) []error {
 	var errs []error
+	seen := map[string]bool{}
 	for _, item := range p.Items {
 		switch {
 		case len(item.Key) == 1 && (item.Key[0] == "values" || item.Key[0] == "order"):
 			values := v2BlockItemValueStringList(item.Value)
 			if len(values) == 0 {
 				errs = append(errs, fmt.Errorf("policy confidence %s: %s must be a non-empty string list", p.Name, item.Key[0]))
+			} else if !v2StringListEqual(values, []string{"low", "medium", "high"}) {
+				errs = append(errs, fmt.Errorf("policy confidence %s: %s must match runtime-supported order [low, medium, high]", p.Name, item.Key[0]))
 			}
+			seen[item.Key[0]] = true
 		case len(item.Key) == 1 && item.Key[0] == "aggregate":
 			expr, ok := item.Value.(V2Expr)
 			if !ok {
@@ -1027,6 +1042,10 @@ func validateV2ConfidencePolicy(p *V2PolicyDecl) []error {
 				continue
 			}
 			errs = append(errs, validateV2PolicyExpr("policy confidence "+p.Name+": aggregate", expr, v2ConfidencePolicyRefs, v2ConfidencePolicyCalls)...)
+			if !v2ConfidenceAggregateIsRuntimeSupported(expr) {
+				errs = append(errs, fmt.Errorf("policy confidence %s: aggregate must be runtime-supported min(rule, endpoints, propagation, requirements)", p.Name))
+			}
+			seen["aggregate"] = true
 		case len(item.Key) == 2 && item.Key[0] == "softRequirement":
 			if !v2RequirementEvidenceStates[item.Key[1]] {
 				errs = append(errs, fmt.Errorf("policy confidence %s: unknown softRequirement state %q", p.Name, item.Key[1]))
@@ -1037,8 +1056,17 @@ func validateV2ConfidencePolicy(p *V2PolicyDecl) []error {
 				continue
 			}
 			errs = append(errs, validateV2ConfidenceActionExpr("policy confidence "+p.Name+": softRequirement "+item.Key[1], expr)...)
+			if !v2ConfidenceSoftRequirementIsRuntimeSupported(item.Key[1], expr) {
+				errs = append(errs, fmt.Errorf("policy confidence %s: softRequirement %s must match runtime-supported downgrade(1)/keep behavior", p.Name, item.Key[1]))
+			}
+			seen["softRequirement."+item.Key[1]] = true
 		default:
 			errs = append(errs, fmt.Errorf("policy confidence %s: unknown item %s", p.Name, strings.Join(item.Key, ".")))
+		}
+	}
+	for _, key := range []string{"values", "order", "aggregate", "softRequirement.missing", "softRequirement.unknown", "softRequirement.conflicting", "softRequirement.satisfied"} {
+		if !seen[key] {
+			errs = append(errs, fmt.Errorf("policy confidence %s: missing runtime-required item %s", p.Name, key))
 		}
 	}
 	return errs
@@ -1111,8 +1139,12 @@ func validateV2DisplayPolicy(p *V2PolicyDecl) []error {
 	for _, item := range p.Items {
 		switch {
 		case len(item.Key) == 1 && (item.Key[0] == "scanAll" || item.Key[0] == "flagSort"):
-			if len(v2BlockItemValueStringList(item.Value)) == 0 {
+			values := v2BlockItemValueStringList(item.Value)
+			if len(values) == 0 {
 				errs = append(errs, fmt.Errorf("policy display %s: %s must be a non-empty string list", p.Name, item.Key[0]))
+			}
+			if item.Key[0] == "scanAll" && !v2StringListEqual(values, []string{"findings", "flags", "checks", "advisoryEvidence", "requirementDiagnostics"}) {
+				errs = append(errs, fmt.Errorf("policy display %s: scanAll must match runtime-supported outputs [findings, flags, checks, advisoryEvidence, requirementDiagnostics]", p.Name))
 			}
 		case len(item.Key) == 1 && item.Key[0] == "includeNearbyChecks":
 			if _, ok := v2BlockValueBool(item.Value); !ok {
@@ -1139,9 +1171,81 @@ func validateV2StringListPolicy(p *V2PolicyDecl, allowedKeys ...string) []error 
 		}
 		if len(v2BlockItemValueStringList(item.Value)) == 0 {
 			errs = append(errs, fmt.Errorf("policy %s %s: %s must be a non-empty string list", p.Kind, p.Name, item.Key[0]))
+			continue
+		}
+		if p.Kind == "resultIdentity" {
+			errs = append(errs, validateV2ResultIdentityRuntimeField(p.Name, item.Key[0], v2BlockItemValueStringList(item.Value))...)
 		}
 	}
 	return errs
+}
+
+func validateV2ResultIdentityRuntimeField(policyName, field string, values []string) []error {
+	switch field {
+	case "flagKey":
+		if !v2StringListEqual(values, []string{"concept", "location", "call.path", "call.method"}) {
+			return []error{fmt.Errorf("policy resultIdentity %s: flagKey must match runtime-supported key [concept, location, call.path, call.method]", policyName)}
+		}
+	case "stableAcross":
+		if !v2StringListEqual(values, []string{"formatting", "requirementDiagnosticText", "traversalOrder"}) {
+			return []error{fmt.Errorf("policy resultIdentity %s: stableAcross must match runtime-supported metadata [formatting, requirementDiagnosticText, traversalOrder]", policyName)}
+		}
+	}
+	return nil
+}
+
+func v2ConfidenceAggregateIsRuntimeSupported(expr V2Expr) bool {
+	call, ok := expr.(V2CallExpr)
+	if !ok || call.Name != "min" || len(call.NamedArgs) != 0 || len(call.Args) != 4 {
+		return false
+	}
+	for i, want := range []string{"rule", "endpoints", "propagation", "requirements"} {
+		ref, ok := call.Args[i].(V2RefExpr)
+		if !ok || ref.Name != want {
+			return false
+		}
+	}
+	return true
+}
+
+func v2ConfidenceSoftRequirementIsRuntimeSupported(state string, expr V2Expr) bool {
+	if state == "satisfied" {
+		ref, ok := expr.(V2RefExpr)
+		return ok && ref.Name == "keep"
+	}
+	if state != "missing" && state != "unknown" && state != "conflicting" {
+		return false
+	}
+	return v2ExprSequenceContainsDowngradeOne(expr)
+}
+
+func v2ExprSequenceContainsDowngradeOne(expr V2Expr) bool {
+	if seq, ok := expr.(V2SequenceExpr); ok {
+		for _, item := range seq.Items {
+			if v2ExprSequenceContainsDowngradeOne(item) {
+				return true
+			}
+		}
+		return false
+	}
+	call, ok := expr.(V2CallExpr)
+	if !ok || call.Name != "downgrade" || len(call.NamedArgs) != 0 || len(call.Args) != 1 {
+		return false
+	}
+	n, ok := v2ExprInt(call.Args[0])
+	return ok && n == 1
+}
+
+func v2StringListEqual(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 var (

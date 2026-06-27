@@ -92,18 +92,6 @@ rule CustomFlow {
 }
 
 func TestLowerV2DefinitionSourcesValidatesCorpus(t *testing.T) {
-	mechanics, err := ParseV2(`
-module mechanics.test;
-mechanic ruleVerb issue {
-  solver: dataflow.taint
-  fromKinds: [source]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy]
-}
-`)
-	if err != nil {
-		t.Fatalf("ParseV2 mechanics: %v", err)
-	}
 	rules, err := ParseV2(`
 module rules.test;
 rule IssueAsFlow {
@@ -114,7 +102,12 @@ rule IssueAsFlow {
 		t.Fatalf("ParseV2 rules: %v", err)
 	}
 	_, err = LowerV2DefinitionSources([]V2Source{
-		{Name: "mechanics.vyql", Program: mechanics},
+		{Name: "mechanics.vyql", Program: &V2Program{
+			Module: "mechanics.test",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "issue"},
+			},
+		}},
 		{Name: "rules.vyql", Program: rules},
 	})
 	if err == nil || !strings.Contains(err.Error(), `duplicate v2 mechanic ruleVerb.issue; first declared in <builtin>`) {

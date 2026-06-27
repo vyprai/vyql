@@ -115,8 +115,7 @@ rule SqlInjection {
 }
 
 func TestLowerRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
-	sources := parseV2SourcesForCompileTest(t, []parser.V2DefinitionSource{
-		{Name: "mechanics.vyql", Source: `
+	_, err := parser.ParseV2(`
 module mechanics.test;
 mechanic ruleVerb taint {
   solver: dataflow.taint
@@ -124,11 +123,9 @@ mechanic ruleVerb taint {
   toKinds: [asset]
   allowedClauses: [where, coveredBy, confidence]
 }
-`},
-	})
-	_, err := parser.LowerV2DefinitionSources(sources)
-	if err == nil || !strings.Contains(err.Error(), "duplicate v2 mechanic ruleVerb.taint") {
-		t.Fatalf("LowerV2DefinitionSources error = %v, want built-in mechanic rejection", err)
+`)
+	if err == nil || !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+		t.Fatalf("ParseV2 error = %v, want built-in mechanic rejection", err)
 	}
 }
 

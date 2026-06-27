@@ -561,11 +561,10 @@ func TestParseV2MechanicAndPolicyDeclarations(t *testing.T) {
 	prog, err := ParseV2(`
 module mechanics.sast;
 
-mechanic coverage path {
-  capability: coverage.path
-  coversWhen: solver.pathCovered(check.anchor, candidate.path)
-  targetParts: [path]
-  suppresses: true
+mechanic ruleVerb customIssue {
+  solver: fact.exists
+  fromKinds: [issue]
+  allowedClauses: [where]
 }
 
 policy priority default {
@@ -596,11 +595,11 @@ policy priority default {
 		t.Fatalf("decl count = %d, want 2", len(prog.Decls))
 	}
 	mech := prog.Decls[0].(*V2MechanicDecl)
-	if mech.Kind != "coverage" || mech.Name != "path" || len(mech.Items) != 4 {
+	if mech.Kind != "ruleVerb" || mech.Name != "customIssue" || len(mech.Items) != 3 {
 		t.Fatalf("mechanic header/items wrong: %+v", mech)
 	}
-	if got := mech.Items[1].Value.(V2CallExpr); got.Name != "solver.pathCovered" || len(got.Args) != 2 {
-		t.Fatalf("coversWhen = %+v, want solver.pathCovered call", mech.Items[1].Value)
+	if got, ok := mech.Items[0].Value.(V2RefExpr); !ok || got.Name != "fact.exists" {
+		t.Fatalf("solver = %+v, want fact.exists", mech.Items[0].Value)
 	}
 	pol := prog.Decls[1].(*V2PolicyDecl)
 	if pol.Kind != "priority" || pol.Name != "default" || len(pol.Items) != 3 {
@@ -645,6 +644,12 @@ func TestParseV2PolicyActionSequence(t *testing.T) {
 module mechanics.sast;
 policy confidence default {
   softRequirement missing: downgrade(1) annotate("missing evidence")
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
 }
 `)
 	if err != nil {
@@ -721,6 +726,48 @@ policy confidence default { softRequirement missing: downgrade("one") }`,
 			want: "downgrade argument must be an integer",
 		},
 		{
+			name: "unsupported confidence order",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, high]
+  order: [low, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "must match runtime-supported order",
+		},
+		{
+			name: "unsupported confidence aggregate",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: max(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "aggregate must be runtime-supported",
+		},
+		{
+			name: "unsupported soft requirement behavior",
+			src: `module mechanics.policy;
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: keep
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}`,
+			want: "softRequirement missing must match runtime-supported",
+		},
+		{
 			name: "priority factor missing weight",
 			src: `module mechanics.policy;
 policy priority default { factor exposure { when context.internetReachable } }`,
@@ -731,6 +778,34 @@ policy priority default { factor exposure { when context.internetReachable } }`,
 			src: `module mechanics.policy;
 policy display default { includeNearbyChecks: maybe }`,
 			want: "includeNearbyChecks must be boolean",
+		},
+		{
+			name: "unsupported display scanAll",
+			src: `module mechanics.policy;
+policy display default { scanAll: [findings] flagSort: [severity] }`,
+			want: "scanAll must match runtime-supported outputs",
+		},
+		{
+			name: "unsupported result identity flag key",
+			src: `module mechanics.policy;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}`,
+			want: "flagKey must match runtime-supported key",
+		},
+		{
+			name: "unsupported result identity stableAcross",
+			src: `module mechanics.policy;
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting]
+}`,
+			want: "stableAcross must match runtime-supported metadata",
 		},
 	}
 	for _, tc := range cases {
@@ -746,7 +821,23 @@ policy display default { includeNearbyChecks: maybe }`,
 	}
 }
 
-func TestParseV2ValidatesCoverageMechanicIndexedSolverForms(t *testing.T) {
+func TestParseV2RejectsUnsupportedMechanicKinds(t *testing.T) {
+	cases := []string{
+		`module mechanics.policy; mechanic context internetExposure { when context.internetReachable }`,
+		`module mechanics.policy; mechanic requirement manifestEvidence { when project.has("manifest") }`,
+	}
+	for _, src := range cases {
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2(%q) succeeded, want unsupported mechanic diagnostic", src)
+		}
+		if !strings.Contains(err.Error(), "recognized by the v2 contract but is not implemented") {
+			t.Fatalf("error = %v, want unsupported mechanic diagnostic", err)
+		}
+	}
+}
+
+func TestParseV2RejectsAuthoredBuiltInCoverageMechanics(t *testing.T) {
 	src := `
 module mechanics.sast;
 
@@ -778,16 +869,16 @@ mechanic coverage sameScope {
   suppresses: true
 }
 `
-	prog, err := ParseV2(src)
-	if err != nil {
-		t.Fatalf("ParseV2 indexed mechanics: %v", err)
+	_, err := ParseV2(src)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want built-in coverage mechanic rejection")
 	}
-	if len(prog.Decls) != 4 {
-		t.Fatalf("decl count = %d, want 4", len(prog.Decls))
+	if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+		t.Fatalf("error = %v, want built-in mechanic diagnostic", err)
 	}
 }
 
-func TestParseV2RejectsNonIndexedCoverageMechanicCoversWhen(t *testing.T) {
+func TestParseV2RejectsAuthoredCoverageMechanicForms(t *testing.T) {
 	cases := []string{
 		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: project.has("custom") }`,
 		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: solver.sameEndpoint(check.anchor, candidate.path) }`,
@@ -811,14 +902,15 @@ func TestParseV2RejectsNonIndexedCoverageMechanicCoversWhen(t *testing.T) {
 }
 
 func TestValidateV2CorpusRejectsAuthoredBuiltInCoverageMechanic(t *testing.T) {
-	sources := parseV2CorpusForTest(t, `
-module mechanics.custom;
-mechanic coverage endpoint {
-  capability: coverage.endpoint
-  coversWhen: solver.sameEndpoint(check.anchor, candidate.path)
-  targetParts: [path]
-}
-`)
+	sources := []V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "coverage", Name: "endpoint"},
+			},
+		},
+	}}
 	err := ValidateV2Corpus(sources)
 	if err == nil {
 		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
@@ -830,13 +922,6 @@ mechanic coverage endpoint {
 
 func TestValidateV2CorpusRejectsConfidenceWithoutPolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
-module mechanics.custom;
-mechanic ruleVerb issue {
-  solver: fact.exists
-  fromKinds: [issue]
-  allowedClauses: [confidence]
-}
-`, `
 module code;
 concept Review : issue {}
 `, `
@@ -1237,14 +1322,6 @@ rule XmlParserHardening {
 
 func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
-module mechanics.custom;
-mechanic ruleVerb taint {
-  solver: dataflow.taint
-  fromKinds: [asset]
-  toKinds: [sink]
-  allowedClauses: [where, coveredBy]
-}
-`, `
 module code;
 concept HttpInput : source {}
 concept SqlExecution : sink {}
@@ -1254,6 +1331,15 @@ rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
 }
 `)
+	sources = append([]V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "taint"},
+			},
+		},
+	}}, sources...)
 	err := ValidateV2Corpus(sources)
 	if err == nil {
 		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
@@ -1321,18 +1407,6 @@ mechanic coverage assume {
 
 func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
-module mechanics.custom;
-mechanic ruleVerb fact {
-  solver: fact.exists
-  fromKinds: [fact]
-  allowedClauses: [where]
-}
-mechanic coverage path {
-  capability: coverage.path
-  coversWhen: solver.pathCovered(check.anchor, candidate.path)
-  targetParts: [path]
-}
-`, `
 module code;
 concept ConfigFact : fact {}
 concept Guard : check { covers: [path] }
@@ -1343,6 +1417,16 @@ rule ConfigGuard {
   unless f.path coveredBy code.Guard
 }
 `)
+	sources = append([]V2Source{{
+		Name: "mechanics/custom.vyql",
+		Program: &V2Program{
+			Module: "mechanics.custom",
+			Decls: []V2Decl{
+				&V2MechanicDecl{Kind: "ruleVerb", Name: "fact"},
+				&V2MechanicDecl{Kind: "coverage", Name: "path"},
+			},
+		},
+	}}, sources...)
 	err := ValidateV2Corpus(sources)
 	if err == nil {
 		t.Fatal("ValidateV2Corpus succeeded, want duplicate built-in mechanic diagnostic")
