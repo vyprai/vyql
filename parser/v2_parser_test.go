@@ -1111,10 +1111,10 @@ binding bad {
 			name: "binding query relation steps not implemented",
 			src: `module bindings.javascript.composed;
 binding bad {
-  query call as c where c.callee.method == "danger" declaredIn call as other where other.callee.method == "safe"
+  query call as c where c.callee.method == "danger" importedBy call as other where other.callee.method == "safe"
   emit sink code.CommandExecution at args[0]
 }`,
-			want: "query relation step declaredIn call needs native production v2 lowering",
+			want: "query relation step importedBy call needs native production v2 lowering",
 		},
 		{
 			name: "binding query string literal relation supported",

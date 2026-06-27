@@ -885,7 +885,7 @@ func v2AssignmentImplicitExpr() V2Expr {
 }
 
 func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
-	if (step.Relation == "references" || step.Relation == "sameScope") && normalizedV2CodeFamily(step.Family) == "call" && step.Alias != "" && step.Where != nil {
+	if (step.Relation == "references" || step.Relation == "sameScope" || step.Relation == "declaredIn") && normalizedV2CodeFamily(step.Family) == "call" && step.Alias != "" && step.Where != nil {
 		rewritten, err := rewriteV2BindingRelationRefs(step.Where, step.Alias)
 		if err != nil {
 			return nil, fmt.Errorf("binding %s: %w", binding, err)
