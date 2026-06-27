@@ -586,37 +586,64 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 	t.Logf("checked %d shipped v2 definition files", checked)
 }
 
-func TestShippedMechanicsDoNotRedefineBuiltInRuleVerbs(t *testing.T) {
+func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 	var hits []string
 	root := filepath.Join(datadir.Root(), "mechanics")
 	if _, err := os.Stat(root); err != nil {
-		if os.IsNotExist(err) {
-			return
+		if !os.IsNotExist(err) {
+			t.Fatalf("stat mechanics dir: %v", err)
 		}
-		t.Fatalf("stat mechanics dir: %v", err)
+		root = ""
 	}
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
-			return err
+	if root != "" {
+		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
+				return err
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			src := string(data)
+			if !strings.Contains(src, "mechanic ruleVerb") && !strings.Contains(src, "mechanic coverage") {
+				return nil
+			}
+			rel, _ := filepath.Rel(datadir.Root(), path)
+			hits = append(hits, filepath.ToSlash(rel))
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk mechanics dir: %v", err)
 		}
+	}
+	files, err := vyqlFilesUnder(datadir.Root())
+	if err != nil {
+		t.Fatalf("collect shipped definition files: %v", err)
+	}
+	for _, path := range files {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			t.Fatalf("read %s: %v", path, err)
 		}
 		src := string(data)
-		if !strings.Contains(src, "mechanic ruleVerb") {
-			return nil
+		if !strings.Contains(src, "assume") {
+			continue
 		}
-		rel, _ := filepath.Rel(datadir.Root(), path)
-		hits = append(hits, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk mechanics dir: %v", err)
+		for _, line := range strings.Split(src, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "assume ") ||
+				strings.HasPrefix(trimmed, "where assume(") ||
+				strings.Contains(trimmed, " assume(") ||
+				strings.Contains(trimmed, " and assume(") ||
+				strings.Contains(trimmed, " or assume(") {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
+			}
+		}
 	}
 	if len(hits) > 0 {
 		sort.Strings(hits)
-		t.Fatalf("built-in v2 rule verbs are implemented in Go and must not be redeclared in shipped mechanics:\n%s", strings.Join(hits, "\n"))
+		t.Fatalf("Go-owned v2 mechanics must not be authored in shipped definitions:\n%s", strings.Join(hits, "\n"))
 	}
 }
 

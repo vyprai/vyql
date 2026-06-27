@@ -1,5 +1,5 @@
-// Package parser implements the VyQL v2 definition parser and compiles authored
-// definitions into the scanner IR consumed by the engine and graph labeler.
+// Package parser implements the VyQL v2 definition parser and compiles
+// authored definitions into the scanner IR consumed by the engine and graph labeler.
 package parser
 
 // --- declarations --------------------------------------------------------
