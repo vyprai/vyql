@@ -3247,8 +3247,11 @@ func lowerV2RuleQuery(body V2RuleBody, names v2NameResolver) (Stmt, error) {
 	if body.Query == nil {
 		return nil, fmt.Errorf("missing query body")
 	}
-	if order, ok := lowerV2OrderQuery(*body.Query, body.Select, names); ok {
+	if order, ok := lowerV2ConceptOrderQuery(*body.Query, body.Select, names); ok {
 		return order, nil
+	}
+	if reach, ok := lowerV2SemanticReachQuery(*body.Query, body.Select, names); ok {
+		return reach, nil
 	}
 	if transition, ok := lowerV2TransitionQuery(*body.Query, body.Select); ok {
 		return transition, nil
@@ -3259,7 +3262,29 @@ func lowerV2RuleQuery(body V2RuleBody, names v2NameResolver) (Stmt, error) {
 	return nil, fmt.Errorf("unsupported semantic query shape")
 }
 
-func lowerV2OrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) (*OrderStmt, bool) {
+func lowerV2ConceptOrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) (*OrderStmt, bool) {
+	if q.Family != "concept" || q.Alias == "" || len(q.Steps) != 1 {
+		return nil, false
+	}
+	step := q.Steps[0]
+	if step.Relation != "reaches" || step.Family != "concept" || step.Alias == "" || selectAlias != step.Alias {
+		return nil, false
+	}
+	first, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
+	if !ok {
+		return nil, false
+	}
+	second, ok := v2QueryWhereFieldEquals(step.Where, step.Alias, "concept")
+	if !ok {
+		return nil, false
+	}
+	return &OrderStmt{
+		First:  Endpoint{Concept: names.concept(first), Binding: q.Alias},
+		Second: Endpoint{Concept: names.concept(second), Binding: step.Alias},
+	}, true
+}
+
+func lowerV2SemanticReachQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) (*FlowStmt, bool) {
 	if !v2SemanticConceptFamily(q.Family) || q.Alias == "" || len(q.Steps) != 1 {
 		return nil, false
 	}
@@ -3275,9 +3300,11 @@ func lowerV2OrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) 
 	if !ok {
 		return nil, false
 	}
-	return &OrderStmt{
-		First:  Endpoint{Concept: names.concept(first), Binding: q.Alias},
-		Second: Endpoint{Concept: names.concept(second), Binding: step.Alias},
+	return &FlowStmt{
+		Verb:          "reach",
+		Src:           Endpoint{Concept: names.concept(first), Binding: q.Alias},
+		Dst:           Endpoint{Concept: names.concept(second), Binding: step.Alias},
+		SemanticQuery: true,
 	}, true
 }
 

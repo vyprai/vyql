@@ -192,9 +192,10 @@ type Endpoint struct {
 // FlowStmt invokes a two-endpoint solver capability such as taint,
 // reachability, or grant.
 type FlowStmt struct {
-	Verb string
-	Src  Endpoint
-	Dst  Endpoint
+	Verb          string
+	Src           Endpoint
+	Dst           Endpoint
+	SemanticQuery bool // true when lowered from raw semantic-tier `query ... reaches ...`
 }
 
 func (*FlowStmt) isStmt() {}

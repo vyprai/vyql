@@ -138,6 +138,14 @@ func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 	if err != nil {
 		return nil, err
 	}
+	sourceName := body.Src.Binding
+	if sourceName == "" {
+		sourceName = "source"
+	}
+	targetName := body.Dst.Binding
+	if targetName == "" {
+		targetName = "target"
+	}
 	var out []*findings.Finding
 	for _, p := range paths {
 		var w []string
@@ -148,8 +156,8 @@ func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "reach", Witness: w,
 			Confidence: e.confConcept(p.TargetID, body.Dst.Concept),
 			Bindings: []findings.Binding{
-				{Name: "source", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
-				{Name: "target", NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID), LabelProvenance: e.prov(p.TargetID, body.Dst.Concept)},
+				{Name: sourceName, NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID), LabelProvenance: e.prov(p.SourceID, body.Src.Concept)},
+				{Name: targetName, NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID), LabelProvenance: e.prov(p.TargetID, body.Dst.Concept)},
 			},
 		})
 	}

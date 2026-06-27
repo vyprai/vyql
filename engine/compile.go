@@ -147,8 +147,10 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 		if err := requireConcept(onto, body.Dst.Concept, "sink/target of "+r.QualifiedName()); err != nil {
 			return nil, err
 		}
-		if err := checkEndpointKinds(onto, body, r.QualifiedName(), ruleVerbs); err != nil {
-			return nil, err
+		if !body.SemanticQuery {
+			if err := checkEndpointKinds(onto, body, r.QualifiedName(), ruleVerbs); err != nil {
+				return nil, err
+			}
 		}
 		if body.Verb == "taint" {
 			cr.SourceConcepts = onto.Descendants(body.Src.Concept)

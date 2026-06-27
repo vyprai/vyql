@@ -2728,18 +2728,18 @@ rule CryptoMiningEgress {
 `)
 	order := decls[0].(*Rule).Body.(*OrderStmt)
 	if order.First.Concept != "code.FileCheck" || order.First.Binding != "first" || order.Second.Concept != "code.FileUse" || order.Second.Binding != "second" {
-		t.Fatalf("order lowering wrong: %+v", order)
+		t.Fatalf("concept order lowering wrong: %+v", order)
 	}
-	reach := decls[1].(*Rule).Body.(*OrderStmt)
-	if reach.First.Concept != "cloud.ExternalPrincipal" || reach.First.Binding != "actor" || reach.Second.Concept != "cloud.SecretStore" || reach.Second.Binding != "store" {
+	reach := decls[1].(*Rule).Body.(*FlowStmt)
+	if reach.Verb != "reach" || !reach.SemanticQuery || reach.Src.Concept != "cloud.ExternalPrincipal" || reach.Src.Binding != "actor" || reach.Dst.Concept != "cloud.SecretStore" || reach.Dst.Binding != "store" {
 		t.Fatalf("semantic reach lowering wrong: %+v", reach)
 	}
 	transition := decls[2].(*Rule).Body.(*MatchStmt)
 	if transition.TargetKind != "transition" || transition.Binding != "t" || transition.Machine != "Order" || transition.FromState != "*" || transition.ToState != "Refunded" {
 		t.Fatalf("transition lowering wrong: %+v", transition)
 	}
-	stateReach := decls[3].(*Rule).Body.(*OrderStmt)
-	if stateReach.First.Concept != "workflow.Open" || stateReach.First.Binding != "start" || stateReach.Second.Concept != "workflow.Closed" || stateReach.Second.Binding != "done" {
+	stateReach := decls[3].(*Rule).Body.(*FlowStmt)
+	if stateReach.Verb != "reach" || !stateReach.SemanticQuery || stateReach.Src.Concept != "workflow.Open" || stateReach.Src.Binding != "start" || stateReach.Dst.Concept != "workflow.Closed" || stateReach.Dst.Binding != "done" {
 		t.Fatalf("state reach lowering wrong: %+v", stateReach)
 	}
 	labeled := decls[4].(*Rule).Body.(*MatchStmt)

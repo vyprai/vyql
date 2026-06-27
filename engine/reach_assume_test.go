@@ -213,10 +213,11 @@ concept SecretStore : asset {}
 		t.Fatalf("compile: %v", errs)
 	}
 	s := usg.NewInMemStore()
-	s.AddNode(usg.Node{ID: "actor", Type: "cloud.Principal", Loc: "iam.tf:1", Order: 1, HasOrder: true})
+	s.AddNode(usg.Node{ID: "actor", Type: "cloud.Principal"})
 	s.AddLabel("actor", usg.Label{Concept: "cloud.ExternalPrincipal"})
-	s.AddNode(usg.Node{ID: "store", Type: "cloud.Asset", Loc: "iam.tf:2", Order: 2, HasOrder: true})
+	s.AddNode(usg.Node{ID: "store", Type: "cloud.Asset"})
 	s.AddLabel("store", usg.Label{Concept: "cloud.SecretStore"})
+	s.AddEdge(usg.Edge{Type: "NET", Src: "actor", Dst: "store", Props: map[string]string{"rule": "semantic-reach", "proto": "any"}})
 
 	fs, err := New(onto, s).Evaluate(compiled[0])
 	if err != nil {
