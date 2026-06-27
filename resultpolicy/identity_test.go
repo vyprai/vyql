@@ -57,6 +57,34 @@ policy resultIdentity default {
 	}
 }
 
+func TestConfidencePolicyFromV2Decl(t *testing.T) {
+	prog, err := parser.ParseV2(`
+module policies.core;
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1)
+  softRequirement conflicting: downgrade(1)
+  softRequirement satisfied: keep
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	policy, err := confidencePolicyFromDecl(prog.Decls[0].(*parser.V2PolicyDecl))
+	if err != nil {
+		t.Fatalf("confidencePolicyFromDecl: %v", err)
+	}
+	if policy.Rank("low") != 1 || policy.Rank("medium") != 2 || policy.Rank("high") != 3 {
+		t.Fatalf("confidence ranks wrong: low=%d medium=%d high=%d", policy.Rank("low"), policy.Rank("medium"), policy.Rank("high"))
+	}
+	if policy.Name(1) != "low" || policy.Name(3) != "high" || policy.MaxRank() != 3 {
+		t.Fatalf("confidence names/max wrong: name1=%q name3=%q max=%d", policy.Name(1), policy.Name(3), policy.MaxRank())
+	}
+}
+
 func TestIdentityPolicyDedupUsesFindingKey(t *testing.T) {
 	policy := IdentityPolicy{
 		FindingKey:  []string{"rule.id", "primaryTarget.location", "primaryTarget.concept"},

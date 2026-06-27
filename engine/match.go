@@ -5,6 +5,7 @@ import (
 
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/solvers"
 )
 
@@ -158,7 +159,7 @@ func (e *Engine) evalTransition(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "match",
-			NegationEvidence: ne, Confidence: "high",
+			NegationEvidence: ne, Confidence: resultpolicy.ConfidenceName(resultpolicy.MaxConfidenceRank()),
 			Bindings: []findings.Binding{
 				{Name: body.Binding, NodeID: id, Concept: "transition", Loc: n.Prop("from") + "->" + n.Prop("to")},
 			},

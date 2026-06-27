@@ -51,8 +51,6 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	}
 }
 
-var confOrder = map[string]int{"possibility": 0, "low": 1, "medium": 2, "high": 3}
-
 // Evaluate runs a compiled rule, returning deduplicated findings filtered by the
 // rule's confidence floor.
 func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -704,7 +702,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				Confidence: firstNonEmpty(srcMeta.SourceConfidence, "medium"),
 			})
 			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
-			if confOrder[conf] > confOrder[ceil] {
+			if resultpolicy.ConfidenceRank(conf) > resultpolicy.ConfidenceRank(ceil) {
 				conf = ceil
 			}
 		}
@@ -726,7 +724,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		if idx, seen := bySink[fl.SinkID]; seen {
 			// same sink already reported for this rule — keep whichever source gives the
 			// higher-confidence witness (strict, so ties keep the earlier/deterministic one).
-			if confOrder[f.Confidence] > confOrder[out[idx].Confidence] {
+			if resultpolicy.ConfidenceRank(f.Confidence) > resultpolicy.ConfidenceRank(out[idx].Confidence) {
 				out[idx] = f
 			}
 			continue
@@ -909,22 +907,22 @@ type bindingRef struct {
 }
 
 func (e *Engine) confBindings(refs ...bindingRef) string {
-	best := 3
+	best := resultpolicy.MaxConfidenceRank()
 	for _, ref := range refs {
 		eff := e.confConceptRank(ref.nodeID, ref.concept)
 		if eff < best {
 			best = eff
 		}
 	}
-	return confidenceName(best)
+	return resultpolicy.ConfidenceName(best)
 }
 
 func (e *Engine) confConcept(nodeID, concept string) string {
-	return confidenceName(e.confConceptRank(nodeID, concept))
+	return resultpolicy.ConfidenceName(e.confConceptRank(nodeID, concept))
 }
 
 func (e *Engine) confConceptRank(nodeID, concept string) int {
-	best := 3
+	best := resultpolicy.MaxConfidenceRank()
 	matched := false
 	for _, l := range e.labels(nodeID) {
 		if concept != "" && l.Concept != concept {
@@ -951,11 +949,11 @@ func (e *Engine) confConceptRank(nodeID, concept string) int {
 func labelConfidenceRank(l usg.Label) int {
 	c := l.Provenance.Confidence
 	if c == "" {
-		c = "high"
+		c = resultpolicy.ConfidenceName(resultpolicy.MaxConfidenceRank())
 	}
-	eff := confOrder[c]
+	eff := resultpolicy.ConfidenceRank(c)
 	if eff == 0 {
-		eff = 3
+		eff = resultpolicy.MaxConfidenceRank()
 	}
 	// a label is only as trustworthy as the fidelity of the match that
 	// produced it
@@ -963,16 +961,6 @@ func labelConfidenceRank(l usg.Label) int {
 		eff = ceil
 	}
 	return eff
-}
-
-func confidenceName(rank int) string {
-	switch rank {
-	case 1:
-		return "low"
-	case 2:
-		return "medium"
-	}
-	return "high"
 }
 
 // endpointGuarded reports whether a guard carrying `control` covers the sink. Path-
@@ -1424,10 +1412,10 @@ func (e *Engine) applyConfidenceFloor(cr *CompiledRule, fs []*findings.Finding) 
 	if floor == "" {
 		return fs
 	}
-	threshold := confOrder[floor]
+	threshold := resultpolicy.ConfidenceRank(floor)
 	var out []*findings.Finding
 	for _, f := range fs {
-		if confOrder[f.Confidence] >= threshold {
+		if resultpolicy.ConfidenceRank(f.Confidence) >= threshold {
 			out = append(out, f)
 		}
 	}

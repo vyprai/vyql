@@ -136,7 +136,7 @@ func findingDedupSortKey(f *findings.Finding) string {
 	}
 	target := primaryTarget(f)
 	return fmt.Sprintf("%02d|%02d|%06d|%06d|%s|%s|%s|%s|%s",
-		99-confidenceRank(f.Confidence),
+		99-ConfidenceRank(f.Confidence),
 		99-severityRank(f.Severity),
 		999999-len(f.Witness),
 		999999-len(f.Context)-len(f.ReviewConditions),
@@ -146,19 +146,6 @@ func findingDedupSortKey(f *findings.Finding) string {
 		target.NodeID,
 		bindingsStableKey(f.Bindings),
 	)
-}
-
-func confidenceRank(conf string) int {
-	switch strings.ToLower(conf) {
-	case "high":
-		return 3
-	case "medium":
-		return 2
-	case "low":
-		return 1
-	default:
-		return 0
-	}
 }
 
 func severityRank(sev string) int {
