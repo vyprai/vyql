@@ -148,6 +148,7 @@ func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, 
 type runtimeMechanics struct {
 	ruleSolvers   map[string]string
 	coverageModes map[string]bool
+	policies      map[string]bool
 }
 
 func (m *runtimeMechanics) merge(other runtimeMechanics) {
@@ -163,25 +164,32 @@ func (m *runtimeMechanics) merge(other runtimeMechanics) {
 	for mode := range other.coverageModes {
 		m.coverageModes[mode] = true
 	}
+	if len(other.policies) != 0 && m.policies == nil {
+		m.policies = make(map[string]bool, len(other.policies))
+	}
+	for policy := range other.policies {
+		m.policies[policy] = true
+	}
 }
 
 func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
-	out := runtimeMechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}}
+	out := runtimeMechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}}
 	if prog == nil {
 		return out
 	}
 	for _, d := range prog.Decls {
-		m, ok := d.(*V2MechanicDecl)
-		if !ok {
-			continue
-		}
-		switch m.Kind {
-		case "ruleVerb":
-			if solver := v2BlockItemString(m.Items, "solver"); solver != "" {
-				out.ruleSolvers[m.Name] = solver
+		switch x := d.(type) {
+		case *V2MechanicDecl:
+			switch x.Kind {
+			case "ruleVerb":
+				if solver := v2BlockItemString(x.Items, "solver"); solver != "" {
+					out.ruleSolvers[x.Name] = solver
+				}
+			case "coverage":
+				out.coverageModes[x.Name] = true
 			}
-		case "coverage":
-			out.coverageModes[m.Name] = true
+		case *V2PolicyDecl:
+			out.policies[x.Kind+":"+x.Name] = true
 		}
 	}
 	return out
@@ -1786,7 +1794,18 @@ func v2SinkLocationParts(location string) (v2SinkLocationInfo, error) {
 }
 
 func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics) (*Rule, error) {
-	out := &Rule{Name: r.Name, Package: r.Module, Meta: r.Meta}
+	out := &Rule{Name: r.Name, Package: r.Module, Meta: lowerV2FieldNames(r.Meta)}
+	if out.Meta != nil {
+		if raw := out.Meta["confidence_floor"]; raw != nil {
+			if !mechanics.policies["confidence:default"] {
+				return nil, fmt.Errorf("rule %s: no loaded policy confidence default", r.Name)
+			}
+			level, ok := raw.(string)
+			if !ok || !v2ConfidenceLevels[level] {
+				return nil, fmt.Errorf("rule %s: unknown confidence level %q", r.Name, raw)
+			}
+		}
+	}
 	solver := mechanics.ruleSolvers[r.Body.Verb]
 	if solver == "" {
 		return nil, fmt.Errorf("rule %s: no loaded mechanic ruleVerb %q", r.Name, r.Body.Verb)
@@ -1869,6 +1888,9 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 			}
 			out.Clauses = append(out.Clauses, Clause{Kind: "where", Where: expr})
 		case "with":
+			if !mechanics.policies["confidence:default"] {
+				return nil, fmt.Errorf("rule %s: no loaded policy confidence default", r.Name)
+			}
 			if !v2ConfidenceLevels[cl.Value] {
 				return nil, fmt.Errorf("rule %s: unknown confidence level %q", r.Name, cl.Value)
 			}

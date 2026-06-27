@@ -595,6 +595,33 @@ rule BadCoverageTarget {
 	}
 }
 
+func TestValidateV2CorpusRejectsConfidenceWithoutPolicy(t *testing.T) {
+	sources := parseV2CorpusForTest(t, `
+module mechanics.custom;
+mechanic ruleVerb issue {
+  solver: fact.exists
+  fromKinds: [issue]
+  allowedClauses: [confidence]
+}
+`, `
+module code;
+concept Review : issue {}
+`, `
+module rules.custom;
+rule HighConfidenceReview {
+  issue code.Review as r
+  with confidence >= high
+}
+`)
+	err := ValidateV2Corpus(sources)
+	if err == nil {
+		t.Fatal("ValidateV2Corpus succeeded, want confidence policy diagnostic")
+	}
+	if !strings.Contains(err.Error(), "confidence floor requires policy confidence default") {
+		t.Fatalf("error = %v, want confidence policy diagnostic", err)
+	}
+}
+
 func TestParseV2QueryWhereContainsIsExpressionOperator(t *testing.T) {
 	prog, err := ParseV2(`
 module rules.query;
@@ -1145,6 +1172,15 @@ mechanic coverage endpoint {
   capability: coverage.endpoint
   coversWhen: solver.sameEndpoint(check.anchor, candidate.endpoint)
   targetParts: [endpoint]
+}
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
+  softRequirement satisfied: keep
 }
 `
 	prog, err := ParseV2(src)

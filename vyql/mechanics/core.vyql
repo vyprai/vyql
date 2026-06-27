@@ -110,3 +110,13 @@ mechanic coverage global {
   targetParts: [global]
   suppresses: true
 }
+
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
+  softRequirement satisfied: keep
+}

@@ -1501,6 +1501,56 @@ rule HighConfidenceReview {
 	}
 }
 
+func TestV2RuleConfidenceClauseRequiresLoadedConfidencePolicy(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module mechanics.core;
+mechanic ruleVerb issue { solver: fact.exists }
+module rules.review;
+rule HighConfidenceReview {
+  issue code.Review as r
+  with confidence >= high
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions succeeded, want missing confidence policy diagnostic")
+	}
+	if !strings.Contains(err.Error(), "no loaded policy confidence default") {
+		t.Fatalf("error = %v, want confidence policy diagnostic", err)
+	}
+}
+
+func TestV2RuleConfidenceMetadataRequiresLoadedConfidencePolicy(t *testing.T) {
+	_, err := ParseV2Definitions(`
+module mechanics.core;
+mechanic ruleVerb issue { solver: fact.exists }
+module rules.review;
+rule HighConfidenceReview {
+  meta { confidenceFloor: high }
+  issue code.Review as r
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions succeeded, want missing confidence policy diagnostic")
+	}
+	if !strings.Contains(err.Error(), "no loaded policy confidence default") {
+		t.Fatalf("error = %v, want confidence policy diagnostic", err)
+	}
+}
+
+func TestV2RuleConfidenceMetadataLowersToRuntimeFloor(t *testing.T) {
+	decls := parseV2DefinitionsWithCoreMechanics(t, `
+module rules.review;
+rule HighConfidenceReview {
+  meta { confidenceFloor: high }
+  issue code.Review as r
+}
+`)
+	rule := decls[0].(*Rule)
+	if got := rule.Meta["confidence_floor"]; got != "high" {
+		t.Fatalf("confidence floor = %#v, want high", got)
+	}
+}
+
 func TestV2RawSemanticQueryLowering(t *testing.T) {
 	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.migrated;
@@ -1863,6 +1913,15 @@ mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAncho
 mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
 mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
 mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
+  softRequirement satisfied: keep
+}
 `
 
 func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {

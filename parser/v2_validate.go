@@ -91,6 +91,11 @@ type v2MechanicID struct {
 	Name string
 }
 
+type v2PolicyID struct {
+	Kind string
+	Name string
+}
+
 type v2RuleVerbMechanic struct {
 	FromKinds      []string
 	ToKinds        []string
@@ -153,6 +158,7 @@ func ValidateV2Corpus(sources []V2Source) error {
 	mechanics := make(map[v2MechanicID]string, 16)
 	ruleMechanics := make(map[string]v2RuleVerbMechanic, 8)
 	coverageMechanics := make(map[string]v2CoverageMechanic, 8)
+	policies := make(map[v2PolicyID]string, 8)
 	var errs []error
 	for _, src := range sources {
 		if src.Program == nil {
@@ -194,6 +200,14 @@ func ValidateV2Corpus(sources []V2Source) error {
 					}
 				}
 			}
+			if p, ok := d.(*V2PolicyDecl); ok {
+				key := v2PolicyID{Kind: p.Kind, Name: p.Name}
+				if prev := policies[key]; prev != "" {
+					errs = append(errs, fmt.Errorf("%s: duplicate v2 policy %s.%s; first declared in %s", src.Name, p.Kind, p.Name, prev))
+				} else {
+					policies[key] = src.Name
+				}
+			}
 		}
 	}
 	errs = append(errs, validateV2RequiredMechanics(concepts, mechanics)...)
@@ -213,7 +227,7 @@ func ValidateV2Corpus(sources []V2Source) error {
 				errs = append(errs, validateV2BindingCorpus(src.Name, x, scope)...)
 				errs = append(errs, validateV2BindingMechanics(src.Name, x, mechanics)...)
 			case *V2RuleDecl:
-				errs = append(errs, validateV2RuleCorpus(src.Name, x, scope, ruleMechanics, coverageMechanics)...)
+				errs = append(errs, validateV2RuleCorpus(src.Name, x, scope, ruleMechanics, coverageMechanics, policies)...)
 				errs = append(errs, validateV2RuleMechanics(src.Name, x, mechanics)...)
 			}
 		}
@@ -473,9 +487,13 @@ func validateV2BindingCorpus(sourceName string, b *V2BindingDecl, concepts v2Con
 	return errs
 }
 
-func validateV2RuleCorpus(sourceName string, r *V2RuleDecl, concepts v2ConceptScope, mechanics map[string]v2RuleVerbMechanic, coverageMechanics map[string]v2CoverageMechanic) []error {
+func validateV2RuleCorpus(sourceName string, r *V2RuleDecl, concepts v2ConceptScope, mechanics map[string]v2RuleVerbMechanic, coverageMechanics map[string]v2CoverageMechanic, policies map[v2PolicyID]string) []error {
 	ctx := sourceName + ": rule " + r.Name
 	var errs []error
+	hasConfidencePolicy := policies[v2PolicyID{Kind: "confidence", Name: "default"}] != ""
+	if v2RuleHasConfidenceFloor(r) && !hasConfidencePolicy {
+		errs = append(errs, fmt.Errorf("%s: confidence floor requires policy confidence default", ctx))
+	}
 	if m, ok := mechanics[r.Body.Verb]; ok {
 		switch {
 		case r.Body.From.Concept != "" || r.Body.To.Concept != "":
@@ -498,6 +516,24 @@ func validateV2RuleCorpus(sourceName string, r *V2RuleDecl, concepts v2ConceptSc
 		}
 	}
 	return errs
+}
+
+func v2RuleHasConfidenceFloor(r *V2RuleDecl) bool {
+	if r == nil {
+		return false
+	}
+	if _, ok := r.Meta["confidenceFloor"]; ok {
+		return true
+	}
+	if _, ok := r.Meta["confidence_floor"]; ok {
+		return true
+	}
+	for _, cl := range r.Clauses {
+		if cl.Kind == "with" {
+			return true
+		}
+	}
+	return false
 }
 
 func validateV2RuleCoverageTargetPart(ctx string, cl V2RuleClause, coverageMechanics map[string]v2CoverageMechanic) []error {

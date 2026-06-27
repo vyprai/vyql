@@ -18,6 +18,15 @@ mechanic coverage sameReceiver { capability: coverage.sameReceiver requiresAncho
 mechanic coverage sameScope { capability: coverage.sameScope requiresAnchor: true targetParts: [sameScope] }
 mechanic coverage dominates { capability: coverage.dominates requiresAnchor: true targetParts: [dominates] }
 mechanic coverage global { capability: coverage.global requiresAnchor: false targetParts: [global] }
+policy confidence default {
+  values: [low, medium, high]
+  order: [low, medium, high]
+  aggregate: min(rule, endpoints, propagation, requirements)
+  softRequirement missing: downgrade(1)
+  softRequirement unknown: downgrade(1) annotate("uninspected evidence")
+  softRequirement conflicting: downgrade(1) annotate("conflicting evidence")
+  softRequirement satisfied: keep
+}
 `
 
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
