@@ -82,17 +82,27 @@ type BindingAction struct {
 	ValMatches       []string // required argument/option literal substrings (AND)
 	ValAbsents       []string // forbidden argument/option literal substrings (AND)
 	Packages         []string // dependency requirements required for the binding to fire
-	Collection       bool     // also flag a Seq/collection-literal arg
-	CollectionFirst  bool     // target element 0 of a Seq/collection arg when present
-	CollectionIndex  int      // collection target index; defaults to 0 when CollectionFirst is set
-	Exact            bool     // exact path match
-	About            string   // advisory/check target concept
-	FlowDestArg      int      // value-propagation destination out-param argument index
-	FlowSourceArg    int      // value-propagation source argument index; -1 when source is the call result
-	FlowSourceResult bool     // call result flows into destination out-param
-	Advisory         bool     // advisory check evidence; must not suppress findings
-	Coverage         string   // v2 coverage mode for advisory check evidence
+	Requirement      *BindingRequirement
+	Collection       bool   // also flag a Seq/collection-literal arg
+	CollectionFirst  bool   // target element 0 of a Seq/collection arg when present
+	CollectionIndex  int    // collection target index; defaults to 0 when CollectionFirst is set
+	Exact            bool   // exact path match
+	About            string // advisory/check target concept
+	FlowDestArg      int    // value-propagation destination out-param argument index
+	FlowSourceArg    int    // value-propagation source argument index; -1 when source is the call result
+	FlowSourceResult bool   // call result flows into destination out-param
+	Advisory         bool   // advisory check evidence; must not suppress findings
+	Coverage         string // v2 coverage mode for advisory check evidence
 	Flag             *BindingPresence
+}
+
+// BindingRequirement is the compiled v2 project-prerequisite expression for a
+// binding. It is evaluated once per adapter application against indexed project
+// evidence, not once per candidate node.
+type BindingRequirement struct {
+	Op    string // dependency, import, language, file, framework, schema, project.has, all, any, not, soft
+	Value string
+	Args  []BindingRequirement
 }
 
 // BindingPresence is an AST/graph-shaped presence annotation produced by v2

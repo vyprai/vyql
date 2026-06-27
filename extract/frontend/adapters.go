@@ -35,6 +35,7 @@ type inputSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Requirement *parser.BindingRequirement
 }
 
 type sinkSpec struct {
@@ -54,6 +55,7 @@ type sinkSpec struct {
 	Collection      bool     // also flag a Seq/collection-literal arg
 	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
 	CollectionIndex int      // selected collection element index
+	Requirement     *parser.BindingRequirement
 }
 
 type controlSpec struct {
@@ -69,6 +71,7 @@ type controlSpec struct {
 	ArgCountMax int
 	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 	Detail      map[string]string
+	Requirement *parser.BindingRequirement
 }
 
 type flagPredicate struct {
@@ -86,13 +89,14 @@ type flagOperandSpec struct {
 }
 
 type flagSpec struct {
-	Concept    string
-	NodeKind   string
-	Scope      string
-	Predicates []flagPredicate
-	Operands   []flagOperandSpec
-	Packages   []string
-	Detail     map[string]string
+	Concept     string
+	NodeKind    string
+	Scope       string
+	Predicates  []flagPredicate
+	Operands    []flagOperandSpec
+	Packages    []string
+	Detail      map[string]string
+	Requirement *parser.BindingRequirement
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
@@ -722,6 +726,7 @@ type filterSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string
+	Requirement *parser.BindingRequirement
 }
 
 // assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
@@ -738,11 +743,13 @@ type assumeSpec struct {
 	ArgCountMin int
 	ArgCountMax int
 	Packages    []string
+	Requirement *parser.BindingRequirement
 }
 
 type paramSourceSpec struct {
-	Concept  string
-	Packages []string
+	Concept     string
+	Packages    []string
+	Requirement *parser.BindingRequirement
 }
 
 type adapterSpec struct {
@@ -876,10 +883,10 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			allowed := make([]bool, len(spec.Assumes))
 			for i := range spec.Assumes {
-				allowed[i] = pkgGate.allowed(spec.Assumes[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Assumes[i].Packages, spec.Assumes[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -928,10 +935,10 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 			}
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			allowed := make([]bool, len(spec.Filters))
 			for i := range spec.Filters {
-				allowed[i] = pkgGate.allowed(spec.Filters[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Filters[i].Packages, spec.Filters[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -1092,10 +1099,10 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "source":
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1106,10 +1113,10 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet || mp.Requirement != nil {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1120,41 +1127,41 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.Inputs[i].Methods = append(s.Inputs[i].Methods, mp.Pattern)
 		case "source_param":
-			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages})
+			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)})
 		case "flag":
 			if mp.Flag != nil {
-				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Detail: adapterMappingDetail(mp)}
+				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp)}
 				for _, pred := range mp.Flag.Predicates {
 					fs.Predicates = append(fs.Predicates, newFlagPredicate(pred.Subject, pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
 				}
@@ -1168,9 +1175,9 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 				s.Flags = append(s.Flags, fs)
 			}
 		case "filter_method":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "filter_path":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		case "assume_guard_method", "assume_guard_path", "assume_sanitizer_method", "assume_sanitizer_path":
 			mode := "guard"
 			if strings.Contains(mp.Kind, "sanitizer") {
@@ -1178,7 +1185,7 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			}
 			s.Assumes = append(s.Assumes, assumeSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
 				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
-				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement})
 		}
 	}
 	return s
@@ -1224,7 +1231,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 		Fidelity: fidelity, Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
 				return spec.Inputs[i].Methods, spec.Inputs[i].Paths, spec.Inputs[i].Match == "contains"
 			})
@@ -1232,7 +1239,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			// resolve it once per spec instead of re-running the costly evidence match per node.
 			allowed := make([]bool, len(spec.Inputs))
 			for i := range spec.Inputs {
-				allowed[i] = pkgGate.allowed(spec.Inputs[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
 			}
 			var out []adapters.Mapping
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
@@ -1304,7 +1311,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			binops, _ := s.NodesOfType("code.BinOp")
 			ids = append(ids, binops...)
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			sinkIdx := buildSpecIndex(len(spec.Sinks), func(i int) (methods, paths []string, loose bool) {
 				if spec.Sinks[i].ByMethod {
 					return []string{spec.Sinks[i].Pattern}, nil, false
@@ -1313,7 +1320,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Sinks))
 			for i := range spec.Sinks {
-				allowed[i] = pkgGate.allowed(spec.Sinks[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Sinks[i].Packages, spec.Sinks[i].Requirement)
 			}
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
@@ -1492,7 +1499,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 		Apply: func(s usg.Store) []adapters.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			ctrlIdx := buildSpecIndex(len(spec.Controls), func(i int) (methods, paths []string, loose bool) {
 				if spec.Controls[i].ByMethod {
 					return []string{spec.Controls[i].Pattern}, nil, false
@@ -1501,7 +1508,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Controls))
 			for i := range spec.Controls {
-				allowed[i] = pkgGate.allowed(spec.Controls[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Controls[i].Packages, spec.Controls[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -1635,21 +1642,6 @@ func rangeNodes(s usg.Store, fn func(usg.Node) bool) {
 
 func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 	out := map[string]bool{}
-	add := func(v string) {
-		v = sca.NormalizePackageName(v)
-		if v == "" {
-			return
-		}
-		out[v] = true
-		if root := sca.PackageRoot(v); root != "" {
-			out[root] = true
-		}
-		// expand import→distribution aliases so package-scoped
-		// adapters keyed by the distribution name activate from imports, not just manifests.
-		for _, a := range sca.ImportAliases(v) {
-			out[a] = true
-		}
-	}
 	// only import/SBOM nodes carry package evidence — use the type index (O(result)) instead of
 	// scanning every node, since this runs once per adapter spec.
 	impIDs, _ := s.NodesOfType("code.Import")
@@ -1663,18 +1655,53 @@ func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 				continue
 			}
 		}
-		add(n.Prop("module"))
-		add(n.Prop("symbol"))
-		add(n.Prop("package"))
-		add(n.Prop("root"))
+		addPackageEvidenceName(out, n.Prop("module"))
+		addPackageEvidenceName(out, n.Prop("symbol"))
+		addPackageEvidenceName(out, n.Prop("package"))
+		addPackageEvidenceName(out, n.Prop("root"))
 	}
 	sbomIDs, _ := s.NodesOfType("sbom.PackageVersion")
 	for _, id := range sbomIDs {
 		if n, ok, _ := s.GetNode(id); ok {
-			add(n.Prop("name"))
+			addPackageEvidenceName(out, n.Prop("name"))
 		}
 	}
 	return out
+}
+
+func importEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
+	out := map[string]bool{}
+	impIDs, _ := s.NodesOfType("code.Import")
+	for _, id := range impIDs {
+		n, ok, _ := s.GetNode(id)
+		if !ok {
+			continue
+		}
+		if !crossLang {
+			if t := nodeTechFromNode(n); t != "" && t != tech {
+				continue
+			}
+		}
+		addPackageEvidenceName(out, n.Prop("module"))
+		addPackageEvidenceName(out, n.Prop("symbol"))
+		addPackageEvidenceName(out, n.Prop("package"))
+		addPackageEvidenceName(out, n.Prop("root"))
+	}
+	return out
+}
+
+func addPackageEvidenceName(out map[string]bool, raw string) {
+	name := sca.NormalizePackageName(raw)
+	if name == "" {
+		return
+	}
+	out[name] = true
+	if root := sca.PackageRoot(name); root != "" {
+		out[root] = true
+	}
+	for _, alias := range sca.ImportAliases(name) {
+		out[alias] = true
+	}
 }
 
 func packageAllowed(want []string, have map[string]bool) bool {
@@ -1769,6 +1796,107 @@ func packageInEvidence(want string, have map[string]bool) bool {
 	return newPackageGate(have).inEvidence(want)
 }
 
+type requirementGate struct {
+	packages   *packageGate
+	imports    *packageGate
+	languages  map[string]bool
+	files      map[string]bool
+	filesBuilt bool
+	store      usg.Store
+	tech       string
+	crossLang  bool
+}
+
+func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[string]bool) *requirementGate {
+	langs := map[string]bool{}
+	if tech != "" {
+		langs[tech] = true
+	}
+	impIDs, _ := s.NodesOfType("code.Import")
+	for _, id := range impIDs {
+		if n, ok, _ := s.GetNode(id); ok {
+			if t := nodeTechFromNode(n); t != "" {
+				langs[t] = true
+			}
+		}
+	}
+	return &requirementGate{
+		packages:  newPackageGate(packages),
+		imports:   newPackageGate(importEvidence(s, tech, crossLang)),
+		languages: langs,
+		store:     s,
+		tech:      tech,
+		crossLang: crossLang,
+	}
+}
+
+func (g *requirementGate) allowed(packages []string, req *parser.BindingRequirement) bool {
+	if req == nil {
+		return g.packages.allowed(packages)
+	}
+	return g.eval(*req)
+}
+
+func (g *requirementGate) eval(req parser.BindingRequirement) bool {
+	switch req.Op {
+	case "":
+		return true
+	case "dependency", "framework":
+		return g.packages.inEvidence(req.Value)
+	case "import":
+		return g.imports.inEvidence(req.Value)
+	case "language":
+		return g.languages[strings.ToLower(req.Value)]
+	case "file":
+		g.ensureFiles()
+		return g.files[filepath.ToSlash(req.Value)]
+	case "schema":
+		name, version, _ := strings.Cut(req.Value, "\x00")
+		return name == "nir" && (version == "" || version == "2.0")
+	case "project.has":
+		return false
+	case "all":
+		for _, child := range req.Args {
+			if !g.eval(child) {
+				return false
+			}
+		}
+		return true
+	case "any":
+		for _, child := range req.Args {
+			if g.eval(child) {
+				return true
+			}
+		}
+		return false
+	case "not":
+		return len(req.Args) == 1 && !g.eval(req.Args[0])
+	case "soft":
+		return true
+	default:
+		return false
+	}
+}
+
+func (g *requirementGate) ensureFiles() {
+	if g.filesBuilt {
+		return
+	}
+	g.filesBuilt = true
+	g.files = map[string]bool{}
+	rangeNodes(g.store, func(n usg.Node) bool {
+		if !g.crossLang {
+			if t := nodeTechFromNode(n); t != "" && t != g.tech {
+				return true
+			}
+		}
+		if file := locFile(n.Prop("loc")); file != "" {
+			g.files[filepath.ToSlash(file)] = true
+		}
+		return true
+	})
+}
+
 func packageGatePrefixes(name string) []string {
 	var out []string
 	for _, sep := range []byte{'.', '/'} {
@@ -1809,11 +1937,11 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []adapters.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			fileTech := fileContextTechs(s)
 			allowed := make([]bool, len(spec.Flags))
 			for i := range spec.Flags {
-				allowed[i] = pkgGate.allowed(spec.Flags[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Flags[i].Packages, spec.Flags[i].Requirement)
 			}
 			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
 				if spec.Flags[i].Scope != "" {
@@ -2844,7 +2972,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
 			pkgs := packageEvidence(s, spec.Technology, crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			markIdx := buildSpecIndex(len(spec.Marks), func(i int) (methods, paths []string, loose bool) {
 				if spec.Marks[i].ByMethod {
 					return []string{spec.Marks[i].Pattern}, nil, false
@@ -2853,7 +2981,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			})
 			allowed := make([]bool, len(spec.Marks))
 			for i := range spec.Marks {
-				allowed[i] = pkgGate.allowed(spec.Marks[i].Packages)
+				allowed[i] = reqGate.allowed(spec.Marks[i].Packages, spec.Marks[i].Requirement)
 			}
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"}
 			if crossLang {
@@ -3173,10 +3301,10 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 				return nil // no active source set -> parameters are not sources
 			}
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
-			pkgGate := newPackageGate(pkgs)
+			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			active := make([]paramSourceSpec, 0, len(sources))
 			for _, src := range sources {
-				if activeSources[src.Concept] && pkgGate.allowed(src.Packages) {
+				if activeSources[src.Concept] && reqGate.allowed(src.Packages, src.Requirement) {
 					active = append(active, src)
 				}
 			}

@@ -472,7 +472,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	if err != nil {
 		return nil, err
 	}
-	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
+	pkgs, req, err := lowerV2Requirements(b.Requirements)
 	if err != nil {
 		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
@@ -486,11 +486,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			}
 			switch {
 			case action.Kind == "emit source":
-				m := shape.mapping(BindingAction{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = append(out, m)
 			case action.Kind == "emit sink":
 				if action.Location == "call" || action.Location == "node" {
-					m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+					m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 					out = append(out, m)
 					continue
 				}
@@ -517,11 +517,12 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					CollectionFirst: loc.CollectionFirst,
 					CollectionIndex: loc.CollectionIndex,
 					Packages:        pkgs,
+					Requirement:     req,
 				})
 				out = append(out, m)
 			case action.Kind == "emit check":
 				if action.Concept == "core.Assumption" {
-					m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs)
+					m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs, req)
 					if err != nil {
 						return nil, err
 					}
@@ -531,7 +532,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					}
 				}
 				if action.Advisory != nil && *action.Advisory {
-					m, err := lowerV2AdvisoryCheck(b.Name, shape, action, pkgs)
+					m, err := lowerV2AdvisoryCheck(b.Name, shape, action, pkgs, req)
 					if err != nil {
 						return nil, err
 					}
@@ -553,11 +554,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if lowerV2CharFilterGlobal(queryWhere) {
 						constraint = "global"
 					}
-					out = append(out, shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}))
+					out = append(out, shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}))
 					continue
 				}
 				if isV2GlobalCheck(action) {
-					m, err := lowerV2GlobalCheck(b.Name, shape, action, pkgs)
+					m, err := lowerV2GlobalCheck(b.Name, shape, action, pkgs, req)
 					if err != nil {
 						return nil, err
 					}
@@ -581,16 +582,16 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 				}
-				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = append(out, m)
 			case action.Kind == "emit issue":
-				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = append(out, m)
 			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
-				m := shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = append(out, m)
 			case strings.HasPrefix(action.Kind, "propagate "):
-				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs)
+				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs, req)
 				if err != nil {
 					return nil, err
 				}
@@ -607,7 +608,7 @@ func isV2GlobalCheck(action V2BindingOutput) bool {
 	return len(action.Covers) == 1 && action.Covers[0].Mode == "global"
 }
 
-func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, error) {
+func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
 	if action.Location != "call" && action.Location != "node" {
 		return BindingAction{}, fmt.Errorf("binding %s: global checks currently lower at call/node only", binding)
 	}
@@ -615,18 +616,19 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 		return BindingAction{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
 	}
 	return shape.mapping(BindingAction{
-		Kind:       shape.markKind(),
-		Pattern:    shape.Pattern,
-		Exact:      shape.Exact,
-		Concept:    action.Concept,
-		Coverage:   "global",
-		ValMatches: shape.ValMatches,
-		ValAbsents: shape.ValAbsents,
-		Packages:   pkgs,
+		Kind:        shape.markKind(),
+		Pattern:     shape.Pattern,
+		Exact:       shape.Exact,
+		Concept:     action.Concept,
+		Coverage:    "global",
+		ValMatches:  shape.ValMatches,
+		ValAbsents:  shape.ValAbsents,
+		Packages:    pkgs,
+		Requirement: req,
 	}), nil
 }
 
-func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, error) {
+func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
 	if action.Location != "call" && action.Location != "node" {
 		return BindingAction{}, fmt.Errorf("binding %s: advisory checks currently lower at call/node only", binding)
 	}
@@ -635,16 +637,17 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 	}
 	kind := shape.markKind()
 	return shape.mapping(BindingAction{
-		Kind:       kind,
-		Pattern:    shape.Pattern,
-		Exact:      shape.Exact,
-		Concept:    action.Concept,
-		About:      action.About,
-		Advisory:   true,
-		Coverage:   action.Covers[0].Mode,
-		ValMatches: shape.ValMatches,
-		ValAbsents: shape.ValAbsents,
-		Packages:   pkgs,
+		Kind:        kind,
+		Pattern:     shape.Pattern,
+		Exact:       shape.Exact,
+		Concept:     action.Concept,
+		About:       action.About,
+		Advisory:    true,
+		Coverage:    action.Covers[0].Mode,
+		ValMatches:  shape.ValMatches,
+		ValAbsents:  shape.ValAbsents,
+		Packages:    pkgs,
+		Requirement: req,
 	}), nil
 }
 
@@ -709,7 +712,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	if err != nil || !ok {
 		return nil, ok, err
 	}
-	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
+	pkgs, req, err := lowerV2Requirements(b.Requirements)
 	if err != nil {
 		return nil, true, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
@@ -735,13 +738,14 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 		}
 		flag := *fl
 		out = append(out, BindingAction{
-			Kind:     "flag",
-			Concept:  action.Concept,
-			About:    action.About,
-			Advisory: action.Advisory != nil && *action.Advisory,
-			Coverage: coverage,
-			Packages: pkgs,
-			Flag:     &flag,
+			Kind:        "flag",
+			Concept:     action.Concept,
+			About:       action.About,
+			Advisory:    action.Advisory != nil && *action.Advisory,
+			Coverage:    coverage,
+			Packages:    pkgs,
+			Requirement: req,
+			Flag:        &flag,
 		})
 	}
 	return out, true, nil
@@ -847,7 +851,7 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Bindin
 	if b.Query.Expr.Alias != "param" || b.Query.Expr.Where != nil || len(b.Query.Expr.Steps) != 0 {
 		return nil, fmt.Errorf("binding %s: param source lowering requires query param as param", b.Name)
 	}
-	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
+	pkgs, req, err := lowerV2Requirements(b.Requirements)
 	if err != nil {
 		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
@@ -857,7 +861,7 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Bindin
 		if action.Kind != "emit source" || action.Location != "param" {
 			return nil, fmt.Errorf("binding %s: param query only supports emit source at param", b.Name)
 		}
-		out = append(out, BindingAction{Kind: "source_param", Concept: action.Concept, Packages: pkgs})
+		out = append(out, BindingAction{Kind: "source_param", Concept: action.Concept, Packages: pkgs, Requirement: req})
 	}
 	return out, nil
 }
@@ -1137,7 +1141,7 @@ func validateV2PathOnlyCheck(binding string, action V2BindingOutput) error {
 	return nil
 }
 
-func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, bool, error) {
+func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, bool, error) {
 	advisory := action.Advisory != nil && *action.Advisory
 	if !advisory || action.About == "" {
 		return BindingAction{}, false, nil
@@ -1162,12 +1166,13 @@ func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingO
 		kind = "assume_" + mode + "_method"
 	}
 	return shape.mapping(BindingAction{
-		Kind:       kind,
-		Pattern:    shape.Pattern,
-		About:      action.About,
-		ValMatches: shape.ValMatches,
-		ValAbsents: shape.ValAbsents,
-		Packages:   pkgs,
+		Kind:        kind,
+		Pattern:     shape.Pattern,
+		About:       action.About,
+		ValMatches:  shape.ValMatches,
+		ValAbsents:  shape.ValAbsents,
+		Packages:    pkgs,
+		Requirement: req,
 	}), true, nil
 }
 
@@ -1573,7 +1578,7 @@ func lowerV2ReceiverConstraint(cmp V2BinaryExpr) (string, bool) {
 	}
 }
 
-func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string) (BindingAction, error) {
+func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
 	if action.Kind != "propagate value" {
 		return BindingAction{}, fmt.Errorf("binding %s: unsupported propagation kind %q", binding, action.Kind)
 	}
@@ -1596,6 +1601,7 @@ func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, ac
 		FlowSourceArg:    srcArg,
 		FlowSourceResult: srcResult,
 		Packages:         pkgs,
+		Requirement:      req,
 	}), nil
 }
 
@@ -1631,62 +1637,116 @@ func v2PropagationDestArg(location string) (int, error) {
 	return v2ArgIndex(location)
 }
 
-func lowerV2RequirementsToPackages(reqs []V2Requirement) ([]string, error) {
+func lowerV2Requirements(reqs []V2Requirement) ([]string, *BindingRequirement, error) {
 	if len(reqs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	if len(reqs) != 1 {
-		return nil, fmt.Errorf("multiple requirements need native v2 requirement evaluation")
+	var req BindingRequirement
+	var err error
+	if len(reqs) == 1 {
+		req, err = lowerV2Requirement(reqs[0])
+	} else {
+		req.Op = "all"
+		req.Args = make([]BindingRequirement, 0, len(reqs))
+		for _, raw := range reqs {
+			child, childErr := lowerV2Requirement(raw)
+			if childErr != nil {
+				err = childErr
+				break
+			}
+			req.Args = append(req.Args, child)
+		}
 	}
-	return lowerV2PackageRequirement(reqs[0])
+	if err != nil {
+		return nil, nil, err
+	}
+	return v2RequirementPackageHints(req), &req, nil
 }
 
-func lowerV2PackageRequirement(req V2Requirement) ([]string, error) {
+func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 	switch req.Name {
-	case "dependency":
-		pkg, err := lowerV2DependencyRequirement(req)
-		if err != nil {
-			return nil, err
-		}
-		return []string{pkg}, nil
-	case "any":
+	case "all", "any":
 		if len(req.Args) == 0 {
-			return nil, fmt.Errorf("any dependency requirement needs at least one child")
+			return BindingRequirement{}, fmt.Errorf("%s requirement needs at least one child", req.Name)
 		}
-		seen := map[string]bool{}
-		out := make([]string, 0, len(req.Args))
+		out := BindingRequirement{Op: req.Name, Args: make([]BindingRequirement, 0, len(req.Args))}
 		for _, raw := range req.Args {
 			child, ok := raw.(V2Requirement)
 			if !ok {
-				return nil, fmt.Errorf("any requirement needs child requirements for runtime package lowering")
+				return BindingRequirement{}, fmt.Errorf("%s requirement needs child requirements", req.Name)
 			}
-			pkg, err := lowerV2DependencyRequirement(child)
+			lowered, err := lowerV2Requirement(child)
 			if err != nil {
-				return nil, err
+				return BindingRequirement{}, err
 			}
-			if !seen[pkg] {
-				seen[pkg] = true
-				out = append(out, pkg)
-			}
+			out.Args = append(out.Args, lowered)
 		}
 		return out, nil
+	case "not", "soft":
+		if len(req.Args) != 1 {
+			return BindingRequirement{}, fmt.Errorf("%s requirement needs exactly one child", req.Name)
+		}
+		child, ok := req.Args[0].(V2Requirement)
+		if !ok {
+			return BindingRequirement{}, fmt.Errorf("%s requirement needs a child requirement", req.Name)
+		}
+		lowered, err := lowerV2Requirement(child)
+		if err != nil {
+			return BindingRequirement{}, err
+		}
+		return BindingRequirement{Op: req.Name, Args: []BindingRequirement{lowered}}, nil
+	case "dependency", "import", "language", "file", "framework", "schema", "project.has":
+		return lowerV2PrimitiveRequirement(req)
 	default:
-		return nil, fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)
+		return BindingRequirement{}, fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)
 	}
 }
 
-func lowerV2DependencyRequirement(req V2Requirement) (string, error) {
-	if req.Name != "dependency" {
-		return "", fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)
+func lowerV2PrimitiveRequirement(req V2Requirement) (BindingRequirement, error) {
+	values := make([]string, 0, len(req.Args))
+	for _, raw := range req.Args {
+		switch arg := raw.(type) {
+		case string:
+			if arg != "" {
+				values = append(values, arg)
+			}
+		case V2NamedArg:
+			if req.Name == "dependency" && arg.Name == "range" {
+				return BindingRequirement{}, fmt.Errorf("dependency version ranges need native v2 version requirement evaluation")
+			}
+			return BindingRequirement{}, fmt.Errorf("%s requirement named arg %q needs native v2 requirement evaluation", req.Name, arg.Name)
+		default:
+			return BindingRequirement{}, fmt.Errorf("%s requirement expects string arguments", req.Name)
+		}
 	}
-	if len(req.Args) != 1 {
-		return "", fmt.Errorf("dependency requirement with named args or version ranges needs native v2 requirement evaluation")
+	if len(values) == 0 {
+		return BindingRequirement{}, fmt.Errorf("%s requirement requires at least one string argument", req.Name)
 	}
-	pkg, ok := req.Args[0].(string)
-	if !ok || pkg == "" {
-		return "", fmt.Errorf("dependency requirement requires one package string")
+	if req.Name != "schema" && len(values) != 1 {
+		return BindingRequirement{}, fmt.Errorf("%s requirement requires exactly one string argument", req.Name)
 	}
-	return pkg, nil
+	return BindingRequirement{Op: req.Name, Value: strings.Join(values, "\x00")}, nil
+}
+
+func v2RequirementPackageHints(req BindingRequirement) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(BindingRequirement)
+	walk = func(r BindingRequirement) {
+		switch r.Op {
+		case "dependency", "import", "framework":
+			if r.Value != "" && !seen[r.Value] {
+				seen[r.Value] = true
+				out = append(out, r.Value)
+			}
+		default:
+			for _, child := range r.Args {
+				walk(child)
+			}
+		}
+	}
+	walk(req)
+	return out
 }
 
 type v2SinkLocationInfo struct {

@@ -612,21 +612,48 @@ binding requestBody {
 	}
 }
 
-func TestV2DependencyRequirementLowersToLegacyPackageGate(t *testing.T) {
+func TestV2RequirementLowersToPackageHintsAndRequirementTree(t *testing.T) {
 	cases := []struct {
-		name string
-		req  string
-		want []string
+		name     string
+		req      string
+		wantPkgs []string
+		wantOp   string
 	}{
 		{
-			name: "dependency",
-			req:  `dependency("express")`,
-			want: []string{"express"},
+			name:     "dependency",
+			req:      `dependency("express")`,
+			wantPkgs: []string{"express"},
+			wantOp:   "dependency",
 		},
 		{
-			name: "any dependency",
-			req:  `any(dependency("express"), dependency("koa"), dependency("express"))`,
-			want: []string{"express", "koa"},
+			name:     "any dependency",
+			req:      `any(dependency("express"), dependency("koa"), dependency("express"))`,
+			wantPkgs: []string{"express", "koa"},
+			wantOp:   "any",
+		},
+		{
+			name:     "all dependency",
+			req:      `all(dependency("express"), dependency("koa"))`,
+			wantPkgs: []string{"express", "koa"},
+			wantOp:   "all",
+		},
+		{
+			name:     "import",
+			req:      `import("express")`,
+			wantPkgs: []string{"express"},
+			wantOp:   "import",
+		},
+		{
+			name:     "soft nested any",
+			req:      `soft(any(dependency("express"), import("koa")))`,
+			wantPkgs: []string{"express", "koa"},
+			wantOp:   "soft",
+		},
+		{
+			name:     "multiple top-level requirements",
+			req:      `dependency("express")` + "\n    " + `language("javascript")`,
+			wantPkgs: []string{"express"},
+			wantOp:   "all",
 		},
 	}
 	for _, tc := range cases {
@@ -645,14 +672,18 @@ binding requestBody {
 				t.Fatalf("ParseV2Definitions: %v", err)
 			}
 			adapter := decls[0].(*BindingSet)
-			if got := adapter.Mappings[0].Packages; !stringSlicesEqual(got, tc.want) {
-				t.Fatalf("packages = %#v, want %#v", got, tc.want)
+			got := adapter.Mappings[0]
+			if !stringSlicesEqual(got.Packages, tc.wantPkgs) {
+				t.Fatalf("packages = %#v, want %#v", got.Packages, tc.wantPkgs)
+			}
+			if got.Requirement == nil || got.Requirement.Op != tc.wantOp {
+				t.Fatalf("requirement = %#v, want op %q", got.Requirement, tc.wantOp)
 			}
 		})
 	}
 }
 
-func TestV2RequirementLoweringRejectsUnsupportedSemantics(t *testing.T) {
+func TestV2RequirementLoweringRejectsRangesAndMalformedCombinators(t *testing.T) {
 	cases := []struct {
 		name string
 		req  string
@@ -664,49 +695,14 @@ func TestV2RequirementLoweringRejectsUnsupportedSemantics(t *testing.T) {
 			want: "version ranges",
 		},
 		{
-			name: "negated dependency",
-			req:  `not(dependency("express"))`,
-			want: "native v2 requirement evaluation",
-		},
-		{
-			name: "soft dependency",
-			req:  `soft(dependency("express"))`,
-			want: "native v2 requirement evaluation",
-		},
-		{
-			name: "all dependency",
-			req:  `all(dependency("express"), dependency("koa"))`,
-			want: "native v2 requirement evaluation",
-		},
-		{
-			name: "top-level import",
-			req:  `import("express")`,
-			want: "native v2 requirement evaluation",
-		},
-		{
 			name: "empty any",
 			req:  `any()`,
 			want: "at least one child",
 		},
 		{
-			name: "nested any",
-			req:  `any(any(dependency("express"), dependency("koa")))`,
-			want: "native v2 requirement evaluation",
-		},
-		{
-			name: "any non-dependency",
-			req:  `any(dependency("express"), import("koa"))`,
-			want: "native v2 requirement evaluation",
-		},
-		{
-			name: "any dependency with range",
-			req:  `any(dependency("express", range: ">=4 <6"), dependency("koa"))`,
-			want: "version ranges",
-		},
-		{
-			name: "multiple top-level requirements",
-			req:  `dependency("express")` + "\n    " + `dependency("koa")`,
-			want: "multiple requirements",
+			name: "empty all",
+			req:  `all()`,
+			want: "at least one child",
 		},
 	}
 	for _, tc := range cases {

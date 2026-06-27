@@ -324,6 +324,87 @@ func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "imp", Type: "code.Import", Loc: "app.js:1", Props: map[string]string{
+		"module": "express", "package": "express",
+	}})
+	g.AddNode(usg.Node{ID: "pkg:generic/koa@1.0", Type: "sbom.PackageVersion", Props: map[string]string{
+		"name": "koa", "version": "1.0",
+	}})
+	g.AddNode(usg.Node{ID: "call", Type: "code.Call", Loc: "app.js:3", Props: map[string]string{
+		"callee_path": "handler", "method": "handler",
+	}})
+	gate := newRequirementGate(g, "javascript", false, packageEvidence(g, "javascript", false))
+
+	cases := []struct {
+		name string
+		req  parser.BindingRequirement
+		want bool
+	}{
+		{name: "dependency uses sbom evidence", req: parser.BindingRequirement{Op: "dependency", Value: "koa"}, want: true},
+		{name: "dependency preserves package evidence from imports", req: parser.BindingRequirement{Op: "dependency", Value: "express"}, want: true},
+		{name: "import uses import evidence", req: parser.BindingRequirement{Op: "import", Value: "express"}, want: true},
+		{name: "language uses scan technology evidence", req: parser.BindingRequirement{Op: "language", Value: "javascript"}, want: true},
+		{name: "file uses lazy file evidence", req: parser.BindingRequirement{Op: "file", Value: "app.js"}, want: true},
+		{name: "all combines children", req: parser.BindingRequirement{Op: "all", Args: []parser.BindingRequirement{
+			{Op: "dependency", Value: "koa"},
+			{Op: "import", Value: "express"},
+		}}, want: true},
+		{name: "not negates child", req: parser.BindingRequirement{Op: "not", Args: []parser.BindingRequirement{
+			{Op: "dependency", Value: "missing"},
+		}}, want: true},
+		{name: "soft never blocks", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+			{Op: "dependency", Value: "missing"},
+		}}, want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := gate.allowed(nil, &tc.req); got != tc.want {
+				t.Fatalf("allowed = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:     "custom.Target",
+			Pattern:     "samplepkg.handle",
+			Packages:    []string{"samplepkg"},
+			Requirement: &parser.BindingRequirement{Op: "dependency", Value: "samplepkg"},
+		}},
+	}
+	adapter := spec.sinkAdapter()
+
+	withImportOnly := usg.NewInMemStore()
+	withImportOnly.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+		"loc": "sample.x:1", "module": "samplepkg", "package": "samplepkg",
+	}})
+	withImportOnly.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:3"}})
+	withImportOnly.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
+	}})
+	if got := adapter.Apply(withImportOnly); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
+		t.Fatalf("dependency-gated sink did not fire from import evidence: %+v", got)
+	}
+
+	withSBOM := usg.NewInMemStore()
+	withSBOM.AddNode(usg.Node{ID: "pkg:generic/samplepkg@1.0", Type: "sbom.PackageVersion", Props: map[string]string{
+		"name": "samplepkg", "version": "1.0",
+	}})
+	withSBOM.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:3"}})
+	withSBOM.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
+	}})
+	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
+		t.Fatalf("dependency-gated sink did not fire from SBOM evidence: %+v", got)
+	}
+}
+
 func TestPackageGateMatchesReferencePackageSemantics(t *testing.T) {
 	have := map[string]bool{
 		"org.apache.commons.lang3":      true,
