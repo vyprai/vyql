@@ -812,6 +812,64 @@ binding urlOpen {
 	}
 }
 
+func TestV2CallPredicateInExpandsMappings(t *testing.T) {
+	decls, err := ParseRuntime(`
+module bindings.java.sql;
+binding sqlExecMethods {
+  query pattern callExpr where callee.method in ["execute", "executeQuery"] and args.any.literal contains "SELECT"
+  emit sink code.SqlExecution at args[0]
+  emit check core.SqlParameterization at call {
+    covers endpoint { anchor: call }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseRuntime: %v", err)
+	}
+	adapter := decls[0].(*AdapterDecl)
+	if adapter.Name != "java" || len(adapter.Mappings) != 4 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	want := []struct {
+		kind    string
+		pattern string
+	}{
+		{"sink_method", "execute"},
+		{"control_method", "execute"},
+		{"sink_method", "executeQuery"},
+		{"control_method", "executeQuery"},
+	}
+	for i, w := range want {
+		got := adapter.Mappings[i]
+		if got.Kind != w.kind || got.Pattern != w.pattern || got.ValMatches[0] != "SELECT" {
+			t.Fatalf("mapping %d = %+v, want kind=%s pattern=%s val SELECT", i, got, w.kind, w.pattern)
+		}
+	}
+}
+
+func TestV2CallPredicateOrExpandsWithSharedConstraints(t *testing.T) {
+	decls, err := ParseRuntime(`
+module bindings.python.web;
+binding requestBodies {
+  query pattern callExpr where (callee.path ~= "request.json" or callee.path ~= "request.get_json") and not args.any.literal contains "safe"
+  emit source code.HttpInput at call.result
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseRuntime: %v", err)
+	}
+	adapter := decls[0].(*AdapterDecl)
+	if adapter.Name != "python" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	for i, want := range []string{"request.json", "request.get_json"} {
+		got := adapter.Mappings[i]
+		if got.Kind != "source" || got.Pattern != want || len(got.ValAbsents) != 1 || got.ValAbsents[0] != "safe" {
+			t.Fatalf("mapping %d = %+v, want source %s with nval safe", i, got, want)
+		}
+	}
+}
+
 func TestV2PropagateValueLowering(t *testing.T) {
 	decls, err := ParseRuntime(`
 module bindings.c.migration;

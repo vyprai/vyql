@@ -507,7 +507,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			return out, err
 		}
 	}
-	shape, err := lowerV2CallShape(b.Name, queryWhere)
+	shapes, err := lowerV2CallShapes(b.Name, queryWhere)
 	if err != nil {
 		return nil, err
 	}
@@ -516,122 +516,124 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
 	var out []AdapterMapping
-	for _, action := range b.Outputs {
-		action.Concept = names.concept(action.Concept)
-		action.About = names.concept(action.About)
-		switch {
-		case action.Kind == "emit source":
-			m := AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
-			out = append(out, m)
-		case action.Kind == "emit sink":
-			if action.Location == "call" || action.Location == "node" {
-				m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+	for _, shape := range shapes {
+		for _, action := range b.Outputs {
+			action.Concept = names.concept(action.Concept)
+			action.About = names.concept(action.About)
+			switch {
+			case action.Kind == "emit source":
+				m := AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
 				out = append(out, m)
-				continue
-			}
-			kind := shape.sinkKind()
-			loc, err := v2SinkLocationParts(action.Location)
-			if err != nil {
-				if action.Location == "callee.receiver" {
-					kind = "sink_receiver"
-					loc = v2SinkLocationInfo{ArgIndex: 0}
-				} else {
-					return nil, fmt.Errorf("binding %s: %w", b.Name, err)
-				}
-			}
-			m := AdapterMapping{
-				Kind:            kind,
-				Pattern:         shape.Pattern,
-				Exact:           shape.Exact,
-				Concept:         action.Concept,
-				Constraint:      shape.Constraint,
-				ArgIndex:        loc.ArgIndex,
-				ValMatches:      shape.ValMatches,
-				ValAbsents:      shape.ValAbsents,
-				Collection:      loc.Collection,
-				CollectionFirst: loc.CollectionFirst,
-				CollectionIndex: loc.CollectionIndex,
-				Packages:        pkgs,
-			}
-			out = append(out, m)
-		case action.Kind == "emit check":
-			if action.Concept == "core.Assumption" {
-				m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs)
-				if err != nil {
-					return nil, err
-				}
-				if ok {
+			case action.Kind == "emit sink":
+				if action.Location == "call" || action.Location == "node" {
+					m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
 					out = append(out, m)
 					continue
 				}
-			}
-			if action.Advisory != nil && *action.Advisory {
-				m, err := lowerV2AdvisoryCheck(b.Name, shape, action, pkgs)
+				kind := shape.sinkKind()
+				loc, err := v2SinkLocationParts(action.Location)
+				if err != nil {
+					if action.Location == "callee.receiver" {
+						kind = "sink_receiver"
+						loc = v2SinkLocationInfo{ArgIndex: 0}
+					} else {
+						return nil, fmt.Errorf("binding %s: %w", b.Name, err)
+					}
+				}
+				m := AdapterMapping{
+					Kind:            kind,
+					Pattern:         shape.Pattern,
+					Exact:           shape.Exact,
+					Concept:         action.Concept,
+					Constraint:      shape.Constraint,
+					ArgIndex:        loc.ArgIndex,
+					ValMatches:      shape.ValMatches,
+					ValAbsents:      shape.ValAbsents,
+					Collection:      loc.Collection,
+					CollectionFirst: loc.CollectionFirst,
+					CollectionIndex: loc.CollectionIndex,
+					Packages:        pkgs,
+				}
+				out = append(out, m)
+			case action.Kind == "emit check":
+				if action.Concept == "core.Assumption" {
+					m, ok, err := lowerV2AssumptionCheck(b.Name, shape, action, pkgs)
+					if err != nil {
+						return nil, err
+					}
+					if ok {
+						out = append(out, m)
+						continue
+					}
+				}
+				if action.Advisory != nil && *action.Advisory {
+					m, err := lowerV2AdvisoryCheck(b.Name, shape, action, pkgs)
+					if err != nil {
+						return nil, err
+					}
+					out = append(out, m)
+					continue
+				}
+				if action.Concept == "threat.CharFilter" {
+					if action.Location != "call" {
+						return nil, fmt.Errorf("binding %s: CharFilter check must be emitted at call", b.Name)
+					}
+					if err := validateV2PathOnlyCheck(b.Name, action); err != nil {
+						return nil, err
+					}
+					kind := "filter_path"
+					if shape.Field == "callee.method" {
+						kind = "filter_method"
+					}
+					constraint := ""
+					if lowerV2CharFilterGlobal(queryWhere) {
+						constraint = "global"
+					}
+					out = append(out, AdapterMapping{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+					continue
+				}
+				if isV2GlobalCheck(action) {
+					m, err := lowerV2GlobalCheck(b.Name, shape, action, pkgs)
+					if err != nil {
+						return nil, err
+					}
+					out = append(out, m)
+					continue
+				}
+				kind := shape.controlKind()
+				if action.Location == "callee.receiver" {
+					if shape.Field != "callee.method" {
+						return nil, fmt.Errorf("binding %s: receiver check lowering requires callee.method predicate", b.Name)
+					}
+					if err := validateV2ConcreteCheck(b.Name, action); err != nil {
+						return nil, err
+					}
+					if action.Covers[0].Mode != "sameReceiver" {
+						return nil, fmt.Errorf("binding %s: receiver checks must declare sameReceiver coverage", b.Name)
+					}
+					kind = "control_receiver_method"
+				} else {
+					if err := validateV2ConcreteCheck(b.Name, action); err != nil {
+						return nil, err
+					}
+				}
+				m := AdapterMapping{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				out = append(out, m)
+			case action.Kind == "emit issue":
+				m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				out = append(out, m)
+			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
+				m := AdapterMapping{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				out = append(out, m)
+			case strings.HasPrefix(action.Kind, "propagate "):
+				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs)
 				if err != nil {
 					return nil, err
 				}
 				out = append(out, m)
-				continue
+			default:
+				return nil, fmt.Errorf("binding %s: unsupported output %q", b.Name, action.Kind)
 			}
-			if action.Concept == "threat.CharFilter" {
-				if action.Location != "call" {
-					return nil, fmt.Errorf("binding %s: CharFilter check must be emitted at call", b.Name)
-				}
-				if err := validateV2PathOnlyCheck(b.Name, action); err != nil {
-					return nil, err
-				}
-				kind := "filter_path"
-				if shape.Field == "callee.method" {
-					kind = "filter_method"
-				}
-				constraint := ""
-				if lowerV2CharFilterGlobal(queryWhere) {
-					constraint = "global"
-				}
-				out = append(out, AdapterMapping{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
-				continue
-			}
-			if isV2GlobalCheck(action) {
-				m, err := lowerV2GlobalCheck(b.Name, shape, action, pkgs)
-				if err != nil {
-					return nil, err
-				}
-				out = append(out, m)
-				continue
-			}
-			kind := shape.controlKind()
-			if action.Location == "callee.receiver" {
-				if shape.Field != "callee.method" {
-					return nil, fmt.Errorf("binding %s: receiver check lowering requires callee.method predicate", b.Name)
-				}
-				if err := validateV2ConcreteCheck(b.Name, action); err != nil {
-					return nil, err
-				}
-				if action.Covers[0].Mode != "sameReceiver" {
-					return nil, fmt.Errorf("binding %s: receiver checks must declare sameReceiver coverage", b.Name)
-				}
-				kind = "control_receiver_method"
-			} else {
-				if err := validateV2ConcreteCheck(b.Name, action); err != nil {
-					return nil, err
-				}
-			}
-			m := AdapterMapping{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
-			out = append(out, m)
-		case action.Kind == "emit issue":
-			m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
-			out = append(out, m)
-		case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
-			m := AdapterMapping{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
-			out = append(out, m)
-		case strings.HasPrefix(action.Kind, "propagate "):
-			m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, m)
-		default:
-			return nil, fmt.Errorf("binding %s: unsupported output %q", b.Name, action.Kind)
 		}
 	}
 	return out, nil
@@ -1221,108 +1223,203 @@ func (s v2CallShape) markKind() string {
 	return "mark"
 }
 
-func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
-	var shape v2CallShape
-	var haveShape bool
-	var visit func(V2Expr, bool) error
-	visit = func(expr V2Expr, neg bool) error {
-		if u, ok := expr.(V2UnaryExpr); ok && u.Op == "not" {
-			return visit(u.X, !neg)
+func lowerV2CallShapes(binding string, expr V2Expr) ([]v2CallShape, error) {
+	shapes, err := lowerV2CallShapeExpr(binding, expr, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, shape := range shapes {
+		if shape.Field == "" {
+			return nil, fmt.Errorf("binding %s: query pattern lowering needs a callee.method/path predicate", binding)
 		}
-		cmp, ok := expr.(V2BinaryExpr)
+	}
+	return dedupeV2CallShapes(shapes), nil
+}
+
+func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool) ([]v2CallShape, error) {
+	if u, ok := expr.(V2UnaryExpr); ok && u.Op == "not" {
+		return lowerV2CallShapeExpr(binding, u.X, !neg)
+	}
+	cmp, ok := expr.(V2BinaryExpr)
+	if !ok {
+		return nil, fmt.Errorf("binding %s: unsupported query predicate %T", binding, expr)
+	}
+	switch cmp.Op {
+	case "and":
+		if neg {
+			return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, true)
+		}
+		return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, false)
+	case "or":
+		if neg {
+			return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, true)
+		}
+		return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, false)
+	default:
+		return lowerV2CallShapeAtom(binding, cmp, neg)
+	}
+}
+
+func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool) ([]v2CallShape, error) {
+	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg)
+	if err != nil {
+		return nil, err
+	}
+	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]v2CallShape, 0, len(leftShapes)*len(rightShapes))
+	for _, l := range leftShapes {
+		for _, r := range rightShapes {
+			merged, err := mergeV2CallShapes(binding, l, r)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, merged)
+		}
+	}
+	return out, nil
+}
+
+func lowerV2CallShapeOr(binding string, left, right V2Expr, neg bool) ([]v2CallShape, error) {
+	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg)
+	if err != nil {
+		return nil, err
+	}
+	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg)
+	if err != nil {
+		return nil, err
+	}
+	return append(leftShapes, rightShapes...), nil
+}
+
+func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	leftExpr := cmp.Left
+	cmpNeg := neg
+	if u, ok := leftExpr.(V2UnaryExpr); ok && u.Op == "not" {
+		leftExpr = u.X
+		cmpNeg = !cmpNeg
+	}
+	left, ok := leftExpr.(V2RefExpr)
+	if !ok {
+		return nil, fmt.Errorf("binding %s: unsupported query predicate left side %T", binding, cmp.Left)
+	}
+	field := v2CallQueryField(left.Name)
+	switch field {
+	case "callee.method", "call.callee.method", "callee.path", "call.callee.path":
+		return lowerV2CalleeShapes(binding, strings.TrimPrefix(field, "call."), cmp, cmpNeg)
+	case "callee.receiver.type", "call.callee.receiver.type":
+		if cmpNeg {
+			return nil, fmt.Errorf("binding %s: negated receiver type predicate is not implemented in runtime lowering", binding)
+		}
+		constraint, ok := lowerV2ReceiverConstraint(cmp)
 		if !ok {
-			return fmt.Errorf("binding %s: unsupported query predicate %T", binding, expr)
+			return nil, fmt.Errorf("binding %s: receiver type predicate must compare to string or string list", binding)
 		}
-		if cmp.Op == "and" {
-			if err := visit(cmp.Left, neg); err != nil {
-				return err
-			}
-			return visit(cmp.Right, neg)
+		return []v2CallShape{{Constraint: constraint}}, nil
+	case "args.any.literal", "call.args.any.literal":
+		if cmp.Op != "contains" {
+			return nil, fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in runtime lowering", binding, cmp.Op)
 		}
-		if cmp.Op == "or" {
-			return fmt.Errorf("binding %s: query predicate disjunction is not implemented in runtime lowering", binding)
-		}
-		leftExpr := cmp.Left
-		cmpNeg := neg
-		if u, ok := leftExpr.(V2UnaryExpr); ok && u.Op == "not" {
-			leftExpr = u.X
-			cmpNeg = !cmpNeg
-		}
-		left, ok := leftExpr.(V2RefExpr)
+		value, ok := v2LiteralString(cmp.Right)
 		if !ok {
-			return fmt.Errorf("binding %s: unsupported query predicate left side %T", binding, cmp.Left)
+			return nil, fmt.Errorf("binding %s: args.any.literal predicate right side must be a string", binding)
 		}
-		field := v2CallQueryField(left.Name)
-		switch field {
-		case "callee.method", "call.callee.method", "callee.path", "call.callee.path":
-			if cmpNeg {
-				return fmt.Errorf("binding %s: negated callee predicate is not implemented in runtime lowering", binding)
-			}
-			if cmp.Op != "==" && cmp.Op != "~=" {
-				return fmt.Errorf("binding %s: callee predicate operator %q is not implemented in runtime lowering", binding, cmp.Op)
-			}
-			lit, ok := cmp.Right.(V2LiteralExpr)
-			if !ok {
-				return fmt.Errorf("binding %s: query predicate right side must be a literal", binding)
-			}
-			pat, ok := lit.Value.(string)
-			if !ok {
-				return fmt.Errorf("binding %s: query predicate right side must be a string", binding)
-			}
-			field := strings.TrimPrefix(field, "call.")
-			shape.Field = field
-			shape.Pattern = pat
-			shape.Exact = cmp.Op == "==" && field == "callee.path"
-			haveShape = true
-		case "callee.receiver.type", "call.callee.receiver.type":
-			if cmpNeg {
-				return fmt.Errorf("binding %s: negated receiver type predicate is not implemented in runtime lowering", binding)
-			}
-			constraint, ok := lowerV2ReceiverConstraint(cmp)
-			if !ok {
-				return fmt.Errorf("binding %s: receiver type predicate must compare to string or string list", binding)
-			}
-			shape.Constraint = constraint
-		case "args.any.literal", "call.args.any.literal":
-			if cmp.Op != "contains" {
-				return fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in runtime lowering", binding, cmp.Op)
-			}
-			value, ok := v2LiteralString(cmp.Right)
-			if !ok {
-				return fmt.Errorf("binding %s: args.any.literal predicate right side must be a string", binding)
-			}
-			if cmpNeg {
-				shape.ValAbsents = append(shape.ValAbsents, value)
-			} else {
-				shape.ValMatches = append(shape.ValMatches, value)
-			}
-		case "call.filter.global", "filter.global":
-			if cmpNeg || cmp.Op != "==" {
-				return fmt.Errorf("binding %s: call.filter.global predicate must be == true", binding)
-			}
-			lit, ok := cmp.Right.(V2LiteralExpr)
-			if !ok {
-				return fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
-			}
-			v, ok := lit.Value.(bool)
-			if !ok {
-				return fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
-			}
-			if !v {
-				return fmt.Errorf("binding %s: call.filter.global == false is not implemented in runtime lowering", binding)
-			}
-		default:
-			return fmt.Errorf("binding %s: query predicate %q is not implemented in runtime lowering", binding, left.Name)
+		if cmpNeg {
+			return []v2CallShape{{ValAbsents: []string{value}}}, nil
 		}
-		return nil
+		return []v2CallShape{{ValMatches: []string{value}}}, nil
+	case "call.filter.global", "filter.global":
+		if cmpNeg || cmp.Op != "==" {
+			return nil, fmt.Errorf("binding %s: call.filter.global predicate must be == true", binding)
+		}
+		lit, ok := cmp.Right.(V2LiteralExpr)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
+		}
+		v, ok := lit.Value.(bool)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
+		}
+		if !v {
+			return nil, fmt.Errorf("binding %s: call.filter.global == false is not implemented in runtime lowering", binding)
+		}
+		return []v2CallShape{{}}, nil
+	default:
+		return nil, fmt.Errorf("binding %s: query predicate %q is not implemented in runtime lowering", binding, left.Name)
 	}
-	if err := visit(expr, false); err != nil {
-		return v2CallShape{}, err
+}
+
+func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	if neg {
+		return nil, fmt.Errorf("binding %s: negated callee predicate is not implemented in runtime lowering", binding)
 	}
-	if !haveShape {
-		return v2CallShape{}, fmt.Errorf("binding %s: query pattern lowering needs a callee.method/path predicate", binding)
+	var values []string
+	exact := field == "callee.path" && (cmp.Op == "==" || cmp.Op == "in")
+	switch cmp.Op {
+	case "==", "~=":
+		pat, ok := v2LiteralString(cmp.Right)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: query predicate right side must be a string", binding)
+		}
+		values = []string{pat}
+	case "in":
+		var ok bool
+		values, ok = v2RuleWhereStringList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, fmt.Errorf("binding %s: callee %s in predicate requires a non-empty string list", binding, field)
+		}
+	default:
+		return nil, fmt.Errorf("binding %s: callee predicate operator %q is not implemented in runtime lowering", binding, cmp.Op)
 	}
-	return shape, nil
+	out := make([]v2CallShape, 0, len(values))
+	for _, value := range values {
+		out = append(out, v2CallShape{Field: field, Pattern: value, Exact: exact})
+	}
+	return out, nil
+}
+
+func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, error) {
+	out := left
+	if right.Field != "" {
+		if out.Field != "" && (out.Field != right.Field || out.Pattern != right.Pattern || out.Exact != right.Exact) {
+			return v2CallShape{}, fmt.Errorf("binding %s: multiple different callee predicates in one conjunction are not supported", binding)
+		}
+		out.Field = right.Field
+		out.Pattern = right.Pattern
+		out.Exact = right.Exact
+	}
+	if right.Constraint != "" {
+		if out.Constraint != "" && out.Constraint != right.Constraint {
+			return v2CallShape{}, fmt.Errorf("binding %s: multiple receiver type predicates in one conjunction are not supported", binding)
+		}
+		out.Constraint = right.Constraint
+	}
+	out.ValMatches = append(out.ValMatches, right.ValMatches...)
+	out.ValAbsents = append(out.ValAbsents, right.ValAbsents...)
+	return out, nil
+}
+
+func dedupeV2CallShapes(shapes []v2CallShape) []v2CallShape {
+	seen := make(map[string]bool, len(shapes))
+	out := make([]v2CallShape, 0, len(shapes))
+	for _, shape := range shapes {
+		key := strings.Join([]string{
+			shape.Field,
+			shape.Pattern,
+			strconv.FormatBool(shape.Exact),
+			shape.Constraint,
+			strings.Join(shape.ValMatches, "\x00"),
+			strings.Join(shape.ValAbsents, "\x00"),
+		}, "\x01")
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, shape)
+	}
+	return out
 }
 
 func v2CallQueryField(name string) string {
