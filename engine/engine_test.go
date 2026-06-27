@@ -98,6 +98,26 @@ func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
 	return onto
 }
 
+func TestEvaluateRejectsUnsupportedCompiledRuleVerb(t *testing.T) {
+	cr := &CompiledRule{
+		Rule: &parser.Rule{
+			Name:    "InternalUnsupported",
+			Package: "test",
+			Meta:    map[string]any{"id": "TEST-UNSUPPORTED", "severity": "medium"},
+			Body: &parser.FlowStmt{
+				Verb: "assume",
+				Src:  parser.Endpoint{Concept: "custom.Input"},
+				Dst:  parser.Endpoint{Concept: "custom.Target"},
+			},
+		},
+		Severity: "medium",
+	}
+	_, err := New(testOntology(), usg.NewInMemStore()).Evaluate(cr)
+	if err == nil || !strings.Contains(err.Error(), `unsupported rule verb "assume"`) {
+		t.Fatalf("Evaluate error = %v, want unsupported internal verb diagnostic", err)
+	}
+}
+
 const flowRule = `
 module test;
 rule Flow {

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -63,6 +64,9 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
+	if cr == nil || cr.Rule == nil {
+		return nil, fmt.Errorf("cannot evaluate nil compiled rule")
+	}
 	switch body := cr.Rule.Body.(type) {
 	case *parser.FlowStmt:
 		switch body.Verb {
@@ -72,13 +76,15 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 			return e.evalReach(cr)
 		case "grant":
 			return e.evalPrivilegeClosure(cr, "grant")
+		default:
+			return nil, fmt.Errorf("unsupported rule verb %q", body.Verb)
 		}
 	case *parser.MatchStmt:
 		return e.evalMatch(cr)
 	case *parser.OrderStmt:
 		return e.evalOrder(cr)
 	}
-	return nil, nil
+	return nil, fmt.Errorf("unsupported rule body %T", cr.Rule.Body)
 }
 
 // evalOrder evaluates `order A before B`: a finding for each (A,B) where an
