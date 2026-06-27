@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding ezPublishSearchNumericParamXss105 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "eZSearch.search" and node.context.callPath contains "$tpl.setVariable" and node.token contains "assign_call:$searchPageLimit:$http.variable" and node.token contains "assign_literal:$searchPageLimit:SearchPageLimit" and node.context.callArg contains "$tpl.setVariable:$searchPageLimit" and not (node.token contains "cast_call_literal:int:$http.variable:SearchPageLimit")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.callPath contains "eZSearch.search" and node.context.callPath contains "$tpl.setVariable" and node.context.assignCall contains "$searchPageLimit:$http.variable" and node.context.assignLiteral contains "$searchPageLimit:SearchPageLimit" and node.context.callArg contains "$tpl.setVariable:$searchPageLimit" and not (node.context.castCallLiteral contains "int:$http.variable:SearchPageLimit")
   emit issue code.EzPublishSearchNumericParamXss at node
 }

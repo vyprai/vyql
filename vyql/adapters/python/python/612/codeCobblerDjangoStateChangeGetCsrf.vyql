@@ -1,6 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding cobblerDjangoStateChangeGetCsrf612 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "reposync" and node.token contains "remote.background_reposync" and not (node.token contains "decorator_path:require_POST")
+  query pattern presenceNode where node.scope == "function" and node.context.name contains "reposync" and node.token contains "remote.background_reposync" and not (node.context.decoratorPath contains "require_POST")
   emit issue code.CobblerDjangoStateChangeGetCsrf at node
 }

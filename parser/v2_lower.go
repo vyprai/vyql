@@ -1314,6 +1314,46 @@ func v2PresenceValuePrefix(field string) string {
 		return "return_call_path:"
 	case "returnIdentifier":
 		return "return_identifier:"
+	case "advisoryCwe":
+		return "advisory_cwe="
+	case "annotationArg":
+		return "annotation_arg:"
+	case "assignCall":
+		return "assign_call:"
+	case "assignCallMethod":
+		return "assign_call_method:"
+	case "assignItem":
+		return "assign_item:"
+	case "assignLiteral":
+		return "assign_literal:"
+	case "callBefore":
+		return "call_before:"
+	case "castCallLiteral":
+		return "cast_call_literal:"
+	case "classModifier":
+		return "class_modifier:"
+	case "decoratorMethod":
+		return "decorator_method:"
+	case "decoratorPath":
+		return "decorator_path:"
+	case "fieldType":
+		return "field_type:"
+	case "functionModifier":
+		return "function_modifier:"
+	case "matchArm":
+		return "match_arm:"
+	case "paramIndex":
+		return "param_index:"
+	case "paramLabel":
+		return "param_label:"
+	case "repr":
+		return "repr:"
+	case "serdeAttr":
+		return "serde_attr:"
+	case "switchCase":
+		return "switch_case:"
+	case "varName":
+		return "var_name:"
 	default:
 		return ""
 	}

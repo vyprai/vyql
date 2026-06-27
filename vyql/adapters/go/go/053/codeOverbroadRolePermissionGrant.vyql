@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding overbroadRolePermissionGrant53 {
-  query pattern presenceNode where node.scope == "module" and node.token contains "var_name:PermissionsByRole" and node.token contains "RoleNetworkManager" and node.token contains "PermBackup" and node.token contains "PermRestore" and not (node.token contains "RoleAdmin:{PermBackup,PermRestore")
+  query pattern presenceNode where node.scope == "module" and node.context.varName contains "PermissionsByRole" and node.token contains "RoleNetworkManager" and node.token contains "PermBackup" and node.token contains "PermRestore" and not (node.token contains "RoleAdmin:{PermBackup,PermRestore")
   emit issue code.OverbroadRolePermissionGrant at node
 }

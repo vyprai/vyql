@@ -1295,7 +1295,7 @@ matcher sensitiveName {
   containsAny: ["token", "secret"]
 }
 binding contextFields {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName and node.context.advisoryCwe == "CWE-444" and node.context.decoratorPath contains "require_POST" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"])
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -1303,7 +1303,7 @@ binding contextFields {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	flag := decls[0].(*BindingSet).Mappings[0].Flag
-	if flag.Scope != "function" || len(flag.Predicates) != 4 {
+	if flag.Scope != "function" || len(flag.Predicates) != 7 {
 		t.Fatalf("flag predicates wrong: %+v", flag)
 	}
 	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "lang=javascript" {
@@ -1317,6 +1317,15 @@ binding contextFields {
 	}
 	if got := flag.Predicates[3]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "identifier:token" || got.Values[1] != "identifier:secret" {
 		t.Fatalf("matcher predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[4]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "advisory_cwe=CWE-444" {
+		t.Fatalf("advisory CWE predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[5]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "decorator_path:require_POST" {
+		t.Fatalf("decorator path predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[6]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "assign_item:viewer_scopes:CONFIG_READ" || got.Values[1] != "assign_item:guest_scopes:CONFIG_READ" {
+		t.Fatalf("assign item predicate wrong: %+v", got)
 	}
 }
 

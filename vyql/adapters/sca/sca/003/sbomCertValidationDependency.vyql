@@ -1,6 +1,6 @@
 module bindings.sca.migration.mc40a837e;
 
 binding certValidationDependency3 {
-  query pattern presenceNode where node.kind == "any" and node.path == "analysis.sca.package" and node.token contains "advisory_cwe=CWE-295"
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.sca.package" and node.context.advisoryCwe contains "CWE-295"
   emit issue sbom.CertValidationDependency at node
 }
