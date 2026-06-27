@@ -1235,9 +1235,9 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			})
 			// package gating is node-independent (pkgs is constant for this Apply), so
 			// resolve it once per spec instead of re-running the costly evidence match per node.
-			allowed := make([]bool, len(spec.Inputs))
+			effects := make([]requirementEffect, len(spec.Inputs))
 			for i := range spec.Inputs {
-				allowed[i] = reqGate.allowed(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
+				effects[i] = reqGate.effect(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
 			}
 			var out []adapters.Mapping
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
@@ -1250,7 +1250,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 				}
 				for _, ci := range inIdx.candidates(method, path) {
 					in := spec.Inputs[ci]
-					if !allowed[ci] {
+					if !effects[ci].Allowed {
 						continue
 					}
 					matched := (path != "" && matchPath(path, in.Paths, in.Match)) ||
@@ -1276,7 +1276,8 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							if len(in.Packages) > 0 {
 								spec = 3 // package-specific source supersedes native/general
 							}
-							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Specificity: spec})
+							conf, detail := effects[ci].apply("", nil)
+							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Confidence: conf, Specificity: spec, Detail: detail})
 						}
 						break
 					}
@@ -1316,9 +1317,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				}
 				return nil, []string{spec.Sinks[i].Pattern}, false
 			})
-			allowed := make([]bool, len(spec.Sinks))
+			effects := make([]requirementEffect, len(spec.Sinks))
 			for i := range spec.Sinks {
-				allowed[i] = reqGate.allowed(spec.Sinks[i].Packages, spec.Sinks[i].Requirement)
+				effects[i] = reqGate.effect(spec.Sinks[i].Packages, spec.Sinks[i].Requirement)
 			}
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
@@ -1337,7 +1338,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 				bestByConcept := map[string]int{}
 				for _, i := range cand {
 					sk := spec.Sinks[i]
-					if !allowed[i] {
+					if !effects[i].Allowed {
 						continue
 					}
 					if isAttr && !attributeSinks[sk.Concept] {
@@ -1384,9 +1385,11 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					if isAttr {
 						if sk.ByMethod {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf, detail = effects[i].apply(conf, detail)
 							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						} else {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf, detail = effects[i].apply(conf, detail)
 							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "resolved", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
@@ -1398,6 +1401,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							continue
 						}
 						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+						conf, detail = effects[i].apply(conf, detail)
 						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: "syntactic", Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
 					}
@@ -1443,6 +1447,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 								continue
 							}
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+							conf, detail = effects[i].apply(conf, detail)
 							out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
@@ -1472,6 +1477,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						continue
 					}
 					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
+					conf, detail = effects[i].apply(conf, detail)
 					out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: fidelity, Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
@@ -1504,9 +1510,9 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				}
 				return nil, []string{spec.Controls[i].Pattern}, false
 			})
-			allowed := make([]bool, len(spec.Controls))
+			effects := make([]requirementEffect, len(spec.Controls))
 			for i := range spec.Controls {
-				allowed[i] = reqGate.allowed(spec.Controls[i].Packages, spec.Controls[i].Requirement)
+				effects[i] = reqGate.effect(spec.Controls[i].Packages, spec.Controls[i].Requirement)
 			}
 			var out []adapters.Mapping
 			for _, id := range ids {
@@ -1517,7 +1523,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				for _, ci := range ctrlIdx.candidates(method, path) {
 					c := spec.Controls[ci]
-					if !allowed[ci] {
+					if !effects[ci].Allowed {
 						continue
 					}
 					// no break: a single call can be MULTIPLE controls, so attach every match.
@@ -1537,7 +1543,8 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 						if len(c.Packages) > 0 {
 							spec = 3 // package-specific control supersedes native/general
 						}
-						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Specificity: spec, Detail: c.Detail})
+						conf, detail := effects[ci].apply("", c.Detail)
+						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Confidence: conf, Specificity: spec, Detail: detail})
 					}
 				}
 			}
@@ -1806,6 +1813,12 @@ type requirementGate struct {
 	crossLang  bool
 }
 
+type requirementEffect struct {
+	Allowed             bool
+	ConfidenceDowngrade int
+	Detail              map[string]string
+}
+
 func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[string]bool) *requirementGate {
 	langs := map[string]bool{}
 	if tech != "" {
@@ -1831,54 +1844,121 @@ func newRequirementGate(s usg.Store, tech string, crossLang bool, packages map[s
 }
 
 func (g *requirementGate) allowed(packages []string, req *parser.BindingRequirement) bool {
+	return g.effect(packages, req).Allowed
+}
+
+func (g *requirementGate) effect(packages []string, req *parser.BindingRequirement) requirementEffect {
 	if req == nil {
-		return g.packages.allowed(packages)
+		return requirementEffect{Allowed: g.packages.allowed(packages)}
 	}
-	return g.eval(*req)
+	return g.evalEffect(*req)
 }
 
 func (g *requirementGate) eval(req parser.BindingRequirement) bool {
+	return g.evalEffect(req).Allowed
+}
+
+func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementEffect {
 	switch req.Op {
 	case "":
-		return true
+		return requirementEffect{Allowed: true}
 	case "dependency", "framework":
 		if req.Range != "" {
-			return g.dependencyVersionSatisfies(req.Value, req.Range)
+			return requirementEffect{Allowed: g.dependencyVersionSatisfies(req.Value, req.Range)}
 		}
-		return g.packages.inEvidence(req.Value)
+		return requirementEffect{Allowed: g.packages.inEvidence(req.Value)}
 	case "import":
-		return g.imports.inEvidence(req.Value)
+		return requirementEffect{Allowed: g.imports.inEvidence(req.Value)}
 	case "language":
-		return g.languages[strings.ToLower(req.Value)]
+		return requirementEffect{Allowed: g.languages[strings.ToLower(req.Value)]}
 	case "file":
 		g.ensureFiles()
-		return g.files[filepath.ToSlash(req.Value)]
+		return requirementEffect{Allowed: g.files[filepath.ToSlash(req.Value)]}
 	case "schema":
 		name, version, _ := strings.Cut(req.Value, "\x00")
-		return name == "nir" && (version == "" || version == "2.0")
+		return requirementEffect{Allowed: name == "nir" && (version == "" || version == "2.0")}
 	case "project.has":
-		return false
+		return requirementEffect{Allowed: false}
 	case "all":
+		out := requirementEffect{Allowed: true}
 		for _, child := range req.Args {
-			if !g.eval(child) {
-				return false
+			eff := g.evalEffect(child)
+			if !eff.Allowed {
+				return requirementEffect{Allowed: false}
 			}
+			out = mergeRequirementEffects(out, eff)
 		}
-		return true
+		return out
 	case "any":
+		var best requirementEffect
+		found := false
 		for _, child := range req.Args {
-			if g.eval(child) {
-				return true
+			if eff := g.evalEffect(child); eff.Allowed {
+				if !found || eff.ConfidenceDowngrade < best.ConfidenceDowngrade {
+					best = eff
+					found = true
+				}
 			}
 		}
-		return false
+		if found {
+			return best
+		}
+		return requirementEffect{Allowed: false}
 	case "not":
-		return len(req.Args) == 1 && !g.eval(req.Args[0])
+		return requirementEffect{Allowed: len(req.Args) == 1 && !g.evalEffect(req.Args[0]).Allowed}
 	case "soft":
-		return false
+		if len(req.Args) != 1 {
+			return requirementEffect{Allowed: false}
+		}
+		child := g.evalEffect(req.Args[0])
+		if child.Allowed {
+			return requirementEffect{Allowed: true}
+		}
+		return requirementEffect{
+			Allowed:             true,
+			ConfidenceDowngrade: 1,
+			Detail: map[string]string{
+				"requirement_state": "missing",
+				"requirement":       "soft evidence missing",
+			},
+		}
 	default:
-		return false
+		return requirementEffect{Allowed: false}
 	}
+}
+
+func mergeRequirementEffects(a, b requirementEffect) requirementEffect {
+	out := a
+	if b.ConfidenceDowngrade > out.ConfidenceDowngrade {
+		out.ConfidenceDowngrade = b.ConfidenceDowngrade
+	}
+	out.Detail = mergeMappingDetail(out.Detail, b.Detail)
+	return out
+}
+
+func (e requirementEffect) apply(conf string, detail map[string]string) (string, map[string]string) {
+	if e.ConfidenceDowngrade > 0 {
+		conf = downgradeConfidence(conf, e.ConfidenceDowngrade)
+	}
+	return conf, mergeMappingDetail(detail, e.Detail)
+}
+
+func downgradeConfidence(conf string, steps int) string {
+	levels := []string{"low", "medium", "high"}
+	idx := 2
+	if conf != "" {
+		for i, level := range levels {
+			if conf == level {
+				idx = i
+				break
+			}
+		}
+	}
+	idx -= steps
+	if idx < 0 {
+		idx = 0
+	}
+	return levels[idx]
 }
 
 func dependencyVersionEvidence(s usg.Store) map[string][]string {
@@ -2098,9 +2178,9 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			fileTech := fileContextTechs(s)
-			allowed := make([]bool, len(spec.Flags))
+			effects := make([]requirementEffect, len(spec.Flags))
 			for i := range spec.Flags {
-				allowed[i] = reqGate.allowed(spec.Flags[i].Packages, spec.Flags[i].Requirement)
+				effects[i] = reqGate.effect(spec.Flags[i].Packages, spec.Flags[i].Requirement)
 			}
 			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
 				if spec.Flags[i].Scope != "" {
@@ -2136,7 +2216,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						continue
 					}
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
-						if !allowed[i] {
+						if !effects[i].Allowed {
 							continue
 						}
 						fl := spec.Flags[i]
@@ -2148,6 +2228,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
 						detail = mergeMappingDetail(detail, fl.Detail)
+						conf, detail = effects[i].apply(conf, detail)
 						specificity := 0
 						if len(fl.Packages) > 0 {
 							specificity = 3
@@ -3138,9 +3219,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 				}
 				return nil, []string{spec.Marks[i].Pattern}, false
 			})
-			allowed := make([]bool, len(spec.Marks))
+			effects := make([]requirementEffect, len(spec.Marks))
 			for i := range spec.Marks {
-				allowed[i] = reqGate.allowed(spec.Marks[i].Packages, spec.Marks[i].Requirement)
+				effects[i] = reqGate.effect(spec.Marks[i].Packages, spec.Marks[i].Requirement)
 			}
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary"}
 			if crossLang {
@@ -3158,7 +3239,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 					seenConcept := map[string]bool{}
 					for _, mi := range markIdx.candidates(method, path) {
 						m := spec.Marks[mi]
-						if !allowed[mi] {
+						if !effects[mi].Allowed {
 							continue
 						}
 						if seenConcept[m.Concept] {
@@ -3177,6 +3258,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						}
 						detail, conf := reviewDetail(m.Concept, m.Pattern)
 						detail = mergeMappingDetail(detail, m.Detail)
+						conf, detail = effects[mi].apply(conf, detail)
 						spec := 0
 						if len(m.Packages) > 0 {
 							spec = 3 // package-specific mark supersedes native/general
@@ -3461,10 +3543,15 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 			}
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
-			active := make([]paramSourceSpec, 0, len(sources))
+			type activeParamSource struct {
+				spec   paramSourceSpec
+				effect requirementEffect
+			}
+			active := make([]activeParamSource, 0, len(sources))
 			for _, src := range sources {
-				if activeSources[src.Concept] && reqGate.allowed(src.Packages, src.Requirement) {
-					active = append(active, src)
+				eff := reqGate.effect(src.Packages, src.Requirement)
+				if activeSources[src.Concept] && eff.Allowed {
+					active = append(active, activeParamSource{spec: src, effect: eff})
 				}
 			}
 			if len(active) == 0 {
@@ -3478,12 +3565,14 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 					continue // only PUBLIC-API params are entry points; internal helpers are
 					// reached by ordinary interprocedural propagation (precision).
 				}
-				for _, src := range active {
+				for _, activeSrc := range active {
+					src := activeSrc.spec
 					spec := 0
 					if len(src.Packages) > 0 {
 						spec = 3
 					}
-					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Specificity: spec})
+					conf, detail := activeSrc.effect.apply("", nil)
+					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Confidence: conf, Specificity: spec, Detail: detail})
 				}
 			}
 			return out

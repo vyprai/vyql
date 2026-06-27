@@ -359,9 +359,9 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 		{name: "not negates child", req: parser.BindingRequirement{Op: "not", Args: []parser.BindingRequirement{
 			{Op: "dependency", Value: "missing"},
 		}}, want: true},
-		{name: "soft is not evaluated by the requirement gate", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+		{name: "soft never blocks", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
 			{Op: "dependency", Value: "missing"},
-		}}, want: false},
+		}}, want: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -369,6 +369,59 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 				t.Fatalf("allowed = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestV2SoftRequirementDowngradesMappingConfidence(t *testing.T) {
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:3"}})
+	g.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:3", "callee_path": "danger", "method": "danger", "arg0": "arg",
+	}})
+	spec := adapterSpec{
+		Name:       "soft",
+		Technology: "javascript",
+		Sinks: []sinkSpec{{
+			Concept: "custom.Target",
+			Pattern: "danger",
+			Requirement: &parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+				{Op: "dependency", Value: "missing"},
+			}},
+		}},
+	}
+
+	got := spec.sinkAdapter().Apply(g)
+	if len(got) != 1 {
+		t.Fatalf("soft requirement should not block mapping, got %+v", got)
+	}
+	if got[0].Confidence != "medium" {
+		t.Fatalf("confidence = %q, want medium", got[0].Confidence)
+	}
+	if got[0].Detail["requirement_state"] != "missing" {
+		t.Fatalf("detail = %#v, want missing soft requirement diagnostic", got[0].Detail)
+	}
+}
+
+func TestV2AnyRequirementPrefersHardSatisfiedEvidence(t *testing.T) {
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "pkg:npm/express@4.18.2", Type: "sbom.PackageVersion", Props: map[string]string{
+		"name": "express", "version": "4.18.2",
+	}})
+	gate := newRequirementGate(g, "javascript", false, packageEvidence(g, "javascript", false))
+	req := parser.BindingRequirement{Op: "any", Args: []parser.BindingRequirement{
+		{Op: "soft", Args: []parser.BindingRequirement{{Op: "dependency", Value: "missing"}}},
+		{Op: "dependency", Value: "express"},
+	}}
+
+	got := gate.evalEffect(req)
+	if !got.Allowed {
+		t.Fatalf("requirement should be allowed")
+	}
+	if got.ConfidenceDowngrade != 0 {
+		t.Fatalf("confidence downgrade = %d, want 0 for satisfied hard branch", got.ConfidenceDowngrade)
+	}
+	if len(got.Detail) != 0 {
+		t.Fatalf("detail = %#v, want no soft-missing diagnostic", got.Detail)
 	}
 }
 
