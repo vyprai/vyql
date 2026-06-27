@@ -612,15 +612,18 @@ binding requestBody {
 	}
 }
 
-func TestParseV2DefinitionsRejectsMatcherUntilScannerIRSupportsInvocation(t *testing.T) {
-	_, err := ParseV2Definitions(`
+func TestParseV2DefinitionsAllowsStandaloneMatcherDeclarations(t *testing.T) {
+	decls, err := ParseV2Definitions(`
 module patterns.javascript;
 matcher secretTokenName {
   containsAny: ["token", "secret"]
 }
 `)
-	if err == nil || !strings.Contains(err.Error(), "matcher secretTokenName: matcher invocation is not implemented in scanner IR lowering") {
-		t.Fatalf("ParseV2Definitions error = %v, want matcher lowering diagnostic", err)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	if len(decls) != 0 {
+		t.Fatalf("matcher declarations lowered to scanner IR decls: %+v", decls)
 	}
 }
 
@@ -1418,8 +1421,14 @@ binding unsupported {
 func TestV2PresenceNodeOperandAndPseudoSubjectLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
+matcher secretTokenName {
+  containsAny: ["token", "secret"]
+}
+matcher csrfHeaderName {
+  equalsAny: ["x-csrf-token", "csrf-token"]
+}
 binding secretCompare {
-  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, ["token", "secret"]))
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and operand.identifier is secretTokenName and operand.key is csrfHeaderName)
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -1439,6 +1448,70 @@ binding secretCompare {
 	}
 	if got := flag.Operands[0].Predicates[1]; got.Subject != "operand" || got.Property != "identifier" || got.Op != "contains_any" {
 		t.Fatalf("operand predicate wrong: %+v", got)
+	}
+	if got := flag.Operands[0].Predicates[2]; got.Subject != "operand" || got.Property != "key" || got.Op != "equals_any" || got.Values[0] != "x-csrf-token" {
+		t.Fatalf("operand matcher equality predicate wrong: %+v", got)
+	}
+}
+
+func TestV2PresenceNodeMatcherImportsUseAliasesAndRejectUnimportedSimpleNames(t *testing.T) {
+	decls, err := parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "patterns/javascript/matchers.vyql", Source: `
+module patterns.javascript.matchers;
+matcher secretTokenName {
+  containsAny: ["token", "secret"]
+}
+`},
+		{Name: "bindings/javascript/migration.vyql", Source: `
+module bindings.javascript.migration;
+uses patterns.javascript.matchers.secretTokenName as SecretName;
+binding secretCompare {
+  query pattern presenceNode where node.kind == "binop" and operand(node, where: operand.identifier is SecretName)
+  emit issue code.SecretComparisonReview at node
+}
+`},
+	})
+	if err != nil {
+		t.Fatalf("ParseV2DefinitionSources: %v", err)
+	}
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
+	if got := flag.Operands[0].Predicates[0]; got.Subject != "operand" || got.Property != "identifier" || got.Op != "contains_any" || got.Values[0] != "token" {
+		t.Fatalf("imported matcher predicate wrong: %+v", got)
+	}
+
+	_, err = parseV2DefinitionSourcesForTest([]V2DefinitionSource{
+		{Name: "patterns/javascript/matchers.vyql", Source: `
+module patterns.javascript.matchers;
+matcher secretTokenName {
+  containsAny: ["token", "secret"]
+}
+`},
+		{Name: "bindings/javascript/migration.vyql", Source: `
+module bindings.javascript.migration;
+binding secretCompare {
+  query pattern presenceNode where node.kind == "binop" and operand(node, where: operand.identifier is secretTokenName)
+  emit issue code.SecretComparisonReview at node
+}
+`},
+	})
+	if err == nil || !strings.Contains(err.Error(), `unknown matcher "secretTokenName"`) {
+		t.Fatalf("ParseV2DefinitionSources error = %v, want unknown matcher diagnostic", err)
+	}
+}
+
+func TestV2PresenceNodeRejectsRegexMatcherInvocationUntilScannerSupport(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module bindings.javascript.migration;
+matcher riskyName {
+  matches: "token|secret"
+}
+binding secretCompare {
+  query pattern presenceNode where node.kind == "binop" and operand(node, where: operand.identifier is riskyName)
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), "regex matcher invocation requires reviewed scanner support") {
+		t.Fatalf("ParseV2Definitions error = %v, want regex matcher diagnostic", err)
 	}
 }
 

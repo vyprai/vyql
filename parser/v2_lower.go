@@ -91,6 +91,13 @@ type v2Mechanics struct {
 	ruleSolvers   map[string]string
 	coverageModes map[string]bool
 	policies      map[string]bool
+	matchers      map[string]v2MatcherSpec
+}
+
+type v2MatcherSpec struct {
+	Op          string
+	Values      []string
+	Unsupported string
 }
 
 func (m *v2Mechanics) merge(other v2Mechanics) {
@@ -112,10 +119,16 @@ func (m *v2Mechanics) merge(other v2Mechanics) {
 	for policy := range other.policies {
 		m.policies[policy] = true
 	}
+	if len(other.matchers) != 0 && m.matchers == nil {
+		m.matchers = make(map[string]v2MatcherSpec, len(other.matchers))
+	}
+	for name, matcher := range other.matchers {
+		m.matchers[name] = matcher
+	}
 }
 
 func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
-	out := v2Mechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}}
+	out := v2Mechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}, matchers: map[string]v2MatcherSpec{}}
 	if prog == nil {
 		return out
 	}
@@ -132,9 +145,40 @@ func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
 			}
 		case *V2PolicyDecl:
 			out.policies[x.Kind+":"+x.Name] = true
+		case *V2MatcherDecl:
+			spec := v2MatcherSpecFromDecl(x)
+			_, fq := v2DeclNames(prog.Module, x)
+			if fq != "" {
+				out.matchers[fq] = spec
+			}
 		}
 	}
 	return out
+}
+
+func v2MatcherSpecFromDecl(m *V2MatcherDecl) v2MatcherSpec {
+	var spec v2MatcherSpec
+	for _, item := range m.Items {
+		op := ""
+		switch item.Kind {
+		case "containsAny":
+			op = "contains_any"
+		case "equalsAny":
+			op = "equals_any"
+		case "matches":
+			op = "matches"
+		}
+		if op == "" {
+			continue
+		}
+		if spec.Op == "" {
+			spec.Op = op
+		} else if spec.Op != op {
+			spec.Unsupported = "mixed matcher item kinds"
+		}
+		spec.Values = append(spec.Values, item.Values...)
+	}
+	return spec
 }
 
 func builtinV2RuleSolvers() map[string]string {
@@ -157,6 +201,7 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 	out := make([]Decl, 0, len(prog.Decls))
 	names := newV2NameResolver(prog)
 	patterns := newV2PatternResolver(prog)
+	matchers := newV2MatcherResolver(prog, mechanics.matchers)
 	bindingsByTech := map[string]*BindingSet{}
 	bindingSetFor := func(tech string) *BindingSet {
 		set := bindingsByTech[tech]
@@ -184,8 +229,6 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 					set.Meta[k] = v
 				}
 			}
-		case *V2MatcherDecl:
-			return nil, fmt.Errorf("matcher %s: matcher invocation is not implemented in scanner IR lowering", x.Name)
 		case *V2ReviewDecl:
 			out = append(out, &ReviewDecl{Concept: names.concept(x.Concept), Fields: lowerV2FieldNames(x.Fields)})
 		case *V2ProfileDecl:
@@ -196,7 +239,7 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 				return nil, fmt.Errorf("binding %s: cannot infer technology from module %q", x.Name, x.Module)
 			}
 			set := bindingSetFor(tech)
-			maps, err := lowerV2Binding(x, names, patterns, mechanics)
+			maps, err := lowerV2Binding(x, names, patterns, matchers, mechanics)
 			if err != nil {
 				return nil, err
 			}
@@ -255,6 +298,71 @@ func (r v2NameResolver) concept(name string) string {
 		return resolved
 	}
 	return name
+}
+
+type v2MatcherResolver struct {
+	matchers map[string]v2MatcherSpec
+	local    map[string]v2MatcherSpec
+	imports  map[string]string
+	module   string
+}
+
+func newV2MatcherResolver(prog *V2Program, matchers map[string]v2MatcherSpec) v2MatcherResolver {
+	out := v2MatcherResolver{
+		matchers: matchers,
+		local:    map[string]v2MatcherSpec{},
+		imports:  map[string]string{},
+	}
+	if prog == nil {
+		return out
+	}
+	out.module = prog.Module
+	for _, d := range prog.Decls {
+		m, ok := d.(*V2MatcherDecl)
+		if !ok {
+			continue
+		}
+		spec := v2MatcherSpecFromDecl(m)
+		local, fq := v2DeclNames(prog.Module, m)
+		for _, name := range []string{m.Name, local, fq} {
+			if name != "" {
+				out.local[name] = spec
+			}
+		}
+	}
+	for _, u := range prog.Uses {
+		local := u.Alias
+		if local == "" {
+			local = lastSeg(u.Name)
+		}
+		if local != "" {
+			out.imports[local] = u.Name
+		}
+		out.imports[u.Name] = u.Name
+	}
+	return out
+}
+
+func (r v2MatcherResolver) resolve(name string) (v2MatcherSpec, bool) {
+	if m, ok := r.local[name]; ok {
+		return m, true
+	}
+	if imported := r.imports[name]; imported != "" {
+		if m, ok := r.matchers[imported]; ok {
+			return m, true
+		}
+	}
+	if strings.Contains(name, ".") {
+		if m, ok := r.matchers[name]; ok {
+			return m, true
+		}
+	}
+	if r.module != "" && !strings.Contains(name, ".") {
+		if m, ok := r.local[r.module+"."+name]; ok {
+			return m, true
+		}
+	}
+	return v2MatcherSpec{}, false
 }
 
 type v2PatternResolver struct {
@@ -456,7 +564,7 @@ func v2BindingTechnology(module string) string {
 	return ""
 }
 
-func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics v2Mechanics) ([]BindingAction, error) {
+func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, matchers v2MatcherResolver, mechanics v2Mechanics) ([]BindingAction, error) {
 	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
 		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
@@ -481,7 +589,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		}
 	}
 	if queryAlias == "node" {
-		if out, ok, err := lowerV2PresenceBinding(b, names, queryWhere, queryAlias, mechanics); ok || err != nil {
+		if out, ok, err := lowerV2PresenceBinding(b, names, queryWhere, queryAlias, matchers, mechanics); ok || err != nil {
 			return out, err
 		}
 	}
@@ -724,8 +832,8 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 	return where, alias, binds, nil
 }
 
-func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics v2Mechanics) ([]BindingAction, bool, error) {
-	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr)
+func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, matchers v2MatcherResolver, mechanics v2Mechanics) ([]BindingAction, bool, error) {
+	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr, matchers)
 	if err != nil || !ok {
 		return nil, ok, err
 	}
@@ -768,7 +876,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	return out, true, nil
 }
 
-func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*BindingPresence, bool, error) {
+func lowerV2PresenceFlagExpr(alias string, expr V2Expr, matchers v2MatcherResolver) (*BindingPresence, bool, error) {
 	if alias == "" {
 		return nil, true, fmt.Errorf("query alias is required")
 	}
@@ -780,7 +888,7 @@ func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*BindingPresence, bool,
 			neg = true
 			atom = u.X
 		}
-		if handledOperand, err := lowerV2PresenceOperand(fl, alias, atom, neg); handledOperand || err != nil {
+		if handledOperand, err := lowerV2PresenceOperand(fl, alias, atom, neg, matchers); handledOperand || err != nil {
 			if err != nil {
 				return nil, true, err
 			}
@@ -794,7 +902,7 @@ func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*BindingPresence, bool,
 			handled = true
 			continue
 		}
-		pred, err := lowerV2PresencePredicate(alias, "node", atom, neg)
+		pred, err := lowerV2PresencePredicate(alias, "node", atom, neg, matchers)
 		if err != nil {
 			return nil, true, err
 		}
@@ -883,7 +991,7 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Bindin
 	return out, nil
 }
 
-func lowerV2PresenceOperand(fl *BindingPresence, alias string, expr V2Expr, neg bool) (bool, error) {
+func lowerV2PresenceOperand(fl *BindingPresence, alias string, expr V2Expr, neg bool, matchers v2MatcherResolver) (bool, error) {
 	if neg {
 		return false, nil
 	}
@@ -915,7 +1023,7 @@ func lowerV2PresenceOperand(fl *BindingPresence, alias string, expr V2Expr, neg 
 			opNeg = true
 			atom = u.X
 		}
-		pred, err := lowerV2PresencePredicate("operand", "operand", atom, opNeg)
+		pred, err := lowerV2PresencePredicate("operand", "operand", atom, opNeg, matchers)
 		if err != nil {
 			return true, err
 		}
@@ -964,10 +1072,10 @@ func lowerV2PresenceMeta(fl *BindingPresence, alias string, expr V2Expr, neg boo
 	return true, nil
 }
 
-func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg bool) (BindingPresencePredicate, error) {
+func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg bool, matchers v2MatcherResolver) (BindingPresencePredicate, error) {
 	switch x := expr.(type) {
 	case V2BinaryExpr:
-		return lowerV2PresenceBinary(alias, defaultSubject, x, neg)
+		return lowerV2PresenceBinary(alias, defaultSubject, x, neg, matchers)
 	case V2CallExpr:
 		return lowerV2PresenceCall(alias, defaultSubject, x, neg)
 	default:
@@ -975,7 +1083,7 @@ func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg boo
 	}
 }
 
-func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool) (BindingPresencePredicate, error) {
+func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool, matchers v2MatcherResolver) (BindingPresencePredicate, error) {
 	field, ok := v2PresenceField(alias, x.Left)
 	if !ok {
 		return BindingPresencePredicate{}, fmt.Errorf("predicate left side must be %s.<field>", alias)
@@ -1009,9 +1117,36 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 			return BindingPresencePredicate{}, fmt.Errorf("%s in predicate requires a string list", field)
 		}
 		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg}, nil
+	case "is":
+		matcherName, ok := v2MatcherRef(x.Right)
+		if !ok {
+			return BindingPresencePredicate{}, fmt.Errorf("%s is predicate requires a matcher name", field)
+		}
+		matcher, ok := matchers.resolve(matcherName)
+		if !ok {
+			return BindingPresencePredicate{}, fmt.Errorf("unknown matcher %q", matcherName)
+		}
+		if matcher.Unsupported != "" {
+			return BindingPresencePredicate{}, fmt.Errorf("matcher %s: %s requires native matcher lowering", matcherName, matcher.Unsupported)
+		}
+		if matcher.Op == "matches" {
+			return BindingPresencePredicate{}, fmt.Errorf("matcher %s: regex matcher invocation requires reviewed scanner support", matcherName)
+		}
+		if matcher.Op == "" || len(matcher.Values) == 0 {
+			return BindingPresencePredicate{}, fmt.Errorf("matcher %s: empty matcher", matcherName)
+		}
+		return BindingPresencePredicate{Subject: subject, Property: prop, Op: matcher.Op, Values: matcher.Values, Negative: neg}, nil
 	default:
 		return BindingPresencePredicate{}, fmt.Errorf("unsupported operator %q", x.Op)
 	}
+}
+
+func v2MatcherRef(expr V2Expr) (string, bool) {
+	ref, ok := expr.(V2RefExpr)
+	if !ok || ref.Name == "" {
+		return "", false
+	}
+	return ref.Name, true
 }
 
 func lowerV2PresenceCall(alias, defaultSubject string, x V2CallExpr, neg bool) (BindingPresencePredicate, error) {
