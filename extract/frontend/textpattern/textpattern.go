@@ -1,5 +1,5 @@
 // Package textpattern runs a data-defined text-pattern profile over files that do not need
-// a language parser. The scanner mechanics are generic; the adapter metadata declares the
+// a language parser. The scanner mechanics are generic; the binding metadata declares the
 // patterns, file extensions, emitted event path, and the concept label for that event.
 package textpattern
 
@@ -201,7 +201,7 @@ func loadProfile() textPatternProfile {
 			return selected[src.Name]
 		})
 		if err != nil {
-			panic("textpattern: parse adapter corpus: " + err.Error())
+			panic("textpattern: parse binding corpus: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
@@ -211,7 +211,7 @@ func loadProfile() textPatternProfile {
 			}
 		}
 		if meta == nil {
-			panic("textpattern: missing adapter metadata")
+			panic("textpattern: missing binding metadata")
 		}
 		profile = textPatternProfile{
 			Event:              metaString(meta, "text_pattern_event"),

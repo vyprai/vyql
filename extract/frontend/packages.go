@@ -103,7 +103,7 @@ func readGeneratedPackageBindingSources(tech, pkg string) ([]datadir.Source, err
 }
 
 func parseGeneratedPackageBindingSource(source datadir.Source) ([]parser.Decl, error) {
-	decls, err := parseV2AdapterSources([]datadir.Source{source})
+	decls, err := parseV2BindingSources([]datadir.Source{source})
 	if err != nil {
 		return nil, fmt.Errorf("frontend: invalid generated package binding %s: %w", source.Name, err)
 	}

@@ -1,6 +1,6 @@
 // Package config is a non-tree-sitter frontend for declarative project files.
 // It performs lightweight file parsing and emits data-defined event calls that
-// adapters can label with concepts.
+// bindings can label with concepts.
 package config
 
 import (
@@ -611,7 +611,7 @@ func loadProfile() configProfile {
 			return selected[src.Name]
 		})
 		if err != nil {
-			panic("config: parse adapter corpus: " + err.Error())
+			panic("config: parse binding corpus: " + err.Error())
 		}
 		var meta map[string]any
 		for _, d := range decls {
@@ -621,7 +621,7 @@ func loadProfile() configProfile {
 			}
 		}
 		if meta == nil {
-			panic("config: missing adapter metadata")
+			panic("config: missing binding metadata")
 		}
 		configProfileData = configProfile{
 			PlistTrueKey:  map[string]string{},

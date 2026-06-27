@@ -54,9 +54,9 @@ func loadCallFlowProfiles() {
 	if err != nil {
 		panic("frontend: read bindings: " + err.Error())
 	}
-	decls, err := parseV2AdapterSources(files)
+	decls, err := parseV2BindingSources(files)
 	if err != nil {
-		panic("frontend: parse adapter call-flow corpus: " + err.Error())
+		panic("frontend: parse binding call-flow corpus: " + err.Error())
 	}
 	for _, d := range decls {
 		ad, ok := d.(*parser.BindingSet)

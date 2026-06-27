@@ -123,10 +123,10 @@ type flagSpec struct {
 var activeSources map[string]bool
 
 var (
-	autoAdaptersCache sync.Map // map[string]cachedAutoAdapters
+	autoBindingsCache sync.Map // map[string]cachedAutoBindings
 )
 
-type cachedAutoAdapters struct {
+type cachedAutoBindings struct {
 	data []adapters.Adapter
 	err  error
 }
@@ -719,7 +719,7 @@ func ontologyConceptDetails() map[string]map[string]string {
 		if err != nil {
 			panic("frontend: read ontology: " + err.Error())
 		}
-		decls, err := parseV2AdapterSources(files)
+		decls, err := parseV2BindingSources(files)
 		if err != nil {
 			panic("frontend: parse ontology detail corpus: " + err.Error())
 		}
@@ -879,7 +879,7 @@ func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
 		if err != nil {
 			return nil, err
 		}
-		decls, err := parseV2AdapterSources([]datadir.Source{{
+		decls, err := parseV2BindingSources([]datadir.Source{{
 			Name: filepath.ToSlash(file),
 			Data: b,
 		}})
@@ -1076,9 +1076,9 @@ func loadBindingSet(tech string) *parser.BindingSet {
 	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + tech); err == nil {
 		sources = append(sources, extra...)
 	}
-	decls, err := parseV2AdapterSources(sources)
+	decls, err := parseV2BindingSources(sources)
 	if err != nil {
-		panic("frontend: invalid adapter corpus for " + tech + ": " + err.Error())
+		panic("frontend: invalid binding corpus for " + tech + ": " + err.Error())
 	}
 	var merged *parser.BindingSet
 	for _, d := range decls {
@@ -1106,7 +1106,7 @@ type bindingSetCacheKey struct {
 	tech string
 }
 
-func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2DefinitionSource {
+func v2DefinitionSourcesForBindings(sources []datadir.Source) []parser.V2DefinitionSource {
 	out := make([]parser.V2DefinitionSource, 0, len(sources)+32)
 	hasOntology, hasPolicies := false, false
 	for _, source := range sources {
@@ -1138,12 +1138,12 @@ func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2Definiti
 	return out
 }
 
-func parseV2AdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
+func parseV2BindingSources(sources []datadir.Source) ([]parser.Decl, error) {
 	selected := make(map[string]bool, len(sources))
 	for _, source := range sources {
 		selected[source.Name] = true
 	}
-	return parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForAdapter(sources), func(src parser.V2DefinitionSource) bool {
+	return parser.ParseV2DefinitionSourcesSelected(v2DefinitionSourcesForBindings(sources), func(src parser.V2DefinitionSource) bool {
 		return selected[src.Name]
 	})
 }
@@ -3808,33 +3808,33 @@ func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern"
 // `meta { auto_apply: graph }`.
 func AutoAdapters() []adapters.Adapter {
 	const key = "v2"
-	if cached, ok := autoAdaptersCache.Load(key); ok {
-		res := cached.(cachedAutoAdapters)
+	if cached, ok := autoBindingsCache.Load(key); ok {
+		res := cached.(cachedAutoBindings)
 		if res.err != nil {
 			panic(res.err.Error())
 		}
 		return res.data
 	}
-	data, err := loadAutoAdapters()
-	res := cachedAutoAdapters{data: data, err: err}
-	actual, _ := autoAdaptersCache.LoadOrStore(key, res)
-	actualRes := actual.(cachedAutoAdapters)
+	data, err := loadAutoBindings()
+	res := cachedAutoBindings{data: data, err: err}
+	actual, _ := autoBindingsCache.LoadOrStore(key, res)
+	actualRes := actual.(cachedAutoBindings)
 	if actualRes.err != nil {
 		panic(actualRes.err.Error())
 	}
 	return actualRes.data
 }
 
-func loadAutoAdapters() ([]adapters.Adapter, error) {
-	sources, err := autoAdapterSources()
+func loadAutoBindings() ([]adapters.Adapter, error) {
+	sources, err := autoBindingSources()
 	if err != nil {
-		return nil, fmt.Errorf("frontend: read auto adapters: %w", err)
+		return nil, fmt.Errorf("frontend: read auto bindings: %w", err)
 	}
 	byName := map[string]*parser.BindingSet{}
 	var order []string
-	decls, err := parseV2AdapterSources(sources)
+	decls, err := parseV2BindingSources(sources)
 	if err != nil {
-		return nil, fmt.Errorf("frontend: parse auto adapter corpus: %w", err)
+		return nil, fmt.Errorf("frontend: parse auto binding corpus: %w", err)
 	}
 	for _, d := range decls {
 		ad, ok := d.(*parser.BindingSet)
@@ -3862,7 +3862,7 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 	return out, nil
 }
 
-func autoAdapterSources() ([]datadir.Source, error) {
+func autoBindingSources() ([]datadir.Source, error) {
 	root := filepath.Join(datadir.Root(), "bindings")
 	entries, err := os.ReadDir(root)
 	if err != nil {
