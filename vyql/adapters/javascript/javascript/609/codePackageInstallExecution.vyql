@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding packageInstallExecution609 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "child_process.spawnSync" and node.token contains "install"
-  emit issue code.PackageInstallExecution at node
+  query pattern callExpr where callee.path ~= "child_process.spawnSync" and args.any.literal contains "install"
+  emit issue code.PackageInstallExecution at call
 }

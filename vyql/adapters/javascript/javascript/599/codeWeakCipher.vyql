@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding weakCipher599 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "createCipheriv" and not (node.token contains "gcm") and not (node.token contains "chacha") and not (node.token contains "poly1305")
-  emit issue code.WeakCipher at node
+  query pattern callExpr where callee.path ~= "createCipheriv" and not args.any.literal contains "gcm" and not args.any.literal contains "chacha" and not args.any.literal contains "poly1305"
+  emit issue code.WeakCipher at call
 }

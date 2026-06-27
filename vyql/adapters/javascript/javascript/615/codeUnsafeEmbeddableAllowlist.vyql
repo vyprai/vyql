@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unsafeEmbeddableAllowlist615 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "Set" and node.token contains "dddice.com"
-  emit issue code.UnsafeEmbeddableAllowlist at node
+  query pattern callExpr where callee.path ~= "Set" and args.any.literal contains "dddice.com"
+  emit issue code.UnsafeEmbeddableAllowlist at call
 }

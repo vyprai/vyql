@@ -1,10 +1,6 @@
 module bindings.swift.migration.m388f23d0;
 
 binding weakCipher55 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "Cipher" and node.token contains "RC4"
-  emit issue code.WeakCipher at node
+  query pattern callExpr where callee.path ~= "Cipher" and args.any.literal contains "RC4"
+  emit issue code.WeakCipher at call
 }

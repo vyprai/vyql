@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding missingFrameProtection659 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "headers.setdefault" and node.token contains "X-Frame-Options" and node.token contains "ALLOWALL"
-  emit issue code.MissingFrameProtection at node
+  query pattern callExpr where callee.path ~= "headers.setdefault" and args.any.literal contains "X-Frame-Options" and args.any.literal contains "ALLOWALL"
+  emit issue code.MissingFrameProtection at call
 }

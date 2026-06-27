@@ -1,10 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding networkFilteringDisabled237 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "command" and node.token contains "bridge-nf-call-arptables" and node.token contains "echo 0"
-  emit issue code.NetworkFilteringDisabled at node
+  query pattern callExpr where callee.path ~= "command" and args.any.literal contains "bridge-nf-call-arptables" and args.any.literal contains "echo 0"
+  emit issue code.NetworkFilteringDisabled at call
 }

@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding weakHash578 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "hashlib.new" and node.token contains "md2"
-  emit issue code.WeakHash at node
+  query pattern callExpr where callee.path ~= "hashlib.new" and args.any.literal contains "md2"
+  emit issue code.WeakHash at call
 }

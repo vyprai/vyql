@@ -1,12 +1,12 @@
 module bindings.kotlin.migration.m304d1620;
 
 binding xmlHardening93 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "setXIncludeAware" and node.token contains "false"
-  emit check core.XmlHardening at node {
+  query pattern callExpr where callee.path ~= "setXIncludeAware" and args.any.literal contains "false"
+  emit check core.XmlHardening at call {
     advisory: true
+    covers path {
+      from: call
+      to: call
+    }
   }
 }

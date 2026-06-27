@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding insecurePermission133 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "Permissions.from_mode" and node.token contains "0o666"
-  emit issue code.InsecurePermission at node
+  query pattern callExpr where callee.path ~= "Permissions.from_mode" and args.any.literal contains "0o666"
+  emit issue code.InsecurePermission at call
 }

@@ -1,10 +1,6 @@
 module bindings.bash.migration.m59952d5d;
 
 binding insecurePermission36 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "chmod" and node.token contains "a+w"
-  emit issue code.InsecurePermission at node
+  query pattern callExpr where callee.path ~= "chmod" and args.any.literal contains "a+w"
+  emit issue code.InsecurePermission at call
 }

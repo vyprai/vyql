@@ -1,10 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding certValidationDisabled54 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "setPeerVerifyMode" and node.token contains "VerifyNone"
-  emit issue code.CertValidationDisabled at node
+  query pattern callExpr where callee.path ~= "setPeerVerifyMode" and args.any.literal contains "VerifyNone"
+  emit issue code.CertValidationDisabled at call
 }

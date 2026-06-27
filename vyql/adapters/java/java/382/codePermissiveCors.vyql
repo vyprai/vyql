@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding permissiveCors382 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "setHeader" and node.token contains "Access-Control-Allow-Origin" and node.token contains "*"
-  emit issue code.PermissiveCors at node
+  query pattern callExpr where callee.path ~= "setHeader" and args.any.literal contains "Access-Control-Allow-Origin" and args.any.literal contains "*"
+  emit issue code.PermissiveCors at call
 }

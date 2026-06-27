@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding weakCipher406 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "openssl_encrypt" and node.token contains "rc2"
-  emit issue code.WeakCipher at node
+  query pattern callExpr where callee.path ~= "openssl_encrypt" and args.any.literal contains "rc2"
+  emit issue code.WeakCipher at call
 }

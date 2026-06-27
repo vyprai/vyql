@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding csrfDisabled655 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "csrfProtection" and node.token contains "false"
-  emit issue code.CsrfDisabled at node
+  query pattern callExpr where callee.path ~= "csrfProtection" and args.any.literal contains "false"
+  emit issue code.CsrfDisabled at call
 }
