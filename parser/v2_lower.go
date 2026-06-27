@@ -961,14 +961,15 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 }
 
 func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
-	if action.Location != "call" && action.Location != "node" {
-		return BindingAction{}, fmt.Errorf("binding %s: advisory checks currently lower at call/node only", binding)
-	}
 	if len(action.Covers) != 1 {
 		return BindingAction{}, fmt.Errorf("binding %s: advisory check requires exactly one coverage mode", binding)
 	}
 	kind := shape.markKind()
-	return shape.mapping(BindingAction{
+	loc, hasArgTarget, err := v2CheckArgTarget(action.Location)
+	if err != nil {
+		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
+	}
+	out := shape.mapping(BindingAction{
 		Kind:           kind,
 		Pattern:        shape.Pattern,
 		Exact:          shape.Exact,
@@ -981,7 +982,19 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 		ValAbsents:     shape.ValAbsents,
 		Packages:       pkgs,
 		Requirement:    req,
-	}), nil
+	})
+	if hasArgTarget {
+		if shape.Field == "callee.method" {
+			out.Kind = "mark_method_arg"
+		} else {
+			out.Kind = "mark_arg"
+		}
+		out.ArgIndex = loc.ArgIndex
+		out.Collection = loc.Collection
+		out.CollectionFirst = loc.CollectionFirst
+		out.CollectionIndex = loc.CollectionIndex
+	}
+	return out, nil
 }
 
 func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2PatternResolver) (V2Expr, string, string, error) {

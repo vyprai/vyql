@@ -1386,6 +1386,36 @@ binding possiblePathValidation {
 	}
 }
 
+func TestV2AdvisoryCheckLowersArgumentLocation(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.python.migration;
+binding possiblePathValidation {
+  query pattern callExpr where callee.method == "startswith" and args.any.literal contains "os.sep"
+  emit check core.PathCanonicalization at args[0] {
+    advisory: true
+    about: code.FilePathAccess
+    covers sameScope {
+      anchor: call.scope
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "mark_method_arg" || got.Pattern != "startswith" || got.Concept != "core.PathCanonicalization" || got.ArgIndex != 0 {
+		t.Fatalf("argument advisory check lowering wrong: %+v", got)
+	}
+	if !got.Advisory || got.About != "code.FilePathAccess" || got.Coverage != "sameScope" {
+		t.Fatalf("argument advisory metadata lost: %+v", got)
+	}
+}
+
 func TestV2GlobalCheckLowersToExplicitGlobalEvidence(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.migration;

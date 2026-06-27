@@ -2596,6 +2596,41 @@ func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
 	}
 }
 
+func TestMarkAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "samplepkg.startswith", "method": "startswith", "arg0": "arg",
+	}})
+
+	spec := specFromBindingSet(&parser.BindingSet{
+		Name: "neutral",
+		Mappings: []parser.BindingAction{{
+			Kind:           "mark_method_arg",
+			Concept:        "custom.PathCanonicalization",
+			Pattern:        "startswith",
+			ArgIndex:       0,
+			About:          "custom.FilePathAccess",
+			Advisory:       true,
+			Coverage:       "sameScope",
+			CoverageDetail: map[string]string{"anchor": "call.scope"},
+			Fidelity:       "syntactic",
+			Confidence:     "low",
+		}},
+	})
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.PathCanonicalization" {
+		t.Fatalf("argument advisory mark mapping wrong: %+v", got)
+	}
+	if got[0].Detail["advisory"] != "true" || got[0].Detail["about"] != "custom.FilePathAccess" ||
+		got[0].Detail["coverage"] != "sameScope" || got[0].Detail["coverage.anchor"] != "call.scope" {
+		t.Fatalf("advisory detail not preserved on argument mark: %+v", got[0])
+	}
+	if got[0].Fidelity != "syntactic" || got[0].Confidence != "low" {
+		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])
+	}
+}
+
 func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "app.js:2"}})
