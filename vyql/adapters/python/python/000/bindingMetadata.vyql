@@ -1,7 +1,7 @@
 module bindings.python.generated.m21017d75;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "python"
     meta: {
       fidelity: "resolved"

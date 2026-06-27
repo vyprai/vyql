@@ -1,8 +1,8 @@
-module bindings.pii.generated.m24e11c07;
+module bindings.sca.generated.mc40a837e;
 
-pattern adapterMetadata {
-  adapter: {
-    name: "pii"
+pattern bindingMetadata {
+  binding: {
+    name: "sca"
     meta: {
       auto_apply: "graph"
       cross_language: "true"

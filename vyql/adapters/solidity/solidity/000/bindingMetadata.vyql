@@ -1,7 +1,7 @@
 module bindings.solidity.generated.m88e544d8;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "solidity"
     meta: {
       fidelity: "resolved"

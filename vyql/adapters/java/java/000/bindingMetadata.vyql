@@ -1,7 +1,7 @@
 module bindings.java.generated.m420f6b67;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "java"
     meta: {
       fidelity: "resolved"

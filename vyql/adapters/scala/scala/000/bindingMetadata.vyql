@@ -1,7 +1,7 @@
 module bindings.scala.generated.m06d0685b;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "scala"
     meta: {
       fidelity: "resolved"

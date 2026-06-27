@@ -1,7 +1,7 @@
 module bindings.perl.generated.mfca40a44;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "perl"
     meta: {
       fidelity: "resolved"

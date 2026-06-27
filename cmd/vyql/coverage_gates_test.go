@@ -765,6 +765,8 @@ func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
 func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
 	return []*regexp.Regexp{
 		regexp.MustCompile(`^\s*adapter\s+[A-Za-z0-9_.-]+\s*\{`),
+		regexp.MustCompile(`^\s*adapter\s*:\s*\{`),
+		regexp.MustCompile(`^\s*pattern\s+adapterMetadata\s*\{`),
 		regexp.MustCompile(`^\s*source\s+"`),
 		regexp.MustCompile(`^\s*sink\s+(?:"|method\s+"|path\s+")`),
 		regexp.MustCompile(`^\s*control\s+"`),

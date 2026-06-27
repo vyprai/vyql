@@ -1,7 +1,7 @@
 module bindings.groovy.generated.m6eabb149;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "groovy"
     meta: {
       fidelity: "resolved"

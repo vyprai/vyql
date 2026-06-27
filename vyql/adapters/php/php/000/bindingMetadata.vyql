@@ -1,7 +1,7 @@
 module bindings.php.generated.mfbe84119;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "php"
     meta: {
       fidelity: "resolved"

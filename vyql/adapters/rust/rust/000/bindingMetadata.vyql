@@ -1,7 +1,7 @@
 module bindings.rust.generated.mdc4f74cd;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "rust"
     meta: {
       fidelity: "resolved"

@@ -1,7 +1,7 @@
 module bindings.dart.generated.m1c398214;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "dart"
     meta: {
       fidelity: "resolved"

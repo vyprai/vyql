@@ -1,7 +1,7 @@
 module bindings.javascript.generated.mfb63017a;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "javascript"
     meta: {
       fidelity: "resolved"

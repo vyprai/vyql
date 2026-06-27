@@ -1,7 +1,7 @@
 module bindings.auditreview.generated.mbf0d19ec;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "auditreview"
     meta: {
       auto_apply: "graph"

@@ -1,7 +1,7 @@
 module bindings.config.generated.m2b6375a9;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "config"
     meta: {
       config_directive_value_events: ["dockerfile|USER|root|exact|analysis.config.container.root_user", "dockerfile|USER|0|exact|analysis.config.container.root_user", "dockerfile|USER|root:|prefix|analysis.config.container.root_user", "dockerfile|USER|0:|prefix|analysis.config.container.root_user"]

@@ -1,7 +1,7 @@
 module bindings.textpattern.generated.mf0439c30;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "textpattern"
     meta: {
       cross_language: "true"

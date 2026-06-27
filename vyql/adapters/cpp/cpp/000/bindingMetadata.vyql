@@ -1,7 +1,7 @@
 module bindings.cpp.generated.m4e783366;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "cpp"
     meta: {
       fidelity: "resolved"

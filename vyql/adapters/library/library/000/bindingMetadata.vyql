@@ -1,7 +1,7 @@
 module bindings.library.generated.m699b14a0;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "library"
     meta: {
       auto_apply: "graph"

@@ -1,7 +1,7 @@
 module bindings.elixir.generated.m728b8a72;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "elixir"
     meta: {
       fidelity: "resolved"

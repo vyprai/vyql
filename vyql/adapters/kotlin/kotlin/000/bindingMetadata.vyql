@@ -1,7 +1,7 @@
 module bindings.kotlin.generated.m304d1620;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "kotlin"
     meta: {
       fidelity: "resolved"

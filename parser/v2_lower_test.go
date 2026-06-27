@@ -2679,11 +2679,11 @@ rule SqlInjection {
 	}
 }
 
-func TestV2AdapterMetadataLowersToScannerIRAdapterMeta(t *testing.T) {
+func TestV2BindingMetadataLowersToScannerIRAdapterMeta(t *testing.T) {
 	decls := parseIRFiles(t, `
 module bindings.textpattern.migration;
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "textpattern"
     meta: {
       cross_language: true
@@ -2694,38 +2694,38 @@ pattern adapterMetadata {
 }
 `)
 	if len(decls) != 1 {
-		t.Fatalf("decls = %d, want metadata adapter only", len(decls))
+		t.Fatalf("decls = %d, want metadata binding only", len(decls))
 	}
 	ad := decls[0].(*BindingSet)
 	if ad.Name != "textpattern" || len(ad.Mappings) != 0 {
-		t.Fatalf("adapter metadata decl wrong: %+v", ad)
+		t.Fatalf("binding metadata decl wrong: %+v", ad)
 	}
 	if ad.Meta["cross_language"] != true || ad.Meta["text_pattern_event"] != "analysis.text_pattern.credential_literal" {
-		t.Fatalf("adapter metadata missing: %+v", ad.Meta)
+		t.Fatalf("binding metadata missing: %+v", ad.Meta)
 	}
 	if got, ok := ad.Meta["text_pattern_extensions"].([]string); !ok || len(got) != 2 || got[1] != ".py" {
-		t.Fatalf("adapter metadata list wrong: %#v", ad.Meta["text_pattern_extensions"])
+		t.Fatalf("binding metadata list wrong: %#v", ad.Meta["text_pattern_extensions"])
 	}
 }
 
-func TestV2UnstableAdapterMetadataRejected(t *testing.T) {
+func TestV2UnstableBindingMetadataRejected(t *testing.T) {
 	_, err := ParseV2Definitions(`
 module bindings.textpattern.migration;
-pattern adapterMetadata {
+pattern bindingMetadata {
   unstable: {
     owner: "test"
-    reason: "unstable adapter metadata"
+    reason: "unstable binding metadata"
     adapter: "textpattern"
     meta: {
       cross_language: true
     }
-  }
+	}
 }
 `)
 	if err == nil {
-		t.Fatal("ParseV2Definitions accepted unstable adapter metadata")
+		t.Fatal("ParseV2Definitions accepted unstable binding metadata")
 	}
-	if !strings.Contains(err.Error(), "unstable adapter metadata must use stable adapter item") {
+	if !strings.Contains(err.Error(), "unstable binding metadata must use stable binding item") {
 		t.Fatalf("ParseV2Definitions error = %v", err)
 	}
 }

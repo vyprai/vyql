@@ -262,7 +262,7 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mech
 		case *V2ThreatDecl:
 			out = append(out, &ThreatDecl{Name: x.Name, Package: x.Module, Fields: lowerV2FieldNames(x.Fields)})
 		case *V2PatternDecl:
-			tech, meta, err := lowerV2AdapterMetaPattern(x)
+			tech, meta, err := lowerV2BindingMetaPattern(x)
 			if err != nil {
 				return nil, err
 			}
@@ -568,25 +568,25 @@ func lowerV2FieldName(name string) string {
 	}
 }
 
-func lowerV2AdapterMetaPattern(p *V2PatternDecl) (string, map[string]any, error) {
+func lowerV2BindingMetaPattern(p *V2PatternDecl) (string, map[string]any, error) {
 	for _, item := range p.Items {
-		if item.Kind == "adapter" {
+		if item.Kind == "binding" {
 			name, _ := item.Meta["name"].(string)
 			if name == "" {
-				return "", nil, fmt.Errorf("pattern %s: adapter metadata requires name", p.Name)
+				return "", nil, fmt.Errorf("pattern %s: binding metadata requires name", p.Name)
 			}
 			rawMeta, ok := item.Meta["meta"].(map[string]any)
 			if !ok {
-				return "", nil, fmt.Errorf("pattern %s: adapter metadata requires meta block", p.Name)
+				return "", nil, fmt.Errorf("pattern %s: binding metadata requires meta block", p.Name)
 			}
 			return name, rawMeta, nil
 		}
 		if item.Kind == "unstable" {
 			if _, hasAdapter := item.Meta["adapter"]; hasAdapter {
-				return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata must use stable adapter item", p.Name)
+				return "", nil, fmt.Errorf("pattern %s: unstable binding metadata must use stable binding item", p.Name)
 			}
 			if _, hasMeta := item.Meta["meta"]; hasMeta {
-				return "", nil, fmt.Errorf("pattern %s: unstable adapter metadata must use stable adapter item", p.Name)
+				return "", nil, fmt.Errorf("pattern %s: unstable binding metadata must use stable binding item", p.Name)
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 module bindings.swift.generated.m388f23d0;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "swift"
     meta: {
       fidelity: "resolved"

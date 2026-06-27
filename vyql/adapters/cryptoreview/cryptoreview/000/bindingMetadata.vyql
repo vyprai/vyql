@@ -1,7 +1,7 @@
 module bindings.cryptoreview.generated.m4f475b34;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "cryptoreview"
     meta: {
       auto_apply: "graph"

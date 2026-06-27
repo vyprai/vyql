@@ -1,7 +1,7 @@
 module bindings.objc.generated.mccadd221;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "objc"
     meta: {
       fidelity: "resolved"

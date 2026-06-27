@@ -1,7 +1,7 @@
 module bindings.bash.generated.m59952d5d;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "bash"
     meta: {
       fidelity: "resolved"

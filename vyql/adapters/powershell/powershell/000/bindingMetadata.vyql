@@ -1,7 +1,7 @@
 module bindings.powershell.generated.m390f1180;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "powershell"
     meta: {
       fidelity: "resolved"

@@ -1,7 +1,7 @@
 module bindings.csharp.generated.m1caa8bf2;
 
-pattern adapterMetadata {
-  adapter: {
+pattern bindingMetadata {
+  binding: {
     name: "csharp"
     meta: {
       fidelity: "resolved"
