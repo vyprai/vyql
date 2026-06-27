@@ -724,7 +724,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit sink":
 				if action.Location == "call" || action.Location == "node" {
-					m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+					m := shape.mapping(BindingAction{Kind: shape.sinkNodeKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
@@ -799,7 +799,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					out = appendV2BindingAction(out, m, b.Attrs)
 					continue
 				}
-				kind := shape.controlKind()
+				kind := shape.checkKind()
 				if action.Location == "callee.receiver" {
 					if shape.Field != "callee.method" {
 						return nil, fmt.Errorf("binding %s: receiver check lowering requires callee.method predicate", b.Name)
@@ -810,7 +810,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if action.Covers[0].Mode != "sameReceiver" {
 						return nil, fmt.Errorf("binding %s: receiver checks must declare sameReceiver coverage", b.Name)
 					}
-					kind = "control_receiver_method"
+					kind = "check_receiver_method"
 				} else {
 					if err := validateV2ConcreteCheck(b.Name, action); err != nil {
 						return nil, err
@@ -823,9 +823,9 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				if hasArgTarget {
 					if shape.Field == "callee.method" {
-						m.Kind = "control_method_arg"
+						m.Kind = "check_method_arg"
 					} else {
-						m.Kind = "control_arg"
+						m.Kind = "check_arg"
 					}
 					m.ArgIndex = loc.ArgIndex
 					m.Collection = loc.Collection
@@ -1070,7 +1070,7 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
 	}
 	out := shape.mapping(BindingAction{
-		Kind:           shape.markKind(),
+		Kind:           shape.checkKind(),
 		Pattern:        shape.Pattern,
 		Exact:          shape.Exact,
 		Concept:        action.Concept,
@@ -1083,9 +1083,9 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 	})
 	if hasArgTarget {
 		if shape.Field == "callee.method" {
-			out.Kind = "mark_method_arg"
+			out.Kind = "check_method_arg"
 		} else {
-			out.Kind = "mark_arg"
+			out.Kind = "check_arg"
 		}
 		out.ArgIndex = loc.ArgIndex
 		out.Collection = loc.Collection
@@ -1099,7 +1099,7 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 	if len(action.Covers) != 1 {
 		return BindingAction{}, fmt.Errorf("binding %s: advisory check requires exactly one coverage mode", binding)
 	}
-	kind := shape.markKind()
+	kind := shape.checkKind()
 	loc, hasArgTarget, err := v2CheckArgTarget(action.Location)
 	if err != nil {
 		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
@@ -1120,9 +1120,9 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 	})
 	if hasArgTarget {
 		if shape.Field == "callee.method" {
-			out.Kind = "mark_method_arg"
+			out.Kind = "check_method_arg"
 		} else {
-			out.Kind = "mark_arg"
+			out.Kind = "check_arg"
 		}
 		out.ArgIndex = loc.ArgIndex
 		out.Collection = loc.Collection
@@ -2086,18 +2086,18 @@ func (s v2CallShape) sinkKind() string {
 	return "sink_path"
 }
 
-func (s v2CallShape) controlKind() string {
+func (s v2CallShape) sinkNodeKind() string {
 	if s.Field == "callee.method" {
-		return "control_method"
+		return "sink_method_node"
 	}
-	return "control"
+	return "sink_node"
 }
 
-func (s v2CallShape) markKind() string {
+func (s v2CallShape) checkKind() string {
 	if s.Field == "callee.method" {
-		return "mark_method"
+		return "check_method"
 	}
-	return "mark"
+	return "check"
 }
 
 func (s v2CallShape) issueKind() string {

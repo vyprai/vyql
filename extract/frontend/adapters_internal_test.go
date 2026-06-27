@@ -732,7 +732,7 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 	}
 	got = markSpec.markAdapter().Apply(store)
 	if len(got) != 0 {
-		t.Fatalf("value-matched mark used flowing string tokens: %+v", got)
+		t.Fatalf("value-matched direct label used flowing string tokens: %+v", got)
 	}
 
 	directMarkStore := usg.NewInMemStore()
@@ -741,7 +741,7 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 	}})
 	got = markSpec.markAdapter().Apply(directMarkStore)
 	if len(got) != 1 || got[0].NodeID != "open" || got[0].Concept != "custom.Mark" {
-		t.Fatalf("value-matched mark did not use direct string tokens: %+v", got)
+		t.Fatalf("value-matched direct label did not use direct string tokens: %+v", got)
 	}
 }
 
@@ -2824,7 +2824,7 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	spec := specFromBindingSet(&parser.BindingSet{
 		Name: "neutral",
 		Mappings: []parser.BindingAction{{
-			Kind:           "control_method",
+			Kind:           "check_method",
 			Concept:        "custom.Control",
 			Pattern:        "normalize",
 			Coverage:       "sameScope",
@@ -2858,7 +2858,7 @@ func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
 	spec := specFromBindingSet(&parser.BindingSet{
 		Name: "neutral",
 		Mappings: []parser.BindingAction{{
-			Kind:           "control_method_arg",
+			Kind:           "check_method_arg",
 			Concept:        "custom.Parameterized",
 			Pattern:        "execute",
 			ArgIndex:       0,
@@ -2880,7 +2880,7 @@ func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
 	}
 }
 
-func TestMarkAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
+func TestControlAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2890,7 +2890,7 @@ func TestMarkAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 	spec := specFromBindingSet(&parser.BindingSet{
 		Name: "neutral",
 		Mappings: []parser.BindingAction{{
-			Kind:           "mark_method_arg",
+			Kind:           "check_method_arg",
 			Concept:        "custom.PathCanonicalization",
 			Pattern:        "startswith",
 			ArgIndex:       0,
@@ -2902,20 +2902,20 @@ func TestMarkAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 			Confidence:     "low",
 		}},
 	})
-	got := spec.markAdapter().Apply(store)
+	got := spec.controlAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.PathCanonicalization" {
-		t.Fatalf("argument advisory mark mapping wrong: %+v", got)
+		t.Fatalf("argument advisory check mapping wrong: %+v", got)
 	}
 	if got[0].Detail["advisory"] != "true" || got[0].Detail["about"] != "custom.FilePathAccess" ||
 		got[0].Detail["coverage"] != "sameScope" || got[0].Detail["coverage.anchor"] != "call.scope" {
-		t.Fatalf("advisory detail not preserved on argument mark: %+v", got[0])
+		t.Fatalf("advisory detail not preserved on argument check: %+v", got[0])
 	}
 	if got[0].Fidelity != "syntactic" || got[0].Confidence != "low" {
 		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])
 	}
 }
 
-func TestMarkAdapterLabelsGlobalArgumentLocation(t *testing.T) {
+func TestControlAdapterLabelsGlobalArgumentLocation(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:2"}})
 	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
@@ -2925,7 +2925,7 @@ func TestMarkAdapterLabelsGlobalArgumentLocation(t *testing.T) {
 	spec := specFromBindingSet(&parser.BindingSet{
 		Name: "neutral",
 		Mappings: []parser.BindingAction{{
-			Kind:       "mark_method_arg",
+			Kind:       "check_method_arg",
 			Concept:    "custom.GlobalHardening",
 			Pattern:    "enableHardening",
 			ArgIndex:   0,
@@ -2934,12 +2934,12 @@ func TestMarkAdapterLabelsGlobalArgumentLocation(t *testing.T) {
 			Confidence: "medium",
 		}},
 	})
-	got := spec.markAdapter().Apply(store)
+	got := spec.controlAdapter().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.GlobalHardening" {
-		t.Fatalf("argument global mark mapping wrong: %+v", got)
+		t.Fatalf("argument global check mapping wrong: %+v", got)
 	}
 	if got[0].Detail["coverage"] != "global" {
-		t.Fatalf("global detail not preserved on argument mark: %+v", got[0])
+		t.Fatalf("global detail not preserved on argument check: %+v", got[0])
 	}
 	if got[0].Fidelity != "semantic" || got[0].Confidence != "medium" {
 		t.Fatalf("binding evidence attrs not preserved: %+v", got[0])

@@ -504,19 +504,12 @@ func bindingDisplayKind(m parser.BindingAction) string {
 		return "advisory"
 	}
 	switch {
-	case strings.HasPrefix(mappingKind, "control"):
-		return "check"
 	case strings.HasPrefix(mappingKind, "issue"):
 		return "issue"
 	case strings.HasPrefix(mappingKind, "fact"):
 		return "fact"
 	case strings.HasPrefix(mappingKind, "flow"):
 		return "propagate"
-	case strings.HasPrefix(mappingKind, "mark"):
-		if m.Coverage != "" {
-			return "check"
-		}
-		return "issue"
 	}
 	return strings.SplitN(mappingKind, "_", 2)[0]
 }

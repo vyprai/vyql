@@ -63,14 +63,11 @@ func TestBindingDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
 		{parser.BindingAction{Kind: "advisory_sanitizer_path"}, "advisory"},
 		{parser.BindingAction{Kind: "source_param"}, "source"},
 		{parser.BindingAction{Kind: "sink_call_arg"}, "sink"},
-		{parser.BindingAction{Kind: "control_authentication"}, "check"},
+		{parser.BindingAction{Kind: "check_authentication"}, "check"},
 		{parser.BindingAction{Kind: "issue_method"}, "issue"},
 		{parser.BindingAction{Kind: "presence_issue"}, "issue"},
 		{parser.BindingAction{Kind: "presence_check"}, "check"},
 		{parser.BindingAction{Kind: "flow_method"}, "propagate"},
-		{parser.BindingAction{Kind: "mark_method", Coverage: "global"}, "check"},
-		{parser.BindingAction{Kind: "mark_method", Coverage: ""}, "issue"},
-		{parser.BindingAction{Kind: "mark_method", Advisory: true}, "advisory"},
 		{parser.BindingAction{Kind: "type"}, "type"},
 	}
 	for _, tc := range cases {

@@ -808,6 +808,27 @@ func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 	}
 }
 
+func TestCompiledV2BindingsDoNotUseLegacyActionFamilies(t *testing.T) {
+	var hits []string
+	for path, decls := range parseDataDecls(t, "bindings", ".vyql") {
+		for _, decl := range decls {
+			binding, ok := decl.(*parser.BindingSet)
+			if !ok {
+				continue
+			}
+			for _, action := range binding.Mappings {
+				if strings.HasPrefix(action.Kind, "control") || strings.HasPrefix(action.Kind, "mark") || action.Kind == "flag" {
+					hits = append(hits, filepath.ToSlash(path)+": "+binding.Name+" emits legacy compiled action "+action.Kind)
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("compiled v2 bindings must use v2 action families, not legacy v1 control/mark/flag:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
 func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 	root := testRepoRoot(t)
 	var hits []string

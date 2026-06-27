@@ -64,7 +64,7 @@ rule SqlInjection {
 	if got := adapter.Mappings[1]; got.Kind != "source" || got.Pattern != "request.json" || got.Concept != "code.HttpInput" {
 		t.Fatalf("source lowering wrong: %+v", got)
 	}
-	if got := adapter.Mappings[2]; got.Kind != "control_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 {
+	if got := adapter.Mappings[2]; got.Kind != "check_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 {
 		t.Fatalf("check lowering wrong: %+v", got)
 	}
 	if rule == nil || rule.QualifiedName() != "rules.injection.SqlInjection" {
@@ -207,10 +207,8 @@ binding receiverFlow {
 	for _, m := range adapter.Mappings {
 		key := m.Kind
 		switch {
-		case strings.HasPrefix(m.Kind, "control") && m.Coverage != "":
+		case strings.HasPrefix(m.Kind, "check") && m.Coverage != "":
 			key += ":" + m.Coverage
-		case strings.HasPrefix(m.Kind, "mark") && m.Coverage == "global":
-			key += ":global"
 		case strings.HasPrefix(m.Kind, "advisory_"):
 			key = m.Kind
 		case m.Kind == "flow_method":
@@ -229,7 +227,7 @@ binding receiverFlow {
 		"source", "source_receiver", "source_param",
 		"sink_method", "sink_path", "sink_receiver",
 		"issue_method", "presence_issue",
-		"control_method_arg:path", "control:endpoint", "control_receiver_method:sameReceiver", "mark_method_arg:global",
+		"check_method_arg:path", "check:endpoint", "check_receiver_method:sameReceiver", "check_method_arg:global",
 		"advisory_guard_method", "filter_method",
 		"type", "fact_method_arg",
 		"flow_method:value", "flow_method:identity", "flow_method:receiver",
@@ -717,7 +715,7 @@ binding parameterizedQuery {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	got := decls[0].(*BindingSet).Mappings[0]
-	if got.Kind != "control_method_arg" || got.Coverage != "path" || got.ArgIndex != 0 {
+	if got.Kind != "check_method_arg" || got.Coverage != "path" || got.ArgIndex != 0 {
 		t.Fatalf("check emission did not lower with builtin coverage mechanic: %+v", got)
 	}
 	if got.CoverageDetail["from"] != "args[0]" || got.CoverageDetail["to"] != "call" {
@@ -1323,9 +1321,9 @@ binding sqlExecMethods {
 		pattern string
 	}{
 		{"sink_method", "execute"},
-		{"control_method", "execute"},
+		{"check_method", "execute"},
 		{"sink_method", "executeQuery"},
-		{"control_method", "executeQuery"},
+		{"check_method", "executeQuery"},
 	}
 	for i, w := range want {
 		got := adapter.Mappings[i]
@@ -1961,7 +1959,7 @@ binding possiblePathValidation {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark_method" || got.Pattern != "startswith" || got.Concept != "core.PathCanonicalization" {
+	if got.Kind != "check_method" || got.Pattern != "startswith" || got.Concept != "core.PathCanonicalization" {
 		t.Fatalf("advisory check lowering wrong: %+v", got)
 	}
 	if !got.Advisory || got.About != "code.FilePathAccess" || got.Coverage != "sameScope" {
@@ -1991,7 +1989,7 @@ binding possiblePathValidation {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark_method_arg" || got.Pattern != "startswith" || got.Concept != "core.PathCanonicalization" || got.ArgIndex != 0 {
+	if got.Kind != "check_method_arg" || got.Pattern != "startswith" || got.Concept != "core.PathCanonicalization" || got.ArgIndex != 0 {
 		t.Fatalf("argument advisory check lowering wrong: %+v", got)
 	}
 	if !got.Advisory || got.About != "code.FilePathAccess" || got.Coverage != "sameScope" {
@@ -2017,7 +2015,7 @@ binding globalHardening {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark_method" || got.Pattern != "enableHardening" || got.Concept != "core.XmlHardening" || got.Coverage != "global" {
+	if got.Kind != "check_method" || got.Pattern != "enableHardening" || got.Concept != "core.XmlHardening" || got.Coverage != "global" {
 		t.Fatalf("global check lowering wrong: %+v", got)
 	}
 }
@@ -2040,7 +2038,7 @@ binding globalHardening {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
 	got := adapter.Mappings[0]
-	if got.Kind != "mark_method_arg" || got.Pattern != "enableHardening" || got.Concept != "core.XmlHardening" || got.Coverage != "global" || got.ArgIndex != 0 {
+	if got.Kind != "check_method_arg" || got.Pattern != "enableHardening" || got.Concept != "core.XmlHardening" || got.Coverage != "global" || got.ArgIndex != 0 {
 		t.Fatalf("argument global check lowering wrong: %+v", got)
 	}
 }
@@ -2084,7 +2082,7 @@ binding relativeTo {
 	if adapter.Name != "python" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
-	if got := adapter.Mappings[0]; got.Kind != "control_receiver_method" || got.Pattern != "relative_to" || got.Concept != "core.PathCanonicalization" {
+	if got := adapter.Mappings[0]; got.Kind != "check_receiver_method" || got.Pattern != "relative_to" || got.Concept != "core.PathCanonicalization" {
 		t.Fatalf("receiver check lowering wrong: %+v", got)
 	}
 }
@@ -2810,9 +2808,9 @@ binding executeWithParams {
 		t.Fatalf("mappings = %#v, want one", ad.Mappings)
 	}
 	got := ad.Mappings[0]
-	if got.Kind != "control_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 ||
+	if got.Kind != "check_method_arg" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" || got.ArgIndex != 0 ||
 		!got.ArgCountSet || got.ArgCountMin != 2 || got.ArgCountMax != -1 {
-		t.Fatalf("args.count mapping = %#v, want arity-gated control_method_arg", got)
+		t.Fatalf("args.count mapping = %#v, want arity-gated check_method_arg", got)
 	}
 }
 
@@ -2928,7 +2926,7 @@ binding releasingHardening {
 	}
 	want := map[string]bool{"endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true}
 	for _, got := range adapter.Mappings {
-		if got.Kind != "control_method" {
+		if got.Kind != "check_method" {
 			t.Fatalf("coverage check lowering wrong: %+v", got)
 		}
 		if !want[got.Coverage] {
