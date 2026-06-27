@@ -1,8 +1,8 @@
-# Package adapter catalog label coverage. These specs keep package/framework
+# Package binding catalog label coverage. These specs keep package/framework
 # vocabulary in VyQL data instead of Go tests.
 
 test "package catalog: bash"
-  adapter bash
+  bindings bash
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.PathCanonicalization
@@ -18,7 +18,7 @@ test "package catalog: bash"
   ```
 
 test "package catalog: c"
-  adapter c
+  bindings c
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.SqlParameterization
@@ -33,7 +33,7 @@ test "package catalog: c"
   ```
 
 test "package catalog: cpp"
-  adapter cpp
+  bindings cpp
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.SqlParameterization
@@ -48,7 +48,7 @@ test "package catalog: cpp"
   ```
 
 test "package catalog: csharp"
-  adapter csharp
+  bindings csharp
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -64,7 +64,7 @@ test "package catalog: csharp"
   ```
 
 test "package catalog: dart"
-  adapter dart
+  bindings dart
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -80,7 +80,7 @@ test "package catalog: dart"
   ```
 
 test "package catalog: elixir"
-  adapter elixir
+  bindings elixir
   expect_label src code.HttpInput
   expect_label sink:arg code.CommandExecution
   expect_label control core.HtmlEscape
@@ -96,7 +96,7 @@ test "package catalog: elixir"
   ```
 
 test "package catalog: go"
-  adapter go
+  bindings go
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -112,7 +112,7 @@ test "package catalog: go"
   ```
 
 test "package catalog: groovy"
-  adapter groovy
+  bindings groovy
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -128,7 +128,7 @@ test "package catalog: groovy"
   ```
 
 test "package catalog: java"
-  adapter java
+  bindings java
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -144,7 +144,7 @@ test "package catalog: java"
   ```
 
 test "package catalog: javascript"
-  adapter javascript
+  bindings javascript
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -160,7 +160,7 @@ test "package catalog: javascript"
   ```
 
 test "package catalog: kotlin"
-  adapter kotlin
+  bindings kotlin
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -176,7 +176,7 @@ test "package catalog: kotlin"
   ```
 
 test "package catalog: lua"
-  adapter lua
+  bindings lua
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.SqlParameterization
@@ -191,7 +191,7 @@ test "package catalog: lua"
   ```
 
 test "package catalog: objc"
-  adapter objc
+  bindings objc
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.RedirectAllowlist
@@ -207,7 +207,7 @@ test "package catalog: objc"
   ```
 
 test "package catalog: perl"
-  adapter perl
+  bindings perl
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -223,7 +223,7 @@ test "package catalog: perl"
   ```
 
 test "package catalog: php"
-  adapter php
+  bindings php
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -238,7 +238,7 @@ test "package catalog: php"
   ```
 
 test "package catalog: powershell"
-  adapter powershell
+  bindings powershell
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -254,7 +254,7 @@ test "package catalog: powershell"
   ```
 
 test "package catalog: python"
-  adapter python
+  bindings python
   expect_label src code.HttpInput
   expect_label sink:arg code.Deserialization
   expect_label control core.HtmlEscape
@@ -270,7 +270,7 @@ test "package catalog: python"
   ```
 
 test "package catalog: python SQLAlchemy model query reads"
-  adapter python
+  bindings python
   expect_label row code.DatabaseRead
   graph
   ```
@@ -280,7 +280,7 @@ test "package catalog: python SQLAlchemy model query reads"
   ```
 
 test "package catalog: ruby"
-  adapter ruby
+  bindings ruby
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -296,7 +296,7 @@ test "package catalog: ruby"
   ```
 
 test "package catalog: rust"
-  adapter rust
+  bindings rust
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -312,7 +312,7 @@ test "package catalog: rust"
   ```
 
 test "package catalog: scala"
-  adapter scala
+  bindings scala
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape
@@ -328,7 +328,7 @@ test "package catalog: scala"
   ```
 
 test "package catalog: solidity"
-  adapter solidity
+  bindings solidity
   expect_label src code.HttpInput
   expect_label sink:arg code.ExternalCall
   expect_label control core.OwnershipCheck
@@ -343,7 +343,7 @@ test "package catalog: solidity"
   ```
 
 test "package catalog: swift"
-  adapter swift
+  bindings swift
   expect_label src code.HttpInput
   expect_label sink:arg code.SqlExecution
   expect_label control core.HtmlEscape

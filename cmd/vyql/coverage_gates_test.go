@@ -725,6 +725,7 @@ func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
 	files := readDataFiles(t, "tests", ".test.vyql")
 	legacyLinePatterns := legacyV1DefinitionLinePatterns()
 	legacySpecPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`^\s*adapter\s+\S+\s*$`),
 		regexp.MustCompile(`^\s*expect_evidence\s+\S+\s+assumption\s*$`),
 		regexp.MustCompile(`^\s*reject_evidence\s+\S+\s+assumption\s*$`),
 	}

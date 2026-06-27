@@ -20,7 +20,7 @@ import (
 // VyQL test specs (`vyql/tests/*.test.vyql`) are declarative, language-agnostic
 // behavior tests for the SHIPPED ruleset: a code snippet plus the rule ids it must
 // (expect) or must not (reject) produce. They live next to the VyQL data they test,
-// so adding a rule/adapter means adding a spec — no Go test code. This runner walks
+// so adding a rule/binding means adding a spec — no Go test code. This runner walks
 // them and scans each snippet through the real scan pipeline (all packs).
 //
 // Format (one or more `test` blocks per file; `#`/`//` comments, blank lines ignored):
@@ -33,9 +33,9 @@ import (
 //	  reject_evidence RULE-ID char-filter # rule evidence must not contain text
 //	  expect_review some.Concept          # repeatable — review concept must appear
 //	  reject_review some.Concept          # repeatable — review concept must not appear
-//	  adapter python                     # optional graph adapter to apply before label checks
-//	  expect_label node-id custom.Source # graph adapter label assertion
-//	  reject_label node-id custom.Source # graph adapter negative label assertion
+//	  bindings python                    # optional binding set to apply before label checks
+//	  expect_label node-id custom.Source # graph binding label assertion
+//	  reject_label node-id custom.Source # graph binding negative label assertion
 //	  gitlink vendor/lib <sha>  # optional git submodule/gitlink fixture
 //	  code
 //	  ```
@@ -77,7 +77,7 @@ type vyqlSpec struct {
 	rejectEv     []evidenceSpec
 	expectReview []string
 	rejectReview []string
-	adapterTech  string
+	bindingsTech string
 	expectLabels []labelSpec
 	rejectLabels []labelSpec
 	profile      string     // optional threat-model profile (e.g. `profile library`); default = generic/auto
@@ -169,8 +169,8 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 			cur.expectReview = append(cur.expectReview, rest)
 		case "reject_review":
 			cur.rejectReview = append(cur.rejectReview, rest)
-		case "adapter":
-			cur.adapterTech = rest
+		case "bindings":
+			cur.bindingsTech = rest
 		case "expect_label":
 			cur.expectLabels = append(cur.expectLabels, parseLabelSpec(t, rel, i+1, rest))
 		case "reject_label":
@@ -248,9 +248,9 @@ func TestVyqlSpecs(t *testing.T) {
 				if s.graphSrc != "" {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
-					if s.adapterTech != "" {
-						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.adapterTech), nil); err != nil {
-							t.Fatalf("apply %s adapters: %v", s.adapterTech, err)
+					if s.bindingsTech != "" {
+						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.bindingsTech), nil); err != nil {
+							t.Fatalf("apply %s bindings: %v", s.bindingsTech, err)
 						}
 					}
 					eng := engine.New(onto, store)
