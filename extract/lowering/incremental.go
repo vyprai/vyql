@@ -37,11 +37,11 @@ type DeltaCache interface {
 // content (Module.Hash) AND the global resolution context (signature fingerprint) are
 // unchanged since a previous run — the heart of incremental dataflow. The global symbol tables
 // and signature/import nodes are always rebuilt (cheap); only the expensive per-module body
-// lowering is cached. The merged graph is byte-identical to LowerTyped's, so adapters, taint,
+// lowering is cached. The merged graph is byte-identical to LowerTyped's, so bindings, taint,
 // and rules run on it unchanged. Falls back to fresh body lowering for modules without a Hash.
 // LowerIncremental returns the lowered store plus the set of module keys that were freshly
 // lowered (cache miss or not content-addressed) — the caller uses it to drive incremental
-// adapter labeling (re-label only fresh modules; replay cached labels for the rest).
+// binding labeling (re-label only fresh modules; replay cached labels for the rest).
 func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[string]string, cache DeltaCache, sync *graphsync.Collector) (usg.Store, map[string]bool, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	l.parseCache = cache
@@ -357,7 +357,7 @@ func batchPutRaw(cache DeltaCache, kv map[string][]byte) {
 
 // NodeModule returns the module key a node id belongs to (ids are "<modkey>\x1f..."), or ""
 // for nodes not minted by the module-namespacing lowerer (e.g. SBOM nodes). Lets the caller
-// attribute graph nodes to modules for incremental adapter labeling.
+// attribute graph nodes to modules for incremental binding labeling.
 func NodeModule(id string) (string, bool) {
 	if i := strings.IndexByte(id, '\x1f'); i >= 0 {
 		return id[:i], true

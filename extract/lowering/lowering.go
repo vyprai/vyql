@@ -986,7 +986,7 @@ func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []st
 	if id == "" || len(contextTokens) == 0 {
 		return
 	}
-	// Lowering records only structural return evidence. Adapter data decides whether
+	// Lowering records only structural return evidence. Binding data decides whether
 	// the event has any domain meaning.
 	valToks := append([]string{}, contextTokens...)
 	n, ok, _ := l.g.GetNode(id)
@@ -1121,7 +1121,7 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 // LowerTyped is Lower with a constructor→type table (callee path of a
 // constructor → the type it returns, e.g. "pkg.Open" → "pkg.Handle"). A receiver
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
-// method calls, which type-constrained sink adapters use for precision.
+// method calls, which type-constrained sink binding applicators use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
 	if err := l.run(); err != nil {
@@ -1672,7 +1672,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
 				typ, hasTyp = [2]string{cm, st.Type}, true
 			} else {
-				// External/library declared types are still useful for adapter receiver
+				// External/library declared types are still useful for binding receiver
 				// constraints even when there is no project class body to resolve.
 				typ, hasTyp = [2]string{"", st.Type}, true
 			}
@@ -2391,7 +2391,7 @@ func constSetFactory(path, method string) bool {
 // bare value, and — when it sits under a key (a kwarg, dict/object/hash entry, or
 // struct field) — also a "key=value" token. Lists/objects are walked so nested
 // literals are reached, so call(options={mode:["fast"]}) yields "fast" and
-// "mode=fast". Pair keys are also emitted on their own so adapters can
+// "mode=fast". Pair keys are also emitted on their own so binding applicators can
 // recognize structured-field sinks even when the field value is non-literal
 // (`{ hypertext: userInput }`). Frontends that don't emit nir.Pair simply
 // contribute bare values.
@@ -2522,7 +2522,7 @@ func unquoteLit(s string) string {
 }
 
 // nirKind returns a short tag for an expression's NIR shape (Thru unwrapped),
-// recorded on Arg slots so adapters can reason about an argument's form.
+// recorded on Arg slots so binding applicators can reason about an argument's form.
 func nirKind(e nir.Expr) string {
 	switch ex := e.(type) {
 	case nir.Thru:
@@ -2585,7 +2585,7 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// Each argument SLOT is a distinct program point at the call site (an Arg
 	// node), flowing from the argument value. This gives sinks the correct
-	// location (the call, not where the value was defined) and lets an adapter
+	// location (the call, not where the value was defined) and lets a binding
 	// label an arg position as a sink even when the value is itself a source —
 	// e.g. call(input_value).
 	var args []string
@@ -2594,7 +2594,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for _, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
-		// Record the argument's NIR kind on the slot, so sink adapters can
+		// Record the argument's NIR kind on the slot, so sink binding applicators can
 		// distinguish a string-building position (Format/Const/Name/...) from a
 		// collection literal (Seq).
 		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
@@ -2608,8 +2608,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			valToks = append(valToks, sv)
 		}
 	}
-	// A bare call to a `from mod import sym` alias is matched by adapters under its
-	// resolved dotted path, so imported adapter targets (e.g. `normalize` from
+	// A bare call to a `from mod import sym` alias is matched by bindings under its
+	// resolved dotted path, so imported binding targets (e.g. `normalize` from
 	// `pkg.normalize`, `run` from `runtime.run`) are recognized.
 	calleePath := call.Path
 	if l.resolveImports {
@@ -2646,7 +2646,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
-	// stamp recv_type so type-constrained sink adapters can reason about it.
+	// stamp recv_type so type-constrained sink binding applicators can reason about it.
 	var recvNode string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {

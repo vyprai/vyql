@@ -1273,13 +1273,23 @@ binding bad {
 			want: "covers global must not declare",
 		},
 		{
-			name: "legacy unstable flag query",
+			name: "unstable binding query",
 			src: `module bindings.javascript.rejection;
 binding bad {
-  query unstable.legacyFlag as node where node.kind == "any"
+  query unstable.frameworkFlag as node where node.kind == "any"
   emit issue code.Review at node
 }`,
-			want: "legacy query family",
+			want: "unsupported unstable query family",
+		},
+		{
+			name: "unstable binding query is unsupported even with metadata",
+			src: `module bindings.javascript.rejection;
+binding bad {
+  unstable: { owner: "frontend" reason: "experimental framework recognizer" }
+  query unstable.frameworkFlag as node where node.kind == "any"
+  emit issue code.Review at node
+}`,
+			want: "unsupported unstable query family",
 		},
 		{
 			name: "unstable binding query without metadata",
@@ -1288,7 +1298,7 @@ binding bad {
   query unstable.frameworkFlag as node where node.kind == "any"
   emit issue code.Review at node
 }`,
-			want: "requires owner and reason metadata",
+			want: "unsupported unstable query family",
 		},
 		{
 			name: "unstable pattern node without metadata",

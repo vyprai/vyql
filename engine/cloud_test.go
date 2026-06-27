@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -26,20 +26,20 @@ func assetMarkerGraph() usg.Store {
 	return s
 }
 
-func markerAdapter(name, prop string, acceptedValues ...string) adapters.Adapter {
+func markerApplicator(name, prop string, acceptedValues ...string) bindings.Applicator {
 	accepted := map[string]bool{}
 	for _, v := range acceptedValues {
 		accepted[v] = true
 	}
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: name, Technology: strings.SplitN(name, ".", 2)[0], Specificity: 2, Fidelity: "resolved", Origin: "test",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			ids, _ := s.NodesOfType("custom.Resource")
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if accepted[n.Prop(prop)] {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: "custom.Marker",
+					out = append(out, bindings.Mapping{NodeID: id, Concept: "custom.Marker",
 						Detail: map[string]string{"asset_kinds": "custom.Important"}})
 				}
 			}
@@ -60,16 +60,16 @@ func TestMarkedAssetThreeAdapters(t *testing.T) {
 	}
 
 	sources := []struct {
-		adapter  adapters.Adapter
+		adapter  bindings.Applicator
 		provider string
 	}{
-		{markerAdapter("alpha.adapter", "flag_a", "shared"), "alpha"},
-		{markerAdapter("beta.adapter", "flag_b", "enabled"), "beta"},
-		{markerAdapter("gamma.adapter", "flag_c", "open"), "gamma"},
+		{markerApplicator("alpha.adapter", "flag_a", "shared"), "alpha"},
+		{markerApplicator("beta.adapter", "flag_b", "enabled"), "beta"},
+		{markerApplicator("gamma.adapter", "flag_c", "open"), "gamma"},
 	}
 	for _, p := range sources {
 		g := assetMarkerGraph()
-		if _, _, err := adapters.Apply(g, []adapters.Adapter{p.adapter}, nil); err != nil {
+		if _, _, err := bindings.Apply(g, []bindings.Applicator{p.adapter}, nil); err != nil {
 			t.Fatal(err)
 		}
 		fs, err := New(onto, g).Evaluate(compiled[0])

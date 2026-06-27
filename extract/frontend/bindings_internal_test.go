@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
@@ -328,7 +328,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 }
 
 func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -337,14 +337,14 @@ func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 			Packages: []string{"samplepkg"},
 		}},
 	}
-	adapter := spec.sinkAdapter()
+	binding := spec.sinkApplicator()
 
 	withoutPkg := usg.NewInMemStore()
 	withoutPkg.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Props: map[string]string{"loc": "sample.x:3"}})
 	withoutPkg.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
-	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+	if got := binding.Apply(withoutPkg); len(got) != 0 {
 		t.Fatalf("explicit package-block sink fired without evidence: %+v", got)
 	}
 
@@ -356,7 +356,7 @@ func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	withImport.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
-	if got := adapter.Apply(withImport); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
+	if got := binding.Apply(withImport); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
 		t.Fatalf("explicit package-block sink did not fire with import evidence: %+v", got)
 	}
 
@@ -368,7 +368,7 @@ func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	withSBOM.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
-	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" {
+	if got := binding.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" {
 		t.Fatalf("explicit package-block sink did not fire with SBOM evidence: %+v", got)
 	}
 }
@@ -440,7 +440,7 @@ func TestV2SoftRequirementDowngradesMappingConfidence(t *testing.T) {
 	g.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "app.js:3", "callee_path": "danger", "method": "danger", "arg0": "arg",
 	}})
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "soft",
 		Technology: "javascript",
 		Sinks: []sinkSpec{{
@@ -452,7 +452,7 @@ func TestV2SoftRequirementDowngradesMappingConfidence(t *testing.T) {
 		}},
 	}
 
-	got := spec.sinkAdapter().Apply(g)
+	got := spec.sinkApplicator().Apply(g)
 	if len(got) != 1 {
 		t.Fatalf("soft requirement should not block mapping, got %+v", got)
 	}
@@ -545,7 +545,7 @@ func TestV2AnyRequirementPrefersHardSatisfiedEvidence(t *testing.T) {
 }
 
 func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -555,7 +555,7 @@ func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
 			Requirement: &parser.BindingRequirement{Op: "dependency", Value: "samplepkg"},
 		}},
 	}
-	adapter := spec.sinkAdapter()
+	binding := spec.sinkApplicator()
 
 	withImportOnly := usg.NewInMemStore()
 	withImportOnly.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
@@ -565,7 +565,7 @@ func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
 	withImportOnly.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
-	if got := adapter.Apply(withImportOnly); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
+	if got := binding.Apply(withImportOnly); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
 		t.Fatalf("dependency-gated sink did not fire from import evidence: %+v", got)
 	}
 
@@ -577,7 +577,7 @@ func TestV2DependencyRequirementPreservesPackageHintRecall(t *testing.T) {
 	withSBOM.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
-	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
+	if got := binding.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
 		t.Fatalf("dependency-gated sink did not fire from SBOM evidence: %+v", got)
 	}
 }
@@ -653,7 +653,7 @@ func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {
 	defer SetActiveSources(nil)
 	SetActiveSources(map[string]bool{"custom.ParamSource": true})
 
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		ParamSources: []paramSourceSpec{{
@@ -661,13 +661,13 @@ func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {
 			Packages: []string{"samplepkg"},
 		}},
 	}
-	adapter := spec.paramSourceAdapter()
+	binding := spec.paramSourceApplicator()
 
 	withoutPkg := usg.NewInMemStore()
 	withoutPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
 		"loc": "sample.x:2", "exported": "true",
 	}})
-	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+	if got := binding.Apply(withoutPkg); len(got) != 0 {
 		t.Fatalf("explicit package-block param source fired without evidence: %+v", got)
 	}
 
@@ -678,13 +678,13 @@ func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {
 	withPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
 		"loc": "sample.x:2", "exported": "true",
 	}})
-	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "param" || got[0].Concept != "custom.ParamSource" || got[0].Specificity != 3 {
+	if got := binding.Apply(withPkg); len(got) != 1 || got[0].NodeID != "param" || got[0].Concept != "custom.ParamSource" || got[0].Specificity != 3 {
 		t.Fatalf("explicit package-block param source did not fire with evidence: %+v", got)
 	}
 }
 
 func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -716,12 +716,12 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 		t.Fatalf("flowing string tokens did not satisfy value constraints: %q", flowingStringTokens(store, &flowIdx, "open", openNode.Prop("str_args")))
 	}
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Target" {
 		t.Fatalf("value-matched sink did not use flowing string tokens: %+v", got)
 	}
 
-	markSpec := adapterSpec{
+	markSpec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Marks: []controlSpec{{
@@ -730,7 +730,7 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 			ValMatches: []string{"/tmp/", "w"},
 		}},
 	}
-	got = markSpec.markAdapter().Apply(store)
+	got = markSpec.matchPresenceApplicator().Apply(store)
 	if len(got) != 0 {
 		t.Fatalf("value-matched direct label used flowing string tokens: %+v", got)
 	}
@@ -739,14 +739,14 @@ func TestValueMatchedSinkUsesFlowingStringTokens(t *testing.T) {
 	directMarkStore.AddNode(usg.Node{ID: "open", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "open", "method": "open", "str_args": "/tmp/fixed\x00w",
 	}})
-	got = markSpec.markAdapter().Apply(directMarkStore)
+	got = markSpec.matchPresenceApplicator().Apply(directMarkStore)
 	if len(got) != 1 || got[0].NodeID != "open" || got[0].Concept != "custom.Mark" {
 		t.Fatalf("value-matched direct label did not use direct string tokens: %+v", got)
 	}
 }
 
 func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -767,7 +767,7 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "sql", Dst: "arg0"})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Target" {
 		t.Fatalf("value-matched sink did not use upstream tokens when call had no direct strings: %+v", got)
 	}
@@ -811,7 +811,7 @@ binding secretComparison {
 		"callee_path": "parseOut",
 		"method":      "parseOut",
 	}})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
 		t.Fatalf("context flag did not label matching context node: %+v", got)
 	}
@@ -832,7 +832,7 @@ binding secretComparison {
 		"callee_path": "crypto.timingSafeEqual",
 		"method":      "timingSafeEqual",
 	}})
-	got = spec.flagAdapter().Apply(store)
+	got = spec.presenceApplicator().Apply(store)
 	if len(got) != 1 {
 		t.Fatalf("context flag should skip scope with matching excluded call, got %+v", got)
 	}
@@ -873,7 +873,7 @@ binding worldAccess {
 			"method":      "getBlockAt",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context flag matched call outside lexical scope: %+v", got)
 	}
 
@@ -887,7 +887,7 @@ binding worldAccess {
 			"method":      "getBlockAt",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.WorldAccess" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.WorldAccess" {
 		t.Fatalf("context flag did not match nested in-scope call: %+v", got)
 	}
 
@@ -901,7 +901,7 @@ binding worldAccess {
 			"method":      "testCoords",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context flag should skip guarded lexical scope, got %+v", got)
 	}
 }
@@ -962,7 +962,7 @@ binding shareInfoLeak {
 		},
 	})
 
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.ShareInfoLeak" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.ShareInfoLeak" {
 		t.Fatalf("context flag did not match ordered same-function call and selector evidence: %+v", got)
 	}
 }
@@ -994,7 +994,7 @@ binding secretComparison {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "header", Dst: "a0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "candidate", Dst: "a1"})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
 		t.Fatalf("AST flag did not label matching binop: %+v", got)
 	}
@@ -1002,7 +1002,7 @@ binding secretComparison {
 	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.js:20", "callee_path": "crypto.timingSafeEqual", "method": "timingSafeEqual",
 	}})
-	got = spec.flagAdapter().Apply(store)
+	got = spec.presenceApplicator().Apply(store)
 	if len(got) != 0 {
 		t.Fatalf("AST flag should skip file with constant-time comparison call: %+v", got)
 	}
@@ -1047,7 +1047,7 @@ binding prototypeMerge {
 		Scope: "merge.js/fn1/loop",
 		Props: map[string]string{"callee_path": "obj.__subscript", "method": "[]", "str_args": "key"},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST flag did not match scoped subscript nodes: %+v", got)
 	}
 
@@ -1058,7 +1058,7 @@ binding prototypeMerge {
 		Scope: "merge.js/fn1",
 		Props: map[string]string{"str_args": "__proto__"},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context AST flag should skip scoped prototype literal guard: %+v", got)
 	}
 }
@@ -1098,7 +1098,7 @@ binding lockOpen {
 			"method":      "lock_file",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST flag did not match selector contains_any text: %+v", got)
 	}
 
@@ -1113,7 +1113,7 @@ binding lockOpen {
 			"str_args":    "lang=python",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 {
 		t.Fatalf("context AST flag should stay file/scope-local, got %+v", got)
 	}
 }
@@ -1156,7 +1156,7 @@ binding emptyPayloadCheck {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "payload", Dst: "len-call"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "len-call", Dst: "arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "zero", Dst: "arg1"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST binary flag did not match scoped binop: %+v", got)
 	}
 
@@ -1173,7 +1173,7 @@ binding emptyPayloadCheck {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked", Dst: "checked-len"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-len", Dst: "checked-arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-zero", Dst: "checked-arg1"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context AST binary flag should skip scoped negative binop: %+v", got)
 	}
 }
@@ -1221,7 +1221,7 @@ binding icmpEchoPayloadLengthUnderflow {
 		"method":      "vApplicationPingReplyHook",
 	}})
 
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("C ICMP echo context flag did not match, got %+v", got)
 	}
 }
@@ -1259,12 +1259,12 @@ binding lockNoFollow {
 	} {
 		store.AddNode(node)
 	}
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("soft-lock context flag did not match AST predicate mix: %+v", got)
 	}
 
 	store.AddNode(usg.Node{ID: "nofollow", Type: "code.Const", Loc: "lock.py:7", Scope: "lock.py/fn1", Props: map[string]string{"str_args": "O_NOFOLLOW"}})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("soft-lock context flag should skip no-follow hardening: %+v", got)
 	}
 }
@@ -1305,7 +1305,7 @@ binding directJsonEncode {
 			"str_args":    "$data[$field_name]",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST call-arg flag did not match scoped call argument: %+v", got)
 	}
 
@@ -1320,7 +1320,7 @@ binding directJsonEncode {
 			"str_args":    "$value",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context AST call-arg flag should honor excluded scoped argument: %+v", got)
 	}
 }
@@ -1353,7 +1353,7 @@ binding gitCloneWrapper {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fmt", Dst: "arg"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "run"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST call-arg flag did not inspect argument expression nodes: %+v", got)
 	}
 }
@@ -1387,7 +1387,7 @@ binding bulkMailRecipients {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "arg"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST call-arg flag did not inspect nested call argument: %+v", got)
 	}
 }
@@ -1420,7 +1420,7 @@ binding bulkMailRecipients {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tos", Dst: "arg"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context AST call-arg flag did not inspect Go name path: %+v", got)
 	}
 
@@ -1434,7 +1434,7 @@ binding bulkMailRecipients {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "single", Dst: "fixedArg"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixedArg", Dst: "fixed"})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context AST call-arg flag should honor object-literal exclusion: %+v", got)
 	}
 }
@@ -1462,7 +1462,7 @@ binding unhardenedXmlParser {
 			"str_args":    "huge_tree=True",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
 		t.Fatalf("direct call-arg flag should match call arguments: %+v", got)
 	}
 
@@ -1475,7 +1475,7 @@ binding unhardenedXmlParser {
 			"str_args":    "huge_tree=True\x00resolve_entities=False",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
 		t.Fatalf("direct call-arg flag should reject hardened call arguments: %+v", got)
 	}
 }
@@ -1512,7 +1512,7 @@ binding passwordOnlySessionHash {
 		Scope: "auth.php/fn1",
 		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "password"},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context subscript flag should match password without permissions: %+v", got)
 	}
 	store.AddNode(usg.Node{
@@ -1522,7 +1522,7 @@ binding passwordOnlySessionHash {
 		Scope: "auth.php/fn1",
 		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "permissions"},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context subscript flag should reject matching permissions key: %+v", got)
 	}
 }
@@ -1567,7 +1567,7 @@ binding remoteUrlDebugLog {
 			"name": "url",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context identifier flag matched unscoped param from a different function: %+v", got)
 	}
 
@@ -1579,7 +1579,7 @@ binding remoteUrlDebugLog {
 			"name": "url",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
 		t.Fatalf("context identifier flag should match unscoped param on context declaration line: %+v", got)
 	}
 }
@@ -1605,7 +1605,7 @@ binding directJsonEncode {
 		"method":      "context",
 		"str_args":    "lang=php\x00call_arg:json_encode:$data[$field_name]",
 	}})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("context call-arg flag should require scoped AST call evidence, got %+v", got)
 	}
 }
@@ -1642,7 +1642,7 @@ binding exactParse {
 		"method":      "context",
 		"str_args":    "lang=ruby\x00function_name:parse_cron",
 	}})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "parse" {
 		t.Fatalf("context exact-token flag should only match function_name:parse, got %+v", got)
 	}
@@ -1687,7 +1687,7 @@ binding scopedLiteral {
 		"method":      "json_encode",
 		"str_args":    "$data[$field_name]",
 	}})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "target-ctx" {
 		t.Fatalf("context AST flag should use region as lexical scope, got %+v", got)
 	}
@@ -1713,7 +1713,7 @@ binding railsSecretToken {
 		"method":      "context",
 		"str_args":    "lang=ruby\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
 	}})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.RailsSecretToken" {
 		t.Fatalf("context structured-token flag did not search token payload: %+v", got)
 	}
@@ -1731,7 +1731,7 @@ binding railsSecretToken {
 	store.AddNode(usg.Node{ID: "fixed-cmp", Type: "code.BinOp", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "fixed-arg0", "arg1": "fixed-arg1"}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-env", Dst: "fixed-arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-test", Dst: "fixed-arg1"})
-	got = spec.flagAdapter().Apply(store)
+	got = spec.presenceApplicator().Apply(store)
 	if len(got) != 1 {
 		t.Fatalf("context structured-token flag should skip test-only guarded scope, got %+v", got)
 	}
@@ -1789,7 +1789,7 @@ binding pathBasedSandboxExposeBindRace {
 			"method":      "filesystem_sandbox_arg",
 		},
 	})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.PathBasedSandboxExposeBindRace" {
 		t.Fatalf("module context flag should match AST call/literal predicates even when context tokens are sparse: %+v", got)
 	}
@@ -1804,7 +1804,7 @@ binding pathBasedSandboxExposeBindRace {
 			"method":      "fd_map_remap_fd",
 		},
 	})
-	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+	if got := spec.presenceApplicator().Apply(store); len(got) != 0 {
 		t.Fatalf("module context flag should honor AST negative call predicates: %+v", got)
 	}
 }
@@ -1844,7 +1844,7 @@ binding pointerAddOverflow {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a0", Dst: "add"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a1", Dst: "add"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "upper"})
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "add" || got[0].Concept != "custom.PointerAddOverflow" {
 		t.Fatalf("AST flow flag did not label vulnerable add: %+v", got)
 	}
@@ -1853,7 +1853,7 @@ binding pointerAddOverflow {
 		"loc": "sample.h:12", "op": "<", "callee_path": "__binop.lt",
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "wrap"})
-	got = spec.flagAdapter().Apply(store)
+	got = spec.presenceApplicator().Apply(store)
 	if len(got) != 0 {
 		t.Fatalf("AST flow flag should skip add with downstream wraparound check: %+v", got)
 	}
@@ -1904,7 +1904,7 @@ binding remoteUrlDebugLog {
 		t.Fatalf("call operand flag did not match transitive URL flow into debug call")
 	}
 
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "debug" || got[0].Concept != "custom.RemoteUrlDebugLog" {
 		t.Fatalf("call operand flag did not label debug log call: %+v", got)
 	}
@@ -1944,14 +1944,14 @@ binding zipCompressedSizeRead {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "string-type", Dst: "read-arg"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "read-arg", Dst: "read-token"})
 
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "read-token" || got[0].Concept != "custom.ZipCompressedSizeRead" {
 		t.Fatalf("call operand flag did not use incoming arg flow fallback: %+v", got)
 	}
 }
 
 func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -1984,14 +1984,14 @@ func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tmp", Dst: "arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
 		t.Fatalf("collection first sink mapping wrong: %+v", got)
 	}
 }
 
 func TestCollectionFirstSinkTargetsElementThroughVariableArg(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -2017,14 +2017,14 @@ func TestCollectionFirstSinkTargetsElementThroughVariableArg(t *testing.T) {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "seq", Dst: "arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
 		t.Fatalf("collection first sink should follow variable-held argv list: %+v", got)
 	}
 }
 
 func TestCollectionSinkAcceptsVariableHeldCollectionArg(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -2050,14 +2050,14 @@ func TestCollectionSinkAcceptsVariableHeldCollectionArg(t *testing.T) {
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tmp", Dst: "arg0"})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg0" || got[0].Concept != "custom.Command" {
 		t.Fatalf("collection sink should accept collection-valued call arg: %+v", got)
 	}
 }
 
 func TestSinkBestMatchKeepsCollectionAndScalarTargets(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{
@@ -2076,7 +2076,7 @@ func TestSinkBestMatchKeepsCollectionAndScalarTargets(t *testing.T) {
 		"loc": "sample.x:1", "callee_path": "Process.run", "method": "run", "arg0": "arg0", "arg1": "arg1",
 	}})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	seen := map[string]bool{}
 	for _, m := range got {
 		if m.Concept == "custom.Command" {
@@ -2148,7 +2148,7 @@ binding executeParameterized {
 		}
 	}
 	if ad == nil {
-		t.Fatalf("ParseV2Definitions decls = %#v, want adapter decl", decls)
+		t.Fatalf("ParseV2Definitions decls = %#v, want binding decl", decls)
 	}
 	spec := specFromBindingSet(ad)
 
@@ -2169,14 +2169,14 @@ binding executeParameterized {
 		"loc": "sample.py:3", "callee_path": "cursor.execute", "method": "execute", "arg0": "twoArg0", "arg1": "twoArg1",
 	}})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "twoArg0" || got[0].Concept != "custom.SqlExecution" {
 		t.Fatalf("args.count-gated sink labels = %+v, want only twoArg0", got)
 	}
 }
 
 func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Inputs: []inputSpec{{
@@ -2186,13 +2186,13 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 			ValMatches: []string{"HTTP_PROXY"},
 		}},
 	}
-	adapter := spec.inputAdapter()
+	binding := spec.sourceApplicator()
 
 	direct := usg.NewInMemStore()
 	direct.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "os.getenv", "method": "getenv", "str_args": "HTTP_PROXY",
 	}})
-	if got := adapter.Apply(direct); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
+	if got := binding.Apply(direct); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
 		t.Fatalf("value-matched source did not use direct string tokens: %+v", got)
 	}
 
@@ -2208,7 +2208,7 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 	}})
 	flowed.AddEdge(usg.Edge{Type: "FLOWS", Src: "literal", Dst: "arg0"})
 	flowed.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "src"})
-	if got := adapter.Apply(flowed); len(got) != 0 {
+	if got := binding.Apply(flowed); len(got) != 0 {
 		t.Fatalf("value-matched source used flowing string tokens: %+v", got)
 	}
 }
@@ -2248,7 +2248,7 @@ binding sqlLiteralQuery {
 		"loc": "app.js:9", "callee_path": "db.query", "method": "query", "arg0": "otherArg", "str_args": "UPDATE users",
 	}})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "matchedArg" || got[0].Concept != "bindings.javascript.sql.SqlExecution" {
 		t.Fatalf("literal relation sink labels = %+v, want only matchedArg", got)
 	}
@@ -2285,7 +2285,7 @@ binding guardedDanger {
 		"loc": "app.js:20", "callee_path": "danger", "method": "danger", "arg0": "otherArg",
 	}})
 
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "matchedArg" || got[0].Concept != "bindings.javascript.composed.CommandExecution" {
 		t.Fatalf("scoped relation sink labels = %+v, want only matchedArg", got)
 	}
@@ -2308,14 +2308,14 @@ func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
 	}})
 	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "value"})
 
-	got := jsDomValueInputAdapter().Apply(store)
+	got := jsDomValueInputApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "value" || got[0].Concept != want {
 		t.Fatalf("DOM value source mapping wrong: %+v want concept %s", got, want)
 	}
 }
 
 func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Inputs: []inputSpec{{
@@ -2350,9 +2350,9 @@ func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 			"loc": "sample.x:1", "callee_path": tc.path, "method": tc.path,
 		}})
 	}
-	got := spec.inputAdapter().Apply(store)
+	got := spec.sourceApplicator().Apply(store)
 	if len(got) != 7 {
-		t.Fatalf("input adapter missed callable node types: %+v", got)
+		t.Fatalf("input binding missed callable node types: %+v", got)
 	}
 	seen := map[string]bool{}
 	for _, m := range got {
@@ -2360,7 +2360,7 @@ func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	}
 	for _, id := range []string{"call", "attr", "name", "subscript", "binop", "unary", "seq"} {
 		if !seen[id] {
-			t.Fatalf("input adapter missed %s in %+v", id, got)
+			t.Fatalf("input binding missed %s in %+v", id, got)
 		}
 	}
 }
@@ -2390,7 +2390,7 @@ binding domValueSource {
 		"loc": "sample.js:2", "callee_path": "input.value", "method": "value",
 	}})
 
-	got := spec.inputAdapter().Apply(store)
+	got := spec.sourceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "attr" || got[0].Concept != "custom.DomValue" {
 		t.Fatalf("memberAccess pattern matched wrong nodes: %+v", got)
 	}
@@ -2421,7 +2421,7 @@ binding secretComparison {
 		"loc": "sample.js:2", "callee_path": "__binop.eq", "method": "eq",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
 		t.Fatalf("binaryExpr pattern matched wrong nodes: %+v", got)
 	}
@@ -2452,7 +2452,7 @@ binding dangerousPathLiteral {
 		"loc": "sample.js:2", "value": "/etc/passwd",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "lit" || got[0].Concept != "custom.DangerousPath" {
 		t.Fatalf("literal pattern matched wrong nodes: %+v", got)
 	}
@@ -2479,7 +2479,7 @@ binding exportedHandler {
 		"loc": "sample.js:2", "name": "exportedHandler",
 	}})
 
-	got := spec.inputAdapter().Apply(store)
+	got := spec.sourceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "fn" || got[0].Concept != "custom.HandlerEntry" {
 		t.Fatalf("function query matched wrong nodes: %+v", got)
 	}
@@ -2506,7 +2506,7 @@ binding lodashImport {
 		"loc": "sample.js:2", "module": "lodash",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "imp" || got[0].Concept != "custom.DependencyUse" {
 		t.Fatalf("import query matched wrong nodes: %+v", got)
 	}
@@ -2533,7 +2533,7 @@ binding adminClass {
 		"loc": "sample.js:2", "name": "AdminController",
 	}})
 
-	got := spec.inputAdapter().Apply(store)
+	got := spec.sourceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "class" || got[0].Concept != "custom.AdminSurface" {
 		t.Fatalf("class query matched wrong nodes: %+v", got)
 	}
@@ -2563,7 +2563,7 @@ binding secretAssignment {
 		"loc": "sample.js:3", "callee_path": "analysis.function.context", "method": "context", "str_args": "assign:other=secretValue",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "assignment" || got[0].Concept != "custom.SecretAssignment" {
 		t.Fatalf("assignment query matched wrong nodes: %+v", got)
 	}
@@ -2593,7 +2593,7 @@ binding expressRoute {
 		"loc": "app.js:8", "callee_path": "app.post", "method": "post", "tech": "javascript",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "route" || got[0].Concept != "bindings.javascript.facts.PublicEndpoint" {
 		t.Fatalf("fact emit labeled wrong nodes: %+v", got)
 	}
@@ -2608,8 +2608,8 @@ binding expressRoute {
 	applied.AddNode(usg.Node{ID: "post", Type: "code.Call", Props: map[string]string{
 		"loc": "app.js:8", "callee_path": "app.post", "method": "post", "tech": "javascript",
 	}})
-	if _, suppressed, err := adapters.Apply(applied, []adapters.Adapter{spec.markAdapter()}, nil); err != nil {
-		t.Fatalf("apply fact adapter: %v", err)
+	if _, suppressed, err := bindings.Apply(applied, []bindings.Applicator{spec.matchPresenceApplicator()}, nil); err != nil {
+		t.Fatalf("apply fact binding: %v", err)
 	} else if len(suppressed) != 0 {
 		t.Fatalf("suppressed fact mappings: %+v", suppressed)
 	}
@@ -2653,7 +2653,7 @@ binding expressRoute {
 		"loc": "app.js:7", "callee_path": "app.get", "method": "get", "arg0": "path", "tech": "javascript",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "path" || got[0].Concept != "bindings.javascript.facts.RoutePath" {
 		t.Fatalf("argument fact emit labeled wrong nodes: %+v", got)
 	}
@@ -2684,7 +2684,7 @@ binding expressRoute {
 		"loc": "app.js:7", "callee_path": "router.route", "method": "route", "arg0": "path", "arg1": "handler", "tech": "javascript",
 	}})
 
-	got := spec.markAdapter().Apply(store)
+	got := spec.matchPresenceApplicator().Apply(store)
 	if len(got) != 2 {
 		t.Fatalf("argument fact emit labels = %+v, want two args", got)
 	}
@@ -2701,7 +2701,7 @@ binding expressRoute {
 }
 
 func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Inputs: []inputSpec{{
@@ -2711,13 +2711,13 @@ func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 			Packages: []string{"samplepkg"},
 		}},
 	}
-	adapter := spec.inputAdapter()
+	binding := spec.sourceApplicator()
 
 	withoutPkg := usg.NewInMemStore()
 	withoutPkg.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
-	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+	if got := binding.Apply(withoutPkg); len(got) != 0 {
 		t.Fatalf("explicit package-block source fired without evidence: %+v", got)
 	}
 
@@ -2728,13 +2728,13 @@ func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	withPkg.AddNode(usg.Node{ID: "src", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
-	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
+	if got := binding.Apply(withPkg); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
 		t.Fatalf("explicit package-block source did not fire with package evidence: %+v", got)
 	}
 }
 
 func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Inputs: []inputSpec{{
@@ -2745,7 +2745,7 @@ func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
 			Packages:   []string{"samplepkg"},
 		}},
 	}
-	adapter := spec.inputAdapter()
+	binding := spec.sourceApplicator()
 
 	withWrongReceiver := usg.NewInMemStore()
 	withWrongReceiver.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
@@ -2754,7 +2754,7 @@ func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
 	withWrongReceiver.AddNode(usg.Node{ID: "src", Type: "code.Attr", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "payload.value", "method": "value",
 	}})
-	if got := adapter.Apply(withWrongReceiver); len(got) != 0 {
+	if got := binding.Apply(withWrongReceiver); len(got) != 0 {
 		t.Fatalf("receiver source fired without receiver type: %+v", got)
 	}
 
@@ -2765,13 +2765,13 @@ func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
 	withReceiver.AddNode(usg.Node{ID: "src", Type: "code.Attr", Props: map[string]string{
 		"loc": "sample.x:3", "callee_path": "request.value", "method": "value", "recv_type": "samplepkg.Request",
 	}})
-	if got := adapter.Apply(withReceiver); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
+	if got := binding.Apply(withReceiver); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
 		t.Fatalf("receiver source did not fire with receiver type: %+v", got)
 	}
 }
 
 func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Controls: []controlSpec{{
@@ -2781,13 +2781,13 @@ func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 			Packages: []string{"samplepkg"},
 		}},
 	}
-	adapter := spec.controlAdapter()
+	binding := spec.checkApplicator()
 
 	withoutPkg := usg.NewInMemStore()
 	withoutPkg.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
-	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+	if got := binding.Apply(withoutPkg); len(got) != 0 {
 		t.Fatalf("explicit package-block control fired without evidence: %+v", got)
 	}
 
@@ -2798,7 +2798,7 @@ func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	withPkg.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
-	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
+	if got := binding.Apply(withPkg); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
 		t.Fatalf("explicit package-block control did not fire with package evidence: %+v", got)
 	}
 }
@@ -2833,7 +2833,7 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 			Confidence:     "medium",
 		}},
 	})
-	got := spec.controlAdapter().Apply(store)
+	got := spec.checkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
 		t.Fatalf("control mapping wrong: %+v", got)
 	}
@@ -2868,7 +2868,7 @@ func TestControlAdapterLabelsArgumentLocation(t *testing.T) {
 			Confidence:     "high",
 		}},
 	})
-	got := spec.controlAdapter().Apply(store)
+	got := spec.checkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Parameterized" {
 		t.Fatalf("argument control mapping wrong: %+v", got)
 	}
@@ -2902,7 +2902,7 @@ func TestControlAdapterLabelsAdvisoryArgumentLocation(t *testing.T) {
 			Confidence:     "low",
 		}},
 	})
-	got := spec.controlAdapter().Apply(store)
+	got := spec.checkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.PathCanonicalization" {
 		t.Fatalf("argument advisory check mapping wrong: %+v", got)
 	}
@@ -2934,7 +2934,7 @@ func TestControlAdapterLabelsGlobalArgumentLocation(t *testing.T) {
 			Confidence: "medium",
 		}},
 	})
-	got := spec.controlAdapter().Apply(store)
+	got := spec.checkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.GlobalHardening" {
 		t.Fatalf("argument global check mapping wrong: %+v", got)
 	}
@@ -2963,7 +2963,7 @@ func TestSinkAdapterUsesBindingEvidenceAttrs(t *testing.T) {
 			Confidence: "medium",
 		}},
 	})
-	got := spec.sinkAdapter().Apply(store)
+	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Command" {
 		t.Fatalf("sink mapping wrong: %+v", got)
 	}
@@ -2978,7 +2978,7 @@ func TestFlagAdapterPreservesAdvisoryDetail(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Flags: []flagSpec{{
@@ -2990,7 +2990,7 @@ func TestFlagAdapterPreservesAdvisoryDetail(t *testing.T) {
 			Detail: map[string]string{"advisory": "true", "coverage": "sameScope"},
 		}},
 	}
-	got := spec.flagAdapter().Apply(store)
+	got := spec.presenceApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
 		t.Fatalf("flag mapping wrong: %+v", got)
 	}
@@ -3008,7 +3008,7 @@ func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 		"recv":   "recv",
 	}})
 
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Controls: []controlSpec{{
@@ -3018,14 +3018,14 @@ func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 			Receiver: true,
 		}},
 	}
-	got := spec.controlAdapter().Apply(store)
+	got := spec.checkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "recv" || got[0].Concept != "custom.Control" {
 		t.Fatalf("receiver control mapping wrong: %+v", got)
 	}
 }
 
 func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
-	spec := adapterSpec{
+	spec := bindingSpec{
 		Name:       "neutral",
 		Technology: "neutral",
 		Sinks: []sinkSpec{{
@@ -3036,13 +3036,13 @@ func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
 			Constraint: "samplepkg.SafeReceiver",
 		}},
 	}
-	adapter := spec.sinkAdapter()
+	binding := spec.sinkApplicator()
 
 	wrongType := usg.NewInMemStore()
 	wrongType.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger", "recv_type": "samplepkg.OtherReceiver",
 	}})
-	if got := adapter.Apply(wrongType); len(got) != 0 {
+	if got := binding.Apply(wrongType); len(got) != 0 {
 		t.Fatalf("receiver sink fired for conflicting receiver type: %+v", got)
 	}
 
@@ -3050,7 +3050,7 @@ func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
 	rightType.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
 		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger", "recv_type": "samplepkg.SafeReceiver",
 	}})
-	if got := adapter.Apply(rightType); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.ReceiverSink" {
+	if got := binding.Apply(rightType); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.ReceiverSink" {
 		t.Fatalf("receiver sink did not fire for matching receiver type: %+v", got)
 	}
 }

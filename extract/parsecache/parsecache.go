@@ -258,7 +258,7 @@ func (c *Cache) GetRaw(key string) ([]byte, bool) {
 }
 
 // GetManyRaw reads many keys in a SINGLE read transaction and returns the present ones. The
-// per-module adapter-label cache looks up thousands of keys per scan; one transaction instead
+// per-module binding-label cache looks up thousands of keys per scan; one transaction instead
 // of one-per-key turns an I/O-bound loop (the dominant cost of a large incremental scan) into a
 // single pass. Missing keys are simply absent from the result.
 func (c *Cache) GetManyRaw(keys []string) map[string][]byte {

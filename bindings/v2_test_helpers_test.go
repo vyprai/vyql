@@ -1,8 +1,8 @@
-package adapters_test
+package bindings_test
 
 import "github.com/vyprai/vyql/parser"
 
-const v2CorePoliciesForAdaptersTest = `
+const v2CorePoliciesForBindingsTest = `
 module policies.core;
 policy resultIdentity default {
   findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
@@ -22,7 +22,7 @@ policy confidence default {
 `
 
 func parseV2DefinitionsForTest(src string) ([]parser.Decl, error) {
-	sources := []parser.V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForAdaptersTest}}
+	sources := []parser.V2DefinitionSource{{Name: "policies/core.vyql", Source: v2CorePoliciesForBindingsTest}}
 	sources = append(sources, parser.V2DefinitionSourcesFromText("test.vyql", src)...)
 	parsed := make([]parser.V2Source, 0, len(sources))
 	for _, source := range sources {

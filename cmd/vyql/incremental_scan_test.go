@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
@@ -94,7 +94,7 @@ func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) 
 		if _, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
 			return nil, err
 		}
-	} else if _, _, err := adapters.Apply(g, bindingApps, nil); err != nil {
+	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
 		return nil, err
 	}
 	return g, nil
@@ -131,19 +131,19 @@ func syntheticIncrementalOntology() *ontology.Ontology {
 	return onto
 }
 
-func syntheticIncrementalBindings() []adapters.Adapter {
-	return []adapters.Adapter{
+func syntheticIncrementalBindings() []bindings.Applicator {
+	return []bindings.Applicator{
 		{
 			Name: "test.input", Technology: "test", Specificity: 10,
 			Fidelity: "resolved", Confidence: "high",
-			Apply: func(g usg.Store) []adapters.Mapping {
+			Apply: func(g usg.Store) []bindings.Mapping {
 				if !syntheticSourceActive("custom.Input") {
 					return nil
 				}
 				params, _ := g.NodesOfType("code.Param")
-				out := make([]adapters.Mapping, 0, len(params))
+				out := make([]bindings.Mapping, 0, len(params))
 				for _, id := range params {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: "custom.Input"})
+					out = append(out, bindings.Mapping{NodeID: id, Concept: "custom.Input"})
 				}
 				return out
 			},
@@ -151,17 +151,17 @@ func syntheticIncrementalBindings() []adapters.Adapter {
 		{
 			Name: "test.target", Technology: "test", Specificity: 10,
 			Fidelity: "resolved", Confidence: "high",
-			Apply: func(g usg.Store) []adapters.Mapping {
+			Apply: func(g usg.Store) []bindings.Mapping {
 				nodes, _ := g.AllNodes()
-				var out []adapters.Mapping
+				var out []bindings.Mapping
 				for _, n := range nodes {
 					switch n.Prop("method") {
 					case "emit":
 						if arg := n.Prop("arg0"); arg != "" {
-							out = append(out, adapters.Mapping{NodeID: arg, Concept: "custom.Target"})
+							out = append(out, bindings.Mapping{NodeID: arg, Concept: "custom.Target"})
 						}
 					case "marker":
-						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: "custom.Marker"})
+						out = append(out, bindings.Mapping{NodeID: n.ID, Concept: "custom.Marker"})
 					}
 				}
 				return out

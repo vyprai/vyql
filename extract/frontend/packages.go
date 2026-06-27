@@ -21,7 +21,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/parser"
@@ -54,7 +54,7 @@ var generatedPackageIndex sync.Map // map[tech]map[lowercase stem]actual stem
 // Missing corpus remains non-fatal because the generated catalog augments a scan.
 // Present generated files must parse/lower successfully so SCA/CVE verification
 // cannot silently lose package coverage. Returns nil when nothing matches.
-func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []adapters.Adapter {
+func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []bindings.Applicator {
 	if len(deps) == 0 {
 		return nil
 	}

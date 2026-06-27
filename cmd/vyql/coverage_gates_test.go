@@ -1,7 +1,7 @@
 package main
 
 // Coverage GATES (plan/test-coverage-tasklist.md T0). These meta-tests enforce that
-// every rule/concept/threat/adapter stays tested and internally consistent — so a new
+// every rule/concept/threat/binding stays tested and internally consistent — so a new
 // feature cannot ship untested. They read the shipped VyQL data (vyql/) directly.
 
 import (
@@ -142,7 +142,7 @@ func TestRuleFiresCoverageGate(t *testing.T) {
 	t.Logf("rule fires-coverage: %d rules, %d covered, %d in burn-down backlog", len(rules), len(expected), len(unspecced))
 }
 
-// T0.2 — every code/core concept reference in adapters and packs resolves to a defined
+// T0.2 — every code/core concept reference in bindings and packs resolves to a defined
 // concept. References come from the parsed VyQL AST, so string-literal sink paths
 // (e.g. the Python `code` stdlib module) are not mistaken for concept refs.
 func TestConceptRefsResolveGate(t *testing.T) {
@@ -157,7 +157,7 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	}
 	check := func(sub, suffix string) {
 		for f, refs := range conceptRefsByFile(t, sub, suffix) {
-			if isGeneratedAdapter(f) {
+			if isGeneratedBinding(f) {
 				continue // generated corpus validated separately below
 			}
 			for ref := range refs {
@@ -173,22 +173,22 @@ func TestConceptRefsResolveGate(t *testing.T) {
 	// concepts (a dead label otherwise), but it is excluded from the curated coherence
 	// gates below because it legitimately wires broad concepts that have no curated rule.
 	for f, refs := range conceptRefsByFile(t, "bindings", ".vyql") {
-		if !isGeneratedAdapter(f) {
+		if !isGeneratedBinding(f) {
 			continue
 		}
 		for ref := range refs {
 			if !defined[ref] && !defined[shortConceptName(ref)] {
-				t.Errorf("generated adapter %s references concept %q not defined in ontology/concepts", f, ref)
+				t.Errorf("generated binding %s references concept %q not defined in ontology/concepts", f, ref)
 			}
 		}
 	}
 	t.Logf("concept refs: %d concepts defined", len(defined))
 }
 
-// isGeneratedAdapter reports whether a data-file path is part of the dynamically-loaded
+// isGeneratedBinding reports whether a data-file path is part of the dynamically-loaded
 // generated package-binding corpus (bindings/packages/generated/<lang>/<pkg>.vyql), which
 // is auxiliary content gated at scan time and excluded from the curated coherence gates.
-func isGeneratedAdapter(path string) bool {
+func isGeneratedBinding(path string) bool {
 	return strings.Contains(filepath.ToSlash(path), "/bindings/packages/generated/")
 }
 
@@ -197,7 +197,7 @@ func isGeneratedAdapter(path string) bool {
 func conceptRefsIn(t *testing.T, sub string) map[string]bool {
 	out := map[string]bool{}
 	for f, refs := range conceptRefsByFile(t, sub, ".vyql") {
-		if isGeneratedAdapter(f) {
+		if isGeneratedBinding(f) {
 			continue // curated-coherence gates ignore the dynamically-loaded generated corpus
 		}
 		for ref := range refs {
@@ -318,11 +318,11 @@ func fieldStringList(fields map[string]any, key string) []string {
 }
 
 // T2.5 — concept-coverage gate. Every SINK concept that a rule consumes must be wired
-// in at least one adapter (otherwise the rule is latent — it can never fire). This is
+// in at least one binding (otherwise the rule is latent — it can never fire). This is
 // the gate that catches dead sinks (e.g. the reflection/log/header sinks that shipped
 // referenced-but-unwired). The allowlist holds sinks for documented-deferred rules.
 func TestSinkConceptsWiredGate(t *testing.T) {
-	// no deferred sinks — every sink a rule consumes is adapter-wired.
+	// no deferred sinks — every sink a rule consumes is binding-wired.
 	deferred := map[string]bool{}
 	sinks := map[string]bool{}
 	for s := range conceptsByKind(t, "sink") {
@@ -341,9 +341,9 @@ func TestSinkConceptsWiredGate(t *testing.T) {
 	}
 	sort.Strings(latent)
 	for _, s := range latent {
-		t.Errorf("sink concept %q is consumed by a rule but wired in NO adapter — latent rule (wire it or document-defer)", s)
+		t.Errorf("sink concept %q is consumed by a rule but wired in NO binding — latent rule (wire it or document-defer)", s)
 	}
-	t.Logf("sink concepts: %d defined, %d adapter-wired", len(sinks), countWired(sinks, adapterRefs))
+	t.Logf("sink concepts: %d defined, %d binding-wired", len(sinks), countWired(sinks, adapterRefs))
 }
 
 func countWired(sinks, wired map[string]bool) int {
@@ -393,7 +393,7 @@ func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 	return out
 }
 
-// T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
+// T2.1 — every SOURCE concept is wired in a binding (something produces it) OR is in the
 // documented reserved vocabulary set in ontology metadata (defined ahead of wiring; the input
 // may currently be subsumed by a broader source, or belong to an archetype not yet wired).
 // A NEW source concept must be wired or explicitly marked `coverageReservedSource: true`.
@@ -410,12 +410,12 @@ func TestSourceConceptsWiredGate(t *testing.T) {
 	}
 	sort.Strings(unwired)
 	for _, s := range unwired {
-		t.Errorf("source concept %q is wired in NO adapter and not reserved — wire it or add to the reserved set", s)
+		t.Errorf("source concept %q is wired in NO binding and not reserved — wire it or add to the reserved set", s)
 	}
 	t.Logf("source concepts: %d defined, %d reserved-vocabulary", len(sources), len(reserved))
 }
 
-// T2.3 — every CONTROL concept WIRED in an adapter must be consumed by some rule's
+// T2.3 — every CONTROL concept WIRED in a binding must be consumed by some rule's
 // coveredBy clause; a wired control no rule reads is INERT (neutralizes
 // nothing). This is the gate that catches the OutputEncoding-style mistake. (A control
 // defined-but-not-wired is just unused vocabulary and is fine.)
@@ -461,7 +461,7 @@ func TestControlsWiredAreConsumedGate(t *testing.T) {
 	}
 	sort.Strings(inert)
 	for _, ctrl := range inert {
-		t.Errorf("control %q is wired in an adapter but consumed by NO rule — inert wiring", ctrl)
+		t.Errorf("control %q is wired in a binding but consumed by NO rule — inert wiring", ctrl)
 	}
 	t.Logf("control concepts: %d defined, %d consumed by rules", len(controls), len(consumed))
 }
@@ -969,6 +969,10 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"validate-adapter parse",
 		"json:\"adapters",
 		"definition kind: all | concepts | rules | adapters",
+		"github.com/vyprai/vyql/adapters",
+		"adapters.Adapter",
+		"adapters.Mapping",
+		"adapters.Apply",
 	}
 	securityConceptNames := []string{
 		"ResourceRelease",
@@ -1132,13 +1136,13 @@ func TestCurrentDesignDocsUseV2BindingTerminology(t *testing.T) {
 	}
 }
 
-func TestDefinitionsDoNotUseLegacyFlagBridge(t *testing.T) {
+func TestBindingDefinitionsUseStableQueryFamilies(t *testing.T) {
 	var hits []string
 	for path, src := range readDataFiles(t, "bindings", ".vyql") {
 		lines := strings.Split(src, "\n")
 		for i, line := range lines {
 			trimmed := strings.TrimSpace(line)
-			if !strings.HasPrefix(trimmed, "query unstable.legacyFlag") {
+			if !strings.HasPrefix(trimmed, "query unstable.") {
 				continue
 			}
 			rel, _ := filepath.Rel(datadir.Root(), path)
@@ -1150,7 +1154,7 @@ func TestDefinitionsDoNotUseLegacyFlagBridge(t *testing.T) {
 	}
 	if len(hits) > 0 {
 		sort.Strings(hits)
-		t.Fatalf("definitions must use stable `callExpr` or `presenceNode` patterns, not unstable.legacyFlag:\n%s", strings.Join(hits, "\n"))
+		t.Fatalf("binding definitions must use stable `callExpr` or `presenceNode` query families:\n%s", strings.Join(hits, "\n"))
 	}
 }
 
@@ -1210,11 +1214,11 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int, int) 
 				t.Fatalf("parse %s: %v", path, err)
 			}
 			for _, decl := range decls {
-				adapter, ok := decl.(*parser.BindingSet)
+				binding, ok := decl.(*parser.BindingSet)
 				if !ok {
 					continue
 				}
-				for _, mapping := range adapter.Mappings {
+				for _, mapping := range binding.Mappings {
 					switch {
 					case strings.HasPrefix(mapping.Kind, "source"):
 						sourceCount++

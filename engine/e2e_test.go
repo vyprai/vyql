@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -125,18 +125,18 @@ func buildToyGraph(t *testing.T) usg.Store {
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "target"})
 	s.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "otherTarget"})
 
-	flowAdapter := adapters.Adapter{
+	flowAdapter := bindings.Applicator{
 		Name: "test.flow", Technology: "test", Specificity: 2,
 		Fidelity: "resolved", Confidence: "high",
-		Apply: func(usg.Store) []adapters.Mapping {
-			return []adapters.Mapping{
+		Apply: func(usg.Store) []bindings.Mapping {
+			return []bindings.Mapping{
 				{NodeID: "input", Concept: "custom.Input"},
 				{NodeID: "target", Concept: "custom.Target"},
 				{NodeID: "otherTarget", Concept: "custom.OtherTarget"},
 			}
 		},
 	}
-	if _, _, err := adapters.Apply(s, []adapters.Adapter{flowAdapter}, nil); err != nil {
+	if _, _, err := bindings.Apply(s, []bindings.Applicator{flowAdapter}, nil); err != nil {
 		t.Fatal(err)
 	}
 

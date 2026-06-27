@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/extract/frontend"
 	cfgfront "github.com/vyprai/vyql/extract/frontend/config"
 	"github.com/vyprai/vyql/extract/frontend/golang"
@@ -21,7 +21,7 @@ type language struct {
 	name     string
 	exts     map[string]bool
 	extract  func(files []string, root string) (nir.Program, error)
-	bindings func() []adapters.Adapter
+	bindings func() []bindings.Applicator
 }
 
 var languages = []language{
@@ -65,7 +65,7 @@ type scanStats struct {
 // extractAll routes every path to the right frontend(s), merges into one NIR
 // Program, and returns the union of binding applicators + constructor→type
 // tables for the languages present.
-func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]string, scanStats, error) {
+func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]string, scanStats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
 	stats := scanStats{files: map[string]int{}}
@@ -100,7 +100,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		}
 	}
 
-	var bindingApps []adapters.Adapter
+	var bindingApps []bindings.Applicator
 	ctorTypes := map[string]string{}
 	for _, lg := range languages {
 		if present[lg.name] {

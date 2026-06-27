@@ -68,7 +68,7 @@ func modPhpB(hash string, extra []nir.Stmt) nir.Module {
 
 // snapshot renders a store as a sorted, comparable string (nodes with type+props, edges,
 // labels). Two graphs are equivalent iff their snapshots match — a stronger invariant than
-// finding-equality (identical graphs ⇒ identical adapter/taint/rule output).
+// finding-equality (identical graphs ⇒ identical binding/taint/rule output).
 func snapshot(t *testing.T, s usg.Store) string {
 	t.Helper()
 	nodes, _ := s.AllNodes()

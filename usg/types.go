@@ -100,7 +100,7 @@ type Store interface {
 	NodesWithConcept(concept string) ([]string, error)
 	// NodesOfType returns ids of nodes of the given namespaced type.
 	NodesOfType(nodeType string) ([]string, error)
-	// AllNodes returns every node (used by extraction adapters that match on
+	// AllNodes returns every node (used by extraction binding applicators that match on
 	// node properties, e.g. callee_path, and by the SBOM reachability linker).
 	AllNodes() ([]Node, error)
 	// Labels returns the labels attached to a node.

@@ -12,7 +12,7 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// Reputation categories are recorded as neutral package tokens; VyQL adapter data
+// Reputation categories are recorded as neutral package tokens; VyQL binding data
 // maps them to concrete concepts.
 // A version listed in trusted.json is verified-good and short-circuits the name scans.
 

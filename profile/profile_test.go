@@ -65,7 +65,7 @@ func TestProfileAutoDetect(t *testing.T) {
 func TestLoadSourcesReportsInvalidProfileSyntax(t *testing.T) {
 	profiles, err := loadSources([]datadir.Source{{
 		Name: "profiles/bad.vyql",
-		Data: []byte(`adapter javascript { source "req.body" -> code.HttpInput }`),
+		Data: []byte(`profile bad {}`),
 	}})
 	if err == nil {
 		t.Fatal("loadSources succeeded, want parse error")

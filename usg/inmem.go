@@ -59,7 +59,7 @@ func (s *InMemStore) AddEdge(e Edge) error {
 
 func (s *InMemStore) AddLabel(nodeID string, l Label) error {
 	s.labels[nodeID] = append(s.labels[nodeID], l)
-	// keep the concept index a SET of node ids: two adapters may label the same node with the
+	// keep the concept index a SET of node ids: two bindings may label the same node with the
 	// same concept (different provenance), but it is one node. A membership set makes the dedup
 	// O(1) — a linear scan here was O(n²) on large graphs where a concept labels many nodes.
 	seen := s.conceptHas[l.Concept]
@@ -112,7 +112,7 @@ func (s *InMemStore) AllNodes() ([]Node, error) {
 }
 
 // RangeNodes streams every node to fn (stop early by returning false) WITHOUT materializing a
-// full []Node copy. Adapters and SCA iterate all nodes once per pass; AllNodes' slice copy was a
+// full []Node copy. Bindings and SCA iterate all nodes once per pass; AllNodes' slice copy was a
 // multi-GB transient allocation (and GC churn) on large graphs. fn must not retain the Node.
 func (s *InMemStore) RangeNodes(fn func(Node) bool) {
 	for _, n := range s.nodes {

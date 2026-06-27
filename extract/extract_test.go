@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
@@ -112,7 +112,7 @@ func TestImportResolutionRemovesNameCollisionFP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := adapters.Apply(g, frontend.PythonBindings(), nil); err != nil {
+		if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 			t.Fatal(err)
 		}
 		fs := runRule(t, sqliRule, g)
@@ -199,7 +199,7 @@ func TestReachabilityGatedSCA(t *testing.T) {
 	if err := sca.LinkReachability(g); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.AutoBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,7 +259,7 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := sca.BuildSBOM(g, "pypi", []sca.Dep{{Name: "pyyaml", Version: "3.12"}}, ""); err != nil {
@@ -275,7 +275,7 @@ func TestVulnerableEntrypointExploitabilityFunnel(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.AutoBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -346,7 +346,7 @@ func TestTypeMapResolution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 	fs := runRule(t, sqliRule, g)
@@ -401,7 +401,7 @@ func TestInterproceduralCrossFileSQLi(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := adapters.Apply(g, frontend.PythonBindings(), nil); err != nil {
+	if _, _, err := bindings.Apply(g, frontend.PythonBindings(), nil); err != nil {
 		t.Fatal(err)
 	}
 

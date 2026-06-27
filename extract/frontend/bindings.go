@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/sca"
 	"github.com/vyprai/vyql/ontology"
@@ -119,7 +119,7 @@ type flagSpec struct {
 	Confidence  string
 }
 
-// activeSources, when non-nil, restricts which source concepts the input adapters
+// activeSources, when non-nil, restricts which source concepts the input bindings
 // emit for the active analysis profile. nil = every source active.
 var activeSources map[string]bool
 
@@ -128,7 +128,7 @@ var (
 )
 
 type cachedAutoBindings struct {
-	data []adapters.Adapter
+	data []bindings.Applicator
 	err  error
 }
 
@@ -817,7 +817,7 @@ type paramSourceSpec struct {
 	Confidence  string
 }
 
-type adapterSpec struct {
+type bindingSpec struct {
 	Name                 string
 	Technology           string
 	containsMatch        bool
@@ -834,16 +834,16 @@ type adapterSpec struct {
 
 // BindingsFor loads v2 bindings for a technology and builds the graph-labeling
 // applicators that apply those bindings to an extracted graph.
-func BindingsFor(tech string) []adapters.Adapter {
+func BindingsFor(tech string) []bindings.Applicator {
 	out := bindingApplicatorsFromSpec(loadSpec(tech))
 	if tech == "javascript" {
-		out = append(out, jsDomValueInputAdapter())
-		out = append(out, jsPathRegexGuardAdapter())
-		out = append(out, jsSafePathResolverAdapter())
-		out = append(out, jsModuleHelperLdapEscapeAdapter())
+		out = append(out, jsDomValueInputApplicator())
+		out = append(out, jsPathRegexGuardApplicator())
+		out = append(out, jsSafePathResolverApplicator())
+		out = append(out, jsModuleHelperLdapEscapeApplicator())
 	}
 	if tech == "ruby" {
-		out = append(out, processArgVectorAdapter(tech))
+		out = append(out, processArgVectorApplicator(tech))
 	}
 	return out
 }
@@ -852,7 +852,7 @@ func BindingsFor(tech string) []adapters.Adapter {
 // directly under root or under root/bindings. The overlay is intentionally
 // explicit and opt-in; parse errors are returned so a bad generated file does
 // not silently change scan behavior.
-func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
+func OverlayBindings(root string, techs []string) ([]bindings.Applicator, error) {
 	if strings.TrimSpace(root) == "" {
 		return nil, nil
 	}
@@ -874,7 +874,7 @@ func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
 		}
 	}
 	sort.Strings(files)
-	var out []adapters.Adapter
+	var out []bindings.Applicator
 	for _, file := range files {
 		b, err := os.ReadFile(file)
 		if err != nil {
@@ -906,44 +906,44 @@ func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
 // bindingApplicatorsFromSpec turns a compiled binding spec into concrete
 // graph-labeling applicators, one per action family present. Shared by
 // BindingsFor and the dynamic package loader.
-func bindingApplicatorsFromSpec(spec adapterSpec) []adapters.Adapter {
-	var out []adapters.Adapter
+func bindingApplicatorsFromSpec(spec bindingSpec) []bindings.Applicator {
+	var out []bindings.Applicator
 	if len(spec.Inputs) > 0 {
-		out = append(out, spec.inputAdapter())
+		out = append(out, spec.sourceApplicator())
 	}
 	if len(spec.Sinks) > 0 {
-		out = append(out, spec.sinkAdapter())
+		out = append(out, spec.sinkApplicator())
 	}
 	if len(spec.Controls) > 0 {
-		out = append(out, spec.controlAdapter())
+		out = append(out, spec.checkApplicator())
 	}
 	if len(spec.Marks) > 0 {
-		out = append(out, spec.markAdapter())
+		out = append(out, spec.matchPresenceApplicator())
 	}
 	if len(spec.Flags) > 0 {
-		out = append(out, spec.flagAdapter())
+		out = append(out, spec.presenceApplicator())
 	}
 	if len(spec.Filters) > 0 {
-		out = append(out, spec.filterAdapter())
+		out = append(out, spec.filterApplicator())
 	}
 	if len(spec.ParamSources) > 0 {
-		out = append(out, spec.paramSourceAdapter())
+		out = append(out, spec.paramSourceApplicator())
 	}
 	if len(spec.AdvisoryNeutralizers) > 0 {
-		out = append(out, spec.advisoryNeutralizerAdapter())
+		out = append(out, spec.advisoryNeutralizerApplicator())
 	}
 	return out
 }
 
-// advisoryNeutralizerAdapter labels unsound-neutralizer calls (guards/transforms that cannot be
+// advisoryNeutralizerApplicator labels unsound-neutralizer calls (guards/transforms that cannot be
 // proven sound) with a Go-owned internal concept that the engine can surface as
 // review context.
-func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
+func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 	concept := ontology.InternalNeutralizerAssumptionConcept
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "syntactic", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
@@ -951,7 +951,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 			for i := range spec.AdvisoryNeutralizers {
 				effects[i] = reqGate.effect(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var scopeIdx flagMatchIndex
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
@@ -983,7 +983,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 					detail["about"] = as.About
 					detail["pattern"] = as.Pattern
 					conf, detail := effects[ai].apply(mappingConfidence(as.Confidence, ""), detail)
-					out = append(out, adapters.Mapping{NodeID: id, Concept: concept,
+					out = append(out, bindings.Mapping{NodeID: id, Concept: concept,
 						Fidelity: mappingFidelity(as.Fidelity, "syntactic"), Confidence: conf, Detail: detail})
 					break
 				}
@@ -993,18 +993,18 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 	}
 }
 
-// filterAdapter labels character-filtering replace(pattern, repl) calls with the
+// filterApplicator labels character-filtering replace(pattern, repl) calls with the
 // ontology role concept, recording the proven OUTPUT alphabet (or that it is unbounded)
 // in the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
 // excluded chars the alphabet excludes, and the engine surfaces an unproven filter
 // as an advisory note. The regex math is general (charfilter.go); WHICH methods
 // filter is data (the `filter` directive).
-func (spec adapterSpec) filterAdapter() adapters.Adapter {
+func (spec bindingSpec) filterApplicator() bindings.Applicator {
 	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleCharFilter)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: spec.Name + ".filters", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if concept == "" {
 				return nil
 			}
@@ -1015,7 +1015,7 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 			for i := range spec.Filters {
 				allowed[i] = reqGate.allowed(spec.Filters[i].Packages, spec.Filters[i].Requirement)
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range ids {
 				n, _, _ := s.GetNode(id)
 				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
@@ -1046,7 +1046,7 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 				if removed != "" {
 					detail["removed"] = removed
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Detail: detail})
+				out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Detail: detail})
 			}
 			return out
 		},
@@ -1149,15 +1149,15 @@ func parseV2BindingSources(sources []datadir.Source) ([]parser.Decl, error) {
 	})
 }
 
-func loadSpec(tech string) adapterSpec {
+func loadSpec(tech string) bindingSpec {
 	return specFromBindingSet(loadBindingSet(tech))
 }
 
-// specFromBindingSet builds an adapterSpec from an already-compiled v2 binding
+// specFromBindingSet builds a bindingSpec from an already-compiled v2 binding
 // set. Split out of loadSpec so the dynamic per-package binding loader
 // (packages.go) can reuse the exact same action-to-spec compilation.
-func specFromBindingSet(d *parser.BindingSet) adapterSpec {
-	s := adapterSpec{Name: d.Name, Technology: d.Name}
+func specFromBindingSet(d *parser.BindingSet) bindingSpec {
+	s := bindingSpec{Name: d.Name, Technology: d.Name}
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
 	}
@@ -1214,7 +1214,7 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 			s.ParamSources = append(s.ParamSources, paramSourceSpec{Concept: mp.Concept, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "type":
 			// Constructor type facts are read by CtorTypesFor; they do not create
-			// graph-labeling adapters.
+			// graph-labeling bindings.
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
@@ -1406,17 +1406,17 @@ func scopePredicatesMatch(s usg.Store, idx *flagMatchIndex, preds []flagPredicat
 	return true
 }
 
-// inputAdapter labels source reads. Prefix matching is `resolved`; `contains`
+// sourceApplicator labels source reads. Prefix matching is `resolved`; `contains`
 // matching (Go's varying receivers) is `syntactic` → lower confidence.
-func (spec adapterSpec) inputAdapter() adapters.Adapter {
+func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 	fidelity := "resolved"
 	if spec.containsMatch {
 		fidelity = "syntactic"
 	}
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: spec.Name + ".input", Technology: spec.Technology, Specificity: 2,
 		Fidelity: fidelity, Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			inIdx := buildSpecIndex(len(spec.Inputs), func(i int) (methods, paths []string, loose bool) {
@@ -1431,7 +1431,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 			for i := range spec.Inputs {
 				effects[i] = reqGate.effect(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var scopeIdx flagMatchIndex
 			rangeCallablePropNodes(s, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
@@ -1439,7 +1439,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 					return true
 				}
 				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
-					return true // only label this language's nodes (cross-language adapters skip this)
+					return true // only label this language's nodes (cross-language bindings skip this)
 				}
 				for _, ci := range inIdx.candidates(method, path) {
 					in := spec.Inputs[ci]
@@ -1461,7 +1461,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							continue
 						}
 						// value-constrained source: only a source when configured literal
-						// tokens are present or absent as declared by the adapter.
+						// tokens are present or absent as declared by the binding.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
 							!valCondsDirectForNode(n, in.ValMatches, in.ValAbsents) {
 							continue
@@ -1477,7 +1477,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 								spec = 3 // package-specific source supersedes native/general
 							}
 							conf, detail := effects[ci].apply(mappingConfidence(in.Confidence, ""), nil)
-							out = append(out, adapters.Mapping{NodeID: n.ID, Concept: in.Concept, Fidelity: mappingFidelity(in.Fidelity, fidelity), Confidence: conf, Specificity: spec, Detail: detail})
+							out = append(out, bindings.Mapping{NodeID: n.ID, Concept: in.Concept, Fidelity: mappingFidelity(in.Fidelity, fidelity), Confidence: conf, Specificity: spec, Detail: detail})
 						}
 						break
 					}
@@ -1489,7 +1489,7 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 	}
 }
 
-// sinkAdapter labels arg0 of matching calls with a PER-MAPPING fidelity:
+// sinkApplicator labels arg0 of matching calls with a PER-MAPPING fidelity:
 //   - dotted-path match           → resolved (high)
 //   - bare-method match, no `on`  → syntactic (medium — receiver type unknown)
 //   - method match with `on T`:
@@ -1498,12 +1498,12 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 //     recv_type != T              → SKIP (known wrong type — not a sink here)
 //
 // Collection-literal arg0s (vkind == Seq) are skipped.
-func (spec adapterSpec) sinkAdapter() adapters.Adapter {
+func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 	attributeSinks := ontologyRoleConcepts(ontology.InternalConceptRoleAttributeSink)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: spec.Name + ".sinks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
 			attrs, _ := s.NodesOfType("code.Attr")
 			ids = append(ids, attrs...)
@@ -1521,7 +1521,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 			for i := range spec.Sinks {
 				effects[i] = reqGate.effect(spec.Sinks[i].Packages, spec.Sinks[i].Requirement)
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var flowIdx flowTokenIndex
 			var collectionIdx collectionFlowIndex
 			var scopeIdx flagMatchIndex
@@ -1594,12 +1594,12 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, bindings.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						} else {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "resolved"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, bindings.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "resolved"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -1612,7 +1612,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 						conf = mappingConfidence(sk.Confidence, conf)
 						conf, detail = effects[i].apply(conf, detail)
-						out = append(out, adapters.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
+						out = append(out, bindings.Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						continue
 					}
 					fidelity := "resolved"
@@ -1659,7 +1659,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 							detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 							conf = mappingConfidence(sk.Confidence, conf)
 							conf, detail = effects[i].apply(conf, detail)
-							out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
+							out = append(out, bindings.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						}
 						continue
 					}
@@ -1690,7 +1690,7 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 					conf = mappingConfidence(sk.Confidence, conf)
 					conf, detail = effects[i].apply(conf, detail)
-					out = append(out, adapters.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
+					out = append(out, bindings.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 			}
 			return out
@@ -1706,13 +1706,13 @@ func sinkBestKey(sk sinkSpec) string {
 		strconv.Itoa(sk.CollectionIndex)
 }
 
-// controlAdapter labels control concepts (transforms/validators) on the calls that
+// checkApplicator labels control concepts (transforms/validators) on the calls that
 // apply them, so v2 path coveredBy controls can suppress a sanitized flow (docs/07).
-func (spec adapterSpec) controlAdapter() adapters.Adapter {
-	return adapters.Adapter{
+func (spec bindingSpec) checkApplicator() bindings.Applicator {
+	return bindings.Applicator{
 		Name: spec.Name + ".controls", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
@@ -1726,7 +1726,7 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 			for i := range spec.Controls {
 				effects[i] = reqGate.effect(spec.Controls[i].Packages, spec.Controls[i].Requirement)
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var collectionIdx collectionFlowIndex
 			var scopeIdx flagMatchIndex
 			for _, id := range ids {
@@ -1765,11 +1765,11 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 						conf, detail := effects[ci].apply(mappingConfidence(c.Confidence, ""), c.Detail)
 						if c.ArgTarget {
 							for _, target := range markTargets(s, &collectionIdx, n, c) {
-								out = append(out, adapters.Mapping{NodeID: target, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+								out = append(out, bindings.Mapping{NodeID: target, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 							}
 							continue
 						}
-						out = append(out, adapters.Mapping{NodeID: nodeID, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+						out = append(out, bindings.Mapping{NodeID: nodeID, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 					}
 				}
 			}
@@ -1778,9 +1778,9 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 	}
 }
 
-// extTech maps a source file extension to its adapter technology, so an adapter
+// extTech maps a source file extension to its binding technology, so a binding
 // only labels nodes from its own language (avoids cross-language FPs in polyglot
-// repos — e.g. one language's adapter matching another language's same-named call).
+// repos — e.g. one language's binding matching another language's same-named call).
 var extTech = map[string]string{
 	".go": "go", ".py": "python",
 	".js": "javascript", ".jsx": "javascript", ".ts": "javascript", ".tsx": "javascript", ".vue": "javascript",
@@ -1855,7 +1855,7 @@ func contextNodeTech(n usg.Node) string {
 }
 
 // rangeNodes streams every node to fn via the store's RangeNodes fast path (no full []Node copy)
-// when available, else falls back to AllNodes. Adapter passes iterate every node once; the slice
+// when available, else falls back to AllNodes. Binding passes iterate every node once; the slice
 // copy was a multi-GB transient on large graphs.
 func rangeNodes(s usg.Store, fn func(usg.Node) bool) {
 	if rs, ok := s.(interface{ RangeNodes(func(usg.Node) bool) }); ok {
@@ -1873,7 +1873,7 @@ func rangeNodes(s usg.Store, fn func(usg.Node) bool) {
 func packageEvidence(s usg.Store, tech string, crossLang bool) map[string]bool {
 	out := map[string]bool{}
 	// only import/SBOM nodes carry package evidence — use the type index (O(result)) instead of
-	// scanning every node, since this runs once per adapter spec.
+	// scanning every node, since this runs once per binding spec.
 	impIDs, _ := s.NodesOfType("code.Import")
 	for _, id := range impIDs {
 		n, ok, _ := s.GetNode(id)
@@ -2593,13 +2593,13 @@ func packageGatePathSegments(name string) []string {
 	return out
 }
 
-// flagAdapter labels nodes with presence/review concepts emitted by v2
+// presenceApplicator labels nodes with presence/review concepts emitted by v2
 // presenceNode bindings.
-func (spec adapterSpec) flagAdapter() adapters.Adapter {
-	return adapters.Adapter{
+func (spec bindingSpec) presenceApplicator() bindings.Applicator {
+	return bindings.Applicator{
 		Name: spec.Name + ".flags", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			fileTech := fileContextTechs(s)
@@ -2624,7 +2624,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 				}
 				return methods, paths, len(methods) == 0 && len(paths) == 0
 			})
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var matchIdx flagMatchIndex
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Name"}
 			if spec.crossLang {
@@ -2659,7 +2659,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						if len(fl.Packages) > 0 {
 							specificity = 3
 						}
-						out = append(out, adapters.Mapping{NodeID: n.ID, Concept: fl.Concept, Fidelity: mappingFidelity(fl.Fidelity, "resolved"), Confidence: conf, Specificity: specificity, Detail: detail})
+						out = append(out, bindings.Mapping{NodeID: n.ID, Concept: fl.Concept, Fidelity: mappingFidelity(fl.Fidelity, "resolved"), Confidence: conf, Specificity: specificity, Detail: detail})
 					}
 				}
 			}
@@ -3756,16 +3756,16 @@ func splitLocFileLine(loc string) (string, int) {
 	return loc[:i], line
 }
 
-// markAdapter labels a node with a presence concept for `match`-style rules.
-func (spec adapterSpec) markAdapter() adapters.Adapter {
-	return adapters.Adapter{
+// matchPresenceApplicator labels a node with a presence concept for `match`-style rules.
+func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
+	return bindings.Applicator{
 		Name: spec.Name + ".marks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			// Most presence events are calls, but some are bare member accesses with
 			// no call, so scan Attr nodes too.
-			var out []adapters.Mapping
-			// cross-language adapters label nodes in source files of
+			var out []bindings.Mapping
+			// cross-language binding applicators label nodes in source files of
 			// every language, so the per-language tech filter doesn't apply.
 			crossLang := spec.crossLang
 			pkgs := packageEvidence(s, spec.Technology, crossLang)
@@ -3834,7 +3834,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 							if seenMapping[key] {
 								continue
 							}
-							out = append(out, adapters.Mapping{NodeID: target, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+							out = append(out, bindings.Mapping{NodeID: target, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 							seenMapping[key] = true
 						}
 					}
@@ -3907,9 +3907,9 @@ func mergeMappingDetail(base, extra map[string]string) map[string]string {
 	return out
 }
 
-// --- adapter spec indexing -------------------------------------------------
+// --- binding spec indexing -------------------------------------------------
 //
-// Adapter matching is a search problem: for each graph node, find the specs whose
+// Binding matching is a search problem: for each graph node, find the specs whose
 // pattern matches its method/callee_path. Done naively that is O(nodes × specs) —
 // the dominant scan cost on large repos. Every matcher here (method exact, path
 // prefix/suffix/segment) shares one invariant: a matching spec's pattern FIRST
@@ -3933,7 +3933,7 @@ func firstSeg(p string) string {
 // specIndex maps node method names and path segments to candidate spec indices.
 // visited/gen provide allocation-free dedup across the per-node candidate lookups
 // (a generation stamp per spec instead of a fresh map each call); buf is the reused
-// output. Not safe for concurrent use — adapters apply sequentially.
+// output. Not safe for concurrent use — binding applicators apply sequentially.
 type specIndex struct {
 	byMethod map[string][]int
 	bySeg    map[string][]int
@@ -4048,12 +4048,12 @@ func matchPath(path string, patterns []string, mode string) bool {
 }
 
 // Per-language binding applicator sets (loaded from vyql/bindings/<tech>/).
-func ConfigBindings() []adapters.Adapter      { return BindingsFor("config") }
-func TextPatternBindings() []adapters.Adapter { return BindingsFor("textpattern") }
+func ConfigBindings() []bindings.Applicator      { return BindingsFor("config") }
+func TextPatternBindings() []bindings.Applicator { return BindingsFor("textpattern") }
 
 // AutoBindings returns v2 binding sets that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
-func AutoBindings() []adapters.Adapter {
+func AutoBindings() []bindings.Applicator {
 	const key = "v2"
 	if cached, ok := autoBindingsCache.Load(key); ok {
 		res := cached.(cachedAutoBindings)
@@ -4072,7 +4072,7 @@ func AutoBindings() []adapters.Adapter {
 	return actualRes.data
 }
 
-func loadAutoBindingApplicators() ([]adapters.Adapter, error) {
+func loadAutoBindingApplicators() ([]bindings.Applicator, error) {
 	sources, err := autoBindingSources()
 	if err != nil {
 		return nil, fmt.Errorf("frontend: read auto bindings: %w", err)
@@ -4099,7 +4099,7 @@ func loadAutoBindingApplicators() ([]adapters.Adapter, error) {
 		}
 		merged.Mappings = append(merged.Mappings, ad.Mappings...)
 	}
-	var out []adapters.Adapter
+	var out []bindings.Applicator
 	for _, name := range order {
 		ad := byName[name]
 		if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
@@ -4143,21 +4143,21 @@ func autoBindingSources() ([]datadir.Source, error) {
 	return out, nil
 }
 
-// paramSourceAdapter labels function/method parameter nodes with the spec's
+// paramSourceApplicator labels function/method parameter nodes with the spec's
 // `source param -> X` concept(s) for profiles that opt into parameter entrypoints.
 // The concrete concept is declared by the .vyql line; this is only the mechanism.
 //
-// Default-OFF, opt-in: unlike the pattern source adapter (where activeSources==nil means
+// Default-OFF, opt-in: unlike the pattern source binding (where activeSources==nil means
 // "no profile → every source on"), a parameter source fires ONLY when a profile is set AND
 // explicitly lists the concept (i.e. the library profile). So application profiles, and the
 // no-profile default, never taint parameters. Low confidence (syntactic): a finding
 // surfaces only if a param actually reaches a sink.
-func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
+func (spec bindingSpec) paramSourceApplicator() bindings.Applicator {
 	sources := spec.ParamSources
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: spec.Name + ".param-source", Technology: spec.Technology, Specificity: 0,
 		Fidelity: "syntactic", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if activeSources == nil {
 				return nil // no active source set -> parameters are not sources
 			}
@@ -4178,7 +4178,7 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 				return nil
 			}
 			ids, _ := s.NodesOfType("code.Param")
-			out := make([]adapters.Mapping, 0, len(active))
+			out := make([]bindings.Mapping, 0, len(active))
 			for _, id := range ids {
 				n, ok, _ := s.GetNode(id)
 				if !ok || n.Prop("exported") != "true" {
@@ -4192,7 +4192,7 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 						spec = 3
 					}
 					conf, detail := activeSrc.effect.apply(mappingConfidence(src.Confidence, ""), nil)
-					out = append(out, adapters.Mapping{NodeID: id, Concept: src.Concept, Fidelity: mappingFidelity(src.Fidelity, "syntactic"), Confidence: conf, Specificity: spec, Detail: detail})
+					out = append(out, bindings.Mapping{NodeID: id, Concept: src.Concept, Fidelity: mappingFidelity(src.Fidelity, "syntactic"), Confidence: conf, Specificity: spec, Detail: detail})
 				}
 			}
 			return out
@@ -4200,17 +4200,17 @@ func (spec adapterSpec) paramSourceAdapter() adapters.Adapter {
 	}
 }
 
-func jsPathRegexGuardAdapter() adapters.Adapter {
+func jsPathRegexGuardApplicator() bindings.Applicator {
 	concept := singleOntologyRoleConcept(ontology.InternalConceptRolePathAccessCheck)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: "javascript.path-regex-guards", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if concept == "" {
 				return nil
 			}
 			ids, _ := s.NodesOfType("code.Call")
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range ids {
 				n, ok, err := s.GetNode(id)
 				if err != nil || !ok {
@@ -4227,24 +4227,24 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 				if !safeJSPathComponentRegex(n.Prop("lit0")) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
+				out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
 			}
 			return out
 		},
 	}
 }
 
-func jsDomValueInputAdapter() adapters.Adapter {
+func jsDomValueInputApplicator() bindings.Applicator {
 	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleDomInput)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: "javascript.dom-value-inputs", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if concept == "" {
 				return nil
 			}
 			attrs, _ := s.NodesOfType("code.Attr")
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			var flowIdx flowTokenIndex
 			for _, id := range attrs {
 				n, ok, err := s.GetNode(id)
@@ -4264,7 +4264,7 @@ func jsDomValueInputAdapter() adapters.Adapter {
 				if !jsAttrReceiverFromDomLookup(s, &flowIdx, id) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
+				out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 			}
 			return out
 		},
@@ -4291,12 +4291,12 @@ func jsAttrReceiverFromDomLookup(s usg.Store, idx *flowTokenIndex, attrID string
 	return false
 }
 
-func jsSafePathResolverAdapter() adapters.Adapter {
+func jsSafePathResolverApplicator() bindings.Applicator {
 	concept := singleOntologyRoleConcept(ontology.InternalConceptRolePathAccessCheck)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: "javascript.safe-path-resolver-summaries", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if concept == "" {
 				return nil
 			}
@@ -4321,7 +4321,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 			if len(safe) == 0 {
 				return nil
 			}
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range contexts {
 				n, ok, err := s.GetNode(id)
 				if err != nil || !ok {
@@ -4334,7 +4334,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 				method := n.Prop("method")
 				for name := range safe {
 					if path == name || method == name || strings.HasSuffix(path, "."+name) {
-						out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
+						out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
 						break
 					}
 				}
@@ -4344,12 +4344,12 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 	}
 }
 
-func jsModuleHelperLdapEscapeAdapter() adapters.Adapter {
+func jsModuleHelperLdapEscapeApplicator() bindings.Applicator {
 	concept := "core." + "Ldap" + "Escape"
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: "javascript.module-helper-ldap-escape", Technology: "javascript", Specificity: 2,
 		Fidelity: "semantic", Origin: "deterministic",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			moduleHelperFiles := map[string]bool{}
 			names, _ := s.NodesOfType("code.Name")
 			for _, id := range names {
@@ -4370,7 +4370,7 @@ func jsModuleHelperLdapEscapeAdapter() adapters.Adapter {
 				return nil
 			}
 			calls, _ := s.NodesOfType("code.Call")
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range calls {
 				n, ok, err := s.GetNode(id)
 				if err != nil || !ok {
@@ -4383,7 +4383,7 @@ func jsModuleHelperLdapEscapeAdapter() adapters.Adapter {
 					continue
 				}
 				if moduleHelperFiles[locFile(n.Prop("loc"))] {
-					out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
+					out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Specificity: 2})
 				}
 			}
 			return out
@@ -4499,18 +4499,18 @@ func jsRegexBody(lit string) (string, bool) {
 	return "", false
 }
 
-func processArgVectorAdapter(tech string) adapters.Adapter {
+func processArgVectorApplicator(tech string) bindings.Applicator {
 	concept := singleOntologyRoleConcept(ontology.InternalConceptRoleProcessArgVector)
-	return adapters.Adapter{
+	return bindings.Applicator{
 		Name: "process-arg-vector.controls", Technology: tech, Specificity: 1,
 		Fidelity: "semantic", Origin: "human",
-		Apply: func(s usg.Store) []adapters.Mapping {
+		Apply: func(s usg.Store) []bindings.Mapping {
 			if concept == "" {
 				return nil
 			}
 			ids, _ := s.NodesOfType("code.Seq")
 			var idx collectionFlowIndex
-			var out []adapters.Mapping
+			var out []bindings.Mapping
 			for _, id := range ids {
 				n, ok, err := s.GetNode(id)
 				if err != nil || !ok {
@@ -4522,7 +4522,7 @@ func processArgVectorAdapter(tech string) adapters.Adapter {
 				if !safeProcessArgVectorSeq(s, &idx, id) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 1})
+				out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Specificity: 1})
 			}
 			return out
 		},
@@ -4547,28 +4547,28 @@ func safeProcessArgVectorSeq(s usg.Store, idx *collectionFlowIndex, seqID string
 	}
 }
 
-func ElixirBindings() []adapters.Adapter     { return BindingsFor("elixir") }
-func DartBindings() []adapters.Adapter       { return BindingsFor("dart") }
-func GroovyBindings() []adapters.Adapter     { return BindingsFor("groovy") }
-func PythonBindings() []adapters.Adapter     { return BindingsFor("python") }
-func JsBindings() []adapters.Adapter         { return BindingsFor("javascript") }
-func RubyBindings() []adapters.Adapter       { return BindingsFor("ruby") }
-func GoBindings() []adapters.Adapter         { return BindingsFor("go") }
-func JavaBindings() []adapters.Adapter       { return BindingsFor("java") }
-func PHPBindings() []adapters.Adapter        { return BindingsFor("php") }
-func CSharpBindings() []adapters.Adapter     { return BindingsFor("csharp") }
-func CBindings() []adapters.Adapter          { return BindingsFor("c") }
-func CPPBindings() []adapters.Adapter        { return BindingsFor("cpp") }
-func RustBindings() []adapters.Adapter       { return BindingsFor("rust") }
-func BashBindings() []adapters.Adapter       { return BindingsFor("bash") }
-func ScalaBindings() []adapters.Adapter      { return BindingsFor("scala") }
-func LuaBindings() []adapters.Adapter        { return BindingsFor("lua") }
-func KotlinBindings() []adapters.Adapter     { return BindingsFor("kotlin") }
-func PowerShellBindings() []adapters.Adapter { return BindingsFor("powershell") }
-func SwiftBindings() []adapters.Adapter      { return BindingsFor("swift") }
-func PerlBindings() []adapters.Adapter       { return BindingsFor("perl") }
-func SolidityBindings() []adapters.Adapter   { return BindingsFor("solidity") }
-func ObjCBindings() []adapters.Adapter       { return BindingsFor("objc") }
+func ElixirBindings() []bindings.Applicator     { return BindingsFor("elixir") }
+func DartBindings() []bindings.Applicator       { return BindingsFor("dart") }
+func GroovyBindings() []bindings.Applicator     { return BindingsFor("groovy") }
+func PythonBindings() []bindings.Applicator     { return BindingsFor("python") }
+func JsBindings() []bindings.Applicator         { return BindingsFor("javascript") }
+func RubyBindings() []bindings.Applicator       { return BindingsFor("ruby") }
+func GoBindings() []bindings.Applicator         { return BindingsFor("go") }
+func JavaBindings() []bindings.Applicator       { return BindingsFor("java") }
+func PHPBindings() []bindings.Applicator        { return BindingsFor("php") }
+func CSharpBindings() []bindings.Applicator     { return BindingsFor("csharp") }
+func CBindings() []bindings.Applicator          { return BindingsFor("c") }
+func CPPBindings() []bindings.Applicator        { return BindingsFor("cpp") }
+func RustBindings() []bindings.Applicator       { return BindingsFor("rust") }
+func BashBindings() []bindings.Applicator       { return BindingsFor("bash") }
+func ScalaBindings() []bindings.Applicator      { return BindingsFor("scala") }
+func LuaBindings() []bindings.Applicator        { return BindingsFor("lua") }
+func KotlinBindings() []bindings.Applicator     { return BindingsFor("kotlin") }
+func PowerShellBindings() []bindings.Applicator { return BindingsFor("powershell") }
+func SwiftBindings() []bindings.Applicator      { return BindingsFor("swift") }
+func PerlBindings() []bindings.Applicator       { return BindingsFor("perl") }
+func SolidityBindings() []bindings.Applicator   { return BindingsFor("solidity") }
+func ObjCBindings() []bindings.Applicator       { return BindingsFor("objc") }
 
 // containsStr reports whether xs contains v.
 func containsStr(xs []string, v string) bool {

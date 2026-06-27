@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
@@ -121,7 +121,7 @@ func (r *lblReader) smap() map[string]string {
 // modules whose content AND the global binding inputs are unchanged, re-running binding
 // applicators only on the rest. This is the binding analogue of incremental lowering.
 //
-// Soundness rests on adapters.Apply resolving precedence strictly per-(node, concept): a node's
+// Soundness rests on bindings.Apply resolving precedence strictly per-(node, concept): a node's
 // final labels depend only on proposals targeting that exact node (its own properties plus the
 // global package/import evidence), never on other code nodes. Since each node belongs to exactly
 // one module, restricting the binding pass to a subset of modules yields labels byte-identical
@@ -133,7 +133,7 @@ func (r *lblReader) smap() map[string]string {
 // binding input misses every module and re-labels the whole graph. modHash maps each module's
 // namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
 // frontend with no Hash) is always relabeled and never cached.
-func applyBindingsIncremental(g usg.Store, bindingApps []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
+func applyBindingsIncremental(g usg.Store, bindingApps []bindings.Applicator, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
 	fp := bindingFingerprint(deps)
 
 	// decide which modules must be (re)labeled: those whose binding-cache key misses. Read all
@@ -174,7 +174,7 @@ func applyBindingsIncremental(g usg.Store, bindingApps []adapters.Adapter, modHa
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := adapters.Apply(view, bindingApps, nil); err != nil {
+	if _, _, err := bindings.Apply(view, bindingApps, nil); err != nil {
 		return nil, err
 	}
 

@@ -6,7 +6,7 @@ package usg
 // or map-key string duplication). This is the in-RAM half of the disk-tier (design follow-up):
 // stage 2 will move the id table + payload to BadgerDB, leaving only int-indexed adjacency in
 // RAM. It implements usg.Store identically to InMemStore (verified by the shared suite), plus the
-// hot-path fast methods (RangeOutEdges/LabelsOf/RangeNodes) the taint solver and adapters use.
+// hot-path fast methods (RangeOutEdges/LabelsOf/RangeNodes) the taint solver and binding applicators use.
 type IntStore struct {
 	idx map[string]int32 // id -> index (stage 2: replace with hash -> index, ids on disk)
 	ids []string         // index -> id

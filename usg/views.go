@@ -1,7 +1,7 @@
 package usg
 
 // RecordingStore forwards every operation to the embedded Store and records the labels added
-// through it, so a phase's label output (e.g. adapter labeling of a node subset) can be
+// through it, so a phase's label output (e.g. binding labeling of a node subset) can be
 // captured for caching. Reads and node/edge writes pass straight through. The captured labels
 // live in Recs (not "Labels", which would shadow the Store.Labels(id) method).
 type RecordingStore struct {
@@ -20,15 +20,15 @@ func (r *RecordingStore) AddLabel(nodeID string, l Label) error {
 	return r.Store.AddLabel(nodeID, l)
 }
 
-// AlwaysListed reports node types that an adapter subset view must always expose regardless of
+// AlwaysListed reports node types that a binding subset view must always expose regardless of
 // which modules are being relabeled: import and SBOM nodes, because package-evidence gathering
 // scans all of them.
 func AlwaysListed(t string) bool { return t == "code.Import" || t == "sbom.PackageVersion" }
 
 // SubsetStore is a read view whose type-indexed listings (NodesOfType, AllNodes) return only a
-// PRECOMPUTED node subset, so an adapter phase iterates O(subset) per adapter instead of
+// PRECOMPUTED node subset, so a binding phase iterates O(subset) per binding instead of
 // re-filtering the whole graph on every call. Point reads (GetNode, edges, Labels) and writes
-// pass through to the embedded Store unchanged, so an adapter that resolves a referenced node by
+// pass through to the embedded Store unchanged, so a binding that resolves a referenced node by
 // id still sees the full graph. Build it with NewSubsetStore.
 type SubsetStore struct {
 	Store
@@ -38,7 +38,7 @@ type SubsetStore struct {
 
 // NewSubsetStore builds a subset view exposing only the nodes for which keep(id, type) is true,
 // plus all AlwaysListed (import/SBOM) nodes, in a single pass over the backing store. The byType
-// index makes each adapter's NodesOfType O(result).
+// index makes each binding's NodesOfType O(result).
 func NewSubsetStore(s Store, keep func(id, nodeType string) bool) (*SubsetStore, error) {
 	all, err := s.AllNodes()
 	if err != nil {

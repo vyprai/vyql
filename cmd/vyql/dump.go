@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/extract/frontend"
 	"github.com/vyprai/vyql/extract/lowering"
 	"github.com/vyprai/vyql/extract/nir"
@@ -56,7 +56,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		if len(nodes) == 0 {
 			return nil, stats, nil
 		}
-		if _, _, err := adapters.Apply(g, frontend.AutoBindings(), nil); err != nil {
+		if _, _, err := bindings.Apply(g, frontend.AutoBindings(), nil); err != nil {
 			return nil, stats, err
 		}
 		tk.mark("sca+bindings")
@@ -122,7 +122,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 				return nil, stats, err
 			}
 		}
-	} else if _, _, err := adapters.Apply(g, bindingApps, nil); err != nil {
+	} else if _, _, err := bindings.Apply(g, bindingApps, nil); err != nil {
 		return nil, stats, err
 	}
 	tk.mark("bindings")

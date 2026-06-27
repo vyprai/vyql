@@ -14,7 +14,7 @@ import (
 // Records are compact binary (no JSON/gob reflection) and INT-INDEXED — nodes are referenced by
 // a dense int32, so the taint hot loop (via usg.IntGraph) reads cached int adjacency blobs with
 // near-zero decode. String ids and payload are fetched only when emitting findings or matching
-// adapters. Key layout (\x00 separator, "g" graph namespace to coexist with the parse cache):
+// bindings. Key layout (\x00 separator, "g" graph namespace to coexist with the parse cache):
 //
 //	gI\0<id>          -> int32                 intern: id -> index
 //	gx\0<idx>         -> id string             reverse: index -> id
@@ -433,7 +433,7 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 
 // RangeNodes streams every node. It flushes the detail buffer, then reads detail via a single
 // SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
-// node — the adapter passes iterate all nodes, and random Gets were the dominant disk-path cost.
+// node — the binding applicator passes iterate all nodes, and random Gets were the dominant disk-path cost.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 	emit := func(idx int32, b []byte) bool {
 		d := decDet(b)

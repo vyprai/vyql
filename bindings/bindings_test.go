@@ -1,9 +1,9 @@
-package adapters_test
+package bindings_test
 
 import (
 	"testing"
 
-	"github.com/vyprai/vyql/adapters"
+	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/engine"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/usg"
@@ -62,33 +62,33 @@ func baseGraph() usg.Store {
 	return s
 }
 
-func genericAdapter() adapters.Adapter {
-	return adapters.Adapter{Name: "python.generic", Technology: "python", Specificity: 1,
-		Apply: func(usg.Store) []adapters.Mapping { return nil }}
+func genericApplicator() bindings.Applicator {
+	return bindings.Applicator{Name: "python.generic", Technology: "python", Specificity: 1,
+		Apply: func(usg.Store) []bindings.Mapping { return nil }}
 }
 
-func pinnedAdapter() adapters.Adapter {
-	return adapters.Adapter{Name: "python.ormlib>=2", Technology: "python", Specificity: 3,
-		Apply: func(usg.Store) []adapters.Mapping {
-			return []adapters.Mapping{{NodeID: "wrap", Concept: "core.SqlParameterization"}}
+func pinnedApplicator() bindings.Applicator {
+	return bindings.Applicator{Name: "python.ormlib>=2", Technology: "python", Specificity: 3,
+		Apply: func(usg.Store) []bindings.Mapping {
+			return []bindings.Mapping{{NodeID: "wrap", Concept: "core.SqlParameterization"}}
 		}}
 }
 
-// Mirrors poc/cases/case_08_precedence.py
-func TestAdapterPrecedenceAndConflict(t *testing.T) {
-	// (a) specificity: pinned adapter labels wrap as parameterization -> suppresses finding
+// Mirrors the precedence case from the original prototype.
+func TestBindingApplicatorPrecedenceAndConflict(t *testing.T) {
+	// (a) specificity: pinned applicator labels wrap as parameterization -> suppresses finding
 	g := baseGraph()
-	if _, _, err := adapters.Apply(g, []adapters.Adapter{genericAdapter(), pinnedAdapter()}, nil); err != nil {
+	if _, _, err := bindings.Apply(g, []bindings.Applicator{genericApplicator(), pinnedApplicator()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(evalSQLI(t, g)); n != 0 {
-		t.Fatalf("(a) pinned adapter should suppress finding, got %d", n)
+		t.Fatalf("(a) pinned applicator should suppress finding, got %d", n)
 	}
 
-	// (b) tenant positive override suppresses even without a pinned adapter
+	// (b) tenant positive override suppresses even without a pinned applicator
 	g2 := baseGraph()
-	if _, _, err := adapters.Apply(g2, []adapters.Adapter{genericAdapter()},
-		[]adapters.Mapping{{NodeID: "wrap", Concept: "core.SqlParameterization"}}); err != nil {
+	if _, _, err := bindings.Apply(g2, []bindings.Applicator{genericApplicator()},
+		[]bindings.Mapping{{NodeID: "wrap", Concept: "core.SqlParameterization"}}); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(evalSQLI(t, g2)); n != 0 {
@@ -101,12 +101,12 @@ func TestAdapterPrecedenceAndConflict(t *testing.T) {
 	mkNode(g3, "q", "h.py:3")
 	g3.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 	g3.AddLabel("in", usg.Label{Concept: "code.HttpInput"})
-	sinkAdapter := adapters.Adapter{Name: "python.dbapi", Technology: "python", Specificity: 2,
-		Apply: func(usg.Store) []adapters.Mapping {
-			return []adapters.Mapping{{NodeID: "q", Concept: "code.SqlExecution"}}
+	sinkApplicator := bindings.Applicator{Name: "python.dbapi", Technology: "python", Specificity: 2,
+		Apply: func(usg.Store) []bindings.Mapping {
+			return []bindings.Mapping{{NodeID: "q", Concept: "code.SqlExecution"}}
 		}}
-	conflicts, suppressed, err := adapters.Apply(g3, []adapters.Adapter{sinkAdapter},
-		[]adapters.Mapping{{NodeID: "q", Concept: "code.SqlExecution",
+	conflicts, suppressed, err := bindings.Apply(g3, []bindings.Applicator{sinkApplicator},
+		[]bindings.Mapping{{NodeID: "q", Concept: "code.SqlExecution",
 			Detail: map[string]string{"negative": "code.SqlExecution"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -135,42 +135,42 @@ func TestConfidenceMinOverDerivation(t *testing.T) {
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "q"})
 		return s
 	}
-	src := func(conf string) adapters.Adapter {
-		return adapters.Adapter{Name: "hi", Technology: "python", Specificity: 3, Confidence: conf,
-			Apply: func(usg.Store) []adapters.Mapping {
-				return []adapters.Mapping{{NodeID: "in", Concept: "code.HttpInput"}}
+	src := func(conf string) bindings.Applicator {
+		return bindings.Applicator{Name: "hi", Technology: "python", Specificity: 3, Confidence: conf,
+			Apply: func(usg.Store) []bindings.Mapping {
+				return []bindings.Mapping{{NodeID: "in", Concept: "code.HttpInput"}}
 			}}
 	}
-	sink := func(name, conf, fidelity string) adapters.Adapter {
-		return adapters.Adapter{Name: name, Technology: "python", Specificity: 2, Confidence: conf, Fidelity: fidelity,
-			Apply: func(usg.Store) []adapters.Mapping {
-				return []adapters.Mapping{{NodeID: "q", Concept: "code.SqlExecution"}}
+	sink := func(name, conf, fidelity string) bindings.Applicator {
+		return bindings.Applicator{Name: name, Technology: "python", Specificity: 2, Confidence: conf, Fidelity: fidelity,
+			Apply: func(usg.Store) []bindings.Mapping {
+				return []bindings.Mapping{{NodeID: "q", Concept: "code.SqlExecution"}}
 			}}
 	}
 
 	cases := []struct {
 		name     string
-		sinkAd   adapters.Adapter
+		sinkAd   bindings.Applicator
 		want     string
-		srcOneAd bool // when true a single adapter labels both nodes high
+		srcOneAd bool // when true a single applicator labels both nodes high
 	}{
-		{"high+high->high", adapters.Adapter{}, "high", true},
+		{"high+high->high", bindings.Applicator{}, "high", true},
 		{"high+low->low", sink("heuristic", "low", "syntactic"), "low", false},
 		{"high+medium->medium", sink("med", "medium", ""), "medium", false},
 	}
 	for _, c := range cases {
 		g := mkVuln()
-		var ads []adapters.Adapter
+		var ads []bindings.Applicator
 		if c.srcOneAd {
-			ads = []adapters.Adapter{{Name: "hi", Technology: "python", Specificity: 2, Confidence: "high",
-				Apply: func(usg.Store) []adapters.Mapping {
-					return []adapters.Mapping{{NodeID: "in", Concept: "code.HttpInput"},
+			ads = []bindings.Applicator{{Name: "hi", Technology: "python", Specificity: 2, Confidence: "high",
+				Apply: func(usg.Store) []bindings.Mapping {
+					return []bindings.Mapping{{NodeID: "in", Concept: "code.HttpInput"},
 						{NodeID: "q", Concept: "code.SqlExecution"}}
 				}}}
 		} else {
-			ads = []adapters.Adapter{src("high"), c.sinkAd}
+			ads = []bindings.Applicator{src("high"), c.sinkAd}
 		}
-		if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+		if _, _, err := bindings.Apply(g, ads, nil); err != nil {
 			t.Fatal(err)
 		}
 		fs := evalSQLI(t, g)
