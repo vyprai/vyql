@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding weakRandomValue368 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "Random" and not (node.scopeCall.any contains "SecureRandom.getInstance")
+  query pattern presenceNode where node.kind == "any" and node.path ~= "Random" and not (node.context.scopeCall contains "SecureRandom.getInstance")
   emit issue code.WeakRandomValue at node
 }

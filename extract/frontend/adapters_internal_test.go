@@ -671,7 +671,7 @@ func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
 module bindings.java.test;
 
 binding worldAccess {
-  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:safe" and node.token contains "call_path:world.getBlockAt" and not containsAny(node.scopeCall.any, ["testCoord"])
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:safe" and node.token contains "call_path:world.getBlockAt" and not containsAny(node.context.scopeCall, ["testCoord"])
   emit issue custom.WorldAccess at node
 }
 `)
@@ -800,7 +800,7 @@ func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
 module bindings.javascript.test;
 
 binding secretComparison {
-  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and operand(node, where: containsAny(operand.key, ["csrf-token", "x-csrf-token"])) and operand(node, where: containsAny(operand.identifier, ["token", "secret", "signature", "key"])) and not containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and operand(node, where: containsAny(operand.key, ["csrf-token", "x-csrf-token"])) and operand(node, where: containsAny(operand.identifier, ["token", "secret", "signature", "key"])) and not containsAny(node.context.scopeCall, ["scmp", "timingSafeEqual"])
   emit issue custom.SecretComparison at node
 }
 `)

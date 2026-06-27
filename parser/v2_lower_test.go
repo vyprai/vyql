@@ -1475,7 +1475,7 @@ matcher csrfHeaderName {
   equalsAny: ["x-csrf-token", "csrf-token"]
 }
 binding secretCompare {
-  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and operand.identifier is secretTokenName and operand.key is csrfHeaderName)
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.context.scopeCall, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and operand.identifier is secretTokenName and operand.key is csrfHeaderName)
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -1562,11 +1562,11 @@ binding secretCompare {
 	}
 }
 
-func TestV2PresenceNodeSnakeCasePseudoSubjectLowering(t *testing.T) {
+func TestV2PresenceNodeContextScopeCallAndFlowToLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.migration;
 binding secretCompare {
-  query pattern presenceNode where node.kind == "binop" and not (containsAny(node.scope_call.any, [scmp])) and containsAny(node.flow_to.op, [return])
+  query pattern presenceNode where node.kind == "binop" and not (containsAny(node.context.inScopeCall, [scmp])) and containsAny(node.flow_to.op, [return])
   emit issue code.SecretComparisonReview at node
 }
 `)

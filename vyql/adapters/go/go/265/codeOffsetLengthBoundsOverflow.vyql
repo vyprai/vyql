@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding offsetLengthBoundsOverflow265 {
-  query pattern presenceNode where node.scope == "function" and node.context.call contains "int" and node.context.call contains "len" and node.context.callArg contains "int:header.TypeOff+header.TypeLen" and node.context.callArg contains "len:btf" and node.token contains "slice:btf:header.TypeOff:" and node.token contains "slice:btf::header.TypeOff+header.TypeLen" and not (node.scopeCall.any contains "uint64") and not (node.context.callArg contains "uint64:header.TypeOff")
+  query pattern presenceNode where node.scope == "function" and node.context.call contains "int" and node.context.call contains "len" and node.context.callArg contains "int:header.TypeOff+header.TypeLen" and node.context.callArg contains "len:btf" and node.token contains "slice:btf:header.TypeOff:" and node.token contains "slice:btf::header.TypeOff+header.TypeLen" and not (node.context.scopeCall contains "uint64") and not (node.context.callArg contains "uint64:header.TypeOff")
   emit issue code.OffsetLengthBoundsOverflow at node
 }

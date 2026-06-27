@@ -1,6 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unboundedProtocolStateByIdentifier255 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "MessageReceived" and node.context.call contains "Wantlist" and node.context.call contains "splitWantsCancels" and node.context.call contains "Wants" and node.context.call contains "PushTasksTruncated" and not (node.scopeCall.any contains "ByteLen") and not (node.token contains "mh.IDENTITY")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "MessageReceived" and node.context.call contains "Wantlist" and node.context.call contains "splitWantsCancels" and node.context.call contains "Wants" and node.context.call contains "PushTasksTruncated" and not (node.context.scopeCall contains "ByteLen") and not (node.token contains "mh.IDENTITY")
   emit issue code.UnboundedProtocolStateByIdentifier at node
 }

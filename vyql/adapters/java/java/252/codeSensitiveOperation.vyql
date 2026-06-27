@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding sensitiveOperation252 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doAttachPublicIP" and node.context.call contains "getNode" and node.context.call contains "attachPublicIP" and not (node.scopeCall.any contains "checkPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doAttachPublicIP" and node.context.call contains "getNode" and node.context.call contains "attachPublicIP" and not (node.context.scopeCall contains "checkPermission")
   emit issue code.SensitiveOperation at node
 }

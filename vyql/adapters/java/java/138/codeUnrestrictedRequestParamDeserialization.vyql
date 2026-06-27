@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unrestrictedRequestParamDeserialization138 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createXStream" and node.context.callPath contains "XStream" and node.context.call contains "registerConverter" and not (node.scopeCall.any contains "addDefaultPermissions") and not (node.scopeCall.any contains "addPermissions") and not (node.scopeCall.any contains "addPermission") and not (node.scopeCall.any contains "denyPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createXStream" and node.context.callPath contains "XStream" and node.context.call contains "registerConverter" and not (node.context.scopeCall contains "addDefaultPermissions") and not (node.context.scopeCall contains "addPermissions") and not (node.context.scopeCall contains "addPermission") and not (node.context.scopeCall contains "denyPermission")
   emit issue code.UnrestrictedRequestParamDeserialization at node
 }

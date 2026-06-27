@@ -1,6 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding persistentModelTitleStoredXss96 {
-  query pattern presenceNode where node.kind == "call" and node.path == "$this.request.request.get" and node.flowTo.path == "$column.__setitem__" and not (containsAny(node.scopeCall.any, [noHtml, htmlspecialchars, htmlentities, strip_tags]))
+  query pattern presenceNode where node.kind == "call" and node.path == "$this.request.request.get" and node.flowTo.path == "$column.__setitem__" and not (containsAny(node.context.scopeCall, [noHtml, htmlspecialchars, htmlentities, strip_tags]))
   emit issue code.PersistentModelTitleStoredXss at node
 }

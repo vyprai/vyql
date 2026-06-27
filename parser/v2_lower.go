@@ -1202,6 +1202,9 @@ func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 	if rest, ok := strings.CutPrefix(field, "prop."); ok {
 		return defaultSubject, rest, true
 	}
+	if field == "context.scopeCall" || field == "context.inScopeCall" {
+		return "scope_call", "any", true
+	}
 	if _, ok := strings.CutPrefix(field, "context."); ok {
 		if v2PresenceValuePrefix(field) != "" {
 			return defaultSubject, "tokens", true

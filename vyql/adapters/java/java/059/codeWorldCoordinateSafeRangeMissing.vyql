@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding worldCoordinateSafeRangeMissing59 {
-  query pattern presenceNode where node.scope == "function" and node.context.paramType contains "BlockVector3" and containsAny(node.context.call, ["getBlockAt", "setBlock", "getBlock", "getFullBlock", "getBiome", "setBiome", "generateTree", "canPlaceAt", "applySideEffects", "simulateItemUse", "checkLoadedChunk"]) and not (containsAny(node.scopeCall.any, [testCoords, checkCoords, validateCoords])) and not (node.context.literal contains "30000000")
+  query pattern presenceNode where node.scope == "function" and node.context.paramType contains "BlockVector3" and containsAny(node.context.call, ["getBlockAt", "setBlock", "getBlock", "getFullBlock", "getBiome", "setBiome", "generateTree", "canPlaceAt", "applySideEffects", "simulateItemUse", "checkLoadedChunk"]) and not (containsAny(node.context.scopeCall, [testCoords, checkCoords, validateCoords])) and not (node.context.literal contains "30000000")
   emit issue code.WorldCoordinateSafeRangeMissing at node
 }

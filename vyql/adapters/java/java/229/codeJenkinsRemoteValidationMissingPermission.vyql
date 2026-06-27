@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsRemoteValidationMissingPermission229 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestConnection" and containsAny(node.context.callPath, ["getClient", "buildClient", "testConnection"]) and containsAny(node.context.callPath, ["getCurrentUser", "getProjects", "getSystemProfiles", "testConnection"]) and containsAny(node.context.identifier, ["url", "host", "endpoint", "apiTokenId", "credentialsId", "clientBuilderId", "ignoreCertificateErrors"]) and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTestConnection" and containsAny(node.context.callPath, ["getClient", "buildClient", "testConnection"]) and containsAny(node.context.callPath, ["getCurrentUser", "getProjects", "getSystemProfiles", "testConnection"]) and containsAny(node.context.identifier, ["url", "host", "endpoint", "apiTokenId", "credentialsId", "clientBuilderId", "ignoreCertificateErrors"]) and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
   emit issue code.JenkinsRemoteValidationMissingPermission at node
 }

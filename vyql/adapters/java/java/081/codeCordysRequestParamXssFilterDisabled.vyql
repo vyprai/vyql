@@ -1,6 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding cordysRequestParamXssFilterDisabled81 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "jackson2ObjectMapperBuilderCustomizer" and node.context.callPath contains "jacksonObjectMapperBuilder.deserializerByType" and node.context.callPath contains "StringUtils.trim" and node.context.callPath contains "jsonParser.getValueAsString" and node.context.callPath contains "HtmlUtils.htmlEscape" and node.context.identifier contains "escape" and not (node.scopeCall.any contains "shouldEscapeXss") and not (node.context.identifier contains "xssFilterUrlList")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "jackson2ObjectMapperBuilderCustomizer" and node.context.callPath contains "jacksonObjectMapperBuilder.deserializerByType" and node.context.callPath contains "StringUtils.trim" and node.context.callPath contains "jsonParser.getValueAsString" and node.context.callPath contains "HtmlUtils.htmlEscape" and node.context.identifier contains "escape" and not (node.context.scopeCall contains "shouldEscapeXss") and not (node.context.identifier contains "xssFilterUrlList")
   emit issue code.CordysRequestParamXssFilterDisabled at node
 }
