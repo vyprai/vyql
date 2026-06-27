@@ -71,3 +71,50 @@ func TestIdentityPolicyDedupUsesFindingKey(t *testing.T) {
 		t.Fatalf("dedup size = %d, want 2", len(got))
 	}
 }
+
+func TestIdentityPolicyDedupIsCanonical(t *testing.T) {
+	policy := IdentityPolicy{
+		FindingKey:  []string{"rule.id", "primaryTarget.location", "primaryTarget.concept"},
+		Fingerprint: []string{"rule.id", "primaryTarget.location", "primaryTarget.concept"},
+		FlagKey:     []string{"concept", "location"},
+	}
+	low := &findings.Finding{
+		RuleID:     "R",
+		Severity:   "medium",
+		Confidence: "low",
+		Bindings: []findings.Binding{
+			{Name: "source", Concept: "code.HttpInput", Loc: "z.go:9", NodeID: "z"},
+			{Name: "sink", Concept: "code.SqlExecution", Loc: "b.go:2", NodeID: "sink2"},
+		},
+	}
+	high := &findings.Finding{
+		RuleID:      "R",
+		Severity:    "high",
+		Confidence:  "high",
+		Witness:     []string{"source", "mid", "sink"},
+		Context:     []string{"ctx"},
+		Bindings:    low.Bindings,
+		PathLocs:    []string{"z.go:9", "b.go:2"},
+		WitnessKind: "taint",
+	}
+	other := &findings.Finding{
+		RuleID:     "R",
+		Severity:   "low",
+		Confidence: "medium",
+		Bindings: []findings.Binding{
+			{Name: "sink", Concept: "code.CommandExecution", Loc: "a.go:1", NodeID: "cmd"},
+		},
+	}
+
+	gotA := policy.Dedup([]*findings.Finding{low, other, high})
+	gotB := policy.Dedup([]*findings.Finding{high, low, other})
+	if len(gotA) != 2 || len(gotB) != 2 {
+		t.Fatalf("dedup sizes = %d/%d, want 2/2", len(gotA), len(gotB))
+	}
+	if gotA[0] != other || gotB[0] != other {
+		t.Fatalf("dedup order should be canonical by finding key: gotA=%#v gotB=%#v", gotA[0], gotB[0])
+	}
+	if gotA[1] != high || gotB[1] != high {
+		t.Fatalf("dedup survivor should be canonical high-evidence finding: gotA=%#v gotB=%#v", gotA[1], gotB[1])
+	}
+}

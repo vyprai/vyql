@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -52,17 +53,95 @@ func Dedup(fs []*findings.Finding) []*findings.Finding {
 }
 
 func (p IdentityPolicy) Dedup(fs []*findings.Finding) []*findings.Finding {
-	seen := map[string]bool{}
-	out := make([]*findings.Finding, 0, len(fs))
+	byKey := map[string]*findings.Finding{}
+	keys := make([]string, 0, len(fs))
 	for _, f := range fs {
 		key := p.FindingKeyFor(f)
-		if seen[key] {
+		if existing, ok := byKey[key]; ok {
+			if compareFindingsForDedup(f, existing) < 0 {
+				byKey[key] = f
+			}
 			continue
 		}
-		seen[key] = true
-		out = append(out, f)
+		byKey[key] = f
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]*findings.Finding, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, byKey[key])
 	}
 	return out
+}
+
+func compareFindingsForDedup(a, b *findings.Finding) int {
+	if a == b {
+		return 0
+	}
+	as := findingDedupSortKey(a)
+	bs := findingDedupSortKey(b)
+	if as < bs {
+		return -1
+	}
+	if as > bs {
+		return 1
+	}
+	return 0
+}
+
+func findingDedupSortKey(f *findings.Finding) string {
+	if f == nil {
+		return "9"
+	}
+	target := primaryTarget(f)
+	return fmt.Sprintf("%02d|%02d|%06d|%06d|%s|%s|%s|%s|%s",
+		99-confidenceRank(f.Confidence),
+		99-severityRank(f.Severity),
+		999999-len(f.Witness),
+		999999-len(f.Context)-len(f.ReviewConditions),
+		f.RuleID,
+		target.Loc,
+		target.Concept,
+		target.NodeID,
+		bindingsStableKey(f.Bindings),
+	)
+}
+
+func confidenceRank(conf string) int {
+	switch strings.ToLower(conf) {
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func severityRank(sev string) int {
+	switch strings.ToLower(sev) {
+	case "critical":
+		return 4
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func bindingsStableKey(bindings []findings.Binding) string {
+	parts := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		parts = append(parts, b.Name+"="+b.Concept+"@"+b.Loc+"#"+b.NodeID)
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ";")
 }
 
 func (p IdentityPolicy) FindingKeyFor(f *findings.Finding) string {

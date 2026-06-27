@@ -114,6 +114,47 @@ rule SqlInjection {
 	}
 }
 
+func TestLoweredV2DedupCanonicalAcrossStoreOrder(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module rules.injection;
+rule SqlInjection {
+  meta { id: "VYQL-INJ-001" severity: high cwe: [CWE89] }
+  taint code.HttpInput -> code.SqlExecution
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	onto := ontology.Seed()
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("CompileRules errors: %+v", errs)
+	}
+
+	memA := usg.NewInMemStore()
+	loadV2DuplicateFlowGraph(t, memA, []string{"srcB", "srcA"})
+	memSource := v2SingleSourceBinding(t, onto, memA, compiled[0])
+	if memSource != "srcA" {
+		t.Fatalf("canonical in-memory source = %q, want srcA", memSource)
+	}
+
+	memB := usg.NewInMemStore()
+	loadV2DuplicateFlowGraph(t, memB, []string{"srcA", "srcB"})
+	if got := v2SingleSourceBinding(t, onto, memB, compiled[0]); got != memSource {
+		t.Fatalf("in-memory canonical source changed across insertion order: %s then %s", memSource, got)
+	}
+
+	badger, err := usg.OpenBadger(":memory:")
+	if err != nil {
+		t.Fatalf("OpenBadger: %v", err)
+	}
+	defer badger.Close()
+	loadV2DuplicateFlowGraph(t, badger, []string{"srcB", "srcA"})
+	if got := v2SingleSourceBinding(t, onto, badger, compiled[0]); got != memSource {
+		t.Fatalf("badger canonical source differs from in-memory: mem=%s badger=%s", memSource, got)
+	}
+}
+
 func TestLowerRejectsAuthoredBuiltInRuleVerbMechanic(t *testing.T) {
 	_, err := parser.ParseV2(`
 module mechanics.test;
@@ -231,6 +272,29 @@ func loadV2FingerprintGraph(t *testing.T, store usg.Store) {
 	}
 }
 
+func loadV2DuplicateFlowGraph(t *testing.T, store usg.Store, sources []string) {
+	t.Helper()
+	for _, id := range sources {
+		if err := store.AddNode(usg.Node{ID: id, Type: "code.Call", Props: map[string]string{"loc": "app.py:10"}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.AddLabel(id, usg.Label{Concept: "code.HttpInput"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.AddNode(usg.Node{ID: "sink", Type: "code.Call", Props: map[string]string{"loc": "app.py:20"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddLabel("sink", usg.Label{Concept: "code.SqlExecution"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range sources {
+		if err := store.AddEdge(usg.Edge{Type: "FLOWS", Src: id, Dst: "sink"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func v2SingleFingerprint(t *testing.T, onto *ontology.Ontology, store usg.Store, cr *CompiledRule) string {
 	t.Helper()
 	fs, err := New(onto, store).Evaluate(cr)
@@ -241,4 +305,22 @@ func v2SingleFingerprint(t *testing.T, onto *ontology.Ontology, store usg.Store,
 		t.Fatalf("findings = %d, want 1: %+v", len(fs), fs)
 	}
 	return resultpolicy.Fingerprint(fs[0])
+}
+
+func v2SingleSourceBinding(t *testing.T, onto *ontology.Ontology, store usg.Store, cr *CompiledRule) string {
+	t.Helper()
+	fs, err := New(onto, store).Evaluate(cr)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("findings = %d, want 1: %+v", len(fs), fs)
+	}
+	for _, b := range fs[0].Bindings {
+		if b.Name == "source" {
+			return b.NodeID
+		}
+	}
+	t.Fatalf("finding has no source binding: %+v", fs[0].Bindings)
+	return ""
 }
