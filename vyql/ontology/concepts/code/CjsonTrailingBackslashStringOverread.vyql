@@ -2,7 +2,7 @@ module code;
 
 concept CjsonTrailingBackslashStringOverread : issue {
   cwe: [CWE_125]
-  review_assumption: "attacker-controlled JSON can end a string with a trailing backslash before the parser scans for the closing quote"
+  reviewAssumption: "attacker-controlled JSON can end a string with a trailing backslash before the parser scans for the closing quote"
   reviewCategory: memory
   reviewCondition: "cJSON parse_string skips an escaped byte without checking whether the backslash is the final input byte"
   reviewConfidence: high

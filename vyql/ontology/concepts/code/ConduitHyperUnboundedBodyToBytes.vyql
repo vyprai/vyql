@@ -2,7 +2,7 @@ module code;
 
 concept ConduitHyperUnboundedBodyToBytes : issue {
   cwe: [CWE_400, CWE_770]
-  review_assumption: "a remote client can send an oversized Content-Length or body stream that reaches the Hyper service handler"
+  reviewAssumption: "a remote client can send an oversized Content-Length or body stream that reaches the Hyper service handler"
   reviewCategory: resource
   reviewCondition: "HTTP request bodies are fully collected with hyper::body::to_bytes before a request-size limit is enforced"
   reviewConfidence: high

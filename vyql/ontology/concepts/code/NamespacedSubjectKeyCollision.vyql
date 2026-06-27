@@ -2,7 +2,7 @@ module code;
 
 concept NamespacedSubjectKeyCollision : issue {
   cwe: [CWE_200, CWE_863]
-  review_assumption: "tenant owners are ServiceAccounts with colliding names in different namespaces and the reflector cache is enabled"
+  reviewAssumption: "tenant owners are ServiceAccounts with colliding names in different namespaces and the reflector cache is enabled"
   reviewCategory: auth
   reviewCondition: "namespaced Kubernetes ServiceAccount subjects are indexed without namespace in authorization or cache keys"
   reviewConfidence: medium

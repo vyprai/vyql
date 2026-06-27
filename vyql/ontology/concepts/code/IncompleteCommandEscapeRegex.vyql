@@ -2,7 +2,7 @@ module code;
 
 concept IncompleteCommandEscapeRegex : issue {
   cwe: [CWE_77]
-  review_assumption: "attacker-controlled command fragments can include shell metacharacters that survive the sanitizer"
+  reviewAssumption: "attacker-controlled command fragments can include shell metacharacters that survive the sanitizer"
   reviewCategory: command
   reviewCondition: "command sanitizer regex omits intended shell metacharacters because alternation is used instead of a character class"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedDocsOpenapiUrl : issue {
   cwe: [CWE_79]
-  review_assumption: "the docs helper inserts openapi_url into a script-string or markup context"
+  reviewAssumption: "the docs helper inserts openapi_url into a script-string or markup context"
   reviewCategory: xss
   reviewCondition: "request query data is interpolated into an OpenAPI docs URL that is embedded in generated HTML"
   reviewConfidence: medium

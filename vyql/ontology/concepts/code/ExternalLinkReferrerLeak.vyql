@@ -2,7 +2,7 @@ module code;
 
 concept ExternalLinkReferrerLeak : issue {
   cwe: [CWE_200, CWE_598]
-  review_assumption: "the template can appear on pages whose URLs contain reset tokens, session keys, or other bearer secrets"
+  reviewAssumption: "the template can appear on pages whose URLs contain reset tokens, session keys, or other bearer secrets"
   reviewCategory: secret
   reviewCondition: "HTML template contains external links that can receive sensitive current-page URLs through the Referer header"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept UnvalidatedRatingRange : issue {
   cwe: [CWE_20]
-  review_assumption: "callers can submit rating values outside the intended product range"
+  reviewAssumption: "callers can submit rating values outside the intended product range"
   reviewCategory: input_validation
   reviewCondition: "a user-controlled rating value is applied without server-side range validation"
   reviewConfidence: medium

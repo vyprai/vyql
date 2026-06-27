@@ -2,7 +2,7 @@ module code;
 
 concept SessionKeyTemplateExposure : issue {
   cwe: [CWE_200, CWE_522]
-  review_assumption: "session primary keys are bearer credentials that allow session hijacking if disclosed"
+  reviewAssumption: "session primary keys are bearer credentials that allow session hijacking if disclosed"
   reviewCategory: secret
   reviewCondition: "a template exposes server session keys in a rendered action URL or form"
   reviewConfidence: high

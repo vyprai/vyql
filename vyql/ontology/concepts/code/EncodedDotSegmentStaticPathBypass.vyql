@@ -2,7 +2,7 @@ module code;
 
 concept EncodedDotSegmentStaticPathBypass : issue {
   cwe: [CWE_22, CWE_184]
-  review_assumption: "request paths can contain percent-encoded dot segments that downstream URL or filesystem handling normalizes before static file resolution"
+  reviewAssumption: "request paths can contain percent-encoded dot segments that downstream URL or filesystem handling normalizes before static file resolution"
   reviewCategory: path
   reviewCondition: "static-file path filtering rejects literal dot-slash traversal but misses percent-encoded dot segments"
   reviewConfidence: high

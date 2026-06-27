@@ -2,7 +2,7 @@ module code;
 
 concept RawDatabaseExceptionLog : issue {
   cwe: [CWE_532]
-  review_assumption: "database exception messages or traces can contain connection usernames, passwords, DSNs, or SQL credential material"
+  reviewAssumption: "database exception messages or traces can contain connection usernames, passwords, DSNs, or SQL credential material"
   reviewCategory: secret
   reviewCondition: "database exception messages or traces are written to logs before credential redaction"
   reviewConfidence: high

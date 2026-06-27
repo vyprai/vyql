@@ -2,7 +2,7 @@ module code;
 
 concept GleezRedactorEditorStoredXss : issue {
   cwe: [CWE_79]
-  review_assumption: "authors can save HTML-mode content that is later opened by an administrator in the editor"
+  reviewAssumption: "authors can save HTML-mode content that is later opened by an administrator in the editor"
   reviewCategory: xss
   reviewCondition: "Gleez CMS enables the Redactor source editor for stored HTML content without server-side sanitization"
   reviewConfidence: high

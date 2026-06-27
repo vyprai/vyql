@@ -2,7 +2,7 @@ module code;
 
 concept EscapedTerminatorWrite : issue {
   cwe: [CWE_119, CWE_125, CWE_787]
-  review_assumption: "attacker-controlled input can end with an escape marker followed by a terminator"
+  reviewAssumption: "attacker-controlled input can end with an escape marker followed by a terminator"
   reviewCategory: memory
   reviewCondition: "an escape decoder writes a decoded byte without rejecting an escaped string terminator"
   reviewConfidence: medium

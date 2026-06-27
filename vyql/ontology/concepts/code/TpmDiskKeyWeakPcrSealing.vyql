@@ -2,7 +2,7 @@ module code;
 
 concept TpmDiskKeyWeakPcrSealing : issue {
   cwe: [CWE_327, CWE_347]
-  review_assumption: "disk-key unsealing relies on this PCR selection to bind the key to measured boot state"
+  reviewAssumption: "disk-key unsealing relies on this PCR selection to bind the key to measured boot state"
   reviewCategory: crypto
   reviewCondition: "disk-key TPM sealing binds to SHA1 PCR selections and omits the measured PCR used by the secure boot chain"
   reviewConfidence: high

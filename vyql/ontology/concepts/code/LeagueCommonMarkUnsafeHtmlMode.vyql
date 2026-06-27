@@ -2,7 +2,7 @@ module code;
 
 concept LeagueCommonMarkUnsafeHtmlMode : issue {
   cwe: [CWE_79]
-  review_assumption: "Markdown content can be supplied by lower-trust authors and rendered in another user's browser"
+  reviewAssumption: "Markdown content can be supplied by lower-trust authors and rendered in another user's browser"
   reviewCategory: xss
   reviewCondition: "league/commonmark renders Markdown with raw HTML enabled by default"
   reviewConfidence: high

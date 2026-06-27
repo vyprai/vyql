@@ -2,7 +2,7 @@ module code;
 
 concept SamlXmlRoundtripValidationBypass : issue {
   cwe: [CWE_287, CWE_347]
-  review_assumption: "an attacker can submit a crafted SAML response whose signed XML view differs from the application-unmarshaled assertion view"
+  reviewAssumption: "an attacker can submit a crafted SAML response whose signed XML view differs from the application-unmarshaled assertion view"
   reviewCategory: auth
   reviewCondition: "SAML response handling verifies XML signatures and then unmarshals assertion data without first checking that XML parsing round-trips safely"
   reviewConfidence: high

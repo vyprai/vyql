@@ -2,7 +2,7 @@ module code;
 
 concept CodeIgniterActiveRecordOffsetSqlInjection : issue {
   cwe: [CWE_89]
-  review_assumption: "application code can pass attacker-controlled offset values into the query builder"
+  reviewAssumption: "application code can pass attacker-controlled offset values into the query builder"
   reviewCategory: sql
   reviewCondition: "CodeIgniter Active Record stores the offset argument without forcing it to an integer"
   reviewConfidence: high

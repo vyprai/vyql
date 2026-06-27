@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedExceptionMessageMarkup : issue {
   cwe: [CWE_79]
-  review_assumption: "the exception message can include attacker-controlled request, URL, parser, or validation text and is later rendered in a browser"
+  reviewAssumption: "the exception message can include attacker-controlled request, URL, parser, or validation text and is later rendered in a browser"
   reviewCategory: xss
   reviewCondition: "exception text is propagated into a markup-rendered error response without escaping"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept ContaoListingModuleSqlIdentifierInjection : issue {
   cwe: [CWE_89]
-  review_assumption: "front-end visitors can reach a configured listing module and control the query parameters"
+  reviewAssumption: "front-end visitors can reach a configured listing module and control the query parameters"
   reviewCategory: sql
   reviewCondition: "Contao listing module concatenates request-selected search, order, or sort identifiers into SQL without checking them against configured field allowlists"
   reviewConfidence: high

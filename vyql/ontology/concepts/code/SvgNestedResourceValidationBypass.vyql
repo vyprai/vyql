@@ -2,7 +2,7 @@ module code;
 
 concept SvgNestedResourceValidationBypass : issue {
   cwe: [CWE_611, CWE_918, CWE_502, CWE_22]
-  review_assumption: "attacker-controlled SVG content can contain nested image references to remote, local, or dangerous wrapper URLs that bypass top-level resource policy"
+  reviewAssumption: "attacker-controlled SVG content can contain nested image references to remote, local, or dangerous wrapper URLs that bypass top-level resource policy"
   reviewCategory: request_forgery
   reviewCondition: "SVG images are accepted after top-level URL validation without validating nested image href references"
   reviewConfidence: high

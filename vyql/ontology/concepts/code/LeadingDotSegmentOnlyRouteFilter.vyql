@@ -2,7 +2,7 @@ module code;
 
 concept LeadingDotSegmentOnlyRouteFilter : issue {
   cwe: [CWE_22, CWE_184]
-  review_assumption: "request paths can contain nested '/.' or '/../' segments that reach later file resolution or package asset access"
+  reviewAssumption: "request paths can contain nested '/.' or '/../' segments that reach later file resolution or package asset access"
   reviewCategory: path
   reviewCondition: "route path filtering blocks only leading dot segments and misses nested dot or parent-directory segments"
   reviewConfidence: high

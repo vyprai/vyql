@@ -2,7 +2,7 @@ module code;
 
 concept InsecureExecutableDownload : issue {
   cwe: [CWE_319, CWE_494]
-  review_assumption: "an attacker in a privileged network position can replace the downloaded runtime archive before local use"
+  reviewAssumption: "an attacker in a privileged network position can replace the downloaded runtime archive before local use"
   reviewCategory: supply_chain
   reviewCondition: "installer downloads an executable or runtime archive over cleartext HTTP before unpacking or executing it"
   reviewConfidence: high

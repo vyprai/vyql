@@ -2,7 +2,7 @@ module code;
 
 concept ChartkickRecursiveExtendPrototypePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "chart data or options loaded from a URL can contain keys such as __proto__"
+  reviewAssumption: "chart data or options loaded from a URL can contain keys such as __proto__"
   reviewCategory: prototype_pollution
   reviewCondition: "Chartkick recursively copies source object keys into target objects without skipping prototype-mutating keys"
   reviewConfidence: high

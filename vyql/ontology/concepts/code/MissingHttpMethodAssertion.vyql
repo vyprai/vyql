@@ -2,7 +2,7 @@ module code;
 
 concept MissingHttpMethodAssertion : issue {
   cwe: [CWE_352, CWE_749]
-  review_assumption: "the action is reachable through a browser-backed route"
+  reviewAssumption: "the action is reachable through a browser-backed route"
   reviewCategory: csrf
   reviewCondition: "a state-changing HTTP action lacks an explicit allowed-method assertion"
   reviewConfidence: medium

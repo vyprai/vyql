@@ -2,7 +2,7 @@ module code;
 
 concept CordysRequestParamXssFilterDisabled : issue {
   cwe: [CWE_79]
-  review_assumption: "stored request fields such as announcements or follow-up content can later be rendered to another user"
+  reviewAssumption: "stored request fields such as announcements or follow-up content can later be rendered to another user"
   reviewCategory: xss
   reviewCondition: "CordysCRM request string deserialization trims user strings but leaves XSS escaping disabled by default"
   reviewConfidence: high

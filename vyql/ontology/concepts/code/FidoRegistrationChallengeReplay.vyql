@@ -2,7 +2,7 @@ module code;
 
 concept FidoRegistrationChallengeReplay : issue {
   cwe: [CWE_294]
-  review_assumption: "an attacker can replay a captured or previously issued registration response while the session challenge remains reusable"
+  reviewAssumption: "an attacker can replay a captured or previously issued registration response while the session challenge remains reusable"
   reviewCategory: auth
   reviewCondition: "FIDO/WebAuthn registration challenge is reused after successful registration"
   reviewConfidence: high

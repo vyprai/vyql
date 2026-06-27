@@ -2,7 +2,7 @@ module code;
 
 concept UnvalidatedDynamicRequirePathTraversal : issue {
   cwe: [CWE_22, CWE_829]
-  review_assumption: "the module id can cross a trust boundary such as IPC, plugin code, or renderer-controlled widget configuration"
+  reviewAssumption: "the module id can cross a trust boundary such as IPC, plugin code, or renderer-controlled widget configuration"
   reviewCategory: code_loading
   reviewCondition: "a caller-controlled module id is joined into a local require path without an allowlist or canonical containment check"
   reviewConfidence: high

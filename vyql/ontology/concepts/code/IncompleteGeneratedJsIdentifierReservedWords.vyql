@@ -2,7 +2,7 @@ module code;
 
 concept IncompleteGeneratedJsIdentifierReservedWords : issue {
   cwe: [CWE_94, CWE_20]
-  review_assumption: "validated names can be inserted into generated JavaScript source as bindings or callable identifiers"
+  reviewAssumption: "validated names can be inserted into generated JavaScript source as bindings or callable identifiers"
   reviewCategory: injection
   reviewCondition: "generated JavaScript identifiers are validated with an incomplete reserved-word denylist"
   reviewConfidence: high

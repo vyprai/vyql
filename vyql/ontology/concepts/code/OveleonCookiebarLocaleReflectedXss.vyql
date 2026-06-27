@@ -2,7 +2,7 @@ module code;
 
 concept OveleonCookiebarLocaleReflectedXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the cookiebar block route locale segment is attacker-controlled and may be included in the rendered backend response path"
+  reviewAssumption: "the cookiebar block route locale segment is attacker-controlled and may be included in the rendered backend response path"
   reviewCategory: xss
   reviewCondition: "Oveleon Cookiebar renders the route locale into a frontend template response without locale validation"
   reviewConfidence: high

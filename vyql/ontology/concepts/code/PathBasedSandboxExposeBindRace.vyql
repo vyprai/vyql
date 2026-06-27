@@ -2,7 +2,7 @@ module code;
 
 concept PathBasedSandboxExposeBindRace : issue {
   cwe: [CWE_59, CWE_367, CWE_22]
-  review_assumption: "the spawned process or filesystem can race or redirect the path between validation and bind mounting"
+  reviewAssumption: "the spawned process or filesystem can race or redirect the path between validation and bind mounting"
   reviewCategory: path
   reviewCondition: "portal or sandbox launcher expose options are converted back into path-based filesystem arguments before spawning the sandbox"
   reviewConfidence: high

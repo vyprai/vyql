@@ -2,7 +2,7 @@ module code;
 
 concept BlockingReadInAcceptLoop : issue {
   cwe: [CWE_400, CWE_667]
-  review_assumption: "an idle client can hold the accept loop and prevent other clients from being accepted"
+  reviewAssumption: "an idle client can hold the accept loop and prevent other clients from being accepted"
   reviewCategory: resource
   reviewCondition: "a network accept loop performs a blocking per-connection read before handing the connection to concurrent processing"
   reviewConfidence: high

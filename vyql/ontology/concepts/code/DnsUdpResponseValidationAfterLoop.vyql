@@ -2,7 +2,7 @@ module code;
 
 concept DnsUdpResponseValidationAfterLoop : issue {
   cwe: [CWE_400, CWE_248]
-  review_assumption: "a remote or spoofing peer can send malformed or mismatched UDP DNS responses before the legitimate response arrives"
+  reviewAssumption: "a remote or spoofing peer can send malformed or mismatched UDP DNS responses before the legitimate response arrives"
   reviewCategory: resource
   reviewCondition: "DNS UDP response loops parse and correlate the response only after accepting a datagram from the expected address"
   reviewConfidence: high

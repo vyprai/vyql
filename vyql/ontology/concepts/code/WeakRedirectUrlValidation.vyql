@@ -2,7 +2,7 @@ module code;
 
 concept WeakRedirectUrlValidation : issue {
   cwe: [CWE_601, CWE_20]
-  review_assumption: "attackers can provide a next/redirect URL that reaches this validation helper"
+  reviewAssumption: "attackers can provide a next/redirect URL that reaches this validation helper"
   reviewCategory: request_forgery
   reviewCondition: "redirect URL validation allows external netloc checks without scheme parity, slash normalization, and control-character rejection"
   reviewConfidence: high

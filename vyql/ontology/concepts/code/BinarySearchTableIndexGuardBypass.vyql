@@ -2,7 +2,7 @@ module code;
 
 concept BinarySearchTableIndexGuardBypass : issue {
   cwe: [CWE_125, CWE_129]
-  review_assumption: "a malformed or attacker-selected lookup id can fall outside the table's covered range"
+  reviewAssumption: "a malformed or attacker-selected lookup id can fall outside the table's covered range"
   reviewCategory: memory
   reviewCondition: "a binary-search index can be recomputed after the search interval becomes invalid"
   reviewConfidence: medium

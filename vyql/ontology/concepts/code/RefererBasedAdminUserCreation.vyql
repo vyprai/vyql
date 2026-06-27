@@ -2,7 +2,7 @@ module code;
 
 concept RefererBasedAdminUserCreation : issue {
   cwe: [CWE_290, CWE_269, CWE_863]
-  review_assumption: "attackers can send a forged Referer header to the authenticated user-creation endpoint"
+  reviewAssumption: "attackers can send a forged Referer header to the authenticated user-creation endpoint"
   reviewCategory: auth
   reviewCondition: "admin privilege for a newly created user is derived from the HTTP Referer header"
   reviewConfidence: high

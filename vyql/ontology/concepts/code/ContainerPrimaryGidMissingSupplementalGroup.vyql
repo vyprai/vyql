@@ -2,7 +2,7 @@ module code;
 
 concept ContainerPrimaryGidMissingSupplementalGroup : issue {
   cwe: [CWE_284, CWE_732]
-  review_assumption: "the container runtime requires the effective GID to appear in the process supplemental group list for expected filesystem/group access semantics"
+  reviewAssumption: "the container runtime requires the effective GID to appear in the process supplemental group list for expected filesystem/group access semantics"
   reviewCategory: auth
   reviewCondition: "container process setup applies an effective primary GID without also adding that GID to supplemental groups"
   reviewConfidence: high

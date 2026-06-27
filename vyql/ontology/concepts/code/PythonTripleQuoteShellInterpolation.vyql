@@ -2,7 +2,7 @@ module code;
 
 concept PythonTripleQuoteShellInterpolation : issue {
   cwe: [CWE_94, CWE_77]
-  review_assumption: "the hook JSON can contain user-controlled path fields with apostrophe sequences that close the Python literal"
+  reviewAssumption: "the hook JSON can contain user-controlled path fields with apostrophe sequences that close the Python literal"
   reviewCategory: code_execution
   reviewCondition: "shell-captured hook input is interpolated into Python source inside a triple-quoted string literal"
   reviewConfidence: high

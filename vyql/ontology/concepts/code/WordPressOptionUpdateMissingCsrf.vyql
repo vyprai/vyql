@@ -2,7 +2,7 @@ module code;
 
 concept WordPressOptionUpdateMissingCsrf : issue {
   cwe: [CWE_352]
-  review_assumption: "an authenticated administrator can be induced to submit the settings request cross-site"
+  reviewAssumption: "an authenticated administrator can be induced to submit the settings request cross-site"
   reviewCategory: csrf
   reviewCondition: "WordPress option updates consume request data without nonce verification"
   reviewConfidence: high

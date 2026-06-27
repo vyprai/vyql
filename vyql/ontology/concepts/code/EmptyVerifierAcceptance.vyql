@@ -2,7 +2,7 @@ module code;
 
 concept EmptyVerifierAcceptance : issue {
   cwe: [CWE_345, CWE_670]
-  review_assumption: "a failed lookup returns an empty value and the verifier is reachable with attacker-supplied challenge id and answer"
+  reviewAssumption: "a failed lookup returns an empty value and the verifier is reachable with attacker-supplied challenge id and answer"
   reviewCategory: auth
   reviewCondition: "verification succeeds when a missing stored challenge value equals an empty supplied answer"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept GitDirShellCommandStringExecution : issue {
   cwe: [CWE_78]
-  review_assumption: "the repository path, ref, or object path can be influenced by the caller"
+  reviewAssumption: "the repository path, ref, or object path can be influenced by the caller"
   reviewCategory: command
   reviewCondition: "git repository paths are interpolated into a shell command string before execution"
   reviewConfidence: high

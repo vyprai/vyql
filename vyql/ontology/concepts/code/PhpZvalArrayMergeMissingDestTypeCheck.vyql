@@ -2,7 +2,7 @@ module code;
 
 concept PhpZvalArrayMergeMissingDestTypeCheck : issue {
   cwe: [CWE_843, CWE_787, CWE_125]
-  review_assumption: "crafted nested query or parameter data can make the existing destination zval non-array while the incoming zval is an array"
+  reviewAssumption: "crafted nested query or parameter data can make the existing destination zval non-array while the incoming zval is an array"
   reviewCategory: memory
   reviewCondition: "PHP C API array-merge logic descends through a destination zval as an array after only checking the incoming zval type"
   reviewConfidence: high

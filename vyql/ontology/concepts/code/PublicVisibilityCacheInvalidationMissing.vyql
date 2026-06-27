@@ -2,7 +2,7 @@ module code;
 
 concept PublicVisibilityCacheInvalidationMissing : issue {
   cwe: [CWE_863]
-  review_assumption: "the cached public-status response gates unauthenticated or cross-tenant access to sandbox proxy or preview data"
+  reviewAssumption: "the cached public-status response gates unauthenticated or cross-tenant access to sandbox proxy or preview data"
   reviewCategory: auth
   reviewCondition: "public-visibility cache entries are not invalidated when the public status changes"
   reviewConfidence: high

@@ -396,7 +396,7 @@ func conceptsWithBoolField(t *testing.T, kind, field string) map[string]bool {
 // T2.1 — every SOURCE concept is wired in an adapter (something produces it) OR is in the
 // documented reserved vocabulary set in ontology metadata (defined ahead of wiring; the input
 // may currently be subsumed by a broader source, or belong to an archetype not yet wired).
-// A NEW source concept must be wired or explicitly marked `coverage_reserved_source: true`.
+// A NEW source concept must be wired or explicitly marked `coverageReservedSource: true`.
 func TestSourceConceptsWiredGate(t *testing.T) {
 	reserved := conceptsWithBoolField(t, "source", "coverage_reserved_source")
 	sources := conceptsByKind(t, "source")
@@ -695,6 +695,29 @@ func TestShippedProfilesUseV2DetectPredicates(t *testing.T) {
 	if len(hits) > 0 {
 		sort.Strings(hits)
 		t.Fatalf("profiles must use native v2 field syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestShippedModelDefinitionsUseV2FieldNames(t *testing.T) {
+	snakeField := regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]*\s*:`)
+	files := map[string]string{}
+	for _, sub := range []string{"ontology", "review", "packs"} {
+		for path, src := range readDataFiles(t, sub, ".vyql") {
+			files[path] = src
+		}
+	}
+	var hits []string
+	for path, src := range files {
+		for i, line := range strings.Split(src, "\n") {
+			if snakeField.MatchString(line) {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("model, review, and pack definitions must author v2 camelCase field names:\n%s", strings.Join(hits, "\n"))
 	}
 }
 

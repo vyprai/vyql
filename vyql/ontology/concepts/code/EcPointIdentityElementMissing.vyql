@@ -2,7 +2,7 @@ module code;
 
 concept EcPointIdentityElementMissing : issue {
   cwe: [CWE_347, CWE_20]
-  review_assumption: "attackers can supply public keys or signature values that drive point-at-infinity arithmetic during ECDSA verification"
+  reviewAssumption: "attackers can supply public keys or signature values that drive point-at-infinity arithmetic during ECDSA verification"
   reviewCategory: crypto
   reviewCondition: "elliptic-curve point arithmetic omits identity-element handling before modular inversion or scalar multiplication"
   reviewConfidence: high

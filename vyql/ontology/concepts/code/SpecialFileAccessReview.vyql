@@ -2,7 +2,7 @@ module code;
 
 concept SpecialFileAccessReview : issue {
   cwe: [CWE_61, CWE_706]
-  review_assumption: "the path may be redirected away from the intended special filesystem"
+  reviewAssumption: "the path may be redirected away from the intended special filesystem"
   reviewCategory: path
   reviewCondition: "security-sensitive virtual filesystem path is opened without an observed secure filesystem boundary"
   reviewConfidence: possibility

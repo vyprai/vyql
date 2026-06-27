@@ -2,7 +2,7 @@ module code;
 
 concept ResponseWriterScriptWindowIdXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the client-window identifier can contain characters that terminate the JavaScript string and execute script"
+  reviewAssumption: "the client-window identifier can contain characters that terminate the JavaScript string and execute script"
   reviewCategory: xss
   reviewCondition: "JSF ResponseWriter emits a window identifier into a script string with write instead of escaping text"
   reviewConfidence: high

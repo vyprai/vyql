@@ -2,7 +2,7 @@ module code;
 
 concept RequestHostUrlValidationBypass : issue {
   cwe: [CWE_20, CWE_918]
-  review_assumption: "the request Host header or equivalent server-name metadata can be attacker-controlled"
+  reviewAssumption: "the request Host header or equivalent server-name metadata can be attacker-controlled"
   reviewCategory: request_forgery
   reviewCondition: "absolute URL validation accepts hosts derived from the current HTTP request"
   reviewConfidence: medium

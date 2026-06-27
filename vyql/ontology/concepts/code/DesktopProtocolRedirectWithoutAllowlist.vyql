@@ -2,7 +2,7 @@ module code;
 
 concept DesktopProtocolRedirectWithoutAllowlist : issue {
   cwe: [CWE_601, CWE_20]
-  review_assumption: "the desktop-link URL can be influenced by workspace, IDE, or caller-controlled service state"
+  reviewAssumption: "the desktop-link URL can be influenced by workspace, IDE, or caller-controlled service state"
   reviewCategory: request_forgery
   reviewCondition: "desktop deep-link redirect logic allows every non-http(s) protocol instead of an explicit trusted protocol allowlist"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept UnsanitizedSvgUpload : issue {
   cwe: [CWE_79]
-  review_assumption: "stored SVG files can be served back to users and scriptable SVG content can execute in a browser"
+  reviewAssumption: "stored SVG files can be served back to users and scriptable SVG content can execute in a browser"
   reviewCategory: xss
   reviewCondition: "uploaded SVG content is accepted and stored without an observed SVG sanitizer"
   reviewConfidence: high

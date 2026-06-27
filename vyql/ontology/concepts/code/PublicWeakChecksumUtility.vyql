@@ -2,7 +2,7 @@ module code;
 
 concept PublicWeakChecksumUtility : issue {
   cwe: [CWE_327, CWE_328]
-  review_assumption: "external callers may use the public API for security-sensitive hashing, integrity, or identity decisions"
+  reviewAssumption: "external callers may use the public API for security-sensitive hashing, integrity, or identity decisions"
   reviewCategory: crypto
   reviewCondition: "public checksum or digest helper exposes weak general-purpose hash/checksum algorithms"
   reviewConfidence: high

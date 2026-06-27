@@ -2,7 +2,7 @@ module code;
 
 concept OcppEvccIdSharedMapRace : issue {
   cwe: [CWE_362, CWE_416]
-  review_assumption: "EV information callbacks and transaction/session handlers can concurrently update and read EVCCID strings"
+  reviewAssumption: "EV information callbacks and transaction/session handlers can concurrently update and read EVCCID strings"
   reviewCategory: concurrency
   reviewCondition: "OCPP EVCCID state is stored in a shared std::map of std::string values without a monitor or lock wrapper"
   reviewConfidence: high

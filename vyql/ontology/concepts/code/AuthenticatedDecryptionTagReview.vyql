@@ -2,7 +2,7 @@ module code;
 
 concept AuthenticatedDecryptionTagReview : issue {
   cwe: [CWE_287, CWE_347]
-  review_assumption: "the encrypted payload or authentication tag can be supplied or replayed by an attacker"
+  reviewAssumption: "the encrypted payload or authentication tag can be supplied or replayed by an attacker"
   reviewCategory: crypto
   reviewCondition: "authenticated decryption accepts a decoded authentication tag without an observed fixed-length check"
   reviewConfidence: medium

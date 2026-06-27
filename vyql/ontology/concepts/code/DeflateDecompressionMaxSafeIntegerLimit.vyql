@@ -2,7 +2,7 @@ module code;
 
 concept DeflateDecompressionMaxSafeIntegerLimit : issue {
   cwe: [CWE_400, CWE_770]
-  review_assumption: "attacker-controlled compressed input can understate or hide its final expanded size and force excessive memory or CPU before rejection"
+  reviewAssumption: "attacker-controlled compressed input can understate or hide its final expanded size and force excessive memory or CPU before rejection"
   reviewCategory: resource
   reviewCondition: "deflate decompression uses JavaScript's Number.MAX_SAFE_INTEGER as the output length limit"
   reviewConfidence: high

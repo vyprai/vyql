@@ -2,7 +2,7 @@ module code;
 
 concept UnsignedOidcStateDestinationRedirect : issue {
   cwe: [CWE_601]
-  review_assumption: "the identity provider or an attacker controlling the callback state value can alter the post-login destination"
+  reviewAssumption: "the identity provider or an attacker controlling the callback state value can alter the post-login destination"
   reviewCategory: request_forgery
   reviewCondition: "OIDC callback redirects to a destination carried through the provider-controlled state value without signing or verifying that destination"
   reviewConfidence: high

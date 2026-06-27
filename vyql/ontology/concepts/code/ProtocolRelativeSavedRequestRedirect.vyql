@@ -2,7 +2,7 @@ module code;
 
 concept ProtocolRelativeSavedRequestRedirect : issue {
   cwe: [CWE_601]
-  review_assumption: "the saved request URI can be attacker-controlled before authentication and is later passed to sendRedirect or equivalent redirect handling"
+  reviewAssumption: "the saved request URI can be attacker-controlled before authentication and is later passed to sendRedirect or equivalent redirect handling"
   reviewCategory: request_forgery
   reviewCondition: "saved request redirect reconstruction can return a protocol-relative URL beginning with double slash"
   reviewConfidence: high

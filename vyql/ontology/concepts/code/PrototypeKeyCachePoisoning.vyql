@@ -2,7 +2,7 @@ module code;
 
 concept PrototypeKeyCachePoisoning : issue {
   cwe: [CWE_1321]
-  review_assumption: "a caller can supply keys such as __proto__ or constructor"
+  reviewAssumption: "a caller can supply keys such as __proto__ or constructor"
   reviewCategory: prototype_pollution
   reviewCondition: "caller-controlled cache keys are stored in plain objects that inherit prototype properties"
   reviewConfidence: medium

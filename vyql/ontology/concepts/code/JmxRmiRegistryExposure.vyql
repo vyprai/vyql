@@ -2,7 +2,7 @@ module code;
 
 concept JmxRmiRegistryExposure : issue {
   cwe: [CWE_306, CWE_94]
-  review_assumption: "default authentication may be disabled and the registry may bind beyond loopback, exposing remote JMX/RMI code execution"
+  reviewAssumption: "default authentication may be disabled and the registry may bind beyond loopback, exposing remote JMX/RMI code execution"
   reviewCategory: auth
   reviewCondition: "a JMX/RMI server is registered through a custom RMI exporter path that can expose unauthenticated remote management"
   reviewConfidence: medium

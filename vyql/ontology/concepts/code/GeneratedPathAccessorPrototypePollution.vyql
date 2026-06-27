@@ -2,7 +2,7 @@ module code;
 
 concept GeneratedPathAccessorPrototypePollution : issue {
   cwe: [CWE_1321, CWE_94]
-  review_assumption: "a caller can provide path segments such as __proto__, constructor, prototype, or code metacharacters that affect the generated accessor"
+  reviewAssumption: "a caller can provide path segments such as __proto__, constructor, prototype, or code metacharacters that affect the generated accessor"
   reviewCategory: prototype_pollution
   reviewCondition: "nested path accessors generate JavaScript property-access code from caller path strings and compile it with Function"
   reviewConfidence: high

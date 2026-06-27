@@ -2,7 +2,7 @@ module code;
 
 concept ContikiSicslowpanFragmentOffsetOobWrite : issue {
   cwe: [CWE_787]
-  review_assumption: "an attacker can send forged 6LoWPAN fragments that control the reassembly offset and fragment length metadata"
+  reviewAssumption: "an attacker can send forged 6LoWPAN fragments that control the reassembly offset and fragment length metadata"
   reviewCategory: memory
   reviewCondition: "Contiki-NG 6LoWPAN reassembly copies a stored fragment into uip_buf using an unchecked forged fragment offset"
   reviewConfidence: high

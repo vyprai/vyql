@@ -2,7 +2,7 @@ module code;
 
 concept UnboundedProtocolStateByIdentifier : issue {
   cwe: [CWE_400, CWE_770]
-  review_assumption: "the identifier bytes can be supplied by a remote peer and can be large enough or numerous enough to amplify memory/CPU"
+  reviewAssumption: "the identifier bytes can be supplied by a remote peer and can be large enough or numerous enough to amplify memory/CPU"
   reviewCategory: resource
   reviewCondition: "protocol message identifiers are stored in peer state or queued before per-identifier size/type limits are enforced"
   reviewConfidence: medium

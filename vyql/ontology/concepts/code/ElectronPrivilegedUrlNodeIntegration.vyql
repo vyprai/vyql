@@ -2,7 +2,7 @@ module code;
 
 concept ElectronPrivilegedUrlNodeIntegration : issue {
   cwe: [CWE_829, CWE_94]
-  review_assumption: "an attacker can combine a navigation or same-origin bypass with the privileged URL to evaluate Node primitives"
+  reviewAssumption: "an attacker can combine a navigation or same-origin bypass with the privileged URL to evaluate Node primitives"
   reviewCategory: desktop
   reviewCondition: "Electron enables Node integration for a privileged internal URL scheme"
   reviewConfidence: high

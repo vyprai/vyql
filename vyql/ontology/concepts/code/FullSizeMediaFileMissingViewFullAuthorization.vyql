@@ -2,7 +2,7 @@ module code;
 
 concept FullSizeMediaFileMissingViewFullAuthorization : issue {
   cwe: [CWE_862, CWE_863]
-  review_assumption: "full/original media files are more sensitive than thumbnails or resized derivatives and require a distinct permission"
+  reviewAssumption: "full/original media files are more sensitive than thumbnails or resized derivatives and require a distinct permission"
   reviewCategory: access_control
   reviewCondition: "a media/data file endpoint serves the original full-size file with only generic view authorization instead of a stronger full-view permission"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept UnboundedDelimiterSplitCount : issue {
   cwe: [CWE_400]
-  review_assumption: "the parsed input body can contain enough delimiters to amplify CPU or memory within the accepted byte limit"
+  reviewAssumption: "the parsed input body can contain enough delimiters to amplify CPU or memory within the accepted byte limit"
   reviewCategory: resource
   reviewCondition: "a delimiter-count helper fully splits attacker-sized input before enforcing a count limit"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept AmbiguousQueryParameterSeparator : issue {
   cwe: [CWE_444]
-  review_assumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
+  reviewAssumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
   reviewCategory: request
   reviewCondition: "query parser accepts semicolon as an alternate parameter separator"
   reviewConfidence: medium

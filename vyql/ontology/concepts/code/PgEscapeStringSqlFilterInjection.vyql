@@ -2,7 +2,7 @@ module code;
 
 concept PgEscapeStringSqlFilterInjection : issue {
   cwe: [CWE_89]
-  review_assumption: "HTTP parameters can control the escaped filter value"
+  reviewAssumption: "HTTP parameters can control the escaped filter value"
   reviewCategory: sql
   reviewCondition: "PostgreSQL filter fragments are built with pg_escape_string instead of pg_escape_literal before query composition"
   reviewConfidence: high

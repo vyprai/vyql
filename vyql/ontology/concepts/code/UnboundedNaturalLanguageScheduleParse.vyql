@@ -2,7 +2,7 @@ module code;
 
 concept UnboundedNaturalLanguageScheduleParse : issue {
   cwe: [CWE_400]
-  review_assumption: "attackers can pass very long schedule text through the public parser API and consume CPU in the grammar parser"
+  reviewAssumption: "attackers can pass very long schedule text through the public parser API and consume CPU in the grammar parser"
   reviewCategory: resource
   reviewCondition: "natural-language schedule parsing runs an internal grammar parser before bounding input length"
   reviewConfidence: high

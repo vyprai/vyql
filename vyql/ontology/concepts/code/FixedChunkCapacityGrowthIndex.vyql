@@ -2,7 +2,7 @@ module code;
 
 concept FixedChunkCapacityGrowthIndex : issue {
   cwe: [CWE_119, CWE_787]
-  review_assumption: "crafted input can select a requested index or continuation level larger than the fixed growth step"
+  reviewAssumption: "crafted input can select a requested index or continuation level larger than the fixed growth step"
   reviewCategory: memory
   reviewCondition: "capacity grows by a fixed chunk even though the requested index or level may jump beyond the new capacity"
   reviewConfidence: high

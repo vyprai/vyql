@@ -2,7 +2,7 @@ module code;
 
 concept VerboseHttpClientAuthorizationLog : issue {
   cwe: [CWE_532]
-  review_assumption: "outbound requests may carry authorization headers, bearer tokens, cookies, or other credentials"
+  reviewAssumption: "outbound requests may carry authorization headers, bearer tokens, cookies, or other credentials"
   reviewCategory: secret
   reviewCondition: "HTTP client logging is configured to include full request headers or bodies"
   reviewConfidence: high

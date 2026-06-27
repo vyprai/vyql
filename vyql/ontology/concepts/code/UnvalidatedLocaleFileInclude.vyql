@@ -2,7 +2,7 @@ module code;
 
 concept UnvalidatedLocaleFileInclude : issue {
   cwe: [CWE_98]
-  review_assumption: "an application can pass user-controlled locale names to the translator or setLocale API"
+  reviewAssumption: "an application can pass user-controlled locale names to the translator or setLocale API"
   reviewCategory: path
   reviewCondition: "a locale parameter is interpolated into a PHP include path before locale validation"
   reviewConfidence: medium

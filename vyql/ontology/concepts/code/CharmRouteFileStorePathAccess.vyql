@@ -2,7 +2,7 @@ module code;
 
 concept CharmRouteFileStorePathAccess : issue {
   cwe: [CWE_22]
-  review_assumption: "the route wildcard can include traversal components that alter the user's data-directory path"
+  reviewAssumption: "the route wildcard can include traversal components that alter the user's data-directory path"
   reviewCategory: path
   reviewCondition: "route wildcard paths are used as file-store object paths without canonicalization"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept AuthFailureResponseReview : issue {
   cwe: [CWE_287]
-  review_assumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
+  reviewAssumption: "an upstream proxy interprets the generic error response as successful authentication or otherwise fails open"
   reviewCategory: auth
   reviewCondition: "authentication verification error handling returns a generic failure response instead of an observed fail-closed unauthorized response"
   reviewConfidence: possibility

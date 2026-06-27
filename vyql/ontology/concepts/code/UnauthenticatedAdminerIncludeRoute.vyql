@@ -2,7 +2,7 @@ module code;
 
 concept UnauthenticatedAdminerIncludeRoute : issue {
   cwe: [CWE_306, CWE_862]
-  review_assumption: "the framework route is reachable by unauthenticated users when auth_required is false"
+  reviewAssumption: "the framework route is reachable by unauthenticated users when auth_required is false"
   reviewCategory: auth
   reviewCondition: "a web administration route loads the Adminer UI while route authentication is disabled and no session gate is checked"
   reviewConfidence: high

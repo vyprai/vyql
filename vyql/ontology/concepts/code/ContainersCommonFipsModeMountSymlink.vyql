@@ -2,7 +2,7 @@ module code;
 
 concept ContainersCommonFipsModeMountSymlink : issue {
   cwe: [CWE_59, CWE_22]
-  review_assumption: "a container image can place symlinks under the mounted root so ordinary path joins can resolve outside the intended container filesystem"
+  reviewAssumption: "a container image can place symlinks under the mounted root so ordinary path joins can resolve outside the intended container filesystem"
   reviewCategory: path
   reviewCondition: "containers/common FIPS subscription mount resolves a container-image path with filepath.Join before bind-mounting it from the host"
   reviewConfidence: high

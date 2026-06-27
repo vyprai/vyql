@@ -2,7 +2,7 @@ module code;
 
 concept ProtocolListAmplification : issue {
   cwe: [CWE_400]
-  review_assumption: "a remote peer can send zero-sized list metadata with a very large element count and force per-element iteration"
+  reviewAssumption: "a remote peer can send zero-sized list metadata with a very large element count and force per-element iteration"
   reviewCategory: resource
   reviewCondition: "protocol list readers accept zero-sized element counts without charging an equivalent traversal budget"
   reviewConfidence: medium

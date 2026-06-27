@@ -2,7 +2,7 @@ module code;
 
 concept UrlDecodedTraversalCheckExceptionBypass : issue {
   cwe: [CWE_22, CWE_184]
-  review_assumption: "request paths may contain malformed percent escapes or already-decoded percent characters that make URL decoding throw before parent-directory validation runs"
+  reviewAssumption: "request paths may contain malformed percent escapes or already-decoded percent characters that make URL decoding throw before parent-directory validation runs"
   reviewCategory: path
   reviewCondition: "URL-decoded request paths are validated for parent-directory traversal only after a decode operation that can throw on malformed percent escapes"
   reviewConfidence: high

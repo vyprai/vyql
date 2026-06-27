@@ -2,7 +2,7 @@ module code;
 
 concept ConstellationLuks2AttachedHeaderActivation : issue {
   cwe: [CWE_347]
-  review_assumption: "the encrypted persistent-storage device is supplied by an untrusted host to the confidential guest"
+  reviewAssumption: "the encrypted persistent-storage device is supplied by an untrusted host to the confidential guest"
   reviewCategory: crypto
   reviewCondition: "Constellation opens an existing LUKS2 device through an attached, host-provided header without detached-header validation"
   reviewConfidence: high

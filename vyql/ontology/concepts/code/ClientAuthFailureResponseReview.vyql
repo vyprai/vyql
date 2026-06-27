@@ -2,7 +2,7 @@ module code;
 
 concept ClientAuthFailureResponseReview : issue {
   cwe: [CWE_287]
-  review_assumption: "privileged UI callbacks trust the shared helper to stop unauthorized response handling"
+  reviewAssumption: "privileged UI callbacks trust the shared helper to stop unauthorized response handling"
   reviewCategory: auth
   reviewCondition: "client-side request helper invokes success callbacks after an observed authorization failure response"
   reviewConfidence: medium

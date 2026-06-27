@@ -2,7 +2,7 @@ module code;
 
 concept CryptoScalarRandomBitsByteLengthConfusion : issue {
   cwe: [CWE_331, CWE_330]
-  review_assumption: "callers may supply a byte count instead of a bit count, biasing security-sensitive scalar or nonce generation"
+  reviewAssumption: "callers may supply a byte count instead of a bit count, biasing security-sensitive scalar or nonce generation"
   reviewCategory: crypto
   reviewCondition: "elliptic-curve scalar or nonce generation may pass a byte-length value to a random-bits API"
   reviewConfidence: high

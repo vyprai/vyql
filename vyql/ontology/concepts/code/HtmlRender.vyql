@@ -3,6 +3,6 @@ module code;
 concept HtmlRender : sink {
   cwe: [CWE_79]
   enabledBy: [taint.UntrustedData]
-  excluded_chars: "<>&\"'"
+  excludedChars: "<>&\"'"
   vulnerableTo: [injection.Xss]
 }

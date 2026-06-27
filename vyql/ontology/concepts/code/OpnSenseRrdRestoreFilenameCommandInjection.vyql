@@ -2,7 +2,7 @@ module code;
 
 concept OpnSenseRrdRestoreFilenameCommandInjection : issue {
   cwe: [CWE_78, CWE_20]
-  review_assumption: "an authenticated administrator can upload a crafted configuration backup containing attacker-controlled RRD filename entries"
+  reviewAssumption: "an authenticated administrator can upload a crafted configuration backup containing attacker-controlled RRD filename entries"
   reviewCategory: command
   reviewCondition: "OPNsense RRD backup restore interpolates a backup-supplied filename into an rrdtool restore shell command"
   reviewConfidence: high

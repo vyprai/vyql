@@ -2,7 +2,7 @@ module code;
 
 concept JavaScriptUrlRedirectXss : issue {
   cwe: [CWE_79]
-  review_assumption: "a victim can be induced to visit the login or redirect URL and complete the action that triggers navigation"
+  reviewAssumption: "a victim can be induced to visit the login or redirect URL and complete the action that triggers navigation"
   reviewCategory: xss
   reviewCondition: "browser redirect parameter can be a javascript: URL assigned to window.location"
   reviewConfidence: high

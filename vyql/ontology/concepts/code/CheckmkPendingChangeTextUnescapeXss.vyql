@@ -2,7 +2,7 @@ module code;
 
 concept CheckmkPendingChangeTextUnescapeXss : issue {
   cwe: [CWE_79]
-  review_assumption: "pending change text can include folder or change attributes controlled by an operator/admin and is inserted with innerHTML"
+  reviewAssumption: "pending change text can include folder or change attributes controlled by an operator/admin and is inserted with innerHTML"
   reviewCategory: xss
   reviewCondition: "pending-change text is HTML-unescaped before being returned to a frontend popout that renders it as HTML"
   reviewConfidence: high

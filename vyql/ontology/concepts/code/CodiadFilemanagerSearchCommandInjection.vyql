@@ -2,7 +2,7 @@ module code;
 
 concept CodiadFilemanagerSearchCommandInjection : issue {
   cwe: [CWE_78]
-  review_assumption: "filemanager actions can receive attacker-controlled search parameters"
+  reviewAssumption: "filemanager actions can receive attacker-controlled search parameters"
   reviewCategory: "command-injection"
   reviewCondition: "Codiad Filemanager stores raw search parameters before building shell find/grep commands"
   reviewConfidence: high

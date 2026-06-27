@@ -2,7 +2,7 @@ module code;
 
 concept UncheckedEncodedLengthArithmetic : issue {
   cwe: [CWE_190, CWE_835]
-  review_assumption: "a malformed serialized payload can supply oversized container or string lengths"
+  reviewAssumption: "a malformed serialized payload can supply oversized container or string lengths"
   reviewCategory: numeric
   reviewCondition: "serialized protocol length arithmetic lacks checked overflow handling"
   reviewConfidence: medium

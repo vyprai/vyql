@@ -2,7 +2,7 @@ module code;
 
 concept CollectionExtendPrototypePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "a caller can pass attacker-controlled objects containing __proto__ keys to collection.extend"
+  reviewAssumption: "a caller can pass attacker-controlled objects containing __proto__ keys to collection.extend"
   reviewCategory: prototype_pollution
   reviewCondition: "Collection.js extend recursively copies source object keys into target objects without skipping prototype-mutating keys"
   reviewConfidence: high

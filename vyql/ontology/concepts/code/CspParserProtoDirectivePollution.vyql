@@ -2,7 +2,7 @@ module code;
 
 concept CspParserProtoDirectivePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "an attacker can supply a Content-Security-Policy header or string containing a __proto__ directive"
+  reviewAssumption: "an attacker can supply a Content-Security-Policy header or string containing a __proto__ directive"
   reviewCategory: prototype_pollution
   reviewCondition: "content-security-policy-parser stores a __proto__ directive on a plain object result"
   reviewConfidence: high

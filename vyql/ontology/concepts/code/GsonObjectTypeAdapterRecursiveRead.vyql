@@ -2,7 +2,7 @@ module code;
 
 concept GsonObjectTypeAdapterRecursiveRead : issue {
   cwe: [CWE_502, CWE_400]
-  review_assumption: "untrusted JSON input can contain deeply nested arrays or objects and reach this Object adapter"
+  reviewAssumption: "untrusted JSON input can contain deeply nested arrays or objects and reach this Object adapter"
   reviewCategory: resource
   reviewCondition: "Gson ObjectTypeAdapter replacement recursively parses nested JSON containers without a depth limit or explicit stack"
   reviewConfidence: high

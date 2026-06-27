@@ -2,7 +2,7 @@ module code;
 
 concept CentreonMyAccountContactXss : issue {
   cwe: [CWE_79]
-  review_assumption: "contact name and alias can be attacker-controlled through the my-account form"
+  reviewAssumption: "contact name and alias can be attacker-controlled through the my-account form"
   reviewCategory: xss
   reviewCondition: "Centreon contact name or alias is rendered into my-account/contact list markup without the illegal-character escape mode"
   reviewConfidence: high

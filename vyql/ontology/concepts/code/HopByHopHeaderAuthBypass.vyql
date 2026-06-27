@@ -2,7 +2,7 @@ module code;
 
 concept HopByHopHeaderAuthBypass : issue {
   cwe: [CWE_287]
-  review_assumption: "the backend or reverse proxy path honors the Connection header by dropping named forwarded headers"
+  reviewAssumption: "the backend or reverse proxy path honors the Connection header by dropping named forwarded headers"
   reviewCategory: auth
   reviewCondition: "a reverse proxy sets privileged backend authentication or impersonation headers without first removing client-controlled hop-by-hop header tokens"
   reviewConfidence: medium

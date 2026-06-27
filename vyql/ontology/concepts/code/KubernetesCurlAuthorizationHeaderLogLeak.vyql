@@ -2,7 +2,7 @@ module code;
 
 concept KubernetesCurlAuthorizationHeaderLogLeak : issue {
   cwe: [CWE_532]
-  review_assumption: "debugCurlCommand logging is enabled at high verbosity and request headers may contain bearer or authorization tokens"
+  reviewAssumption: "debugCurlCommand logging is enabled at high verbosity and request headers may contain bearer or authorization tokens"
   reviewCategory: secret
   reviewCondition: "Kubernetes client-go curl debug logging formats request authorization headers without redaction"
   reviewConfidence: high

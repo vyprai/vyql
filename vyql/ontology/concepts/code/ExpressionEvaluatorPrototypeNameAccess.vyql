@@ -2,7 +2,7 @@ module code;
 
 concept ExpressionEvaluatorPrototypeNameAccess : issue {
   cwe: [CWE_1321]
-  review_assumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
+  reviewAssumption: "a caller can evaluate attacker-controlled expressions containing variable or member names"
   reviewCategory: prototype_pollution
   reviewCondition: "expression evaluator resolves variable or member tokens against JavaScript objects without rejecting prototype-sensitive names"
   reviewConfidence: high

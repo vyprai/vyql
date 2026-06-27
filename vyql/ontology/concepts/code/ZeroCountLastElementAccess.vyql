@@ -2,7 +2,7 @@ module code;
 
 concept ZeroCountLastElementAccess : issue {
   cwe: [CWE_129, CWE_125, CWE_787]
-  review_assumption: "a malformed or attacker-influenced container can declare zero elements and make count - 1 underflow or access outside an empty allocation"
+  reviewAssumption: "a malformed or attacker-influenced container can declare zero elements and make count - 1 underflow or access outside an empty allocation"
   reviewCategory: memory
   reviewCondition: "a count-derived allocation or table can be indexed at count - 1 without first rejecting zero elements"
   reviewConfidence: high

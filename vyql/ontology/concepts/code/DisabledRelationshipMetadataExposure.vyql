@@ -2,7 +2,7 @@ module code;
 
 concept DisabledRelationshipMetadataExposure : issue {
   cwe: [CWE_284, CWE_863]
-  review_assumption: "the exposed relationship metadata can be requested by a principal that should not see disabled fields"
+  reviewAssumption: "the exposed relationship metadata can be requested by a principal that should not see disabled fields"
   reviewCategory: auth
   reviewCondition: "relationship or resource metadata exposes disabled or inaccessible fields without an enabled/access check"
   reviewConfidence: high

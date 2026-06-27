@@ -2,7 +2,7 @@ module code;
 
 concept ConditionalFallbackListDoubleFree : issue {
   cwe: [CWE_415, CWE_416]
-  review_assumption: "the list pointer remains in scope after the successful fallback path and the common cleanup frees it again"
+  reviewAssumption: "the list pointer remains in scope after the successful fallback path and the common cleanup frees it again"
   reviewCategory: memory
   reviewCondition: "a fallback branch frees a parsed list before a successful fallback open can continue to the shared list cleanup"
   reviewConfidence: high

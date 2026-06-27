@@ -2,7 +2,7 @@ module code;
 
 concept AutoActiveSignupAccount : issue {
   cwe: [CWE_306, CWE_862]
-  review_assumption: "active status grants access to system resources before separate approval"
+  reviewAssumption: "active status grants access to system resources before separate approval"
   reviewCategory: auth
   reviewCondition: "self-service signup creates an active account before an observed administrator activation step"
   reviewConfidence: medium

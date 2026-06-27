@@ -2,7 +2,7 @@ module code;
 
 concept RemoteUrlObjectDebugLog : issue {
   cwe: [CWE_200, CWE_532, CWE_598]
-  review_assumption: "remote source URLs may contain credentials, tokens, query strings, or fragments supplied by users or package metadata"
+  reviewAssumption: "remote source URLs may contain credentials, tokens, query strings, or fragments supplied by users or package metadata"
   reviewCategory: secret
   reviewCondition: "remote repository URL objects are written to debug logs before credential-bearing components are removed"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept DokuwikiRemoteAclMissingAdminCheck : issue {
   cwe: [CWE_862, CWE_269]
-  review_assumption: "users allowed to call the XML-RPC API may not be DokuWiki superusers and can alter ACL rules"
+  reviewAssumption: "users allowed to call the XML-RPC API may not be DokuWiki superusers and can alter ACL rules"
   reviewCategory: auth
   reviewCondition: "DokuWiki XML-RPC ACL mutation method invokes ACL add/delete operations without requiring superuser permission"
   reviewConfidence: high

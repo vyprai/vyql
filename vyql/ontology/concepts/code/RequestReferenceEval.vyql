@@ -2,7 +2,7 @@ module code;
 
 concept RequestReferenceEval : issue {
   cwe: [CWE_94]
-  review_assumption: "an attacker can submit batch request paths containing reference expressions"
+  reviewAssumption: "an attacker can submit batch request paths containing reference expressions"
   reviewCategory: code_execution
   reviewCondition: "request-controlled reference paths are evaluated as code to read response fields"
   reviewConfidence: high

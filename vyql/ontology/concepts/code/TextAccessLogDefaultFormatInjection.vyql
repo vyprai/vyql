@@ -2,7 +2,7 @@ module code;
 
 concept TextAccessLogDefaultFormatInjection : issue {
   cwe: [CWE_117, CWE_150]
-  review_assumption: "generated access logs include request headers or paths supplied by remote clients and are consumed as structured log records"
+  reviewAssumption: "generated access logs include request headers or paths supplied by remote clients and are consumed as structured log records"
   reviewCategory: injection
   reviewCondition: "a proxy access-log translator defaults to text formatting instead of structured JSON formatting"
   reviewConfidence: high

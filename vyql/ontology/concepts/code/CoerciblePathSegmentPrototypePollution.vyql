@@ -2,7 +2,7 @@ module code;
 
 concept CoerciblePathSegmentPrototypePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "a caller can provide a path array containing objects whose toString/valueOf result is __proto__, constructor, or prototype"
+  reviewAssumption: "a caller can provide a path array containing objects whose toString/valueOf result is __proto__, constructor, or prototype"
   reviewCategory: prototype_pollution
   reviewCondition: "nested path assignment rejects literal prototype-mutating strings but indexes objects with non-primitive path segments that JavaScript can coerce to prototype names"
   reviewConfidence: high

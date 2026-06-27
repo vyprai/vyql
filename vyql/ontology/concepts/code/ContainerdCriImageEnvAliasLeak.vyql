@@ -2,7 +2,7 @@ module code;
 
 concept ContainerdCriImageEnvAliasLeak : issue {
   cwe: [CWE_200, CWE_668]
-  review_assumption: "multiple CRI containers can be created from the same image config with different environment variables"
+  reviewAssumption: "multiple CRI containers can be created from the same image config with different environment variables"
   reviewCategory: secret
   reviewCondition: "containerd CRI derives per-container environment variables from a shared image-config slice without copying it first"
   reviewConfidence: high

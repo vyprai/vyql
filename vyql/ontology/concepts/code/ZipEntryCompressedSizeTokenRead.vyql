@@ -2,7 +2,7 @@ module code;
 
 concept ZipEntryCompressedSizeTokenRead : issue {
   cwe: [CWE_400]
-  review_assumption: "attacker-controlled ZIP metadata can select a large or amplification-prone entry consumed during type detection"
+  reviewAssumption: "attacker-controlled ZIP metadata can select a large or amplification-prone entry consumed during type detection"
   reviewCategory: resource
   reviewCondition: "ZIP entry parsing reads a StringType sized directly from the compressed-size header before applying an inflate/output limit"
   reviewConfidence: high

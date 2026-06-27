@@ -2,7 +2,7 @@ module code;
 
 concept ClockworkWebJobCsrf : issue {
   cwe: [CWE_352]
-  review_assumption: "the job action is reachable through the mounted Rails engine POST route"
+  reviewAssumption: "the job action is reachable through the mounted Rails engine POST route"
   reviewCategory: csrf
   reviewCondition: "Clockwork Web job enable/disable action lacks a Rails forgery-protection guard"
   reviewConfidence: high

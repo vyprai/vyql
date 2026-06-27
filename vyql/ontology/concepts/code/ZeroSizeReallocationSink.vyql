@@ -3,7 +3,7 @@ module code;
 concept ZeroSizeReallocationSink : sink {
   cwe: [CWE_415]
   enabledBy: [taint.ComputedSize]
-  review_assumption: "zero is not excluded on the same size value before reallocation"
+  reviewAssumption: "zero is not excluded on the same size value before reallocation"
   reviewCategory: memory
   reviewCondition: "computed allocation size reaches a reallocation primitive that can treat zero size as free"
   reviewConfidence: low

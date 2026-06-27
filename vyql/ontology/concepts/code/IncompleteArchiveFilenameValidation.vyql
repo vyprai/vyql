@@ -2,7 +2,7 @@ module code;
 
 concept IncompleteArchiveFilenameValidation : issue {
   cwe: [CWE_502, CWE_915]
-  review_assumption: "archive member names may be attacker-controlled and passed to filesystem APIs that resolve stream wrappers"
+  reviewAssumption: "archive member names may be attacker-controlled and passed to filesystem APIs that resolve stream wrappers"
   reviewCategory: deserialization
   reviewCondition: "archive member filename validation omits dangerous URI or stream-wrapper schemes"
   reviewConfidence: medium

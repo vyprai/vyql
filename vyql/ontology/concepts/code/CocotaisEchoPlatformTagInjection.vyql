@@ -2,7 +2,7 @@ module code;
 
 concept CocotaisEchoPlatformTagInjection : issue {
   cwe: [CWE_74]
-  review_assumption: "QQ platform tags such as qqbot-at-everyone are interpreted in bot replies with privileges unavailable to ordinary users"
+  reviewAssumption: "QQ platform tags such as qqbot-at-everyone are interpreted in bot replies with privileges unavailable to ordinary users"
   reviewCategory: injection
   reviewCondition: "Cocotais builtin echo replies with user-controlled platform tags using bot privileges"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept ChecksumErrorLogoutRedirect : issue {
   cwe: [CWE_601]
-  review_assumption: "the API redirects validation failures and exposes logoutURL as a request parameter"
+  reviewAssumption: "the API redirects validation failures and exposes logoutURL as a request parameter"
   reviewCategory: request_forgery
   reviewCondition: "checksum-error handling can redirect to a request-supplied logout URL"
   reviewConfidence: medium

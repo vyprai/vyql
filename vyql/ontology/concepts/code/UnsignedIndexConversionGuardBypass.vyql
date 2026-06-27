@@ -2,7 +2,7 @@ module code;
 
 concept UnsignedIndexConversionGuardBypass : issue {
   cwe: [CWE_190, CWE_129]
-  review_assumption: "a malformed input can supply a value whose signed conversion becomes negative"
+  reviewAssumption: "a malformed input can supply a value whose signed conversion becomes negative"
   reviewCategory: numeric
   reviewCondition: "an unsigned index is range-checked before the signed conversion used for indexing or dispatch"
   reviewConfidence: medium

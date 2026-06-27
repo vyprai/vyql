@@ -2,7 +2,7 @@ module code;
 
 concept LengthDerivedAllocation : issue {
   cwe: [CWE_400, CWE_789]
-  review_assumption: "the encoded length can be attacker-controlled and larger than the remaining input"
+  reviewAssumption: "the encoded length can be attacker-controlled and larger than the remaining input"
   reviewCategory: resource
   reviewCondition: "parsed length controls allocation before the available input bytes are proven"
   reviewConfidence: medium

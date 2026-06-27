@@ -2,7 +2,7 @@ module code;
 
 concept ControlledMergeInheritedKeyPrototypePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "an attacker can supply an object whose inherited keys include prototype-mutating names such as __proto__"
+  reviewAssumption: "an attacker can supply an object whose inherited keys include prototype-mutating names such as __proto__"
   reviewCategory: prototype_pollution
   reviewCondition: "controlled-merge copies inherited source keys into result object properties during recursive merge"
   reviewConfidence: high

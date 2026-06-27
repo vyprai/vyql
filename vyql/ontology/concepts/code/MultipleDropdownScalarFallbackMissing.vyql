@@ -2,7 +2,7 @@ module code;
 
 concept MultipleDropdownScalarFallbackMissing : issue {
   cwe: [CWE_20]
-  review_assumption: "callers or persisted defaults can provide scalar/empty values where downstream dropdown code expects arrays"
+  reviewAssumption: "callers or persisted defaults can provide scalar/empty values where downstream dropdown code expects arrays"
   reviewCategory: input_validation
   reviewCondition: "multiple-select dropdown handlers should normalize scalar or malformed JSON values to an array before storing or rendering them"
   reviewConfidence: high

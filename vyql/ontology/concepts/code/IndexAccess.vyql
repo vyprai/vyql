@@ -3,7 +3,7 @@ module code;
 concept IndexAccess : issue {
   cwe: [CWE_125, CWE_787]
   enabledBy: [taint.UntrustedData]
-  review_assumption: "the index is not range-checked against the accessed object"
+  reviewAssumption: "the index is not range-checked against the accessed object"
   reviewCategory: memory
   reviewCondition: "attacker-controlled index reaches an array/subscript access"
   reviewConfidence: medium

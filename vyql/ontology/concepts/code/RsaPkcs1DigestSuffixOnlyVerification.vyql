@@ -2,7 +2,7 @@ module code;
 
 concept RsaPkcs1DigestSuffixOnlyVerification : issue {
   cwe: [CWE_347]
-  review_assumption: "an attacker can provide low-exponent RSA signatures and exploit lax PKCS#1 v1.5 padding validation"
+  reviewAssumption: "an attacker can provide low-exponent RSA signatures and exploit lax PKCS#1 v1.5 padding validation"
   reviewCategory: crypto
   reviewCondition: "RSA PKCS#1 v1.5 signature verification accepts a recovered block when only its trailing digest matches"
   reviewConfidence: high

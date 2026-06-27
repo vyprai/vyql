@@ -2,7 +2,7 @@ module code;
 
 concept EcdsaNonceBitLengthTimingLeak : issue {
   cwe: [CWE_200, CWE_203, CWE_208]
-  review_assumption: "an attacker can request repeated signatures and observe timing differences correlated with nonce bit length"
+  reviewAssumption: "an attacker can request repeated signatures and observe timing differences correlated with nonce bit length"
   reviewCategory: crypto
   reviewCondition: "ECDSA signing uses a variable-bit-length nonce in scalar multiplication"
   reviewConfidence: high

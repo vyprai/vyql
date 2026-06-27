@@ -2,7 +2,7 @@ module code;
 
 concept NextcloudFileDropShareScopeBypass : issue {
   cwe: [CWE_639, CWE_863]
-  review_assumption: "an external share recipient can supply the share token and choose the file id parameter for the public metadata endpoint"
+  reviewAssumption: "an external share recipient can supply the share token and choose the file id parameter for the public metadata endpoint"
   reviewCategory: access_control
   reviewCondition: "a Nextcloud public file-drop metadata endpoint accepts a share token and requested file id without proving the id belongs under the shared folder"
   reviewConfidence: high

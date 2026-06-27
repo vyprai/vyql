@@ -2,7 +2,7 @@ module code;
 
 concept DspaceJspuiAutocompleteLabelXss : issue {
   cwe: [CWE_79]
-  review_assumption: "autocomplete suggestions may contain attacker-controlled or indexed metadata that jQuery UI renders as HTML"
+  reviewAssumption: "autocomplete suggestions may contain attacker-controlled or indexed metadata that jQuery UI renders as HTML"
   reviewCategory: xss
   reviewCondition: "JSPUI autocomplete labels escape server-provided display text before inserting it into the jQuery UI label HTML"
   reviewConfidence: high

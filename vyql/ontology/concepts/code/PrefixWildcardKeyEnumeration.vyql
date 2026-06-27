@@ -2,7 +2,7 @@ module code;
 
 concept PrefixWildcardKeyEnumeration : issue {
   cwe: [CWE_22, CWE_200]
-  review_assumption: "the requested key can be a prefix of other records that should not be included in the export or read response"
+  reviewAssumption: "the requested key can be a prefix of other records that should not be included in the export or read response"
   reviewCategory: path
   reviewCondition: "key-value store wildcard enumeration appends '*' directly to an attacker-selected key prefix"
   reviewConfidence: high

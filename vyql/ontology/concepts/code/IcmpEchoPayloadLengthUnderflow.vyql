@@ -2,7 +2,7 @@ module code;
 
 concept IcmpEchoPayloadLengthUnderflow : issue {
   cwe: [CWE_125, CWE_191]
-  review_assumption: "a peer can send a short or zero-length ICMPv6 echo reply payload that makes the size_t subtraction wrap"
+  reviewAssumption: "a peer can send a short or zero-length ICMPv6 echo reply payload that makes the size_t subtraction wrap"
   reviewCategory: memory
   reviewCondition: "ICMP echo reply handling subtracts the echo header size from the IPv6 payload length before proving the payload is large enough"
   reviewConfidence: high

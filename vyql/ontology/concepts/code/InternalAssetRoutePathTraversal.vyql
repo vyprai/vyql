@@ -2,7 +2,7 @@ module code;
 
 concept InternalAssetRoutePathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the routed path suffix can contain traversal segments that escape the intended package asset directory"
+  reviewAssumption: "the routed path suffix can contain traversal segments that escape the intended package asset directory"
   reviewCategory: path
   reviewCondition: "an internal static-asset route joins the requested suffix under a package asset directory without canonical containment"
   reviewConfidence: high

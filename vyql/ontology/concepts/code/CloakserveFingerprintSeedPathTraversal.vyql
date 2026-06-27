@@ -2,7 +2,7 @@ module code;
 
 concept CloakserveFingerprintSeedPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "an unauthenticated caller can reach the cloakserve fingerprint route and choose the seed path segment"
+  reviewAssumption: "an unauthenticated caller can reach the cloakserve fingerprint route and choose the seed path segment"
   reviewCategory: path
   reviewCondition: "cloakserve uses a request-supplied fingerprint seed as a Chrome profile directory component before validating it"
   reviewConfidence: high

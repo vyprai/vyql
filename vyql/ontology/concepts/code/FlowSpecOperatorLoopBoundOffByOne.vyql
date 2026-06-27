@@ -2,7 +2,7 @@ module code;
 
 concept FlowSpecOperatorLoopBoundOffByOne : issue {
   cwe: [CWE_193, CWE_787]
-  review_assumption: "a crafted FlowSpec component can contain enough chained operators to reach the fixed mval array limit"
+  reviewAssumption: "a crafted FlowSpec component can contain enough chained operators to reach the fixed mval array limit"
   reviewCategory: memory
   reviewCondition: "a chained FlowSpec operator decoder writes match values while allowing the loop counter to reach the fixed match-value capacity"
   reviewConfidence: high

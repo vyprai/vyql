@@ -2,7 +2,7 @@ module code;
 
 concept RubyLineAnchorValidationBypass : issue {
   cwe: [CWE_400]
-  review_assumption: "attacker-controlled input can include a newline plus trailing data"
+  reviewAssumption: "attacker-controlled input can include a newline plus trailing data"
   reviewCategory: resource
   reviewCondition: "Ruby line anchors are used for whole-string validation"
   reviewConfidence: low

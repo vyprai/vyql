@@ -2,7 +2,7 @@ module code;
 
 concept OAuthStateCookieValidationMissing : issue {
   cwe: [CWE_352, CWE_287]
-  review_assumption: "attackers can supply or replay OAuth callback state values unless the callback compares them with a value stored during login initiation"
+  reviewAssumption: "attackers can supply or replay OAuth callback state values unless the callback compares them with a value stored during login initiation"
   reviewCategory: auth
   reviewCondition: "an OAuth/SSO login flow sends a state parameter but does not bind callback state to a stored cookie/session value"
   reviewConfidence: high

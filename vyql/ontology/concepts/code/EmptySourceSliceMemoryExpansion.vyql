@@ -2,7 +2,7 @@ module code;
 
 concept EmptySourceSliceMemoryExpansion : issue {
   cwe: [CWE_400, CWE_770, CWE_789]
-  review_assumption: "callers can request a large target size while the selected source slice is empty"
+  reviewAssumption: "callers can request a large target size while the selected source slice is empty"
   reviewCategory: resource
   reviewCondition: "an empty source slice can still drive target-size memory expansion and zero-fill writes"
   reviewConfidence: high

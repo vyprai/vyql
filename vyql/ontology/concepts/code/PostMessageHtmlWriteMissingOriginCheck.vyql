@@ -2,7 +2,7 @@ module code;
 
 concept PostMessageHtmlWriteMissingOriginCheck : issue {
   cwe: [CWE_79, CWE_346]
-  review_assumption: "an attacker-controlled window can post crafted HTML to the preview frame or same handler"
+  reviewAssumption: "an attacker-controlled window can post crafted HTML to the preview frame or same handler"
   reviewCategory: xss
   reviewCondition: "a browser postMessage handler writes message data into HTML without validating the sender origin"
   reviewConfidence: high

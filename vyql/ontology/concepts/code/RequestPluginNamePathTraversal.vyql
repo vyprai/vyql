@@ -2,7 +2,7 @@ module code;
 
 concept RequestPluginNamePathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the plugin or module name is later joined under generated server or web plugin directories"
+  reviewAssumption: "the plugin or module name is later joined under generated server or web plugin directories"
   reviewCategory: path
   reviewCondition: "a request-bound plugin or module name is passed into code-generation file creation without rejecting path separators"
   reviewConfidence: high

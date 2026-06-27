@@ -2,7 +2,7 @@ module code;
 
 concept CommentUpdateMissingOwnershipConstraint : issue {
   cwe: [CWE_639, CWE_862]
-  review_assumption: "the comment id can reference another user's comment through the edit/update path"
+  reviewAssumption: "the comment id can reference another user's comment through the edit/update path"
   reviewCategory: auth
   reviewCondition: "comment update criteria select a comment by id without constraining the row to the current author or user"
   reviewConfidence: high

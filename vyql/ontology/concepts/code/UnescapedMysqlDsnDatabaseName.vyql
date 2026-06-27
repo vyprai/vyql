@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedMysqlDsnDatabaseName : issue {
   cwe: [CWE_89, CWE_20]
-  review_assumption: "the database name later becomes the path component of a MySQL DSN where query separators can alter connection parameters"
+  reviewAssumption: "the database name later becomes the path component of a MySQL DSN where query separators can alter connection parameters"
   reviewCategory: sql
   reviewCondition: "a caller-selected MySQL database name is kept in migration or connection context without URL escaping before DSN use"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept BladeRawMarkdownRenderWithoutSanitizer : issue {
   cwe: [CWE_79]
-  review_assumption: "the rendered content can be supplied by a lower-trust dashboard/editor user and viewed by another user"
+  reviewAssumption: "the rendered content can be supplied by a lower-trust dashboard/editor user and viewed by another user"
   reviewCategory: xss
   reviewCondition: "Blade templates render content-like data through Markdown in a raw echo without stripping or escaping HTML"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept FeehiUsernameStoredXss : issue {
   cwe: [CWE_79]
-  review_assumption: "stored usernames can be controlled by a user and rendered when posts are browsed"
+  reviewAssumption: "stored usernames can be controlled by a user and rendered when posts are browsed"
   reviewCategory: xss
   reviewCondition: "Feehi CMS frontend users expose stored usernames without the afterFind HTML-encoding hook"
   reviewConfidence: high

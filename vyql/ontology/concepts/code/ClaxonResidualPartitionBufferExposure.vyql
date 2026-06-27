@@ -2,7 +2,7 @@ module code;
 
 concept ClaxonResidualPartitionBufferExposure : issue {
   cwe: [CWE_908]
-  review_assumption: "a malformed FLAC bitstream can choose a partition order that leaves part of the decoded output buffer uninitialized"
+  reviewAssumption: "a malformed FLAC bitstream can choose a partition order that leaves part of the decoded output buffer uninitialized"
   reviewCategory: memory
   reviewCondition: "residual partition decoding slices the sample buffer by a bitstream-derived partition count without first proving the block size divides evenly"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept CipherWithoutIntegrityHash : issue {
   cwe: [CWE_665]
-  review_assumption: "remote packets are decrypted or processed before an integrity check rejects forged input"
+  reviewAssumption: "remote packets are decrypted or processed before an integrity check rejects forged input"
   reviewCategory: crypto
   reviewCondition: "encrypted transport configuration can enable a cipher while disabling the integrity hash or HMAC"
   reviewConfidence: high

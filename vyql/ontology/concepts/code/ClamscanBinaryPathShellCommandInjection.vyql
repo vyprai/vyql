@@ -2,7 +2,7 @@ module code;
 
 concept ClamscanBinaryPathShellCommandInjection : issue {
   cwe: [CWE_78]
-  review_assumption: "library callers can configure the scanner path and an attacker can arrange a matching filesystem entry so shell metacharacters survive the access check"
+  reviewAssumption: "library callers can configure the scanner path and an attacker can arrange a matching filesystem entry so shell metacharacters survive the access check"
   reviewCategory: command
   reviewCondition: "Clamscan verifies a configured scanner binary path by interpolating it into a shell command"
   reviewConfidence: high

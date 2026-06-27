@@ -2,7 +2,7 @@ module code;
 
 concept FlaskEntityDetailMissingAuthorization : issue {
   cwe: [CWE_862, CWE_200]
-  review_assumption: "callers can directly request the entity-detail route for another user or group"
+  reviewAssumption: "callers can directly request the entity-detail route for another user or group"
   reviewCategory: access_control
   reviewCondition: "a Flask entity-detail route returns user or group metadata without an observed authorization guard"
   reviewConfidence: high

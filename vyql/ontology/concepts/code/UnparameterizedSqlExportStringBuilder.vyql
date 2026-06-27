@@ -2,7 +2,7 @@ module code;
 
 concept UnparameterizedSqlExportStringBuilder : issue {
   cwe: [CWE_89]
-  review_assumption: "exported metric names, keys, process names, or values can contain attacker-controlled SQL metacharacters"
+  reviewAssumption: "exported metric names, keys, process names, or values can contain attacker-controlled SQL metacharacters"
   reviewCategory: sql
   reviewCondition: "database export code assembles CREATE or INSERT statements from runtime table, column, or value lists and executes them without parameterization"
   reviewConfidence: high

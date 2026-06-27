@@ -2,7 +2,7 @@ module code;
 
 concept AjaxBackslashProtocolRelativeUrlXss : issue {
   cwe: [CWE_79]
-  review_assumption: "attacker-controlled links or hashes can supply a /\\ host-prefixed URL whose response is inserted into the page"
+  reviewAssumption: "attacker-controlled links or hashes can supply a /\\ host-prefixed URL whose response is inserted into the page"
   reviewCategory: xss
   reviewCondition: "AJAX URL validation blocks ordinary protocol-relative URLs but misses browser-normalized backslash variants"
   reviewConfidence: high

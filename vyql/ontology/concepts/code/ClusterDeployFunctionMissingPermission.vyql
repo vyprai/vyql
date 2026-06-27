@@ -2,7 +2,7 @@ module code;
 
 concept ClusterDeployFunctionMissingPermission : issue {
   cwe: [CWE_862, CWE_863, CWE_269]
-  review_assumption: "remote users can execute the function through the cluster function service using lower privileges than required for code deployment"
+  reviewAssumption: "remote users can execute the function through the cluster function service using lower privileges than required for code deployment"
   reviewCategory: access_control
   reviewCondition: "a cluster function can deploy uploaded code without declaring a privileged execution permission"
   reviewConfidence: high

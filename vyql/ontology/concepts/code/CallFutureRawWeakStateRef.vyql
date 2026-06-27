@@ -2,7 +2,7 @@ module code;
 
 concept CallFutureRawWeakStateRef : issue {
   cwe: [CWE_401, CWE_400]
-  review_assumption: "repeated polling before completion can allocate additional weak references that no callback consumes"
+  reviewAssumption: "repeated polling before completion can allocate additional weak references that no callback consumes"
   reviewCategory: resource
   reviewCondition: "a raw weak reference to call future state should only be created when the IC call callback is registered"
   reviewConfidence: medium

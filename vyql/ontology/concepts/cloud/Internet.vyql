@@ -1,7 +1,7 @@
 module cloud;
 
 concept Internet : exposure {
-  context_reach_label: "internet-reachable"
-  context_reach_source: true
-  context_reach_target_prop: service
+  contextReachLabel: "internet-reachable"
+  contextReachSource: true
+  contextReachTargetProp: service
 }

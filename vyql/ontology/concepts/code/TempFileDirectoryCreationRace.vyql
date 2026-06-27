@@ -2,7 +2,7 @@ module code;
 
 concept TempFileDirectoryCreationRace : issue {
   cwe: [CWE_377, CWE_367, CWE_59]
-  review_assumption: "an attacker with access to the temporary parent directory can race the delete/mkdir window or substitute a link/path before the directory is recreated"
+  reviewAssumption: "an attacker with access to the temporary parent directory can race the delete/mkdir window or substitute a link/path before the directory is recreated"
   reviewCategory: path
   reviewCondition: "a temporary directory is created by first creating a temporary file, deleting it, and then calling mkdir"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept StoredHtmlWrite : issue {
   cwe: [CWE_79]
-  review_assumption: "the stored value is later rendered as HTML in the application UI"
+  reviewAssumption: "the stored value is later rendered as HTML in the application UI"
   reviewCategory: xss
   reviewCondition: "stored HTML is written without a proven sanitizer before later rendering"
   reviewConfidence: medium

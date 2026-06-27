@@ -2,7 +2,7 @@ module code;
 
 concept TokenCacheAuthorizationBypass : issue {
   cwe: [CWE_862, CWE_863]
-  review_assumption: "cached tokens may correspond to users, groups, scopes, or audiences that the current authenticated caller is not authorized to obtain"
+  reviewAssumption: "cached tokens may correspond to users, groups, scopes, or audiences that the current authenticated caller is not authorized to obtain"
   reviewCategory: auth
   reviewCondition: "a token endpoint returns cached access or refresh tokens before performing the requester's authorization check"
   reviewConfidence: high

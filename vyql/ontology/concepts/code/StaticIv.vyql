@@ -2,7 +2,7 @@ module code;
 
 concept StaticIv : issue {
   cwe: [CWE_329]
-  review_assumption: "the mode requires nonce/IV uniqueness for confidentiality or integrity"
+  reviewAssumption: "the mode requires nonce/IV uniqueness for confidentiality or integrity"
   reviewCategory: crypto
   reviewCondition: "cipher operation uses a static or predictable IV/nonce"
   reviewConfidence: low

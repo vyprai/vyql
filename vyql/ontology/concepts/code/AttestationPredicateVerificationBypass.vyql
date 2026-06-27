@@ -2,7 +2,7 @@ module code;
 
 concept AttestationPredicateVerificationBypass : issue {
   cwe: [CWE_347]
-  review_assumption: "callers rely on the requested predicate type or policy match to decide whether the printed attestation is acceptable"
+  reviewAssumption: "callers rely on the requested predicate type or policy match to decide whether the printed attestation is acceptable"
   reviewCategory: crypto
   reviewCondition: "signature-verified attestations are emitted after predicate filtering without requiring a non-empty predicate-matched subset"
   reviewConfidence: high

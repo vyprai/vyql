@@ -2,7 +2,7 @@ module code;
 
 concept SvgOnclickWindowOpenLinkXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the link value can be configured or requested by a lower-trust user and the generated SVG is rendered by a browser"
+  reviewAssumption: "the link value can be configured or requested by a lower-trust user and the generated SVG is rendered by a browser"
   reviewCategory: xss
   reviewCondition: "SVG response builder concatenates a dynamic link into an onclick window.open JavaScript string"
   reviewConfidence: high

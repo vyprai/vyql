@@ -2,7 +2,7 @@ module code;
 
 concept OwnerFieldClear : issue {
   cwe: [CWE_401]
-  review_assumption: "the cleared field owns nested allocation state that the owner release would otherwise free"
+  reviewAssumption: "the cleared field owns nested allocation state that the owner release would otherwise free"
   reviewCategory: resource
   reviewCondition: "an owned field is cleared before the owning object is released"
   reviewConfidence: low

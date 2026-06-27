@@ -2,7 +2,7 @@ module code;
 
 concept UnfilteredAgentCommandTag : issue {
   cwe: [CWE_94]
-  review_assumption: "model output or imported content can contain command tags that later drive agent/tool execution or unsafe preview behavior"
+  reviewAssumption: "model output or imported content can contain command tags that later drive agent/tool execution or unsafe preview behavior"
   reviewCategory: code_execution
   reviewCondition: "AI/agent command tags are not included in the custom-tag parser allowlist and can fall through to rendered markdown or output"
   reviewConfidence: high

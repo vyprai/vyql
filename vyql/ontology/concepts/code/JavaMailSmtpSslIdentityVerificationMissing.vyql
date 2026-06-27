@@ -2,7 +2,7 @@ module code;
 
 concept JavaMailSmtpSslIdentityVerificationMissing : issue {
   cwe: [CWE_295]
-  review_assumption: "SMTP credentials or message content rely on TLS hostname verification against a server that may be intercepted"
+  reviewAssumption: "SMTP credentials or message content rely on TLS hostname verification against a server that may be intercepted"
   reviewCategory: crypto
   reviewCondition: "JavaMail SMTP SSL/TLS is configured without enabling server identity verification"
   reviewConfidence: high

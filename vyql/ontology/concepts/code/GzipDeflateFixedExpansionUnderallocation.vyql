@@ -2,7 +2,7 @@ module code;
 
 concept GzipDeflateFixedExpansionUnderallocation : issue {
   cwe: [CWE_119, CWE_787]
-  review_assumption: "some inputs can expand by more than the fixed slack under the deflate worst-case expansion bound"
+  reviewAssumption: "some inputs can expand by more than the fixed slack under the deflate worst-case expansion bound"
   reviewCategory: memory
   reviewCondition: "a gzip or deflate output buffer is sized as input length plus a fixed constant"
   reviewConfidence: high

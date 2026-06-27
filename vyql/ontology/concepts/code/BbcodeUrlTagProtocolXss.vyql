@@ -2,7 +2,7 @@ module code;
 
 concept BbcodeUrlTagProtocolXss : issue {
   cwe: [CWE_79]
-  review_assumption: "attacker-controlled markup content can contain javascript:, data:, or other browser-interpreted URL schemes"
+  reviewAssumption: "attacker-controlled markup content can contain javascript:, data:, or other browser-interpreted URL schemes"
   reviewCategory: xss
   reviewCondition: "BBCode or UBB URL/image tags render href/src attributes without a safe protocol allowlist"
   reviewConfidence: high

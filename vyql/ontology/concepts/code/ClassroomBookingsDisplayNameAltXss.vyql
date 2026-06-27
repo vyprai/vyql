@@ -2,7 +2,7 @@ module code;
 
 concept ClassroomBookingsDisplayNameAltXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the global menu label can contain an attacker-controlled stored display name"
+  reviewAssumption: "the global menu label can contain an attacker-controlled stored display name"
   reviewCategory: xss
   reviewCondition: "classroombookings renders a user display name into an image alt attribute string without attribute escaping"
   reviewConfidence: high

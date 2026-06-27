@@ -2,7 +2,7 @@ module code;
 
 concept LocalFileUrlNavigation : issue {
   cwe: [CWE_22]
-  review_assumption: "the request URL can use the file:// protocol and the rendered output is returned to the caller"
+  reviewAssumption: "the request URL can use the file:// protocol and the rendered output is returned to the caller"
   reviewCategory: path
   reviewCondition: "caller-controlled file URLs can be navigated by a headless browser and expose local file contents"
   reviewConfidence: medium

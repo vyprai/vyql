@@ -2,7 +2,7 @@ module code;
 
 concept CompassCsfleEjsonParserMissingStrictMode : issue {
   cwe: [CWE_94, CWE_20]
-  review_assumption: "connection form encrypted field configuration text can be supplied by a user or imported connection data and reaches the parser"
+  reviewAssumption: "connection form encrypted field configuration text can be supplied by a user or imported connection data and reaches the parser"
   reviewCategory: injection
   reviewCondition: "MongoDB Compass CSFLE connection handling parses user-supplied EJSON with the shell/query parser instead of strict EJSON mode"
   reviewConfidence: high

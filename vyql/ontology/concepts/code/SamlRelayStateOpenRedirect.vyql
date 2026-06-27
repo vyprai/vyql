@@ -2,7 +2,7 @@ module code;
 
 concept SamlRelayStateOpenRedirect : issue {
   cwe: [CWE_601]
-  review_assumption: "IdP-initiated SSO or a crafted SAML flow can provide RelayState and cause an authenticated browser redirect"
+  reviewAssumption: "IdP-initiated SSO or a crafted SAML flow can provide RelayState and cause an authenticated browser redirect"
   reviewCategory: request_forgery
   reviewCondition: "SAML RelayState is accepted as a post-login redirect URL without a safe-url allowlist"
   reviewConfidence: high

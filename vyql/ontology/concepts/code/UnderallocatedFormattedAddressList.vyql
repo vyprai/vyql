@@ -2,7 +2,7 @@ module code;
 
 concept UnderallocatedFormattedAddressList : issue {
   cwe: [CWE_787]
-  review_assumption: "the address count can be influenced by a malformed network option"
+  reviewAssumption: "the address count can be influenced by a malformed network option"
   reviewCategory: memory
   reviewCondition: "a formatted address-list buffer allocation is smaller than the bytes subsequently written"
   reviewConfidence: medium

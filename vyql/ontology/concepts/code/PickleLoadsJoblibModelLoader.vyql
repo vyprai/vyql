@@ -2,7 +2,7 @@ module code;
 
 concept PickleLoadsJoblibModelLoader : issue {
   cwe: [CWE_502]
-  review_assumption: "the model file path or artifact can be supplied from an untrusted or semi-trusted source"
+  reviewAssumption: "the model file path or artifact can be supplied from an untrusted or semi-trusted source"
   reviewCategory: deserialization
   reviewCondition: "a model-loading helper feeds data from joblib.load into pickle.loads without a restricted unpickler"
   reviewConfidence: high

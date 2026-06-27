@@ -2,7 +2,7 @@ module code;
 
 concept CallerControlledFilenameComponentPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the returned filename is later joined under a storage directory or used for persisted XML/report files"
+  reviewAssumption: "the returned filename is later joined under a storage directory or used for persisted XML/report files"
   reviewCategory: path
   reviewCondition: "a filename builder returns caller-controlled name or version components without component encoding"
   reviewConfidence: high

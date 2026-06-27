@@ -2,7 +2,7 @@ module code;
 
 concept PublicUploadChunkPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "unauthenticated or public upload callers can supply checksum values containing traversal components"
+  reviewAssumption: "unauthenticated or public upload callers can supply checksum values containing traversal components"
   reviewCategory: path
   reviewCondition: "public chunk-upload handlers join a request checksum into a temporary file path before writes without sanitization or canonical containment"
   reviewConfidence: high

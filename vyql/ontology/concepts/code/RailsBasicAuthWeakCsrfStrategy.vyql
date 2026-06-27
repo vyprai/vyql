@@ -2,7 +2,7 @@ module code;
 
 concept RailsBasicAuthWeakCsrfStrategy : issue {
   cwe: [CWE_352]
-  review_assumption: "the controller authenticates browser-reachable non-session requests where null-session fallback would not fail closed"
+  reviewAssumption: "the controller authenticates browser-reachable non-session requests where null-session fallback would not fail closed"
   reviewCategory: csrf
   reviewCondition: "Rails controller uses HTTP Basic authentication with protect_from_forgery but does not force exception strategy"
   reviewConfidence: high

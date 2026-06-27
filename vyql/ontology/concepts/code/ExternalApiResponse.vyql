@@ -1,6 +1,6 @@
 module code;
 
 concept ExternalApiResponse : source {
-  coverage_reserved_source: true
+  coverageReservedSource: true
   taint: [taint.UntrustedData]
 }

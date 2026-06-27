@@ -2,7 +2,7 @@ module code;
 
 concept PointerFree : issue {
   cwe: [CWE_416, CWE_415]
-  review_assumption: "the same allocation or alias is involved and remains attacker-reachable"
+  reviewAssumption: "the same allocation or alias is involved and remains attacker-reachable"
   reviewCategory: memory
   reviewCondition: "a pointer is released and may be released or used again later"
   reviewConfidence: low

@@ -2,7 +2,7 @@ module code;
 
 concept PhpWindowOpenerCallbackNameXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the file-browser endpoint is reachable by an authenticated user and the callback name parameter can contain JavaScript metacharacters"
+  reviewAssumption: "the file-browser endpoint is reachable by an authenticated user and the callback name parameter can contain JavaScript metacharacters"
   reviewCategory: xss
   reviewCondition: "PHP file-browser callback name from request data is emitted into a window.opener JavaScript property access"
   reviewConfidence: high

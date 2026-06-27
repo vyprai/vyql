@@ -2,7 +2,7 @@ module code;
 
 concept EmmettUnhandledCookieParseException : issue {
   cwe: [CWE_248, CWE_400]
-  review_assumption: "an unauthenticated remote client can send malformed Cookie headers and trigger the request cookies property"
+  reviewAssumption: "an unauthenticated remote client can send malformed Cookie headers and trigger the request cookies property"
   reviewCategory: resource
   reviewCondition: "Emmett request cookie parsing lets malformed Cookie headers raise an unhandled exception"
   reviewConfidence: high

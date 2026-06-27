@@ -2,7 +2,7 @@ module code;
 
 concept InternalServiceUrlPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the downstream service interprets URL path segments after percent-decoding and exposes privileged internal routes or objects"
+  reviewAssumption: "the downstream service interprets URL path segments after percent-decoding and exposes privileged internal routes or objects"
   reviewCategory: path
   reviewCondition: "a caller-controlled path segment is joined into an internal service base URL without decoded traversal validation"
   reviewConfidence: high

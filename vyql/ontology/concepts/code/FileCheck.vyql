@@ -2,7 +2,7 @@ module code;
 
 concept FileCheck : issue {
   cwe: [CWE_367]
-  review_assumption: "an attacker can change the path target between check and use"
+  reviewAssumption: "an attacker can change the path target between check and use"
   reviewCategory: race
   reviewCondition: "filesystem state is checked before a later use"
   reviewConfidence: medium

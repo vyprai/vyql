@@ -2,7 +2,7 @@ module code;
 
 concept SnsCertificateUrlTrustBypass : issue {
   cwe: [CWE_295, CWE_918]
-  review_assumption: "an attacker can provide a signed SNS/SES notification whose SigningCertURL points at an attacker-controlled matching cloud hostname"
+  reviewAssumption: "an attacker can provide a signed SNS/SES notification whose SigningCertURL points at an attacker-controlled matching cloud hostname"
   reviewCategory: crypto
   reviewCondition: "SNS/SES message verification accepts a broad certificate URL host suffix before downloading and trusting the certificate"
   reviewConfidence: high

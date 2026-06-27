@@ -2,7 +2,7 @@ module code;
 
 concept CinnyServiceWorkerMediaAuthLeak : issue {
   cwe: [CWE_20, CWE_200, CWE_522]
-  review_assumption: "an attacker-controlled media URL can contain Matrix media path fragments while targeting a non-homeserver origin"
+  reviewAssumption: "an attacker-controlled media URL can contain Matrix media path fragments while targeting a non-homeserver origin"
   reviewCategory: secret
   reviewCondition: "service-worker media fetch authorization is selected by substring path checks before a bearer token is attached"
   reviewConfidence: high

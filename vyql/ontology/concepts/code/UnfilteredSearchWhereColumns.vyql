@@ -2,7 +2,7 @@ module code;
 
 concept UnfilteredSearchWhereColumns : issue {
   cwe: [CWE_89, CWE_287]
-  review_assumption: "unauthenticated API callers can include both allowed and disallowed search keys"
+  reviewAssumption: "unauthenticated API callers can include both allowed and disallowed search keys"
   reviewCategory: sql
   reviewCondition: "request-derived search keys are only partially checked before the full search array reaches a query where()"
   reviewConfidence: medium

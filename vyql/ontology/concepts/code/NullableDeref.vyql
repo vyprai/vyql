@@ -2,7 +2,7 @@ module code;
 
 concept NullableDeref : issue {
   cwe: [CWE_476]
-  review_assumption: "the dereferenced value may be null on an attacker-triggerable path"
+  reviewAssumption: "the dereferenced value may be null on an attacker-triggerable path"
   reviewCategory: memory
   reviewCondition: "a pointer-like value is dereferenced without an observed null exclusion"
   reviewConfidence: low

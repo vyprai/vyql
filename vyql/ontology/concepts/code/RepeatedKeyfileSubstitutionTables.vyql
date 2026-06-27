@@ -2,7 +2,7 @@ module code;
 
 concept RepeatedKeyfileSubstitutionTables : issue {
   cwe: [CWE_327, CWE_326]
-  review_assumption: "an attacker with known plaintext or ciphertext samples can exploit repeated substitution-table order for frequency analysis or key recovery"
+  reviewAssumption: "an attacker with known plaintext or ciphertext samples can exploit repeated substitution-table order for frequency analysis or key recovery"
   reviewCategory: crypto
   reviewCondition: "keyfile-driven substitution-table generation repeats the same table schedule or table order across encryption rounds"
   reviewConfidence: high

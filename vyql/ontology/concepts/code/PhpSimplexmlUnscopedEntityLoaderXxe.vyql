@@ -2,7 +2,7 @@ module code;
 
 concept PhpSimplexmlUnscopedEntityLoaderXxe : issue {
   cwe: [CWE_611]
-  review_assumption: "the XML string can be influenced by file metadata, request, or integration input and safe parsing depends on scoped libxml entity-loader state"
+  reviewAssumption: "the XML string can be influenced by file metadata, request, or integration input and safe parsing depends on scoped libxml entity-loader state"
   reviewCategory: xml
   reviewCondition: "PHP code toggles the libxml entity loader around SimpleXML parsing without restoring the previous loader state"
   reviewConfidence: medium

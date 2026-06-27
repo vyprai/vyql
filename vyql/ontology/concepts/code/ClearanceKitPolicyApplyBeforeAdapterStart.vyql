@@ -2,7 +2,7 @@ module code;
 
 concept ClearanceKitPolicyApplyBeforeAdapterStart : issue {
   cwe: [CWE_269]
-  review_assumption: "managed or user-defined rules can be absent from the active interactor until a later XPC policy mutation"
+  reviewAssumption: "managed or user-defined rules can be absent from the active interactor until a later XPC policy mutation"
   reviewCategory: auth
   reviewCondition: "file-access policy rules are applied before the EndpointSecurity adapter has created its client"
   reviewConfidence: high

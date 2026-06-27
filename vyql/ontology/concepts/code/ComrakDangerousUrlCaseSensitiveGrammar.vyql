@@ -2,7 +2,7 @@ module code;
 
 concept ComrakDangerousUrlCaseSensitiveGrammar : issue {
   cwe: [CWE_79, CWE_178]
-  review_assumption: "rendered Markdown links can carry mixed-case unsafe schemes such as Data: or Javascript: into HTML output"
+  reviewAssumption: "rendered Markdown links can carry mixed-case unsafe schemes such as Data: or Javascript: into HTML output"
   reviewCategory: xss
   reviewCondition: "Comrak dangerous URL scheme grammar matches unsafe schemes case-sensitively"
   reviewConfidence: high

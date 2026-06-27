@@ -2,7 +2,7 @@ module code;
 
 concept ShopwareStoreApiManyToManyCriteriaBypass : issue {
   cwe: [CWE_284]
-  review_assumption: "extensions can define ManyToMany associations whose target entity exposes non-ApiAware fields through Store API criteria"
+  reviewAssumption: "extensions can define ManyToMany associations whose target entity exposes non-ApiAware fields through Store API criteria"
   reviewCategory: access_control
   reviewCondition: "Shopware Store API criteria processing walks requested associations without applying ApiAware protections to ManyToMany target definitions"
   reviewConfidence: high

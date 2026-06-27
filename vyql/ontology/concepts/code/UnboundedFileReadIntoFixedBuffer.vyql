@@ -2,7 +2,7 @@ module code;
 
 concept UnboundedFileReadIntoFixedBuffer : issue {
   cwe: [CWE_787, CWE_121]
-  review_assumption: "the file content can contain more bytes than the fixed buffer capacity before termination is reached"
+  reviewAssumption: "the file content can contain more bytes than the fixed buffer capacity before termination is reached"
   reviewCategory: memory
   reviewCondition: "a repeated file read writes into a fixed-size stack buffer through an unbounded index"
   reviewConfidence: high

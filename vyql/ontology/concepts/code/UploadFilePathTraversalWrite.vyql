@@ -2,7 +2,7 @@ module code;
 
 concept UploadFilePathTraversalWrite : issue {
   cwe: [CWE_22]
-  review_assumption: "the upload endpoint exposes the full file path or object key to clients"
+  reviewAssumption: "the upload endpoint exposes the full file path or object key to clients"
   reviewCategory: path
   reviewCondition: "file upload storage accepts caller-controlled object paths without rejecting traversal segments"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept CryptoMissingOptimizationBarrier : issue {
   cwe: [CWE_200, CWE_203, CWE_208, CWE_733]
-  review_assumption: "compiler optimization can introduce data-dependent branches that are observable across repeated scalar operations"
+  reviewAssumption: "compiler optimization can introduce data-dependent branches that are observable across repeated scalar operations"
   reviewCategory: crypto
   reviewCondition: "secret-dependent mask arithmetic in constant-time scalar code lacks an optimization barrier"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept RegexLineCommentStripWithoutCharWhitelist : issue {
   cwe: [CWE_20]
-  review_assumption: "the parsed source text can contain alternate control or line-separator characters that the regex and grammar treat inconsistently"
+  reviewAssumption: "the parsed source text can contain alternate control or line-separator characters that the regex and grammar treat inconsistently"
   reviewCategory: input_validation
   reviewCondition: "parser input is comment-stripped with a line-anchor regex before enforcing the parser's accepted character and newline alphabet"
   reviewConfidence: high

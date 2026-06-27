@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedHtmlOptionRenderer : issue {
   cwe: [CWE_79]
-  review_assumption: "the rendered option label can contain stored or attacker-provided text"
+  reviewAssumption: "the rendered option label can contain stored or attacker-provided text"
   reviewCategory: xss
   reviewCondition: "a frontend option renderer returns HTML containing model fields without escaping"
   reviewConfidence: medium

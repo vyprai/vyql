@@ -2,7 +2,7 @@ module code;
 
 concept CowAgentMemoryFilenameTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the memory content API can pass remote filename payload values to this resolver"
+  reviewAssumption: "the memory content API can pass remote filename payload values to this resolver"
   reviewCategory: path
   reviewCondition: "memory content filenames are joined under workspace directories without canonical containment"
   reviewConfidence: high

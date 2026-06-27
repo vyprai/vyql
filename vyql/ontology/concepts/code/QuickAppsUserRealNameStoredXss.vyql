@@ -2,7 +2,7 @@ module code;
 
 concept QuickAppsUserRealNameStoredXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the stored name field can be controlled by a user and rendered in admin or comment templates"
+  reviewAssumption: "the stored name field can be controlled by a user and rendered in admin or comment templates"
   reviewCategory: xss
   reviewCondition: "QuickApps CMS exposes a stored user real-name property without the escaping Cake entity accessor"
   reviewConfidence: high

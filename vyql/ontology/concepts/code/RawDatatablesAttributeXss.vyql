@@ -2,7 +2,7 @@ module code;
 
 concept RawDatatablesAttributeXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the DataTables response is rendered into the browser as HTML, so attribute-breaking markup in stored model fields can execute script"
+  reviewAssumption: "the DataTables response is rendered into the browser as HTML, so attribute-breaking markup in stored model fields can execute script"
   reviewCategory: xss
   reviewCondition: "server-side DataTables raw columns insert model fields into HTML attributes without escaping"
   reviewConfidence: high

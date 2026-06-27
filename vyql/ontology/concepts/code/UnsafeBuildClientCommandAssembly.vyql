@@ -2,7 +2,7 @@ module code;
 
 concept UnsafeBuildClientCommandAssembly : issue {
   cwe: [CWE_78]
-  review_assumption: "the build request can control filename, server address, or server port values"
+  reviewAssumption: "the build request can control filename, server address, or server port values"
   reviewCategory: command
   reviewCondition: "client build command text includes caller-controlled build fields before shell execution"
   reviewConfidence: high

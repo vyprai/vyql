@@ -2,7 +2,7 @@ module code;
 
 concept PathMatcherNormalizationOrderBypass : issue {
   cwe: [CWE_601, CWE_22]
-  review_assumption: "a crafted request path can use dot segments or trailing platform-ignored characters to bypass routing or redirect matchers"
+  reviewAssumption: "a crafted request path can use dot segments or trailing platform-ignored characters to bypass routing or redirect matchers"
   reviewCategory: request_forgery
   reviewCondition: "security path matching trims platform-ignored suffixes before canonical path cleaning"
   reviewConfidence: medium

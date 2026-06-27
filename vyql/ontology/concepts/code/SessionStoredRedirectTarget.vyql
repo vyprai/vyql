@@ -2,7 +2,7 @@ module code;
 
 concept SessionStoredRedirectTarget : issue {
   cwe: [CWE_601]
-  review_assumption: "the pre-authentication session redirect value can be influenced by an attacker-controlled request flow"
+  reviewAssumption: "the pre-authentication session redirect value can be influenced by an attacker-controlled request flow"
   reviewCategory: request_forgery
   reviewCondition: "login success handling returns a session-stored redirect URL without a same-origin or relative-URL check"
   reviewConfidence: medium

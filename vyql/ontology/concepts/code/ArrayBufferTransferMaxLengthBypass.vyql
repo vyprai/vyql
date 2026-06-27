@@ -2,7 +2,7 @@ module code;
 
 concept ArrayBufferTransferMaxLengthBypass : issue {
   cwe: [CWE_20, CWE_787, CWE_789]
-  review_assumption: "callers can request a transfer length larger than the resizable ArrayBuffer maximum"
+  reviewAssumption: "callers can request a transfer length larger than the resizable ArrayBuffer maximum"
   reviewCategory: memory
   reviewCondition: "ArrayBuffer transfer allocates a caller-selected new length with a resizable-buffer max length but without rejecting lengths above the max"
   reviewConfidence: high

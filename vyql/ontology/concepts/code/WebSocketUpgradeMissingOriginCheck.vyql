@@ -2,7 +2,7 @@ module code;
 
 concept WebSocketUpgradeMissingOriginCheck : issue {
   cwe: [CWE_352, CWE_346]
-  review_assumption: "the WebSocket endpoint is reachable from browsers and performs privileged HMR or application actions after the upgrade"
+  reviewAssumption: "the WebSocket endpoint is reachable from browsers and performs privileged HMR or application actions after the upgrade"
   reviewCategory: request
   reviewCondition: "a browser-reachable WebSocket upgrade path validates path/protocol headers but not the Origin header"
   reviewConfidence: high

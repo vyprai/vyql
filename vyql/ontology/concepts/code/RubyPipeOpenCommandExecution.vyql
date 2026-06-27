@@ -3,7 +3,7 @@ module code;
 concept RubyPipeOpenCommandExecution : sink {
   cwe: [CWE_78]
   enabledBy: [taint.UntrustedData]
-  review_assumption: "the path can begin with a pipe character and reach Ruby's process-opening behavior"
+  reviewAssumption: "the path can begin with a pipe character and reach Ruby's process-opening behavior"
   reviewCategory: command
   reviewCondition: "caller-controlled Ruby open path can select process execution with a pipe prefix"
   reviewConfidence: high

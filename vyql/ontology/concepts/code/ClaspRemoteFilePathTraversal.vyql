@@ -2,7 +2,7 @@ module code;
 
 concept ClaspRemoteFilePathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "a malicious or compromised Apps Script project can provide filenames containing traversal components"
+  reviewAssumption: "a malicious or compromised Apps Script project can provide filenames containing traversal components"
   reviewCategory: path
   reviewCondition: "remote Apps Script filenames are resolved into local project paths without a containment check"
   reviewConfidence: high

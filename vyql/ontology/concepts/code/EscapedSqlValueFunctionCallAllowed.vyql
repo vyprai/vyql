@@ -2,7 +2,7 @@ module code;
 
 concept EscapedSqlValueFunctionCallAllowed : issue {
   cwe: [CWE_89]
-  review_assumption: "application callers can pass array-shaped values into the condition builder while expecting escaped or parameterized value handling"
+  reviewAssumption: "application callers can pass array-shaped values into the condition builder while expecting escaped or parameterized value handling"
   reviewCategory: sql
   reviewCondition: "a SQL condition builder treats array-backed values as database function calls while escaped-value mode is still allowed"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept PackageVersionSpecifierValidationReview : issue {
   cwe: [CWE_20, CWE_94]
-  review_assumption: "project metadata or action inputs can influence the dependency specifier passed to the package installer"
+  reviewAssumption: "project metadata or action inputs can influence the dependency specifier passed to the package installer"
   reviewCategory: supply_chain
   reviewCondition: "package version specifier validation accepts arbitrary trailing dependency syntax"
   reviewConfidence: medium

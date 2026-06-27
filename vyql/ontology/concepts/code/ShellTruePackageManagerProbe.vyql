@@ -2,7 +2,7 @@ module code;
 
 concept ShellTruePackageManagerProbe : issue {
   cwe: [CWE_78]
-  review_assumption: "package-manager, flag, or package-name values should remain argv-separated so shell metacharacters cannot alter command execution"
+  reviewAssumption: "package-manager, flag, or package-name values should remain argv-separated so shell metacharacters cannot alter command execution"
   reviewCategory: command
   reviewCondition: "package-manager availability probe formats command text and executes it through shell=True"
   reviewConfidence: high

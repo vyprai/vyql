@@ -2,7 +2,7 @@ module code;
 
 concept ParsedUserIdDefaultRootPrivilegeEscalation : issue {
   cwe: [CWE_269]
-  review_assumption: "the zero-initialized user structure represents root or another higher-privilege default when a caller supplies a non-root UID"
+  reviewAssumption: "the zero-initialized user structure represents root or another higher-privilege default when a caller supplies a non-root UID"
   reviewCategory: auth
   reviewCondition: "numeric user identity parsing can return a zero-initialized root UID/GID object before assigning the parsed UID"
   reviewConfidence: high

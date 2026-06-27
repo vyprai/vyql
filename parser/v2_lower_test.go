@@ -2281,17 +2281,23 @@ binding dominatingHardening {
     covers dominates { from: call to: candidate }
   }
 }
+binding releasingHardening {
+  query pattern callExpr where callee.method == "close"
+  emit check core.ResourceRelease at call {
+    covers postDominates { from: call to: candidate }
+  }
+}
 `)
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	adapter := decls[0].(*BindingSet)
-	if len(adapter.Mappings) != 4 {
-		t.Fatalf("adapter mappings = %d, want 4: %+v", len(adapter.Mappings), adapter)
+	if len(adapter.Mappings) != 5 {
+		t.Fatalf("adapter mappings = %d, want 5: %+v", len(adapter.Mappings), adapter)
 	}
-	want := map[string]bool{"endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true}
+	want := map[string]bool{"endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true}
 	for _, got := range adapter.Mappings {
-		if got.Kind != "control_method" || got.Pattern != "setFeature" || got.Concept != "core.XmlHardening" {
+		if got.Kind != "control_method" {
 			t.Fatalf("coverage check lowering wrong: %+v", got)
 		}
 		if !want[got.Coverage] {
@@ -2311,8 +2317,22 @@ binding dominatingHardening {
 				t.Fatalf("sameScope coverage detail = %#v, want anchor call.scope", got.CoverageDetail)
 			}
 		case "dominates":
+			if got.Pattern != "setFeature" || got.Concept != "core.XmlHardening" {
+				t.Fatalf("dominates coverage check lowering wrong: %+v", got)
+			}
 			if got.CoverageDetail["from"] != "call" || got.CoverageDetail["to"] != "candidate" {
 				t.Fatalf("dominates coverage detail = %#v, want from call/to candidate", got.CoverageDetail)
+			}
+		case "postDominates":
+			if got.Pattern != "close" || got.Concept != "core.ResourceRelease" {
+				t.Fatalf("postDominates coverage check lowering wrong: %+v", got)
+			}
+			if got.CoverageDetail["from"] != "call" || got.CoverageDetail["to"] != "candidate" {
+				t.Fatalf("postDominates coverage detail = %#v, want from call/to candidate", got.CoverageDetail)
+			}
+		default:
+			if got.Pattern != "setFeature" || got.Concept != "core.XmlHardening" {
+				t.Fatalf("%s coverage check lowering wrong: %+v", got.Coverage, got)
 			}
 		}
 		delete(want, got.Coverage)
@@ -2473,6 +2493,7 @@ module code;
 concept SqlExecution : sink {
   vulnerableTo: [injection.SqlInjection]
   reviewCondition: "inspect query construction"
+  reviewAssumption: "query text can be attacker controlled"
 }
 `)
 	c := decls[0].(*ConceptDecl)
@@ -2481,6 +2502,9 @@ concept SqlExecution : sink {
 	}
 	if c.Fields["review_condition"] != "inspect query construction" {
 		t.Fatalf("reviewCondition did not lower: %+v", c.Fields)
+	}
+	if c.Fields["review_assumption"] != "query text can be attacker controlled" {
+		t.Fatalf("reviewAssumption did not lower: %+v", c.Fields)
 	}
 }
 

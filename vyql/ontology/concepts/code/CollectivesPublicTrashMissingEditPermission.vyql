@@ -2,7 +2,7 @@ module code;
 
 concept CollectivesPublicTrashMissingEditPermission : issue {
   cwe: [CWE_284]
-  review_assumption: "view-only public collective shares can reach the public page trash index endpoint"
+  reviewAssumption: "view-only public collective shares can reach the public page trash index endpoint"
   reviewCategory: access_control
   reviewCondition: "Nextcloud Collectives public trash listing exposes deleted pages for a shared collective without requiring edit permission"
   reviewConfidence: high

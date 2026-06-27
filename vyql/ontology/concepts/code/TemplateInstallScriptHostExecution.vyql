@@ -2,7 +2,7 @@ module code;
 
 concept TemplateInstallScriptHostExecution : issue {
   cwe: [CWE_78, CWE_269]
-  review_assumption: "a lower-privileged template author can define or update install scripts that run on cluster nodes"
+  reviewAssumption: "a lower-privileged template author can define or update install scripts that run on cluster nodes"
   reviewCategory: command
   reviewCondition: "template-defined install scripts execute on the host shell instead of an isolated runtime"
   reviewConfidence: medium

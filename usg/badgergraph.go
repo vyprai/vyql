@@ -232,7 +232,7 @@ func (g *BadgerGraph) flushDet() {
 func detKey(i int32) []byte {
 	b := make([]byte, 6)
 	b[0], b[1] = 'g', 'n'
-	binary.LittleEndian.PutUint32(b[2:], uint32(i))
+	binary.BigEndian.PutUint32(b[2:], uint32(i))
 	return b
 }
 
@@ -440,16 +440,28 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 		return fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
 			Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props})
 	}
-	// in-RAM (unflushed) detail first — the only detail at all when unbounded (no ceiling).
-	for idx, b := range g.detBuf {
-		if !emit(idx, b) {
-			return
-		}
-	}
 	if len(g.detBuf) == len(g.ids) { // everything resident → no badger scan needed
+		for idx := range g.ids {
+			i := int32(idx)
+			if !emit(i, g.detBuf[i]) {
+				return
+			}
+		}
 		return
 	}
-	// spilled detail: one sequential prefix scan, skipping any index also held in RAM.
+	nextResidentScan := int32(0)
+	emitResidentBefore := func(limit int32) bool {
+		for nextResidentScan < limit {
+			if b, ok := g.detBuf[nextResidentScan]; ok {
+				if !emit(nextResidentScan, b) {
+					return false
+				}
+			}
+			nextResidentScan++
+		}
+		return true
+	}
+	// Spilled detail: one sequential prefix scan, merging any still-resident nodes.
 	pfx := []byte("gn")
 	stop := false
 	_ = g.db.View(func(txn *badger.Txn) error {
@@ -461,14 +473,30 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 			if len(k) != 6 {
 				continue
 			}
-			idx := int32(binary.LittleEndian.Uint32(k[2:]))
-			if _, inRAM := g.detBuf[idx]; inRAM {
+			idx := int32(binary.BigEndian.Uint32(k[2:]))
+			if idx < 0 || int(idx) >= len(g.ids) {
+				continue
+			}
+			if idx < nextResidentScan {
+				continue
+			}
+			if !emitResidentBefore(idx) {
+				stop = true
+				return nil
+			}
+			if b, inRAM := g.detBuf[idx]; inRAM {
+				nextResidentScan = idx + 1
+				if !emit(idx, b) {
+					stop = true
+					return nil
+				}
 				continue
 			}
 			if err := item.Value(func(v []byte) error {
 				if !emit(idx, v) {
 					stop = true
 				}
+				nextResidentScan = idx + 1
 				return nil
 			}); err != nil {
 				return err
@@ -479,4 +507,15 @@ func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
 		}
 		return nil
 	})
+	if stop {
+		return
+	}
+	for nextResidentScan < int32(len(g.ids)) {
+		if b, ok := g.detBuf[nextResidentScan]; ok {
+			if !emit(nextResidentScan, b) {
+				return
+			}
+		}
+		nextResidentScan++
+	}
 }

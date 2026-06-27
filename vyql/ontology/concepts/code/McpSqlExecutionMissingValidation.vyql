@@ -2,7 +2,7 @@ module code;
 
 concept McpSqlExecutionMissingValidation : issue {
   cwe: [CWE_89, CWE_863]
-  review_assumption: "MCP clients can provide SQL text to the helper and the backing database permissions exceed the intended read-only tool surface"
+  reviewAssumption: "MCP clients can provide SQL text to the helper and the backing database permissions exceed the intended read-only tool surface"
   reviewCategory: sql
   reviewCondition: "an MCP SQL helper executes caller-provided SQL through an internal query executor without applying the configured SQL security policy"
   reviewConfidence: high

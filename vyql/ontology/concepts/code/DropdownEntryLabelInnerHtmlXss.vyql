@@ -2,7 +2,7 @@ module code;
 
 concept DropdownEntryLabelInnerHtmlXss : issue {
   cwe: [CWE_79]
-  review_assumption: "dropdown labels can originate from user-controlled names or external API data"
+  reviewAssumption: "dropdown labels can originate from user-controlled names or external API data"
   reviewCategory: xss
   reviewCondition: "dropdown entry helper interpolates a label into innerHTML without sanitizing the label"
   reviewConfidence: high

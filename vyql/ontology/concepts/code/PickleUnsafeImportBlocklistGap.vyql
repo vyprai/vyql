@@ -2,7 +2,7 @@ module code;
 
 concept PickleUnsafeImportBlocklistGap : issue {
   cwe: [CWE_184, CWE_502]
-  review_assumption: "pickle analysis results are trusted to classify malicious pickle payloads before loading or accepting model artifacts"
+  reviewAssumption: "pickle analysis results are trusted to classify malicious pickle payloads before loading or accepting model artifacts"
   reviewCategory: deserialization
   reviewCondition: "a pickle safety analyzer blocklists dangerous imports but omits known code-execution modules"
   reviewConfidence: high

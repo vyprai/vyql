@@ -99,18 +99,18 @@ func TestCrossDomainContextReachSourceComesFromOntology(t *testing.T) {
 	conceptsSrc := `
 module custom;
 concept PublicEdge : exposure {
-  context_reach_source: true
-  context_reach_label: "public-edge-reachable"
-  context_reach_target_prop: endpoint
+  contextReachSource: true
+  contextReachLabel: "public-edge-reachable"
+  contextReachTargetProp: endpoint
 }
 concept PublicEdgeObservation : fact {
-  context_confirm_dst_prop: target
-  context_confirm_flag_prop: observed
-  context_confirm_flag_value: yes
-  context_confirm_label: "confirmed by public edge observation"
+  contextConfirmDstProp: target
+  contextConfirmFlagProp: observed
+  contextConfirmFlagValue: yes
+  contextConfirmLabel: "confirmed by public edge observation"
 }
 concept Input : source { taint: [custom.Taint] }
-concept Target : sink { vulnerable_to: [custom.Condition] }
+concept Target : sink { vulnerableTo: [custom.Condition] }
 `
 	ruleSrc := `
 module t;

@@ -2,7 +2,7 @@ module code;
 
 concept EzPublishSearchNumericParamXss : issue {
   cwe: [CWE_79, CWE_20]
-  review_assumption: "the search state or browse module response renders these request-derived numeric fields into browser-visible markup or URLs"
+  reviewAssumption: "the search state or browse module response renders these request-derived numeric fields into browser-visible markup or URLs"
   reviewCategory: xss
   reviewCondition: "eZ Publish search or browse parameters are reused in search state and templates without numeric narrowing"
   reviewConfidence: high

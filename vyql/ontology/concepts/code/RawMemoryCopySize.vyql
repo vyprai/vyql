@@ -3,7 +3,7 @@ module code;
 concept RawMemoryCopySize : issue {
   cwe: [CWE_787]
   enabledBy: [taint.UntrustedData]
-  review_assumption: "the size or source offset can exceed the destination/source object bounds"
+  reviewAssumption: "the size or source offset can exceed the destination/source object bounds"
   reviewCategory: memory
   reviewCondition: "raw memory copy size expression needs bounds review"
   reviewConfidence: medium

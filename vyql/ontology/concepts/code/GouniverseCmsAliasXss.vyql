@@ -2,7 +2,7 @@ module code;
 
 concept GouniverseCmsAliasXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the page alias argument can be attacker-controlled through CMS routing"
+  reviewAssumption: "the page alias argument can be attacker-controlled through CMS routing"
   reviewCategory: xss
   reviewCondition: "Gouniverse CMS renders the requested page alias in an HTML error response without an escaping builder"
   reviewConfidence: high

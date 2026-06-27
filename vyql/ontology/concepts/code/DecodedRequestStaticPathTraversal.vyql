@@ -2,7 +2,7 @@ module code;
 
 concept DecodedRequestStaticPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the request path can contain encoded parent-directory separators that decode before filesystem lookup"
+  reviewAssumption: "the request path can contain encoded parent-directory separators that decode before filesystem lookup"
   reviewCategory: path
   reviewCondition: "decoded request paths are appended to a static-file root and served without canonical containment"
   reviewConfidence: high

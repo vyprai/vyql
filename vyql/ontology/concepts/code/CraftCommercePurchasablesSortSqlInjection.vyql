@@ -2,7 +2,7 @@ module code;
 
 concept CraftCommercePurchasablesSortSqlInjection : issue {
   cwe: [CWE_89]
-  review_assumption: "authenticated Commerce users can reach the purchasables table endpoint and control the sort parameter"
+  reviewAssumption: "authenticated Commerce users can reach the purchasables table endpoint and control the sort parameter"
   reviewCategory: sql
   reviewCondition: "Craft Commerce purchasables table sorting passes a request-selected column name into Yii orderBy array keys without a column allowlist"
   reviewConfidence: high

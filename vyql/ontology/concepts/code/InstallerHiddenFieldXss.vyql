@@ -2,7 +2,7 @@ module code;
 
 concept InstallerHiddenFieldXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the installer step can receive attacker-controlled uchidden state"
+  reviewAssumption: "the installer step can receive attacker-controlled uchidden state"
   reviewCategory: xss
   reviewCondition: "installer form renders a hidden-field value from preserved request state without HTML escaping"
   reviewConfidence: high

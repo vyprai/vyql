@@ -2,7 +2,7 @@ module code;
 
 concept CaseInsensitiveLocalIdentityAuthorizationBypass : issue {
   cwe: [CWE_178, CWE_863]
-  review_assumption: "the platform treats local user or group names as case-sensitive for identity resolution or has distinct principals that differ only by case"
+  reviewAssumption: "the platform treats local user or group names as case-sensitive for identity resolution or has distinct principals that differ only by case"
   reviewCategory: auth
   reviewCondition: "local user or group names are authorized with case-insensitive string comparison instead of canonical OS identity names"
   reviewConfidence: high

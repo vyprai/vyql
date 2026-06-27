@@ -2,7 +2,7 @@ module code;
 
 concept CockpitLimeRedirectStopContinuation : issue {
   cwe: [CWE_613]
-  review_assumption: "protected controller initialization can reroute unauthenticated or expired sessions before state-changing code continues"
+  reviewAssumption: "protected controller initialization can reroute unauthenticated or expired sessions before state-changing code continues"
   reviewCategory: auth
   reviewCondition: "Cockpit Lime redirects mark the request stopped but do not terminate response execution"
   reviewConfidence: high

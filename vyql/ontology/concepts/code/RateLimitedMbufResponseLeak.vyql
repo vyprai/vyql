@@ -2,7 +2,7 @@ module code;
 
 concept RateLimitedMbufResponseLeak : issue {
   cwe: [CWE_772, CWE_400]
-  review_assumption: "the response helper owns or must consume the mbuf argument on every return path"
+  reviewAssumption: "the response helper owns or must consume the mbuf argument on every return path"
   reviewCategory: resource
   reviewCondition: "a rate-limited TCP response helper consumes an mbuf only on the send path and lacks a release on the suppressed path"
   reviewConfidence: high

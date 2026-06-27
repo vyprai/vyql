@@ -2,7 +2,7 @@ module code;
 
 concept ExpressParamArrayValuePollution : issue {
   cwe: [CWE_20, CWE_235]
-  review_assumption: "callers can supply duplicated HTTP parameters that Express exposes as arrays"
+  reviewAssumption: "callers can supply duplicated HTTP parameters that Express exposes as arrays"
   reviewCategory: input_validation
   reviewCondition: "Express request parameter lookup can return array values from duplicated parameters without normalization"
   reviewConfidence: high

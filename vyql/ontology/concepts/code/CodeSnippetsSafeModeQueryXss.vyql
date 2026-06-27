@@ -2,7 +2,7 @@ module code;
 
 concept CodeSnippetsSafeModeQueryXss : issue {
   cwe: [CWE_79]
-  review_assumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
+  reviewAssumption: "generated admin URLs are later rendered into HTML attributes, matching the reported reflected snippets-safe-mode XSS"
   reviewCategory: xss
   reviewCondition: "Code Snippets safe-mode URL helper reuses a request parameter in generated admin URLs without narrowing or escaping"
   reviewConfidence: high

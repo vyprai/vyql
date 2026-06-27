@@ -2,7 +2,7 @@ module code;
 
 concept SensitiveConfigInfoLog : issue {
   cwe: [CWE_200, CWE_532]
-  review_assumption: "operator configuration files may contain inline credentials or target resource secrets"
+  reviewAssumption: "operator configuration files may contain inline credentials or target resource secrets"
   reviewCategory: secret
   reviewCondition: "parsed configuration content that may include credentials is logged above debug level"
   reviewConfidence: medium

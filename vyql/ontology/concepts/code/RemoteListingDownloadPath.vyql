@@ -2,7 +2,7 @@ module code;
 
 concept RemoteListingDownloadPath : issue {
   cwe: [CWE_22]
-  review_assumption: "the remote server can provide listing names containing path separators or traversal components"
+  reviewAssumption: "the remote server can provide listing names containing path separators or traversal components"
   reviewCategory: path
   reviewCondition: "remote directory listing filenames are joined into local download paths without rejecting path components"
   reviewConfidence: medium

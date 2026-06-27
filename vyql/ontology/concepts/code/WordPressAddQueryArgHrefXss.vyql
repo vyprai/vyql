@@ -2,7 +2,7 @@ module code;
 
 concept WordPressAddQueryArgHrefXss : issue {
   cwe: [CWE_79]
-  review_assumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
+  reviewAssumption: "the generated URL may include request-controlled current-URL data and is served to a browser as HTML"
   reviewCategory: xss
   reviewCondition: "WordPress add_query_arg output is rendered into an HTML href attribute without URL or attribute escaping"
   reviewConfidence: high

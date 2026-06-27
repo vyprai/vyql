@@ -2,10 +2,10 @@ module code;
 
 concept ExternalEntryInput : source {
   refines: core.UserControlledData
-  source_assumption: "the library is invoked with untrusted input at this entry point"
-  source_condition: "a caller forwards attacker-controlled data into the public-API parameter {param}"
-  source_condition_category: "caller-controlled-input"
-  source_confidence: medium
+  sourceAssumption: "the library is invoked with untrusted input at this entry point"
+  sourceCondition: "a caller forwards attacker-controlled data into the public-API parameter {param}"
+  sourceConditionCategory: "caller-controlled-input"
+  sourceConfidence: medium
   sourcePolicy: caller_conditional
   taint: [taint.UntrustedData]
 }

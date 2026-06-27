@@ -2,7 +2,7 @@ module code;
 
 concept CollectiveContactWidgetTitleXss : issue {
   cwe: [CWE_79]
-  review_assumption: "contact titles can contain attacker-controlled stored content rendered in the Plone term-contact viewlet"
+  reviewAssumption: "contact titles can contain attacker-controlled stored content rendered in the Plone term-contact viewlet"
   reviewCategory: xss
   reviewCondition: "collective.contact.widget term-contact viewlet renders contact titles into a hidden HTML input without escaping"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept AdmissionSubresourcePolicyReview : issue {
   cwe: [CWE_288, CWE_863]
-  review_assumption: "an alternate subresource path may bypass the policy applied to the primary resource"
+  reviewAssumption: "an alternate subresource path may bypass the policy applied to the primary resource"
   reviewCategory: auth
   reviewCondition: "admission logic returns early for a non-empty subresource without an observed explicit subresource policy"
   reviewConfidence: possibility

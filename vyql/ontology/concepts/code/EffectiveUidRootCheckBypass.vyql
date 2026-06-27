@@ -2,7 +2,7 @@ module code;
 
 concept EffectiveUidRootCheckBypass : issue {
   cwe: [CWE_269]
-  review_assumption: "daemon startup may change effective privileges before worker code executes while the real UID remains privileged"
+  reviewAssumption: "daemon startup may change effective privileges before worker code executes while the real UID remains privileged"
   reviewCategory: auth
   reviewCondition: "root/superuser privilege checks should inspect the real UID when only effective IDs may have been dropped"
   reviewConfidence: medium

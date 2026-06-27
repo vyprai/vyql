@@ -2,7 +2,7 @@ module code;
 
 concept NodePreGypRemoteBinaryInstall : issue {
   cwe: [CWE_829, CWE_494]
-  review_assumption: "installing the package can fetch and execute a remote native binary outside the package tarball's integrity boundary"
+  reviewAssumption: "installing the package can fetch and execute a remote native binary outside the package tarball's integrity boundary"
   reviewCategory: supply_chain
   reviewCondition: "an npm package lifecycle install script invokes node-pre-gyp to download and load a prebuilt native binary from a remote host"
   reviewConfidence: high

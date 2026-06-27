@@ -520,6 +520,10 @@ func lowerV2FieldName(name string) string {
 		return "source_assumption"
 	case "sourceConfidence":
 		return "source_confidence"
+	case "coverageReservedSource":
+		return "coverage_reserved_source"
+	case "coverageReservedControl":
+		return "coverage_reserved_control"
 	case "contextReachSource":
 		return "context_reach_source"
 	case "contextReachLabel":
@@ -546,6 +550,8 @@ func lowerV2FieldName(name string) string {
 		return "review_condition"
 	case "reviewEvidence":
 		return "review_evidence"
+	case "reviewAssumption":
+		return "review_assumption"
 	case "reviewConfidence":
 		return "review_confidence"
 	default:

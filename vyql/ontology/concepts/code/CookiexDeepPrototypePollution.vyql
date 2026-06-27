@@ -2,7 +2,7 @@ module code;
 
 concept CookiexDeepPrototypePollution : issue {
   cwe: [CWE_1321]
-  review_assumption: "a caller can pass attacker-controlled objects containing __proto__, constructor, or prototype keys to the deep assignment API"
+  reviewAssumption: "a caller can pass attacker-controlled objects containing __proto__, constructor, or prototype keys to the deep assignment API"
   reviewCategory: prototype_pollution
   reviewCondition: "cookiex-deep recursively writes source object keys into target objects without rejecting prototype-mutating names"
   reviewConfidence: high

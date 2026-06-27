@@ -2,7 +2,7 @@ module code;
 
 concept UntrustedSupportUrlNotification : issue {
   cwe: [CWE_20]
-  review_assumption: "mail clients or administrator workflows may auto-link the supplied URL, causing the notification to imply trust in an attacker-selected site"
+  reviewAssumption: "mail clients or administrator workflows may auto-link the supplied URL, causing the notification to imply trust in an attacker-selected site"
   reviewCategory: validation
   reviewCondition: "a support or contact endpoint forwards a user-supplied site URL into an administrator notification as trusted context"
   reviewConfidence: high

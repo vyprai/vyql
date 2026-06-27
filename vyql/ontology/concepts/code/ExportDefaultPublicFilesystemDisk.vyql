@@ -2,7 +2,7 @@ module code;
 
 concept ExportDefaultPublicFilesystemDisk : issue {
   cwe: [CWE_1188, CWE_552]
-  review_assumption: "exported files can contain sensitive application data and the framework default disk may be public in development-derived deployments"
+  reviewAssumption: "exported files can contain sensitive application data and the framework default disk may be public in development-derived deployments"
   reviewCategory: secret
   reviewCondition: "export storage helpers inherit the default filesystem disk without remapping a public default to a private disk"
   reviewConfidence: high

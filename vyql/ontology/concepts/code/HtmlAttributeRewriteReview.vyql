@@ -2,7 +2,7 @@ module code;
 
 concept HtmlAttributeRewriteReview : issue {
   cwe: [CWE_79]
-  review_assumption: "the rewritten markup or injected attribute value may be attacker-influenced before browser parsing"
+  reviewAssumption: "the rewritten markup or injected attribute value may be attacker-influenced before browser parsing"
   reviewCategory: xss
   reviewCondition: "review HTML attribute rewrite logic that injects dynamic values into markup without an attribute-aware parser or escaping"
   reviewConfidence: possibility

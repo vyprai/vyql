@@ -2,7 +2,7 @@ module code;
 
 concept PostTlsIdentityRebindingMissingCheck : issue {
   cwe: [CWE_287, CWE_290, CWE_349, CWE_841]
-  review_assumption: "an attacker can make the encrypted identity packet differ from the pre-TLS identity packet and impersonate or rebind the channel peer"
+  reviewAssumption: "an attacker can make the encrypted identity packet differ from the pre-TLS identity packet and impersonate or rebind the channel peer"
   reviewCategory: request
   reviewCondition: "a protocol handshake exchanges identity packets again after TLS but overwrites the active peer identity without comparing stable identity fields"
   reviewConfidence: high

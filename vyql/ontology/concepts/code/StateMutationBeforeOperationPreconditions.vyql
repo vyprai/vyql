@@ -2,7 +2,7 @@ module code;
 
 concept StateMutationBeforeOperationPreconditions : issue {
   cwe: [CWE_696, CWE_460]
-  review_assumption: "an attacker-controlled operation can pass transaction-level checks but fail a later operation-specific authorization or validation check"
+  reviewAssumption: "an attacker-controlled operation can pass transaction-level checks but fail a later operation-specific authorization or validation check"
   reviewCategory: lifecycle
   reviewCondition: "state-changing operation handling mutates durable state before all operation-specific preconditions are known to pass"
   reviewConfidence: high

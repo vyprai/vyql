@@ -2,7 +2,7 @@ module code;
 
 concept CatastrophicRegex : issue {
   cwe: [CWE_1333, CWE_400]
-  review_assumption: "an attacker can supply input matched by this exported or reachable regex"
+  reviewAssumption: "an attacker can supply input matched by this exported or reachable regex"
   reviewCategory: resource
   reviewCondition: "a static regular expression has catastrophic-backtracking structure"
   reviewConfidence: medium

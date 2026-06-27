@@ -2,7 +2,7 @@ module code;
 
 concept AssemblyLoadPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "library callers can pass type names containing assembly components such as '../payload' or drive-qualified paths"
+  reviewAssumption: "library callers can pass type names containing assembly components such as '../payload' or drive-qualified paths"
   reviewCategory: path
   reviewCondition: "a dynamic assembly-load path is built from a caller-controlled assembly/type-name component without rejecting traversal or drive-qualified paths"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedDiagnosticHtml : issue {
   cwe: [CWE_79]
-  review_assumption: "the diagnostic log is visible in a browser context"
+  reviewAssumption: "the diagnostic log is visible in a browser context"
   reviewCategory: xss
   reviewCondition: "diagnostic or log text containing remote response data is rendered as HTML without escaping"
   reviewConfidence: medium

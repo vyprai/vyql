@@ -2,7 +2,7 @@ module code;
 
 concept CountDerivedElementAccess : issue {
   cwe: [CWE_129, CWE_125, CWE_787]
-  review_assumption: "a malformed or attacker-influenced container can have zero elements"
+  reviewAssumption: "a malformed or attacker-influenced container can have zero elements"
   reviewCategory: memory
   reviewCondition: "an element accessor uses a count-derived last index without a visible non-empty guard"
   reviewConfidence: medium

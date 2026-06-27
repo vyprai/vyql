@@ -2,7 +2,7 @@ module code;
 
 concept StackAllocationSmell : issue {
   cwe: [CWE_400]
-  review_assumption: "the allocation size can be attacker-influenced or unexpectedly large"
+  reviewAssumption: "the allocation size can be attacker-influenced or unexpectedly large"
   reviewCategory: memory
   reviewCondition: "unbounded stack allocation can exhaust stack or corrupt nearby state"
   reviewConfidence: low

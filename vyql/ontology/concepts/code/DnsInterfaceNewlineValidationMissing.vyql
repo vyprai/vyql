@@ -2,7 +2,7 @@ module code;
 
 concept DnsInterfaceNewlineValidationMissing : issue {
   cwe: [CWE_20, CWE_74]
-  review_assumption: "the interface setting can be written through configuration input and later rendered into dnsmasq or resolver configuration"
+  reviewAssumption: "the interface setting can be written through configuration input and later rendered into dnsmasq or resolver configuration"
   reviewCategory: input_validation
   reviewCondition: "DNS interface configuration accepts newline characters before being used in resolver configuration syntax"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept XmlLeadByteNameValidationMissing : issue {
   cwe: [CWE_20, CWE_125]
-  review_assumption: "attacker-controlled XML input can contain invalid multibyte lead-byte sequences that reach these tokenizer paths"
+  reviewAssumption: "attacker-controlled XML input can contain invalid multibyte lead-byte sequences that reach these tokenizer paths"
   reviewCategory: input_validation
   reviewCondition: "XML tokenizer lead-byte name parsing checks name character classes without first rejecting invalid encoded characters"
   reviewConfidence: high

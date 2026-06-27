@@ -2,7 +2,7 @@ module code;
 
 concept MethodGatedRedirectValidationBypass : issue {
   cwe: [CWE_601]
-  review_assumption: "a GET or other non-matching method can carry attacker-controlled redirect/callback URL parameters"
+  reviewAssumption: "a GET or other non-matching method can carry attacker-controlled redirect/callback URL parameters"
   reviewCategory: request_forgery
   reviewCondition: "redirect or callback URL validation is skipped for non-matching HTTP methods"
   reviewConfidence: medium

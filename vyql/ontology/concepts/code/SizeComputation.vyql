@@ -3,7 +3,7 @@ module code;
 concept SizeComputation : sink {
   cwe: [CWE_190]
   enabledBy: [taint.UntrustedData]
-  review_assumption: "the value is not range-checked before memory use"
+  reviewAssumption: "the value is not range-checked before memory use"
   reviewCategory: numeric
   reviewCondition: "attacker-controlled size feeds allocation or bounds-sensitive operation"
   reviewConfidence: medium

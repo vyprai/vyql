@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedLinterIssueMessageXss : issue {
   cwe: [CWE_79]
-  review_assumption: "lint rule messages or source-derived diagnostics can contain markup rendered in the generated report"
+  reviewAssumption: "lint rule messages or source-derived diagnostics can contain markup rendered in the generated report"
   reviewCategory: xss
   reviewCondition: "linter issue messages are rendered into an HTML report template without escaping"
   reviewConfidence: high

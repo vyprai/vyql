@@ -2,7 +2,7 @@ module code;
 
 concept PythonDunderPathClassPollution : issue {
   cwe: [CWE_915]
-  review_assumption: "a remote component or API request can provide the property path and value"
+  reviewAssumption: "a remote component or API request can provide the property path and value"
   reviewCategory: mass_assignment
   reviewCondition: "caller-controlled dotted attribute paths are traversed and written without rejecting Python magic attributes"
   reviewConfidence: high

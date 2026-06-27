@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedTableExportHtml : issue {
   cwe: [CWE_79]
-  review_assumption: "exported table cells may contain attacker-controlled markup"
+  reviewAssumption: "exported table cells may contain attacker-controlled markup"
   reviewCategory: xss
   reviewCondition: "table export callback preserves raw cell HTML"
   reviewConfidence: medium

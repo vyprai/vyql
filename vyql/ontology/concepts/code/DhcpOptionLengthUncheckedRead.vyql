@@ -2,7 +2,7 @@ module code;
 
 concept DhcpOptionLengthUncheckedRead : issue {
   cwe: [CWE_125, CWE_20]
-  review_assumption: "a network client can send a truncated DHCP option buffer to the parser"
+  reviewAssumption: "a network client can send a truncated DHCP option buffer to the parser"
   reviewCategory: memory
   reviewCondition: "DHCP option parsing reads option payload bytes before validating the option length fits in the packet"
   reviewConfidence: high

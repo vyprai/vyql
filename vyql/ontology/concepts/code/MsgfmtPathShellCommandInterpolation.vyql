@@ -2,7 +2,7 @@ module code;
 
 concept MsgfmtPathShellCommandInterpolation : issue {
   cwe: [CWE_78]
-  review_assumption: "an attacker can introduce a translation filename or directory containing shell metacharacters"
+  reviewAssumption: "an attacker can introduce a translation filename or directory containing shell metacharacters"
   reviewCategory: command
   reviewCondition: "message compilation command text interpolates filesystem-derived .po/.mo paths before shell execution"
   reviewConfidence: high

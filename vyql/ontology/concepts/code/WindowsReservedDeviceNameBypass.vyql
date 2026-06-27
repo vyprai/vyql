@@ -2,7 +2,7 @@ module code;
 
 concept WindowsReservedDeviceNameBypass : issue {
   cwe: [CWE_67, CWE_184]
-  review_assumption: "an untrusted or sandboxed caller can supply Windows path components that resolve to reserved devices"
+  reviewAssumption: "an untrusted or sandboxed caller can supply Windows path components that resolve to reserved devices"
   reviewCategory: path
   reviewCondition: "Windows reserved device-name filtering omits alternate device-name spellings"
   reviewConfidence: medium

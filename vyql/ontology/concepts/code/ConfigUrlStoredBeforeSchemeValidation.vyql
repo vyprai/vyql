@@ -2,7 +2,7 @@ module code;
 
 concept ConfigUrlStoredBeforeSchemeValidation : issue {
   cwe: [CWE_918, CWE_20]
-  review_assumption: "the configured URL is later used by a server-side connector with access to internal network targets"
+  reviewAssumption: "the configured URL is later used by a server-side connector with access to internal network targets"
   reviewCategory: request_forgery
   reviewCondition: "import or connector configuration stores a caller-supplied service URL before enforcing URL syntax and allowed schemes"
   reviewConfidence: high

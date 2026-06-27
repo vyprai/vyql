@@ -2,7 +2,7 @@ module code;
 
 concept SensitiveModelJsonSerializationExposure : issue {
   cwe: [CWE_200, CWE_522]
-  review_assumption: "the serialized model may include password, token, MFA secret, credential, or other sensitive attributes by default"
+  reviewAssumption: "the serialized model may include password, token, MFA secret, credential, or other sensitive attributes by default"
   reviewCategory: secret
   reviewCondition: "a framework response serializes a full or privileged user/model representation instead of returning an explicit safe data map"
   reviewConfidence: high

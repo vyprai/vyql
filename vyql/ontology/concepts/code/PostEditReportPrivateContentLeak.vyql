@@ -2,7 +2,7 @@ module code;
 
 concept PostEditReportPrivateContentLeak : issue {
   cwe: [CWE_200, CWE_863]
-  review_assumption: "moderators or staff users can request the report without admin-only visibility"
+  reviewAssumption: "moderators or staff users can request the report without admin-only visibility"
   reviewCategory: access_control
   reviewCondition: "a post-edit report query returns revision/post data without filtering private messages and secure categories for the current user"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept CookieMaxAgeDurationSecondsPanic : issue {
   cwe: [CWE_20, CWE_400]
-  review_assumption: "a remote peer can supply a very large Max-Age value that triggers a panic in the time crate duration constructor"
+  reviewAssumption: "a remote peer can supply a very large Max-Age value that triggers a panic in the time crate duration constructor"
   reviewCategory: resource
   reviewCondition: "cookie Max-Age parser passes unbounded parsed seconds directly to Duration::seconds"
   reviewConfidence: high

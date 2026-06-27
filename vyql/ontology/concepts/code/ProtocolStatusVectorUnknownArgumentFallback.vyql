@@ -2,7 +2,7 @@ module code;
 
 concept ProtocolStatusVectorUnknownArgumentFallback : issue {
   cwe: [CWE_228, CWE_248, CWE_400]
-  review_assumption: "a remote peer can send a crafted status-vector packet containing an unsupported argument tag such as cstring and trigger malformed decoding or crash handling"
+  reviewAssumption: "a remote peer can send a crafted status-vector packet containing an unsupported argument tag such as cstring and trigger malformed decoding or crash handling"
   reviewCategory: resource
   reviewCondition: "a protocol status-vector decoder falls back to consuming an additional scalar for unknown argument tags instead of rejecting malformed tags"
   reviewConfidence: high

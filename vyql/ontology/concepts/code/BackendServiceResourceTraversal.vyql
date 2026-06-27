@@ -2,7 +2,7 @@ module code;
 
 concept BackendServiceResourceTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "the backend service handler interprets the resource value as an object path, file path, or nested service route"
+  reviewAssumption: "the backend service handler interprets the resource value as an object path, file path, or nested service route"
   reviewCategory: path
   reviewCondition: "request route/resource path segments are forwarded to a backend service dispatcher without rejecting parent-directory traversal"
   reviewConfidence: medium

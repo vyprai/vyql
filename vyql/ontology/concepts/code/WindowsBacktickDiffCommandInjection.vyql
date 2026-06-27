@@ -2,7 +2,7 @@ module code;
 
 concept WindowsBacktickDiffCommandInjection : issue {
   cwe: [CWE_78, CWE_88]
-  review_assumption: "library callers can supply diff options or file path values containing shell metacharacters on Windows"
+  reviewAssumption: "library callers can supply diff options or file path values containing shell metacharacters on Windows"
   reviewCategory: command
   reviewCondition: "a Windows-specific diff execution path builds one shell string from options and file paths before executing it with backticks"
   reviewConfidence: high

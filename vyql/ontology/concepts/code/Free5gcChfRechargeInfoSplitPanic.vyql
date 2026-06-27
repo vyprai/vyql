@@ -2,7 +2,7 @@ module code;
 
 concept Free5gcChfRechargeInfoSplitPanic : issue {
   cwe: [CWE_129, CWE_400]
-  review_assumption: "a valid authenticated caller can supply a recharge route value without the underscore delimiter and repeatedly trigger panic recovery"
+  reviewAssumption: "a valid authenticated caller can supply a recharge route value without the underscore delimiter and repeatedly trigger panic recovery"
   reviewCategory: resource
   reviewCondition: "recharge route input is split and indexed for rating-group data without proving the split result length"
   reviewConfidence: high

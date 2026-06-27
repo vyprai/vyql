@@ -1,6 +1,6 @@
 module cloud;
 
 concept Database : asset {
-  context_asset_label: "sink database {target} holds [{kinds}]"
-  context_asset_target_prop: database
+  contextAssetLabel: "sink database {target} holds [{kinds}]"
+  contextAssetTargetProp: database
 }

@@ -2,7 +2,7 @@ module code;
 
 concept JenkinsStaplerStateChangeMissingPost : issue {
   cwe: [CWE_352]
-  review_assumption: "a browser-backed request can invoke the Stapler action with the caller's Jenkins session"
+  reviewAssumption: "a browser-backed request can invoke the Stapler action with the caller's Jenkins session"
   reviewCategory: csrf
   reviewCondition: "Jenkins Stapler state-changing endpoint is reachable without an explicit POST requirement"
   reviewConfidence: high

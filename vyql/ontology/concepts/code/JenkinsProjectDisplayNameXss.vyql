@@ -2,7 +2,7 @@ module code;
 
 concept JenkinsProjectDisplayNameXss : issue {
   cwe: [CWE_79]
-  review_assumption: "job or folder display names can include attacker-controlled HTML that is rendered by the plugin UI"
+  reviewAssumption: "job or folder display names can include attacker-controlled HTML that is rendered by the plugin UI"
   reviewCategory: xss
   reviewCondition: "Jenkins project display names are returned to graph or UI rendering without HTML escaping"
   reviewConfidence: high

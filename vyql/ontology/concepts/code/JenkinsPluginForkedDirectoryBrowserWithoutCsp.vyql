@@ -2,7 +2,7 @@ module code;
 
 concept JenkinsPluginForkedDirectoryBrowserWithoutCsp : issue {
   cwe: [CWE_79]
-  review_assumption: "attackers with Item/Configure or report-content control can place active HTML or JavaScript in served report files"
+  reviewAssumption: "attackers with Item/Configure or report-content control can place active HTML or JavaScript in served report files"
   reviewCategory: xss
   reviewCondition: "Jenkins plugin serves HTML reports through a plugin-local DirectoryBrowserSupport fork instead of Jenkins core's CSP-aware browser"
   reviewConfidence: high

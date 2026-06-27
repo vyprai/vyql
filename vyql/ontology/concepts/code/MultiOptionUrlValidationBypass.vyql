@@ -2,7 +2,7 @@ module code;
 
 concept MultiOptionUrlValidationBypass : issue {
   cwe: [CWE_601]
-  review_assumption: "the validated URL is later used as an authentication callback or redirect target"
+  reviewAssumption: "the validated URL is later used as an authentication callback or redirect target"
   reviewCategory: request_forgery
   reviewCondition: "multi-option authentication URL validation accepts absolute URLs without host allowlisting"
   reviewConfidence: medium

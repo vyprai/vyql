@@ -2,7 +2,7 @@ module code;
 
 concept FrappeLinkExpansionMissingReadPermission : issue {
   cwe: [CWE_862, CWE_863]
-  review_assumption: "expanded linked documents may reference records or fields the caller cannot read directly"
+  reviewAssumption: "expanded linked documents may reference records or fields the caller cannot read directly"
   reviewCategory: auth
   reviewCondition: "Frappe document link expansion fetches linked documents without enforcing read permission and field-level read filtering"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept BrowserPostExportMissingOriginGuard : issue {
   cwe: [CWE_352, CWE_346]
-  review_assumption: "the route is reachable from a browser context and the export operation writes or exposes local emulator/project data"
+  reviewAssumption: "the route is reachable from a browser context and the export operation writes or exposes local emulator/project data"
   reviewCategory: request
   reviewCondition: "a browser-reachable POST export endpoint performs filesystem or emulator export work without checking Origin or an equivalent CSRF guard"
   reviewConfidence: high

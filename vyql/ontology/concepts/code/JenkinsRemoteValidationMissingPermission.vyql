@@ -2,7 +2,7 @@ module code;
 
 concept JenkinsRemoteValidationMissingPermission : issue {
   cwe: [CWE_862, CWE_918]
-  review_assumption: "users with Overall/Read can invoke descriptor validation endpoints with attacker-controlled host and credential parameters"
+  reviewAssumption: "users with Overall/Read can invoke descriptor validation endpoints with attacker-controlled host and credential parameters"
   reviewCategory: auth
   reviewCondition: "Jenkins descriptor form-validation endpoint connects to a supplied remote service without an administrator permission check"
   reviewConfidence: high

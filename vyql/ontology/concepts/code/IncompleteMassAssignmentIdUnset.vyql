@@ -2,7 +2,7 @@ module code;
 
 concept IncompleteMassAssignmentIdUnset : issue {
   cwe: [CWE_915]
-  review_assumption: "request normalization can reintroduce or preserve an attacker-supplied id field"
+  reviewAssumption: "request normalization can reintroduce or preserve an attacker-supplied id field"
   reviewCategory: mass_assignment
   reviewCondition: "server-controlled identifier fields are removed before request normalization instead of from the normalized input"
   reviewConfidence: high

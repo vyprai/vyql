@@ -2,7 +2,7 @@ module code;
 
 concept ErbHrefUrlHtmlEscapeOnly : issue {
   cwe: [CWE_79, CWE_20]
-  review_assumption: "the rendered URL-like value can contain a scriptable URL scheme or unsafe URL characters interpreted by the browser"
+  reviewAssumption: "the rendered URL-like value can contain a scriptable URL scheme or unsafe URL characters interpreted by the browser"
   reviewCategory: xss
   reviewCondition: "Ruby ERB renders a URL-like value into a href attribute using only HTML escaping instead of URL validation or URI encoding"
   reviewConfidence: high

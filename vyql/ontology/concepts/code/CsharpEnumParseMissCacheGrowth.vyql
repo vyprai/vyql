@@ -2,7 +2,7 @@ module code;
 
 concept CsharpEnumParseMissCacheGrowth : issue {
   cwe: [CWE_400, CWE_770]
-  review_assumption: "callers can submit high-cardinality invalid enum strings to the parser"
+  reviewAssumption: "callers can submit high-cardinality invalid enum strings to the parser"
   reviewCategory: resource
   reviewCondition: "C# enum string parsing caches failed lookup keys in process-global state"
   reviewConfidence: high

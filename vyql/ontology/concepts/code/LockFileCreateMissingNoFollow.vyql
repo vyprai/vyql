@@ -2,7 +2,7 @@ module code;
 
 concept LockFileCreateMissingNoFollow : issue {
   cwe: [CWE_59, CWE_367]
-  review_assumption: "the lock-file path may reside in a directory where an attacker can race or place symlinks"
+  reviewAssumption: "the lock-file path may reside in a directory where an attacker can race or place symlinks"
   reviewCategory: path
   reviewCondition: "a lock file is created with exclusive open semantics without no-follow protection"
   reviewConfidence: medium

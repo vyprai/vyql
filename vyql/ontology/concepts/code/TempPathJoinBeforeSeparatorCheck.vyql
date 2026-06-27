@@ -2,7 +2,7 @@ module code;
 
 concept TempPathJoinBeforeSeparatorCheck : issue {
   cwe: [CWE_22]
-  review_assumption: "the joined filename can be influenced by a caller and the process account can access filesystem paths reached by the joined name"
+  reviewAssumption: "the joined filename can be influenced by a caller and the process account can access filesystem paths reached by the joined name"
   reviewCategory: path
   reviewCondition: "a temporary filename is joined with a temp directory before rejecting path separators or canonicalizing to a basename"
   reviewConfidence: high

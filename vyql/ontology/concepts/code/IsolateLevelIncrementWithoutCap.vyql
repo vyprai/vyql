@@ -2,7 +2,7 @@ module code;
 
 concept IsolateLevelIncrementWithoutCap : issue {
   cwe: [CWE_787, CWE_125]
-  review_assumption: "attacker-controlled bidi isolate characters can drive nesting high enough to exceed the explicit-level array bounds"
+  reviewAssumption: "attacker-controlled bidi isolate characters can drive nesting high enough to exceed the explicit-level array bounds"
   reviewCategory: memory
   reviewCondition: "Unicode bidi isolate nesting increments isolate_level without capping it before using it as an isolate-level array index"
   reviewConfidence: high

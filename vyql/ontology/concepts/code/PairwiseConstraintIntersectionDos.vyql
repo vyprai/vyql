@@ -2,7 +2,7 @@ module code;
 
 concept PairwiseConstraintIntersectionDos : issue {
   cwe: [CWE_400, CWE_407]
-  review_assumption: "attackers can provide certificates or structured inputs with many constraints, causing CPU and allocation growth from pairwise intersection"
+  reviewAssumption: "attackers can provide certificates or structured inputs with many constraints, causing CPU and allocation growth from pairwise intersection"
   reviewCategory: resource
   reviewCondition: "constraint-list intersection performs pairwise nested intersection work instead of a sorted or bounded merge"
   reviewConfidence: high

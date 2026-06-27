@@ -2,7 +2,7 @@ module code;
 
 concept BulkEmailRecipientDisclosure : issue {
   cwe: [CWE_200]
-  review_assumption: "the mail sender exposes recipient addresses in visible To or Cc headers to every recipient"
+  reviewAssumption: "the mail sender exposes recipient addresses in visible To or Cc headers to every recipient"
   reviewCategory: privacy
   reviewCondition: "notification email is sent once with a collected multi-recipient address list"
   reviewConfidence: high

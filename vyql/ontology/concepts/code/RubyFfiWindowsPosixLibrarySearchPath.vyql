@@ -2,7 +2,7 @@ module code;
 
 concept RubyFfiWindowsPosixLibrarySearchPath : issue {
   cwe: [CWE_427]
-  review_assumption: "native Windows library loading can resolve unintended DLLs from Cygwin or other lower-trust POSIX-style directories"
+  reviewAssumption: "native Windows library loading can resolve unintended DLLs from Cygwin or other lower-trust POSIX-style directories"
   reviewCategory: path
   reviewCondition: "native Windows FFI library loading falls back to POSIX library directories"
   reviewConfidence: high

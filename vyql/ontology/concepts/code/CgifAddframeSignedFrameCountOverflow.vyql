@@ -2,7 +2,7 @@ module code;
 
 concept CgifAddframeSignedFrameCountOverflow : issue {
   cwe: [CWE_190]
-  review_assumption: "large width and height values can overflow the promoted signed int product and skip or truncate frame comparison"
+  reviewAssumption: "large width and height values can overflow the promoted signed int product and skip or truncate frame comparison"
   reviewCategory: numeric
   reviewCondition: "CGIF frame comparison multiplies 16-bit width and height in a signed loop bound"
   reviewConfidence: high

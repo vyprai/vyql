@@ -1,7 +1,7 @@
 module code;
 
 concept Cookie : source {
-  coverage_reserved_source: true
+  coverageReservedSource: true
   cwe: [CWE_20]
   refines: core.UserControlledData
   taint: [taint.UntrustedData]

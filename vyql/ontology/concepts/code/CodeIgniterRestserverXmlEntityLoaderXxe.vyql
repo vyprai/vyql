@@ -2,7 +2,7 @@ module code;
 
 concept CodeIgniterRestserverXmlEntityLoaderXxe : issue {
   cwe: [CWE_611]
-  review_assumption: "the bundled Format library parses XML bodies with simplexml_load_string and request clients can submit XML payloads"
+  reviewAssumption: "the bundled Format library parses XML bodies with simplexml_load_string and request clients can submit XML payloads"
   reviewCategory: xml
   reviewCondition: "CodeIgniter Rest Server parses XML request bodies without disabling external entity loading"
   reviewConfidence: high

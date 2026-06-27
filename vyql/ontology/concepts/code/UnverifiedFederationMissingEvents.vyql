@@ -2,7 +2,7 @@ module code;
 
 concept UnverifiedFederationMissingEvents : issue {
   cwe: [CWE_287, CWE_347]
-  review_assumption: "the missing events response is supplied by a remote homeserver and cached events can affect room state or auth decisions"
+  reviewAssumption: "the missing events response is supplied by a remote homeserver and cached events can affect room state or auth decisions"
   reviewCategory: auth
   reviewCondition: "federated Matrix missing events are accepted from an untrusted response without per-event signature verification"
   reviewConfidence: high

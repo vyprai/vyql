@@ -2,7 +2,7 @@ module code;
 
 concept RequestViewVariableHtmlEscapeMissing : issue {
   cwe: [CWE_79]
-  review_assumption: "the receiving view renders the variable in HTML or JavaScript where caller-side escaping is required"
+  reviewAssumption: "the receiving view renders the variable in HTML or JavaScript where caller-side escaping is required"
   reviewCategory: xss
   reviewCondition: "request-derived view variables are passed into an HTML view without local entity escaping"
   reviewConfidence: high

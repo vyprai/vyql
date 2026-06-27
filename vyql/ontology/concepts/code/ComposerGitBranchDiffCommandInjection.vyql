@@ -2,7 +2,7 @@ module code;
 
 concept ComposerGitBranchDiffCommandInjection : issue {
   cwe: [CWE_78, CWE_88]
-  review_assumption: "a dependency installed from source can contain specially crafted local or remote Git branch names"
+  reviewAssumption: "a dependency installed from source can contain specially crafted local or remote Git branch names"
   reviewCategory: command
   reviewCondition: "Composer formats Git branch names into a git diff shell command instead of passing argv"
   reviewConfidence: high

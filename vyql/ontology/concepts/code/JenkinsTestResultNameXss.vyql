@@ -2,7 +2,7 @@ module code;
 
 concept JenkinsTestResultNameXss : issue {
   cwe: [CWE_79]
-  review_assumption: "test result names can be influenced by build or report input and later rendered by Jenkins test result UI routes"
+  reviewAssumption: "test result names can be influenced by build or report input and later rendered by Jenkins test result UI routes"
   reviewCategory: xss
   reviewCondition: "Jenkins test-result names are returned from UI-facing getName accessors without HTML escaping"
   reviewConfidence: high

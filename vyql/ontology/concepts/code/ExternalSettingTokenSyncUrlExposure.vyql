@@ -2,7 +2,7 @@ module code;
 
 concept ExternalSettingTokenSyncUrlExposure : issue {
   cwe: [CWE_79, CWE_200]
-  review_assumption: "an attacker can preset or influence the runtime/default setting and receive token-bearing synchronization requests"
+  reviewAssumption: "an attacker can preset or influence the runtime/default setting and receive token-bearing synchronization requests"
   reviewCategory: secret
   reviewCondition: "an externally supplied runtime/default setting selects the URL used for auth or session token synchronization without same-origin path validation"
   reviewConfidence: high

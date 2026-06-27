@@ -2,7 +2,7 @@ module code;
 
 concept OAuthReauthenticationUserMismatch : issue {
   cwe: [CWE_287]
-  review_assumption: "an attacker can complete the OAuth verification step with a different valid OAuth-linked account while operating a stale victim session"
+  reviewAssumption: "an attacker can complete the OAuth verification step with a different valid OAuth-linked account while operating a stale victim session"
   reviewCategory: auth
   reviewCondition: "OAuth reauthentication marks the current session fresh after resolving any OAuth user, without requiring that resolved user to match the current session user"
   reviewConfidence: high

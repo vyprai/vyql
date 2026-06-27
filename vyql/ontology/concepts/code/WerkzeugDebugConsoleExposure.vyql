@@ -2,7 +2,7 @@ module code;
 
 concept WerkzeugDebugConsoleExposure : issue {
   cwe: [CWE_94, CWE_77]
-  review_assumption: "the development server can be reached by an unauthenticated network client"
+  reviewAssumption: "the development server can be reached by an unauthenticated network client"
   reviewCategory: code_execution
   reviewCondition: "Flask/Werkzeug debug mode is bound to an externally reachable interface with the eval console enabled"
   reviewConfidence: high

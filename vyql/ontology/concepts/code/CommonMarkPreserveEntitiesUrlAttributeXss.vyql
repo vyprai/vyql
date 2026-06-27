@@ -2,7 +2,7 @@ module code;
 
 concept CommonMarkPreserveEntitiesUrlAttributeXss : issue {
   cwe: [CWE_79]
-  review_assumption: "applications may render attacker-controlled Markdown output in a browser context"
+  reviewAssumption: "applications may render attacker-controlled Markdown output in a browser context"
   reviewCategory: xss
   reviewCondition: "league/commonmark preserves HTML entities while escaping rendered URL attributes"
   reviewConfidence: high

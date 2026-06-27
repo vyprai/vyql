@@ -2,7 +2,7 @@ module code;
 
 concept JobOutputEventUpdateAuthorizationBypass : issue {
   cwe: [CWE_862]
-  review_assumption: "plugin or child process output is less trusted than the scheduler configuration it can update"
+  reviewAssumption: "plugin or child process output is less trusted than the scheduler configuration it can update"
   reviewCategory: auth
   reviewCondition: "untrusted child job output can request persistent event or schedule updates without an explicit configuration or authorization gate"
   reviewConfidence: high

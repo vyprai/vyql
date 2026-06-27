@@ -2,7 +2,7 @@ module code;
 
 concept DotcmsSqlUtilBlacklistBypass : issue {
   cwe: [CWE_89]
-  review_assumption: "callers may use the sanitized value in ORDER BY, condition, or direction SQL fragments such as the Forms and Content Types admin screens"
+  reviewAssumption: "callers may use the sanitized value in ORDER BY, condition, or direction SQL fragments such as the Forms and Content Types admin screens"
   reviewCategory: sql
   reviewCondition: "dotCMS SQLUtil relies on a single SQL keyword blacklist after quote escaping for dynamic SQL fragments"
   reviewConfidence: high

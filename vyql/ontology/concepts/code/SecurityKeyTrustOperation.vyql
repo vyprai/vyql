@@ -3,7 +3,7 @@ module code;
 concept SecurityKeyTrustOperation : sink {
   cwe: [CWE_358, CWE_347]
   enabledBy: [taint.WeakSecurityIdentifier]
-  review_assumption: "the keyserver or trust store may contain a colliding key identifier"
+  reviewAssumption: "the keyserver or trust store may contain a colliding key identifier"
   reviewCategory: crypto
   reviewCondition: "a shortened security key identifier reaches a key trust operation"
   reviewConfidence: medium

@@ -2,7 +2,7 @@ module code;
 
 concept ChGoCompressedSizeUint32Overflow : issue {
   cwe: [CWE_190, CWE_444]
-  review_assumption: "attacker-controlled external data can produce a large uncompressed or compressed block that wraps the advertised packet length and desynchronizes subsequent query packets"
+  reviewAssumption: "attacker-controlled external data can produce a large uncompressed or compressed block that wraps the advertised packet length and desynchronizes subsequent query packets"
   reviewCategory: numeric
   reviewCondition: "compressed packet size is narrowed to uint32 without checking for overflow before framing the stream"
   reviewConfidence: high

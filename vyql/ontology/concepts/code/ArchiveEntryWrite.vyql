@@ -3,7 +3,7 @@ module code;
 concept ArchiveEntryWrite : sink {
   cwe: [CWE_22, CWE_59]
   enabledBy: [taint.UntrustedData]
-  review_assumption: "the entry name is not normalized, confined, or symlink-safe before writing"
+  reviewAssumption: "the entry name is not normalized, confined, or symlink-safe before writing"
   reviewCategory: path
   reviewCondition: "attacker-controlled archive entry path reaches filesystem write/extraction"
   reviewConfidence: medium

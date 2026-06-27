@@ -2,7 +2,7 @@ module code;
 
 concept LibreOfficeEnhwmfDibHeaderSizeUnderflow : issue {
   cwe: [CWE_190, CWE_787]
-  review_assumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
+  reviewAssumption: "crafted EMF records can choose cbBmiSrc while forcing the alpha-reading path"
   reviewCategory: memory
   reviewCondition: "LibreOffice EMF alpha-blend import subtracts an attacker-controlled bitmap header size from the DIBV5 header size before sizing and copying a heap buffer"
   reviewConfidence: high

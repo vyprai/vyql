@@ -2,7 +2,7 @@ module code;
 
 concept Fat12SuccessorEntryBoundsBypass : issue {
   cwe: [CWE_125, CWE_787, CWE_193]
-  review_assumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
+  reviewAssumption: "a crafted FAT12 filesystem can drive writes near the last FAT entry and make the stale successor entry corrupt later memory accesses"
   reviewCategory: memory
   reviewCondition: "FAT12 even-entry writes read the successor FAT entry using a cluster bound that excludes the reserved FAT entries"
   reviewConfidence: high

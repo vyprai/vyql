@@ -2,7 +2,7 @@ module code;
 
 concept FoldedHeaderContinuationCrash : issue {
   cwe: [CWE_248, CWE_400]
-  review_assumption: "a remote peer can send a malformed header block whose first non-empty line is a folded continuation"
+  reviewAssumption: "a remote peer can send a malformed header block whose first non-empty line is a folded continuation"
   reviewCategory: resource
   reviewCondition: "a header parser handles folded continuation lines before proving a current header field exists"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept ExpiredCachedAuthTokenReuse : issue {
   cwe: [CWE_613]
-  review_assumption: "the cached token is used for authenticated requests and becomes invalid or stale after its expiry time"
+  reviewAssumption: "the cached token is used for authenticated requests and becomes invalid or stale after its expiry time"
   reviewCategory: auth
   reviewCondition: "cached authentication or bearer-token material is only reused while its expiry/timeout is still after the current time"
   reviewConfidence: high

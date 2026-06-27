@@ -2,7 +2,7 @@ module code;
 
 concept TotalJsAdminThemeXss : issue {
   cwe: [CWE_79]
-  review_assumption: "grid column values or notification message text can contain attacker-controlled content shown to an administrator"
+  reviewAssumption: "grid column values or notification message text can contain attacker-controlled content shown to an administrator"
   reviewCategory: xss
   reviewCondition: "Total.js CMS admin theme renders formatted grid values or notification messages without Thelpers.encode"
   reviewConfidence: high

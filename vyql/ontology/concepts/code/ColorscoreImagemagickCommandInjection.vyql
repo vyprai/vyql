@@ -2,7 +2,7 @@ module code;
 
 concept ColorscoreImagemagickCommandInjection : issue {
   cwe: [CWE_78]
-  review_assumption: "library callers can pass attacker-controlled image_path, colors, or depth values containing shell metacharacters"
+  reviewAssumption: "library callers can pass attacker-controlled image_path, colors, or depth values containing shell metacharacters"
   reviewCategory: "command-injection"
   reviewCondition: "colorscore interpolates image path and quantization options directly into an ImageMagick shell command"
   reviewConfidence: high

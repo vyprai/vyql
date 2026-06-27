@@ -2,7 +2,7 @@ module code;
 
 concept CodecovNodeGcovCommandInjection : issue {
   cwe: [CWE_78]
-  review_assumption: "library callers can supply upload options containing shell metacharacters such as backticks that survive sanitizeVar"
+  reviewAssumption: "library callers can supply upload options containing shell metacharacters such as backticks that survive sanitizeVar"
   reviewCategory: command
   reviewCondition: "Codecov Node upload builds a gcov shell command from upload options after stripping only ampersands"
   reviewConfidence: high

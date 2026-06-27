@@ -2,7 +2,7 @@ module code;
 
 concept RequestBackedFooterScriptXss : issue {
   cwe: [CWE_79]
-  review_assumption: "attackers can supply GET, POST, or cookie parameters named footerScripts that reach the footer renderer"
+  reviewAssumption: "attackers can supply GET, POST, or cookie parameters named footerScripts that reach the footer renderer"
   reviewCategory: xss
   reviewCondition: "footer script rendering reads script markup from the merged request bag instead of server-only state"
   reviewConfidence: high

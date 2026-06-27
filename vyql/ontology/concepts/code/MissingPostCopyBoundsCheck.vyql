@@ -2,7 +2,7 @@ module code;
 
 concept MissingPostCopyBoundsCheck : issue {
   cwe: [CWE_787]
-  review_assumption: "the second block length can make the advanced destination offset exceed the allocation"
+  reviewAssumption: "the second block length can make the advanced destination offset exceed the allocation"
   reviewCategory: memory
   reviewCondition: "a later raw copy uses an advanced destination offset without a matching length bound"
   reviewConfidence: medium

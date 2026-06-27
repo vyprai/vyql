@@ -2,7 +2,7 @@ module code;
 
 concept UnescapedRequestGlobalTemplateVar : issue {
   cwe: [CWE_79]
-  review_assumption: "the template variables are later rendered into HTML or script context"
+  reviewAssumption: "the template variables are later rendered into HTML or script context"
   reviewCategory: xss
   reviewCondition: "request data is copied through PHP globals into template variables without an observed HTML escape"
   reviewConfidence: medium

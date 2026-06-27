@@ -2,7 +2,7 @@ module code;
 
 concept PointerAddOverflowAllocation : issue {
   cwe: [CWE_190, CWE_787]
-  review_assumption: "a caller-controlled or model-controlled allocation size can wrap the end pointer below the aligned start"
+  reviewAssumption: "a caller-controlled or model-controlled allocation size can wrap the end pointer below the aligned start"
   reviewCategory: memory
   reviewCondition: "allocator end pointer is computed with pointer-plus-size before checking for addition wraparound"
   reviewConfidence: high

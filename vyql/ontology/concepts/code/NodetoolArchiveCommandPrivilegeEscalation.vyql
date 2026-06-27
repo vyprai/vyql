@@ -2,7 +2,7 @@ module code;
 
 concept NodetoolArchiveCommandPrivilegeEscalation : issue {
   cwe: [CWE_269, CWE_78]
-  review_assumption: "a lower-privileged operator with JMX/nodetool access can invoke the logging endpoint with an archive command"
+  reviewAssumption: "a lower-privileged operator with JMX/nodetool access can invoke the logging endpoint with an archive command"
   reviewCategory: auth
   reviewCondition: "JMX/nodetool users can supply a local archive command that runs as the Cassandra process user"
   reviewConfidence: medium

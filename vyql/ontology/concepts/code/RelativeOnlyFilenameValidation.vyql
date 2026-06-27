@@ -2,7 +2,7 @@ module code;
 
 concept RelativeOnlyFilenameValidation : issue {
   cwe: [CWE_22, CWE_184]
-  review_assumption: "the validated filename may later be resolved by file access code that treats absolute paths as escaping the intended base directory"
+  reviewAssumption: "the validated filename may later be resolved by file access code that treats absolute paths as escaping the intended base directory"
   reviewCategory: path
   reviewCondition: "filename validation rejects parent-directory traversal but still permits absolute path forms"
   reviewConfidence: high

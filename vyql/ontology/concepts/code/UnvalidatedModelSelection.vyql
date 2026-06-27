@@ -2,7 +2,7 @@ module code;
 
 concept UnvalidatedModelSelection : issue {
   cwe: [CWE_20, CWE_863]
-  review_assumption: "remote callers can request unavailable or unauthorized model names and trigger an unauthorized or exceptional path"
+  reviewAssumption: "remote callers can request unavailable or unauthorized model names and trigger an unauthorized or exceptional path"
   reviewCategory: auth
   reviewCondition: "request-selected model or classifier names are used before membership/existence validation"
   reviewConfidence: high

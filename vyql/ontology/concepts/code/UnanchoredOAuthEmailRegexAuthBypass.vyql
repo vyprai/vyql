@@ -2,7 +2,7 @@ module code;
 
 concept UnanchoredOAuthEmailRegexAuthBypass : issue {
   cwe: [CWE_287, CWE_184]
-  review_assumption: "configured auth patterns may be literal emails or domains where prefix regex matching lets attacker-controlled suffixes pass authorization"
+  reviewAssumption: "configured auth patterns may be literal emails or domains where prefix regex matching lets attacker-controlled suffixes pass authorization"
   reviewCategory: auth
   reviewCondition: "OAuth callback email authorization uses prefix regex matching against configured auth patterns instead of exact or full-string matching"
   reviewConfidence: high

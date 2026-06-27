@@ -2,7 +2,7 @@ module code;
 
 concept ServerSideBrowserActiveHtmlRendering : issue {
   cwe: [CWE_918, CWE_79, CWE_200]
-  review_assumption: "the HTML input can be attacker-controlled and the renderer runs with server network or local file visibility"
+  reviewAssumption: "the HTML input can be attacker-controlled and the renderer runs with server network or local file visibility"
   reviewCategory: request_forgery
   reviewCondition: "server-side browser rendering executes or fetches resources from untrusted HTML without sandbox restrictions"
   reviewConfidence: high

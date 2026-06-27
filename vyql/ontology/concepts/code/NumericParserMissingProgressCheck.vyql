@@ -2,7 +2,7 @@ module code;
 
 concept NumericParserMissingProgressCheck : issue {
   cwe: [CWE_400, CWE_835]
-  review_assumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
+  reviewAssumption: "malformed numeric input can leave the parse cursor unchanged and cause repeated parser work or an infinite loop"
   reviewCategory: resource
   reviewCondition: "a numeric parser can retry parsing without verifying that the parse cursor advanced"
   reviewConfidence: high

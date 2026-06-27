@@ -2,7 +2,7 @@ module code;
 
 concept ModexpZeroExponentIterationUnderflow : issue {
   cwe: [CWE_191, CWE_400]
-  review_assumption: "callers can provide a zero exponent with an exponent length above the short-exponent branch, triggering unsigned underflow or inflated gas accounting"
+  reviewAssumption: "callers can provide a zero exponent with an exponent length above the short-exponent branch, triggering unsigned underflow or inflated gas accounting"
   reviewCategory: numeric
   reviewCondition: "modular exponentiation gas accounting subtracts one from a zero exponent bit length before adding the positive length term"
   reviewConfidence: high

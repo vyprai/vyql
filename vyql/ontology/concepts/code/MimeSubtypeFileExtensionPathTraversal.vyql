@@ -2,7 +2,7 @@ module code;
 
 concept MimeSubtypeFileExtensionPathTraversal : issue {
   cwe: [CWE_22]
-  review_assumption: "an attacker-controlled server can return a crafted Content-Type subtype containing path separators or dangerous extension text"
+  reviewAssumption: "an attacker-controlled server can return a crafted Content-Type subtype containing path separators or dangerous extension text"
   reviewCategory: path
   reviewCondition: "a MIME subtype from response metadata is converted directly into a file extension used for writes"
   reviewConfidence: high

@@ -2,7 +2,7 @@ module code;
 
 concept LengthMultiplierFormattedExpansionUnderallocation : issue {
   cwe: [CWE_787, CWE_190]
-  review_assumption: "the generated formatted tokens can grow beyond the per-input multiplier as numeric indexes gain digits"
+  reviewAssumption: "the generated formatted tokens can grow beyond the per-input multiplier as numeric indexes gain digits"
   reviewCategory: memory
   reviewCondition: "a buffer is allocated from input length with a fixed small multiplier before formatted numeric expansion writes into it"
   reviewConfidence: high
