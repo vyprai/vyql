@@ -19,7 +19,7 @@ var (
 	}
 	v2SemanticFamilies = map[string]bool{
 		"concept": true, "finding": true, "exposure": true, "asset": true,
-		"principal": true, "privilege": true, "state": true, "observation": true,
+		"principal": true, "privilege": true, "state": true,
 	}
 	v2RequirementPrimitives = map[string]bool{
 		"language": true, "dependency": true, "import": true, "file": true,
@@ -27,13 +27,13 @@ var (
 	}
 	v2RequirementCombinators   = map[string]bool{"all": true, "any": true, "not": true, "soft": true}
 	v2CoverageModes            = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true, "global": true}
-	v2ConceptKinds             = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
+	v2ConceptKinds             = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2MechanicKinds            = map[string]bool{"ruleVerb": true, "coverage": true, "context": true, "requirement": true}
 	v2PolicyKinds              = map[string]bool{"resultLifecycle": true, "resultIdentity": true, "confidence": true, "priority": true, "display": true, "diagnostic": true}
 	v2MechanicCapabilities     = map[string]bool{"coverage.path": true, "coverage.endpoint": true, "coverage.sameReceiver": true, "coverage.sameScope": true, "coverage.dominates": true, "coverage.postDominates": true, "coverage.global": true, "dataflow.taint": true, "graph.reach": true, "graph.grant": true, "fact.exists": true, "query.semantic": true}
 	v2RuleClauseKinds          = map[string]bool{"where": true, "coveredBy": true, "confidence": true, "profile": true}
 	v2EmitKinds                = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
-	v2FactEmitKinds            = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
+	v2FactEmitKinds            = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2PropagateKinds           = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
 	v2ProductionPropagateKinds = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
@@ -176,8 +176,8 @@ func builtinV2RuleVerbMechanics() map[string]v2RuleVerbMechanic {
 		"reach": {FromKinds: []string{"asset", "exposure"}, ToKinds: []string{"asset", "exposure"}, AllowedClauses: clauses},
 		"grant": {FromKinds: []string{"principal"}, ToKinds: []string{"principal", "privilege"}, AllowedClauses: clauses},
 		"issue": {FromKinds: []string{"issue"}, AllowedClauses: clauses},
-		"fact":  {FromKinds: []string{"fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: clauses},
-		"query": {FromKinds: []string{"concept", "fact", "asset", "exposure", "principal", "privilege", "state", "observation"}, AllowedClauses: v2StringSet([]string{"where", "confidence", "profile"})},
+		"fact":  {FromKinds: []string{"fact", "asset", "exposure", "principal", "privilege", "state"}, AllowedClauses: clauses},
+		"query": {FromKinds: []string{"concept", "fact", "asset", "exposure", "principal", "privilege", "state"}, AllowedClauses: v2StringSet([]string{"where", "confidence", "profile"})},
 	}
 }
 
@@ -325,7 +325,7 @@ func validateV2ConceptModelReferences(sourceName string, c *V2ConceptDecl, scope
 	var errs []error
 	errs = append(errs, validateV2ModelRefList(ctx, c.Fields, "vulnerableTo", scope, true, true)...)
 	errs = append(errs, validateV2ModelRefList(ctx, c.Fields, "neutralizes", scope, true, true)...)
-	errs = append(errs, validateV2ConceptRefList(ctx, c.Fields, "enabledBy", scope, "source", "fact", "asset", "exposure", "principal", "privilege", "state", "observation")...)
+	errs = append(errs, validateV2ConceptRefList(ctx, c.Fields, "enabledBy", scope, "source", "fact", "asset", "exposure", "principal", "privilege", "state")...)
 	errs = append(errs, validateV2ConceptRefList(ctx, c.Fields, "expected", scope, "check")...)
 	errs = append(errs, validateV2ConceptRefList(ctx, c.Fields, "taint", scope, "source", "fact")...)
 	if raw, ok := c.Fields["refines"]; ok {
@@ -625,7 +625,7 @@ func validateV2EmitConceptKindStrict(ctx, emitKind, concept string, concepts v2C
 	case "source", "sink", "check", "issue":
 		return validateV2EndpointConceptKind(ctx, emitKind, concept, concepts, want)
 	case "fact":
-		return validateV2EndpointConceptKind(ctx, emitKind, concept, concepts, "fact", "asset", "exposure", "principal", "privilege", "state", "observation")
+		return validateV2EndpointConceptKind(ctx, emitKind, concept, concepts, "fact", "asset", "exposure", "principal", "privilege", "state")
 	default:
 		return nil
 	}
@@ -1021,7 +1021,7 @@ func validateV2StringListPolicy(p *V2PolicyDecl, allowedKeys ...string) []error 
 
 var (
 	v2RequirementEvidenceStates = map[string]bool{"satisfied": true, "missing": true, "unknown": true, "conflicting": true}
-	v2LifecyclePolicyRefs       = map[string]bool{"explainsFinding": true, "candidate": true, "covered": true, "rule": true, "concept": true, "source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
+	v2LifecyclePolicyRefs       = map[string]bool{"explainsFinding": true, "candidate": true, "covered": true, "rule": true, "concept": true, "source": true, "sink": true, "check": true, "issue": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true}
 	v2LifecyclePolicyCalls      = map[string]int{"emitted": 1, "matched": 1, "hasReview": 1}
 	v2ConfidencePolicyRefs      = map[string]bool{"rule": true, "endpoints": true, "propagation": true, "requirements": true}
 	v2ConfidencePolicyCalls     = map[string]int{"min": -1, "max": -1}

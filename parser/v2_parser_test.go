@@ -345,7 +345,6 @@ concept Exposure : exposure {}
 concept Principal : principal {}
 concept Privilege : privilege {}
 concept State : state {}
-concept Observation : observation {}
 pattern callExpr { node: call }
 binding outputs {
   query pattern callExpr
@@ -361,7 +360,6 @@ binding outputs {
   emit fact Principal at call
   emit fact Privilege at call
   emit fact State at call
-  emit fact Observation at call
   propagate value from args[0] to args[1]
 }
 `)
@@ -369,8 +367,8 @@ binding outputs {
 		t.Fatalf("ParseV2: %v", err)
 	}
 	binding := prog.Decls[len(prog.Decls)-1].(*V2BindingDecl)
-	if got := len(binding.Outputs); got != 12 {
-		t.Fatalf("binding outputs = %d, want 12", got)
+	if got := len(binding.Outputs); got != 11 {
+		t.Fatalf("binding outputs = %d, want 11", got)
 	}
 }
 
@@ -1147,10 +1145,10 @@ rule ConfigGuard {
 	}
 }
 
-func TestValidateV2CorpusAllowsEmitFactObservation(t *testing.T) {
+func TestValidateV2CorpusAllowsEmitFactConcept(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module code;
-concept PublicRouteObservation : observation {}
+concept PublicRouteObservation : fact {}
 `, `
 module bindings.web;
 binding publicRoute {
@@ -1159,7 +1157,20 @@ binding publicRoute {
 }
 `)
 	if err := ValidateV2Corpus(sources); err != nil {
-		t.Fatalf("ValidateV2Corpus rejected observation fact emit: %v", err)
+		t.Fatalf("ValidateV2Corpus rejected fact emit: %v", err)
+	}
+}
+
+func TestValidateV2CorpusRejectsNonSpecObservationConceptKind(t *testing.T) {
+	_, err := ParseV2(`
+module code;
+concept PublicRouteObservation : observation {}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 accepted observation concept kind")
+	}
+	if !strings.Contains(err.Error(), `unknown v2 concept kind "observation"`) {
+		t.Fatalf("error = %v, want observation kind diagnostic", err)
 	}
 }
 

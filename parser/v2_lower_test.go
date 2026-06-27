@@ -2215,14 +2215,14 @@ concept SqlExecution : sink {
 	}
 }
 
-func TestV2ScannerIRSupportsGrantRulesAndObservationConcepts(t *testing.T) {
+func TestV2ScannerIRSupportsGrantRulesAndContextFactConcepts(t *testing.T) {
 	decls := parseIRFiles(t, `
 module custom;
 concept External : principal {}
 concept Elevated : privilege {
   grantMinLevel: ADMIN
 }
-concept PublicEdgeObservation : observation {
+concept PublicEdgeObservation : fact {
   contextConfirmFlagValue: true
 }
 `, `
@@ -2231,14 +2231,14 @@ rule ExternalGrant {
   grant custom.External -> custom.Elevated
 }
 `)
-	var sawObservation, sawGrant bool
+	var sawFact, sawGrant bool
 	for _, decl := range decls {
 		switch d := decl.(type) {
 		case *ConceptDecl:
 			if d.QualifiedName() == "custom.PublicEdgeObservation" {
-				sawObservation = true
-				if d.Kind != "observation" || d.Fields["context_confirm_flag_value"] != true {
-					t.Fatalf("observation concept lowering wrong: %+v", d)
+				sawFact = true
+				if d.Kind != "fact" || d.Fields["context_confirm_flag_value"] != true {
+					t.Fatalf("context fact concept lowering wrong: %+v", d)
 				}
 			}
 		case *Rule:
@@ -2251,8 +2251,8 @@ rule ExternalGrant {
 			}
 		}
 	}
-	if !sawObservation || !sawGrant {
-		t.Fatalf("missing observation=%v grant=%v in decls: %+v", sawObservation, sawGrant, decls)
+	if !sawFact || !sawGrant {
+		t.Fatalf("missing context fact=%v grant=%v in decls: %+v", sawFact, sawGrant, decls)
 	}
 }
 

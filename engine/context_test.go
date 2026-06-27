@@ -103,7 +103,7 @@ concept PublicEdge : exposure {
   context_reach_label: "public-edge-reachable"
   context_reach_target_prop: endpoint
 }
-concept PublicEdgeObservation : observation {
+concept PublicEdgeObservation : fact {
   context_confirm_dst_prop: target
   context_confirm_flag_prop: observed
   context_confirm_flag_value: yes

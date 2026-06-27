@@ -35,7 +35,7 @@ func runtimeTestOntology() *ontology.Ontology {
 	onto.Add(ontology.Concept{
 		Name:                    "ObservedLink",
 		Package:                 "custom",
-		Kind:                    "observation",
+		Kind:                    "fact",
 		ContextConfirmDstProp:   "dst",
 		ContextConfirmFlagProp:  "observed",
 		ContextConfirmFlagValue: "yes",
