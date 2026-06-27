@@ -25,6 +25,29 @@ func TestOWASPBenchmark(t *testing.T) {
 	if dir == "" {
 		dir = "/tmp/bench/BenchmarkPython"
 	}
+	runOWASPBenchmarkDir(t, dir)
+}
+
+// TestLocalOWASPPortBenchmarks scores every generated local OWASP language port
+// and enforces the exact protected parity target for each. It is intentionally
+// opt-in because it scans 22 full benchmark corpora.
+func TestLocalOWASPPortBenchmarks(t *testing.T) {
+	if os.Getenv("VYQL_BENCH_ALL_OWASP") == "" {
+		t.Skip("set VYQL_BENCH_ALL_OWASP=1 to score every /Users/rizqme/Workspace/owasp-* port")
+	}
+	for _, dir := range localOWASPPortDirs() {
+		dir := dir
+		t.Run(filepath.Base(dir), func(t *testing.T) {
+			if _, err := os.Stat(dir); err != nil {
+				t.Fatalf("local OWASP port %s is not available: %v", dir, err)
+			}
+			runOWASPBenchmarkDir(t, dir)
+		})
+	}
+}
+
+func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
+	t.Helper()
 	expected := loadExpected(t, dir)
 	if len(expected) == 0 {
 		t.Fatalf("no expectedresults*.csv found under %s", dir)
@@ -100,6 +123,7 @@ func TestOWASPBenchmark(t *testing.T) {
 	if want, ok := protectedOWASPBenchmarkExpectation(dir); ok {
 		gotScore.assert(t, dir, want)
 	}
+	return gotScore
 }
 
 // hasAdvisoryNote reports whether a finding is advisory-gated — an unsound neutralizer
@@ -211,6 +235,38 @@ func protectedOWASPBenchmarkExpectation(dir string) (benchmarkScore, bool) {
 	}
 }
 
+func localOWASPPortDirs() []string {
+	ports := []string{
+		"bash",
+		"c",
+		"cpp",
+		"csharp",
+		"dart",
+		"elixir",
+		"go",
+		"groovy",
+		"js",
+		"kotlin",
+		"lua",
+		"objc",
+		"perl",
+		"php",
+		"powershell",
+		"python",
+		"ruby",
+		"rust",
+		"scala",
+		"solidity",
+		"swift",
+		"typescript",
+	}
+	out := make([]string, 0, len(ports))
+	for _, port := range ports {
+		out = append(out, filepath.Join("/Users/rizqme/Workspace", "owasp-"+port))
+	}
+	return out
+}
+
 func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
 	tests := []struct {
 		dir  string
@@ -223,6 +279,13 @@ func TestProtectedOWASPBenchmarkExpectation(t *testing.T) {
 		{dir: "/tmp/bench/BenchmarkPython", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.81}, ok: true},
 		{dir: "/tmp/benchjs", want: benchmarkScore{tp: 1415, fn: 0, fp: benchmarkCountWildcard, tn: benchmarkCountWildcard, overall: 0.78}, ok: true},
 		{dir: "/tmp/random-benchmark", ok: false},
+	}
+	for _, dir := range localOWASPPortDirs() {
+		tests = append(tests, struct {
+			dir  string
+			want benchmarkScore
+			ok   bool
+		}{dir: dir, want: benchmarkScore{tp: 1415, fn: 0, fp: 0, tn: 1325, overall: 1.0}, ok: true})
 	}
 	for _, tt := range tests {
 		got, ok := protectedOWASPBenchmarkExpectation(tt.dir)
