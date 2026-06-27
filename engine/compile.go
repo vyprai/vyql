@@ -91,13 +91,12 @@ func builtinRuleVerbMechanics() ruleVerbMechanicPolicy {
 	return ruleVerbMechanicPolicy{
 		present: true,
 		verbs: map[string]ruleVerbMechanic{
-			"taint":  {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
-			"reach":  {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
-			"grant":  {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
-			"assume": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
-			"issue":  {FromKinds: map[string]bool{"issue": true}, ToKinds: nil},
-			"fact":   {FromKinds: map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
-			"query":  {FromKinds: map[string]bool{"concept": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
+			"taint": {FromKinds: map[string]bool{"source": true}, ToKinds: map[string]bool{"sink": true}},
+			"reach": {FromKinds: map[string]bool{"asset": true, "exposure": true}, ToKinds: map[string]bool{"asset": true, "exposure": true}},
+			"grant": {FromKinds: map[string]bool{"principal": true}, ToKinds: map[string]bool{"principal": true, "privilege": true}},
+			"issue": {FromKinds: map[string]bool{"issue": true}, ToKinds: nil},
+			"fact":  {FromKinds: map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
+			"query": {FromKinds: map[string]bool{"concept": true, "fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}, ToKinds: nil},
 		},
 	}
 }

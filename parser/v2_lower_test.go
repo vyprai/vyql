@@ -2066,6 +2066,19 @@ rule ExternalAssume {
 	}
 }
 
+func TestV2ScannerIRRejectsAuthoredAssumeSolverCall(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module rules.identity;
+rule ExternalAssume {
+  issue custom.Marker as m
+  where assume(custom.External, custom.Elevated)
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), `unsupported call "assume"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want authored assume solver rejection", err)
+	}
+}
+
 const v2CorePoliciesForLoweringTest = `
 module policies.core;
 policy resultIdentity default {

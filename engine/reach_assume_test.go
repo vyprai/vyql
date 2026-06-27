@@ -51,9 +51,9 @@ rule ReachAsset {
 	}
 }
 
-func TestAssumeEscalationMultiStep(t *testing.T) {
+func TestGrantEscalationMultiStep(t *testing.T) {
 	onto := solverContractOntology()
-	cr := compileInternalAssumeRuleForTest(t, onto, "TEST-ASSUME", "custom.Actor", "custom.Capability")
+	cr := compileInternalGrantRuleForTest(t, onto, "TEST-GRANT-MULTI", "custom.Actor", "custom.Capability")
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor", Props: map[string]string{"loc": "actor"}})
 	s.AddLabel("actor", usg.Label{Concept: "custom.Actor"})
@@ -70,8 +70,8 @@ func TestAssumeEscalationMultiStep(t *testing.T) {
 	if len(fs) != 1 {
 		t.Fatalf("expected 1 escalation finding, got %d", len(fs))
 	}
-	if fs[0].WitnessKind != "assume" {
-		t.Fatalf("WitnessKind = %q, want assume", fs[0].WitnessKind)
+	if fs[0].WitnessKind != "grant" {
+		t.Fatalf("WitnessKind = %q, want grant", fs[0].WitnessKind)
 	}
 	if len(fs[0].Witness) != 3 {
 		t.Fatalf("expected a 3-step ability chain, got %v", fs[0].Witness)
@@ -127,7 +127,7 @@ concept Elevated : privilege {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	cr := compileInternalAssumeRuleForTest(t, onto, "TEST-ASSUME", "custom.External", "custom.Elevated")
+	cr := compileInternalGrantRuleForTest(t, onto, "TEST-GRANT-MIN-LEVEL", "custom.External", "custom.Elevated")
 	s := usg.NewInMemStore()
 	s.AddNode(usg.Node{ID: "ext", Type: "custom.Principal"})
 	s.AddLabel("ext", usg.Label{Concept: "custom.External"})
@@ -139,25 +139,46 @@ concept Elevated : privilege {
 		t.Fatalf("eval: %v", err)
 	}
 	if len(fs) != 1 {
-		t.Fatalf("expected data-driven min-level assume finding, got %d", len(fs))
+		t.Fatalf("expected data-driven min-level grant finding, got %d", len(fs))
 	}
 }
 
-func compileInternalAssumeRuleForTest(t *testing.T, onto *ontology.Ontology, id, src, dst string) *CompiledRule {
-	t.Helper()
+func TestCompileRejectsInternalAssumeVerb(t *testing.T) {
+	onto := solverContractOntology()
 	decls := []parser.Decl{&parser.Rule{
 		Name:    "InternalAssume",
 		Package: "test",
-		Meta:    map[string]any{"id": id, "severity": "critical"},
+		Meta:    map[string]any{"id": "TEST-ASSUME-REJECT", "severity": "critical"},
 		Body: &parser.FlowStmt{
 			Verb: "assume",
+			Src:  parser.Endpoint{Concept: "custom.Actor"},
+			Dst:  parser.Endpoint{Concept: "custom.Capability"},
+		},
+	}}
+	_, errs := CompileRules(decls, onto)
+	if len(errs) == 0 {
+		t.Fatalf("expected internal assume verb to be rejected")
+	}
+	if !strings.Contains(errs[0].Error(), `rule verb "assume" has no built-in rule verb policy`) {
+		t.Fatalf("compile error = %v, want missing assume rule verb policy", errs)
+	}
+}
+
+func compileInternalGrantRuleForTest(t *testing.T, onto *ontology.Ontology, id, src, dst string) *CompiledRule {
+	t.Helper()
+	decls := []parser.Decl{&parser.Rule{
+		Name:    "InternalGrant",
+		Package: "test",
+		Meta:    map[string]any{"id": id, "severity": "critical"},
+		Body: &parser.FlowStmt{
+			Verb: "grant",
 			Src:  parser.Endpoint{Concept: src},
 			Dst:  parser.Endpoint{Concept: dst},
 		},
 	}}
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
-		t.Fatalf("compile internal assume: %v", errs)
+		t.Fatalf("compile internal grant: %v", errs)
 	}
 	return compiled[0]
 }

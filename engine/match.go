@@ -235,7 +235,7 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 			}
 			return true, w
 		}
-	case "grant", "assume":
+	case "grant":
 		bConcept := call.Args[1].Ref.String()
 		bIDs := e.resolveArg(call.Args[1], env)
 		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))

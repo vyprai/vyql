@@ -72,8 +72,6 @@ func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 			return e.evalReach(cr)
 		case "grant":
 			return e.evalPrivilegeClosure(cr, "grant")
-		case "assume":
-			return e.evalPrivilegeClosure(cr, "assume")
 		}
 	case *parser.MatchStmt:
 		return e.evalMatch(cr)
@@ -589,8 +587,8 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		if wf := e.charFilterAssumption(fl.Path, excluded); wf != "" {
 			ne = append(ne, findings.NegationEvidence{Clause: "char-filter (assumption)", Satisfied: false, Detail: wf})
 		}
-		// Unsound guards/sanitizers (declared via the `assume` directive) likewise never kill
-		// the flow — they annotate it as assumption-gated.
+		// Unsound guards/sanitizers are Go-owned mechanics. They never kill the flow;
+		// they annotate it as assumption-gated.
 		ne = append(ne, e.neutralizerAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
