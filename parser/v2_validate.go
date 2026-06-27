@@ -46,7 +46,7 @@ var (
 )
 
 // ValidateV2 applies language-contract checks that are semantic enough to sit
-// above token parsing but below runtime typechecking. It intentionally does not
+// above token parsing but below scanner IR and engine typechecking. It intentionally does not
 // validate concept existence; converted content may be checked one file at a
 // time before the whole definition graph is loaded.
 func ValidateV2(prog *V2Program) error {

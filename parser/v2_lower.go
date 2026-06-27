@@ -50,7 +50,7 @@ func ParseV2DefinitionSourcesSelected(raw []V2DefinitionSource, keep func(V2Defi
 
 // lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.
 func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
-	return lowerV2ProgramToDeclarationsWithMechanics(prog, runtimeMechanicsFromProgram(prog))
+	return lowerV2ProgramToDeclarationsWithMechanics(prog, v2MechanicsFromProgram(prog))
 }
 
 func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
@@ -58,10 +58,10 @@ func LowerV2DefinitionSources(sources []V2Source) ([]Decl, error) {
 }
 
 func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, error) {
-	mechanics := runtimeMechanics{}
+	mechanics := v2Mechanics{}
 	outCap := 0
 	for _, src := range sources {
-		mechanics.merge(runtimeMechanicsFromProgram(src.Program))
+		mechanics.merge(v2MechanicsFromProgram(src.Program))
 	}
 	for i, src := range sources {
 		if keep != nil && !keep[i] {
@@ -85,13 +85,13 @@ func lowerV2DefinitionSourcesSelected(sources []V2Source, keep []bool) ([]Decl, 
 	return out, nil
 }
 
-type runtimeMechanics struct {
+type v2Mechanics struct {
 	ruleSolvers   map[string]string
 	coverageModes map[string]bool
 	policies      map[string]bool
 }
 
-func (m *runtimeMechanics) merge(other runtimeMechanics) {
+func (m *v2Mechanics) merge(other v2Mechanics) {
 	if len(other.ruleSolvers) != 0 && m.ruleSolvers == nil {
 		m.ruleSolvers = make(map[string]string, len(other.ruleSolvers))
 	}
@@ -112,8 +112,8 @@ func (m *runtimeMechanics) merge(other runtimeMechanics) {
 	}
 }
 
-func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
-	out := runtimeMechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}}
+func v2MechanicsFromProgram(prog *V2Program) v2Mechanics {
+	out := v2Mechanics{ruleSolvers: map[string]string{}, coverageModes: map[string]bool{}, policies: map[string]bool{}}
 	if prog == nil {
 		return out
 	}
@@ -135,7 +135,7 @@ func runtimeMechanicsFromProgram(prog *V2Program) runtimeMechanics {
 	return out
 }
 
-func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtimeMechanics) ([]Decl, error) {
+func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics v2Mechanics) ([]Decl, error) {
 	if prog == nil {
 		return nil, nil
 	}
@@ -439,7 +439,7 @@ func v2BindingTechnology(module string) string {
 	return ""
 }
 
-func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics runtimeMechanics) ([]BindingAction, error) {
+func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics v2Mechanics) ([]BindingAction, error) {
 	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
 		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
@@ -702,12 +702,12 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 		}
 	}
 	if nodeCount != 1 {
-		return nil, "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call node for runtime lowering", binding, pat.Name)
+		return nil, "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call node for scanner IR lowering", binding, pat.Name)
 	}
 	return where, alias, binds, nil
 }
 
-func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics runtimeMechanics) ([]BindingAction, bool, error) {
+func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics v2Mechanics) ([]BindingAction, bool, error) {
 	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr)
 	if err != nil || !ok {
 		return nil, ok, err
@@ -1119,7 +1119,7 @@ func validateV2ConcreteCheck(binding string, action V2BindingOutput) error {
 	}
 }
 
-func validateV2OutputCoverageMechanics(binding string, action V2BindingOutput, mechanics runtimeMechanics) error {
+func validateV2OutputCoverageMechanics(binding string, action V2BindingOutput, mechanics v2Mechanics) error {
 	for _, cov := range action.Covers {
 		if cov.Mode == "" {
 			continue
@@ -1336,7 +1336,7 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return lowerV2CalleeShapes(binding, strings.TrimPrefix(field, "call."), cmp, cmpNeg)
 	case "callee.receiver.type", "call.callee.receiver.type":
 		if cmpNeg {
-			return nil, fmt.Errorf("binding %s: negated receiver type predicate is not implemented in runtime lowering", binding)
+			return nil, fmt.Errorf("binding %s: negated receiver type predicate is not implemented in scanner IR lowering", binding)
 		}
 		constraint, ok := lowerV2ReceiverConstraint(cmp)
 		if !ok {
@@ -1345,7 +1345,7 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return []v2CallShape{{Constraint: constraint}}, nil
 	case "args.any.literal", "call.args.any.literal":
 		if cmp.Op != "contains" {
-			return nil, fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in runtime lowering", binding, cmp.Op)
+			return nil, fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in scanner IR lowering", binding, cmp.Op)
 		}
 		value, ok := v2LiteralString(cmp.Right)
 		if !ok {
@@ -1374,17 +1374,17 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 			return nil, fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
 		}
 		if !v {
-			return nil, fmt.Errorf("binding %s: call.filter.global == false is not implemented in runtime lowering", binding)
+			return nil, fmt.Errorf("binding %s: call.filter.global == false is not implemented in scanner IR lowering", binding)
 		}
 		return []v2CallShape{{}}, nil
 	default:
-		return nil, fmt.Errorf("binding %s: query predicate %q is not implemented in runtime lowering", binding, left.Name)
+		return nil, fmt.Errorf("binding %s: query predicate %q is not implemented in scanner IR lowering", binding, left.Name)
 	}
 }
 
 func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
 	if neg {
-		return nil, fmt.Errorf("binding %s: negated callee predicate is not implemented in runtime lowering", binding)
+		return nil, fmt.Errorf("binding %s: negated callee predicate is not implemented in scanner IR lowering", binding)
 	}
 	var values []string
 	exact := field == "callee.path" && (cmp.Op == "==" || cmp.Op == "in")
@@ -1402,7 +1402,7 @@ func lowerV2CalleeShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v
 			return nil, fmt.Errorf("binding %s: callee %s in predicate requires a non-empty string list", binding, field)
 		}
 	default:
-		return nil, fmt.Errorf("binding %s: callee predicate operator %q is not implemented in runtime lowering", binding, cmp.Op)
+		return nil, fmt.Errorf("binding %s: callee predicate operator %q is not implemented in scanner IR lowering", binding, cmp.Op)
 	}
 	out := make([]v2CallShape, 0, len(values))
 	for _, value := range values {
@@ -1799,7 +1799,7 @@ func v2SinkLocationParts(location string) (v2SinkLocationInfo, error) {
 	return out, nil
 }
 
-func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics) (*Rule, error) {
+func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2Mechanics) (*Rule, error) {
 	out := &Rule{Name: r.Name, Package: r.Module, Meta: lowerV2FieldNames(r.Meta)}
 	if out.Meta != nil {
 		if raw := out.Meta["confidence_floor"]; raw != nil {
@@ -1821,7 +1821,7 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics runtimeMechanics
 		if r.Body.From.Concept == "" || r.Body.To.Concept == "" {
 			return nil, fmt.Errorf("rule %s: solver capability %q requires from/to endpoints", r.Name, solver)
 		}
-		verb, err := v2RuntimeFlowVerbForSolver(solver)
+		verb, err := v2IRFlowVerbForSolver(solver)
 		if err != nil {
 			return nil, fmt.Errorf("rule %s: %w", r.Name, err)
 		}
@@ -1925,7 +1925,7 @@ func appendStringField(raw any, value string) []string {
 	}
 }
 
-func v2RuntimeFlowVerbForSolver(solver string) (string, error) {
+func v2IRFlowVerbForSolver(solver string) (string, error) {
 	switch solver {
 	case "dataflow.taint":
 		return "taint", nil
@@ -1934,7 +1934,7 @@ func v2RuntimeFlowVerbForSolver(solver string) (string, error) {
 	case "graph.reach":
 		return "reach", nil
 	default:
-		return "", fmt.Errorf("solver capability %q is not a runtime flow solver", solver)
+		return "", fmt.Errorf("solver capability %q is not a scanner IR flow solver", solver)
 	}
 }
 
@@ -1952,11 +1952,11 @@ func lowerV2RuleQuery(body V2RuleBody, names v2NameResolver) (Stmt, error) {
 }
 
 func lowerV2OrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) (*OrderStmt, bool) {
-	if q.Family != "concept" || q.Alias == "" || len(q.Steps) != 1 {
+	if !v2SemanticConceptFamily(q.Family) || q.Alias == "" || len(q.Steps) != 1 {
 		return nil, false
 	}
 	step := q.Steps[0]
-	if step.Relation != "reaches" || step.Family != "concept" || step.Alias == "" || selectAlias != step.Alias {
+	if step.Relation != "reaches" || !v2SemanticConceptFamily(step.Family) || step.Alias == "" || selectAlias != step.Alias {
 		return nil, false
 	}
 	first, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
@@ -1971,6 +1971,15 @@ func lowerV2OrderQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) 
 		First:  Endpoint{Concept: names.concept(first), Binding: q.Alias},
 		Second: Endpoint{Concept: names.concept(second), Binding: step.Alias},
 	}, true
+}
+
+func v2SemanticConceptFamily(family string) bool {
+	switch family {
+	case "concept", "fact", "asset", "exposure", "principal", "privilege", "observation":
+		return true
+	default:
+		return false
+	}
 }
 
 func lowerV2TransitionQuery(q V2QueryExpr, selectAlias string) (*MatchStmt, bool) {

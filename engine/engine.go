@@ -89,6 +89,14 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	body := cr.Rule.Body.(*parser.OrderStmt)
 	firsts := e.nodesWithConcept(body.First.Concept)
 	seconds := e.nodesWithConcept(body.Second.Concept)
+	firstName := body.First.Binding
+	if firstName == "" {
+		firstName = "first"
+	}
+	secondName := body.Second.Binding
+	if secondName == "" {
+		secondName = "second"
+	}
 	var out []*findings.Finding
 	for _, a := range firsts {
 		for _, b := range seconds {
@@ -100,8 +108,8 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 				Confidence:       e.confBindings(bindingRef{nodeID: a, concept: body.First.Concept}, bindingRef{nodeID: b, concept: body.Second.Concept}),
 				ReviewConditions: append(e.reviewConditions(a, body.First.Concept), e.reviewConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
-					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
-					{Name: "second", NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
+					{Name: firstName, NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
+					{Name: secondName, NodeID: b, Concept: body.Second.Concept, Loc: e.loc(b), LabelProvenance: e.prov(b, body.Second.Concept)},
 				},
 			})
 		}

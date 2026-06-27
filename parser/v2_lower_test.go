@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestV2LoweringToRuntimeDecls(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2LoweringToScannerIRDecls(t *testing.T) {
+	decls := parseIRFiles(t, `
 module core;
 concept SqlParameterization : check { neutralizes: [code.SqlExecution] }
 `, `
@@ -107,7 +107,7 @@ rule CustomFlow {
 	}
 	body, ok := rule.Body.(*FlowStmt)
 	if !ok || body.Verb != "taint" {
-		t.Fatalf("authored solver did not drive runtime flow verb: %+v", rule.Body)
+		t.Fatalf("authored solver did not drive scanner IR flow verb: %+v", rule.Body)
 	}
 }
 
@@ -234,7 +234,7 @@ rule SelectedOnly {
 	}
 }
 
-func TestV2RuntimePreservesMechanicsAndPolicies(t *testing.T) {
+func TestV2ScannerIRPreservesMechanicsAndPolicies(t *testing.T) {
 	decls, err := ParseV2Definitions(`
 module mechanics.sast;
 mechanic ruleVerb taint {
@@ -327,7 +327,7 @@ rule SelectedOnly {
 }
 
 func TestV2LoweringUsesLocalPatternWhere(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+	decls := parseIRFiles(t, `
 module bindings.javascript.express;
 pattern requestBodyCall as call {
   node: call
@@ -349,7 +349,7 @@ binding requestBody {
 }
 
 func TestV2LoweringRewritesPatternBindAliases(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+	decls := parseIRFiles(t, `
 module bindings.javascript.sql;
 pattern dbCall as call {
   node: call
@@ -414,7 +414,7 @@ func TestV2BindingTechnologyScansModuleSegments(t *testing.T) {
 }
 
 func TestV2LoweringAllowsImportedBuiltinCallExprPattern(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+	decls := parseIRFiles(t, `
 module bindings.javascript.express;
 uses patterns.javascript.callExpr as jsCall;
 binding requestBody {
@@ -448,8 +448,8 @@ binding routeSource {
 	}
 }
 
-func TestV2LoweringResolvesUsesAliasesToRuntimeConcepts(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2LoweringResolvesUsesAliasesToScannerIRConcepts(t *testing.T) {
+	decls := parseIRFiles(t, `
 module bindings.javascript.express;
 uses code.HttpInput as Input;
 binding requestBody {
@@ -1489,9 +1489,9 @@ rule Confidence {
 	if got, ok := asset.Clauses[0].Where.(HoldsAssetKind); !ok || got.Ref.String() != "cloud.Database" || len(got.Kinds) != 1 || got.Kinds[0] != "data.Pii" {
 		t.Fatalf("asset where = %#v, want HoldsAssetKind", asset.Clauses[0].Where)
 	}
-	runtimeRule := decls[2].(*Rule)
-	if got, ok := runtimeRule.Clauses[0].Where.(Has); !ok || got.Ref.String() != "c.dst" || got.Concept != "threat.MiningPool" {
-		t.Fatalf("runtime where = %#v, want Has", runtimeRule.Clauses[0].Where)
+	irRule := decls[2].(*Rule)
+	if got, ok := irRule.Clauses[0].Where.(Has); !ok || got.Ref.String() != "c.dst" || got.Concept != "threat.MiningPool" {
+		t.Fatalf("scanner IR where = %#v, want Has", irRule.Clauses[0].Where)
 	}
 	drift := decls[3].(*Rule)
 	if got, ok := drift.Clauses[0].Where.(NotIn); !ok || got.Ref.String() != "p.image" || !got.Negate || len(got.Values) != 3 {
@@ -1503,7 +1503,7 @@ rule Confidence {
 	}
 }
 
-func TestV2RuleConfidenceClauseLowersToRuntimeFloor(t *testing.T) {
+func TestV2RuleConfidenceClauseLowersToScannerIRFloor(t *testing.T) {
 	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.review;
 rule HighConfidenceReview {
@@ -1557,7 +1557,7 @@ rule HighConfidenceReview {
 	}
 }
 
-func TestV2RuleConfidenceMetadataLowersToRuntimeFloor(t *testing.T) {
+func TestV2RuleConfidenceMetadataLowersToScannerIRFloor(t *testing.T) {
 	decls := parseV2DefinitionsWithCoreMechanics(t, `
 module rules.review;
 rule HighConfidenceReview {
@@ -1578,6 +1578,12 @@ rule FileToctou {
   query concept as first where first.concept == code.FileCheck reaches concept as second where second.concept == code.FileUse select second
 }
 
+rule LateralReachToSecretStore {
+  query principal as actor where actor.concept == cloud.ExternalPrincipal
+    reaches asset as store where store.concept == cloud.SecretStore
+    select store
+}
+
 rule InvalidRefundTransition {
   query state as t where t.machine == Order and t.from == "*" and t.to == Refunded select t
 }
@@ -1586,7 +1592,11 @@ rule InvalidRefundTransition {
 	if order.First.Concept != "code.FileCheck" || order.First.Binding != "first" || order.Second.Concept != "code.FileUse" || order.Second.Binding != "second" {
 		t.Fatalf("order lowering wrong: %+v", order)
 	}
-	transition := decls[1].(*Rule).Body.(*MatchStmt)
+	reach := decls[1].(*Rule).Body.(*OrderStmt)
+	if reach.First.Concept != "cloud.ExternalPrincipal" || reach.First.Binding != "actor" || reach.Second.Concept != "cloud.SecretStore" || reach.Second.Binding != "store" {
+		t.Fatalf("semantic reach lowering wrong: %+v", reach)
+	}
+	transition := decls[2].(*Rule).Body.(*MatchStmt)
 	if transition.TargetKind != "transition" || transition.Binding != "t" || transition.Machine != "Order" || transition.FromState != "*" || transition.ToState != "Refunded" {
 		t.Fatalf("transition lowering wrong: %+v", transition)
 	}
@@ -1704,8 +1714,8 @@ binding dominatingHardening {
 	}
 }
 
-func TestV2RuleSupportedCoveredByModesLowerToLegacyClauseKinds(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2RuleSupportedCoveredByModesLowerToScannerIRClauseKinds(t *testing.T) {
+	decls := parseIRFiles(t, `
 module rules.xml;
 rule UnhardenedXmlParser {
   issue code.XmlParserCreate as parser
@@ -1771,7 +1781,7 @@ rule LockNotReleased {
 }
 
 func TestV2LoweringPreservesRequiredProfileClause(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+	decls := parseIRFiles(t, `
 module rules.injection;
 rule SqlInjection {
   taint code.HttpInput -> code.SqlExecution
@@ -1798,8 +1808,8 @@ rule SqlInjection {
 	}
 }
 
-func TestV2AdapterMetadataLowersToRuntimeAdapterMeta(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2AdapterMetadataLowersToScannerIRAdapterMeta(t *testing.T) {
+	decls := parseIRFiles(t, `
 module bindings.textpattern.migration;
 pattern adapterMetadata {
   adapter: {
@@ -1849,8 +1859,8 @@ pattern adapterMetadata {
 	}
 }
 
-func TestV2ConceptFieldsLowerToRuntimeFieldNames(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2ConceptFieldsLowerToScannerIRFieldNames(t *testing.T) {
+	decls := parseIRFiles(t, `
 module code;
 concept SqlExecution : sink {
   vulnerableTo: [injection.SqlInjection]
@@ -1866,8 +1876,8 @@ concept SqlExecution : sink {
 	}
 }
 
-func TestV2RuntimeSupportsGrantAssumeRulesAndObservationConcepts(t *testing.T) {
-	decls := parseRuntimeFiles(t, `
+func TestV2ScannerIRSupportsGrantAssumeRulesAndObservationConcepts(t *testing.T) {
+	decls := parseIRFiles(t, `
 module custom;
 concept External : principal {}
 concept Elevated : privilege {
@@ -1947,7 +1957,7 @@ policy confidence default {
 
 func parseV2DefinitionsWithCoreMechanics(t *testing.T, src string) []Decl {
 	t.Helper()
-	return parseRuntimeFiles(t, src)
+	return parseIRFiles(t, src)
 }
 
 func parseV2DefinitionsForTest(src string) ([]Decl, error) {
@@ -1990,7 +2000,7 @@ func parseV2DefinitionSourcesForTest(sources []V2DefinitionSource) ([]Decl, erro
 	return out, nil
 }
 
-func parseRuntimeFiles(t *testing.T, srcs ...string) []Decl {
+func parseIRFiles(t *testing.T, srcs ...string) []Decl {
 	t.Helper()
 	sources := []V2Source{parseV2SourceForLoweringTest(t, "mechanics/core.vyql", v2CoreMechanicsForLoweringTest)}
 	keep := []bool{false}

@@ -165,7 +165,7 @@ func (*ProfileDecl) isDecl() {}
 
 // --- statements (rule body) ----------------------------------------------
 
-// Stmt is a runtime rule body.
+// Stmt is a scanner IR rule body.
 type Stmt interface{ isStmt() }
 
 // Endpoint is a flow endpoint: a concept with an optional binding.
@@ -208,7 +208,7 @@ func (*MatchStmt) isStmt() {}
 
 // --- clauses -------------------------------------------------------------
 
-// Clause is a runtime where/unless clause.
+// Clause is a scanner IR where/unless clause.
 type Clause struct {
 	Kind   string    // "where" | "unless"
 	Where  Expr      // for where

@@ -156,3 +156,50 @@ rule ExternalToElevated {
 		t.Fatalf("expected data-driven min-level assume finding, got %d", len(fs))
 	}
 }
+
+func TestRawSemanticQueryPrincipalReachesAsset(t *testing.T) {
+	src := `
+module rules.cloud;
+rule LateralReachToSecretStore {
+  query principal as actor where actor.concept == cloud.ExternalPrincipal
+    reaches asset as store where store.concept == cloud.SecretStore
+    select store
+}
+`
+	onto := ontology.New()
+	cs, err := ontology.LoadConceptText(`
+module cloud;
+concept ExternalPrincipal : principal {}
+concept SecretStore : asset {}
+`)
+	if err != nil {
+		t.Fatalf("load concepts: %v", err)
+	}
+	for _, c := range cs {
+		onto.Add(c)
+	}
+	decls, err := parseV2DefinitionsForTest(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "actor", Type: "cloud.Principal", Loc: "iam.tf:1", Order: 1, HasOrder: true})
+	s.AddLabel("actor", usg.Label{Concept: "cloud.ExternalPrincipal"})
+	s.AddNode(usg.Node{ID: "store", Type: "cloud.Asset", Loc: "iam.tf:2", Order: 2, HasOrder: true})
+	s.AddLabel("store", usg.Label{Concept: "cloud.SecretStore"})
+
+	fs, err := New(onto, s).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected raw semantic query finding, got %d", len(fs))
+	}
+	if fs[0].Bindings[0].Name != "actor" || fs[0].Bindings[0].NodeID != "actor" || fs[0].Bindings[1].Name != "store" || fs[0].Bindings[1].NodeID != "store" {
+		t.Fatalf("unexpected bindings: %+v", fs[0].Bindings)
+	}
+}
