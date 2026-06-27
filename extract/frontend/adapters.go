@@ -652,7 +652,7 @@ func ontologyConceptDetails() map[string]map[string]string {
 		if err != nil {
 			panic("frontend: read ontology: " + err.Error())
 		}
-		decls, err := parseRuntimeAdapterSources(files)
+		decls, err := parseV2AdapterSources(files)
 		if err != nil {
 			panic("frontend: parse ontology detail corpus: " + err.Error())
 		}
@@ -808,7 +808,7 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 		if err != nil {
 			return nil, err
 		}
-		decls, err := parseRuntimeAdapterSources([]datadir.Source{{
+		decls, err := parseV2AdapterSources([]datadir.Source{{
 			Name: filepath.ToSlash(file),
 			Data: b,
 		}})
@@ -994,7 +994,7 @@ func loadDecl(tech string) *parser.AdapterDecl {
 	if extra, err := datadir.ReadVYQL("adapters/packages/" + tech + ".vyql"); err == nil {
 		sources = append(sources, extra...)
 	}
-	decls, err := parseRuntimeAdapterSources(sources)
+	decls, err := parseV2AdapterSources(sources)
 	if err != nil {
 		panic("frontend: invalid adapter corpus for " + tech + ": " + err.Error())
 	}
@@ -1056,7 +1056,7 @@ func v2DefinitionSourcesForAdapter(sources []datadir.Source) []parser.V2Definiti
 	return out
 }
 
-func parseRuntimeAdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
+func parseV2AdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
 	selected := make(map[string]bool, len(sources))
 	for _, source := range sources {
 		selected[source.Name] = true
@@ -3089,7 +3089,7 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 	}
 	byName := map[string]*parser.AdapterDecl{}
 	var order []string
-	decls, err := parseRuntimeAdapterSources(sources)
+	decls, err := parseV2AdapterSources(sources)
 	if err != nil {
 		return nil, fmt.Errorf("frontend: parse auto adapter corpus: %w", err)
 	}

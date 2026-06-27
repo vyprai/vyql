@@ -93,7 +93,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 }
 
 func parseGeneratedPackageAdapterSource(source datadir.Source) ([]parser.Decl, error) {
-	decls, err := parseRuntimeAdapterSources([]datadir.Source{source})
+	decls, err := parseV2AdapterSources([]datadir.Source{source})
 	if err != nil {
 		return nil, fmt.Errorf("frontend: invalid generated package adapter %s: %w", source.Name, err)
 	}

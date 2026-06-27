@@ -1,9 +1,11 @@
 package risk
 
 import (
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/findings"
 )
 
@@ -18,9 +20,27 @@ func mkFinding(severity, confidence string, context []string) *findings.Finding 
 	}
 }
 
-// docs/17 v1: an internet-reachable PII finding outranks the same finding
-// deployed internally; every factor carries a witness; the combination is
-// monotonic.
+func TestPriorityPolicyLoadedFromV2(t *testing.T) {
+	m := conf()
+	if got := m.severityWeight("high"); got != 3 {
+		t.Fatalf("high severity weight = %d, want 3", got)
+	}
+	if got := m.factorWeight("controlPressure"); got != -1 {
+		t.Fatalf("controlPressure weight = %d, want -1", got)
+	}
+	if got := m.factorWeight("confidenceLow"); got != -2 {
+		t.Fatalf("confidenceLow weight = %d, want -2", got)
+	}
+}
+
+func TestLegacyRiskJSONIsNotAPrioritySource(t *testing.T) {
+	if _, err := datadir.Read("risk.json"); err == nil || !os.IsNotExist(err) {
+		t.Fatalf("risk priority must be authored as policy priority default, not risk.json; read error = %v", err)
+	}
+}
+
+// An internet-reachable PII finding outranks the same finding deployed
+// internally; every factor carries a witness; the combination is monotonic.
 func TestPriorityBands(t *testing.T) {
 	exposedPII := mkFinding("high", "high", []string{
 		"svc is internet-reachable (via sg-pub:443)",

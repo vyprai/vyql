@@ -390,6 +390,26 @@ policy priority default {
 	}
 }
 
+func TestParseV2PriorityPolicyAllowsNegativeWeights(t *testing.T) {
+	prog, err := ParseV2(`
+module mechanics.policy;
+policy priority default {
+  factor confidenceLow {
+    when finding.confidence == low
+    weight: -2
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2: %v", err)
+	}
+	pol := prog.Decls[0].(*V2PolicyDecl)
+	weight, ok := pol.Items[0].Block[1].Value.(V2LiteralExpr)
+	if !ok || weight.Value != -2 {
+		t.Fatalf("weight = %#v, want -2 literal", pol.Items[0].Block[1].Value)
+	}
+}
+
 func TestParseV2PolicyActionSequence(t *testing.T) {
 	prog, err := ParseV2(`
 module mechanics.sast;

@@ -776,7 +776,14 @@ func isV2Number(s string) bool {
 	if s == "" {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+	start := 0
+	if s[0] == '-' {
+		if len(s) == 1 {
+			return false
+		}
+		start = 1
+	}
+	for i := start; i < len(s); i++ {
 		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
