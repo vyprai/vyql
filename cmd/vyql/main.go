@@ -604,7 +604,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
-	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews; migrate-v2 converts legacy files")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews; check-v2 verifies v2 definitions")
 	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

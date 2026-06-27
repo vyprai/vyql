@@ -10,11 +10,11 @@ import (
 )
 
 const assetMarkerRule = `
-package test;
+module test;
 rule MarkedAsset {
   meta { id: "TEST-ASSET-001", severity: critical }
-  match custom.Marker as s
-  where s holds_asset_kind [custom.Important]
+  issue custom.Marker as s
+  where holdsAssetKind(s, [custom.Important])
 }
 `
 
@@ -51,7 +51,7 @@ func markerAdapter(name, prop string, acceptedValues ...string) adapters.Adapter
 
 func TestMarkedAssetThreeAdapters(t *testing.T) {
 	onto := solverContractOntology()
-	decls, err := parser.Parse(assetMarkerRule)
+	decls, err := parser.ParseRuntime(assetMarkerRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

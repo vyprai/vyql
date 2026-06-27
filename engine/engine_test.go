@@ -16,7 +16,7 @@ import (
 func runRule(t *testing.T, src string, build func(s usg.Store)) ([]int, []CompileError) {
 	t.Helper()
 	onto := testOntology()
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -99,11 +99,11 @@ func addFlowConcepts(onto *ontology.Ontology) *ontology.Ontology {
 }
 
 const flowRule = `
-package test;
+module test;
 rule Flow {
   meta { id: "TEST-FLOW", severity: high }
-  taint custom.Input -> custom.Target
-  unless sanitized_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
 }
 `
 
@@ -276,10 +276,10 @@ func TestTaintFindingAndSanitizer(t *testing.T) {
 
 func TestMistypedSanitizerRejected(t *testing.T) {
 	src := `
-package bad;
+module bad;
 rule MismatchedTransform {
-  taint custom.Input -> custom.Target
-  unless sanitized_by custom.OtherTransform
+  taint custom.Input -> custom.Target as sink
+  unless sink.path coveredBy custom.OtherTransform
 }
 `
 	_, errs := runRule(t, src, func(s usg.Store) {})
@@ -293,7 +293,7 @@ rule MismatchedTransform {
 
 func TestWrongRoleEndpoint(t *testing.T) {
 	src := `
-package bad;
+module bad;
 rule Reversed { taint custom.Target -> custom.Input }
 `
 	_, errs := runRule(t, src, func(s usg.Store) {})

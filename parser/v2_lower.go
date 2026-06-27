@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ParseV2Runtime parses v2 source and lowers it into the current runtime
+// ParseV2Runtime parses v2 source and lowers it into the scanner runtime
 // declaration model.
 func ParseV2Runtime(src string) ([]Decl, error) {
 	prog, err := ParseV2(src)
@@ -57,7 +57,7 @@ func ParseV2RuntimeSourcesSelected(raw []V2RuntimeSource, keep func(V2RuntimeSou
 }
 
 // ParseV2RuntimeMulti parses one or more concatenated v2 modules and lowers
-// them into the current runtime declaration model without falling back to v1.
+// them into the scanner runtime declaration model without falling back to v1.
 func ParseV2RuntimeMulti(src string) ([]Decl, error) {
 	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
 		programs := make([]*V2Program, 0, len(chunks))
@@ -125,9 +125,8 @@ func splitV2ModuleChunks(src string) []string {
 	return chunks
 }
 
-// LowerV2ToRuntime lowers v2 declarations into the current runtime structs.
-// It is a migration bridge: authored syntax is v2, while scanner internals are
-// converted incrementally behind this boundary.
+// LowerV2ToRuntime lowers v2 declarations into the scanner runtime structs.
+// It materializes authored v2 definitions into the scanner runtime model.
 func LowerV2ToRuntime(prog *V2Program) ([]Decl, error) {
 	return lowerV2ToRuntimeWithMechanics(prog, v2RuntimeMechanicsFromProgram(prog))
 }
@@ -752,7 +751,7 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 		}
 	}
 	if nodeCount != 1 {
-		return nil, "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call node for legacy lowering", binding, pat.Name)
+		return nil, "", nil, fmt.Errorf("binding %s: pattern %s must have exactly one call node for runtime lowering", binding, pat.Name)
 	}
 	return where, alias, binds, nil
 }
@@ -1259,7 +1258,7 @@ func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
 			return visit(cmp.Right, neg)
 		}
 		if cmp.Op == "or" {
-			return fmt.Errorf("binding %s: query predicate disjunction is not implemented in legacy lowering", binding)
+			return fmt.Errorf("binding %s: query predicate disjunction is not implemented in runtime lowering", binding)
 		}
 		leftExpr := cmp.Left
 		cmpNeg := neg
@@ -1275,10 +1274,10 @@ func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
 		switch field {
 		case "callee.method", "call.callee.method", "callee.path", "call.callee.path":
 			if cmpNeg {
-				return fmt.Errorf("binding %s: negated callee predicate is not implemented in legacy lowering", binding)
+				return fmt.Errorf("binding %s: negated callee predicate is not implemented in runtime lowering", binding)
 			}
 			if cmp.Op != "==" && cmp.Op != "~=" {
-				return fmt.Errorf("binding %s: callee predicate operator %q is not implemented in legacy lowering", binding, cmp.Op)
+				return fmt.Errorf("binding %s: callee predicate operator %q is not implemented in runtime lowering", binding, cmp.Op)
 			}
 			lit, ok := cmp.Right.(V2LiteralExpr)
 			if !ok {
@@ -1295,7 +1294,7 @@ func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
 			haveShape = true
 		case "callee.receiver.type", "call.callee.receiver.type":
 			if cmpNeg {
-				return fmt.Errorf("binding %s: negated receiver type predicate is not implemented in legacy lowering", binding)
+				return fmt.Errorf("binding %s: negated receiver type predicate is not implemented in runtime lowering", binding)
 			}
 			constraint, ok := lowerV2ReceiverConstraint(cmp)
 			if !ok {
@@ -1304,7 +1303,7 @@ func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
 			shape.Constraint = constraint
 		case "args.any.literal", "call.args.any.literal":
 			if cmp.Op != "contains" {
-				return fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in legacy lowering", binding, cmp.Op)
+				return fmt.Errorf("binding %s: args.any.literal operator %q is not implemented in runtime lowering", binding, cmp.Op)
 			}
 			value, ok := v2LiteralString(cmp.Right)
 			if !ok {
@@ -1328,10 +1327,10 @@ func lowerV2CallShape(binding string, expr V2Expr) (v2CallShape, error) {
 				return fmt.Errorf("binding %s: call.filter.global predicate right side must be a boolean", binding)
 			}
 			if !v {
-				return fmt.Errorf("binding %s: call.filter.global == false is not implemented in legacy lowering", binding)
+				return fmt.Errorf("binding %s: call.filter.global == false is not implemented in runtime lowering", binding)
 			}
 		default:
-			return fmt.Errorf("binding %s: query predicate %q is not implemented in legacy lowering", binding, left.Name)
+			return fmt.Errorf("binding %s: query predicate %q is not implemented in runtime lowering", binding, left.Name)
 		}
 		return nil
 	}
@@ -1471,7 +1470,7 @@ func lowerV2PackageRequirement(req V2Requirement) ([]string, error) {
 		for _, raw := range req.Args {
 			child, ok := raw.(V2Requirement)
 			if !ok {
-				return nil, fmt.Errorf("any requirement needs child requirements for legacy package lowering")
+				return nil, fmt.Errorf("any requirement needs child requirements for runtime package lowering")
 			}
 			pkg, err := lowerV2DependencyRequirement(child)
 			if err != nil {
@@ -1550,14 +1549,14 @@ func lowerV2Rule(r *V2RuleDecl, names v2NameResolver, mechanics v2RuntimeMechani
 	out := &Rule{Name: r.Name, Package: r.Module, Meta: r.Meta}
 	solver := mechanics.ruleSolvers[r.Body.Verb]
 	if solver == "" {
-		solver = v2LegacySolverForRuleVerb(r.Body.Verb)
+		solver = v2DefaultSolverForRuleVerb(r.Body.Verb)
 	}
 	switch solver {
 	case "dataflow.taint", "dataflow.flow", "graph.reach":
 		if r.Body.From.Concept == "" || r.Body.To.Concept == "" {
 			return nil, fmt.Errorf("rule %s: solver capability %q requires from/to endpoints", r.Name, solver)
 		}
-		verb, err := v2LegacyFlowVerbForSolver(solver)
+		verb, err := v2RuntimeFlowVerbForSolver(solver)
 		if err != nil {
 			return nil, fmt.Errorf("rule %s: %w", r.Name, err)
 		}
@@ -1666,7 +1665,7 @@ func appendStringField(raw any, value string) []string {
 	}
 }
 
-func v2LegacySolverForRuleVerb(verb string) string {
+func v2DefaultSolverForRuleVerb(verb string) string {
 	switch verb {
 	case "taint":
 		return "dataflow.taint"
@@ -1687,7 +1686,7 @@ func v2LegacySolverForRuleVerb(verb string) string {
 	}
 }
 
-func v2LegacyFlowVerbForSolver(solver string) (string, error) {
+func v2RuntimeFlowVerbForSolver(solver string) (string, error) {
 	switch solver {
 	case "dataflow.taint":
 		return "taint", nil
@@ -1696,7 +1695,7 @@ func v2LegacyFlowVerbForSolver(solver string) (string, error) {
 	case "graph.reach":
 		return "reach", nil
 	default:
-		return "", fmt.Errorf("solver capability %q is not a legacy flow solver", solver)
+		return "", fmt.Errorf("solver capability %q is not a runtime flow solver", solver)
 	}
 }
 

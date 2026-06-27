@@ -15,7 +15,7 @@ import (
 func fireOne(t *testing.T, rule string, build func(*usg.InMemStore)) findingView {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestSolverContractConformance(t *testing.T) {
 	}{
 		{
 			name:     "taint",
-			rule:     "package t;\nrule R { meta { id: \"X-TAINT\" }\n taint custom.Input -> custom.Target }",
+			rule:     "module t;\nrule R { meta { id: \"X-TAINT\" }\n taint custom.Input -> custom.Target }",
 			wantKind: "taint", wantFlow: true,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "in", Type: "code.X", Props: map[string]string{"loc": "a:1"}})
@@ -82,7 +82,7 @@ func TestSolverContractConformance(t *testing.T) {
 		},
 		{
 			name:     "reach",
-			rule:     "package t;\nrule R { meta { id: \"X-REACH\" }\n reach custom.Edge -> custom.Asset }",
+			rule:     "module t;\nrule R { meta { id: \"X-REACH\" }\n reach custom.Edge -> custom.Asset }",
 			wantKind: "reach", wantFlow: true,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "edge", Type: "custom.Edge"})
@@ -94,7 +94,7 @@ func TestSolverContractConformance(t *testing.T) {
 		},
 		{
 			name:     "assume",
-			rule:     "package t;\nrule R { meta { id: \"X-ASSUME\" }\n assume custom.Actor -> custom.Capability }",
+			rule:     "module t;\nrule R { meta { id: \"X-ASSUME\" }\n assume custom.Actor -> custom.Capability }",
 			wantKind: "assume", wantFlow: true,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor"})
@@ -106,7 +106,7 @@ func TestSolverContractConformance(t *testing.T) {
 		},
 		{
 			name:     "grant",
-			rule:     "package t;\nrule R { meta { id: \"X-GRANT\" }\n grant custom.Actor -> custom.Capability }",
+			rule:     "module t;\nrule R { meta { id: \"X-GRANT\" }\n grant custom.Actor -> custom.Capability }",
 			wantKind: "grant", wantFlow: true,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "actor", Type: "custom.Actor"})
@@ -118,7 +118,7 @@ func TestSolverContractConformance(t *testing.T) {
 		},
 		{
 			name:     "match",
-			rule:     "package t;\nrule R { meta { id: \"X-MATCH\" }\n match custom.Marker as s }",
+			rule:     "module t;\nrule R { meta { id: \"X-MATCH\" }\n issue custom.Marker as s }",
 			wantKind: "match", wantFlow: false,
 			build: func(s *usg.InMemStore) {
 				s.AddNode(usg.Node{ID: "matched", Type: "custom.Marker", Props: map[string]string{"loc": "m"}})

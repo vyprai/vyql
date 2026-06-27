@@ -10,7 +10,7 @@ import (
 func nFlow(t *testing.T, labels map[string]string, edges [][2]string) int {
 	t.Helper()
 	onto := testOntology()
-	decls, err := parser.Parse(flowRule)
+	decls, err := parser.ParseRuntime(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -66,13 +66,13 @@ func TestSanitizerConformanceTable(t *testing.T) {
 		t.Fatalf("row5 boundary transform -> no finding, got %d", n)
 	}
 	wrong := `
-package bad;
+module bad;
 rule WrongTransform {
-  taint custom.Input -> custom.Target
-  unless sanitized_by custom.OtherTransform
+  taint custom.Input -> custom.Target as sink
+  unless sink.path coveredBy custom.OtherTransform
 }
 `
-	decls, _ := parser.Parse(wrong)
+	decls, _ := parser.ParseRuntime(wrong)
 	_, errs := CompileRules(decls, testOntology())
 	if len(errs) != 1 || !contains(errs[0].Msg, "does not defend") {
 		t.Fatalf("row6 wrong transform -> compile error, got %v", errs)
@@ -85,7 +85,7 @@ rule WrongTransform {
 
 func TestAdvisoryControlDoesNotSuppressTaint(t *testing.T) {
 	onto := testOntology()
-	decls, err := parser.Parse(flowRule)
+	decls, err := parser.ParseRuntime(flowRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

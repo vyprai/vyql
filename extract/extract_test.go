@@ -41,11 +41,11 @@ func methodCall(recv, method, loc string, args ...nir.Expr) nir.Call {
 func concat(parts ...nir.Expr) nir.Format { return nir.Format{Parts: parts, Loc: "?"} }
 
 const sqliRule = `
-package vypr.injection;
+module vypr.injection;
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high }
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.SqlParameterization
+  taint code.HttpInput -> code.SqlExecution as sink
+  unless sink.path coveredBy core.SqlParameterization
 }
 `
 
@@ -53,7 +53,7 @@ rule Sql {
 func runRule(t *testing.T, src string, g usg.Store) []*findings.Finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -151,18 +151,18 @@ func TestImportResolutionRemovesNameCollisionFP(t *testing.T) {
 }
 
 const scaGated = `
-package vypr.sca;
+module vypr.sca;
 rule ReachableVulnerableDependency {
   meta { id: "VYQL-SCA-002", severity: high }
-  match sbom.VulnerableDependency as p
-  where p has sbom.ReachableSymbol
+  issue sbom.VulnerableDependency as p
+  where has(p, sbom.ReachableSymbol)
 }
 `
 const scaPlain = `
-package vypr.sca;
+module vypr.sca;
 rule VulnerableDependency {
   meta { id: "VYQL-SCA-001", severity: medium }
-  match sbom.VulnerableDependency as p
+  issue sbom.VulnerableDependency as p
 }
 `
 
@@ -228,7 +228,7 @@ func TestReachabilityGatedSCA(t *testing.T) {
 }
 
 const scaExploitable = `
-package vypr.sca;
+module vypr.sca;
 rule ExploitableVulnerableDependency {
   meta { id: "VYQL-SCA-003", severity: high }
   taint code.HttpInput -> code.Deserialization

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestV2LoweringToLegacyRuntimeDecls(t *testing.T) {
+func TestV2LoweringToRuntimeDecls(t *testing.T) {
 	decls := parseV2RuntimeFiles(t, `
 module core;
 concept SqlParameterization : check { neutralizes: [code.SqlExecution] }
@@ -104,7 +104,7 @@ rule CustomFlow {
 	}
 	body, ok := rule.Body.(*FlowStmt)
 	if !ok || body.Verb != "taint" {
-		t.Fatalf("authored solver did not drive legacy flow verb: %+v", rule.Body)
+		t.Fatalf("authored solver did not drive runtime flow verb: %+v", rule.Body)
 	}
 }
 

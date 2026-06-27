@@ -10,11 +10,11 @@ import (
 
 func TestGuardedByEndpoint(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule GuardedFlow {
   meta { id: "TEST-GUARDED", severity: high }
-  taint custom.Input -> custom.Target
-  unless guarded_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	guarded := func(s usg.Store) {
@@ -51,11 +51,11 @@ rule GuardedFlow {
 
 func TestGuardedByFunctionContextSummary(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule GuardedFlow {
   meta { id: "TEST-GUARDED", severity: high }
-  taint custom.Input -> custom.Target
-  unless guarded_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	counts, errs := runRule(t, rule, func(s usg.Store) {
@@ -105,12 +105,12 @@ rule GuardedFlow {
 
 func TestRefinementAndDisjunctiveControls(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule ParentFlow {
   meta { id: "TEST-PARENT", severity: critical }
-  taint custom.ParentInput -> custom.Target
-  unless sanitized_by custom.Transform
-  unless sanitized_by custom.AlternateTransform
+  taint custom.ParentInput -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
+  unless sink.path coveredBy custom.AlternateTransform
 }
 `
 	counts, errs := runRule(t, rule, func(s usg.Store) {
@@ -172,14 +172,14 @@ func TestAliasResolutionThroughEngine(t *testing.T) {
 	}
 
 	rule := `
-package test;
+module test;
 rule AliasFlow {
   meta { id: "ALIAS-1", severity: high }
-  taint custom.LegacyInput -> custom.Target
-  unless sanitized_by custom.Transform
+  taint custom.LegacyInput -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
 }
 `
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

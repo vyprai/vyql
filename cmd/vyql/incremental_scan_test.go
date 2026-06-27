@@ -36,7 +36,7 @@ func scanFindingKeys(t *testing.T, paths []string, cache lowering.DeltaCache) []
 	if g == nil {
 		return nil
 	}
-	decls, err := parser.Parse(syntheticIncrementalRules)
+	decls, err := parser.ParseRuntime(syntheticIncrementalRules)
 	if err != nil {
 		t.Fatalf("rule parse: %v", err)
 	}
@@ -100,7 +100,7 @@ func buildGraphWithSyntheticAdapters(paths []string, cache lowering.DeltaCache) 
 }
 
 const syntheticIncrementalRules = `
-package test;
+module test;
 
 rule Flow {
   meta { id: "TEST-FLOW-001", severity: high }
@@ -109,7 +109,7 @@ rule Flow {
 
 rule Marker {
   meta { id: "TEST-MARKER-001", severity: low }
-  match custom.Marker as sink
+  issue custom.Marker as sink
 }
 `
 

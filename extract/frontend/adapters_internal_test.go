@@ -505,15 +505,12 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 }
 
 func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.SecretComparison in function {
-    lang "javascript"
-    call path "parseOut"
-    selector "data.x-csrf-token"
-    token identifier "providedToken"
-    not call path "crypto.timingSafeEqual"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding secretComparison {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:parseOut" and node.token contains "selector:data.x-csrf-token" and node.token contains "identifier:providedToken" and not (node.token contains "call_path:crypto.timingSafeEqual")
+  emit issue custom.SecretComparison at node
 }
 `)
 	if err != nil {
@@ -577,13 +574,12 @@ adapter javascript {
 }
 
 func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter java {
-  flag custom.WorldAccess in function {
-    function "safe"
-    call path "world.getBlockAt"
-    not call contains_any ["testCoord"]
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.java.test;
+
+binding worldAccess {
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:safe" and node.token contains "call_path:world.getBlockAt" and not containsAny(node.scopeCall.any, ["testCoord"])
+  emit issue custom.WorldAccess at node
 }
 `)
 	if err != nil {
@@ -646,14 +642,12 @@ adapter java {
 }
 
 func TestContextFlagIndexesScopedContextAndMatchesOrderedSelectorScope(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter go {
-  flag custom.ShareInfoLeak in function {
-    function "shareInfoHandler"
-    call path "store.Share.GetByHash"
-    call path "getShareURL"
-    selector "shareLink.Token"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.go.test;
+
+binding shareInfoLeak {
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:shareInfoHandler" and node.token contains "call_path:store.Share.GetByHash" and node.token contains "call_path:getShareURL" and node.token contains "selector:shareLink.Token"
+  emit issue custom.ShareInfoLeak at node
 }
 `)
 	if err != nil {
@@ -709,18 +703,12 @@ adapter go {
 }
 
 func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.SecretComparison on binop {
-    op any ["==", "==="]
-    operand {
-      key contains_any ["csrf-token", "x-csrf-token"]
-    }
-    operand {
-      identifier contains_any ["token", "secret", "signature", "key"]
-    }
-    lacks call contains_any ["scmp", "timingSafeEqual"]
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding secretComparison {
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and operand(node, where: containsAny(operand.key, ["csrf-token", "x-csrf-token"])) and operand(node, where: containsAny(operand.identifier, ["token", "secret", "signature", "key"])) and not containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])
+  emit issue custom.SecretComparison at node
 }
 `)
 	if err != nil {
@@ -756,14 +744,12 @@ adapter javascript {
 }
 
 func TestContextFlagAstScopedLiteralAndSubscriptPredicates(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.PrototypeMerge in function {
-    lang "javascript"
-    index "base.__subscript"
-    token subscript "obj[key]"
-    not literal "__proto__"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding prototypeMerge {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "index:base.__subscript" and node.token contains "subscript:obj[key]" and not (node.token contains "literal:__proto__")
+  emit issue custom.PrototypeMerge at node
 }
 `)
 	if err != nil {
@@ -813,12 +799,12 @@ adapter javascript {
 }
 
 func TestContextFlagAstScopedSelectorContainsAny(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter python {
-  flag custom.LockOpen in function {
-    lang "python"
-    selector contains_any ["lock_file", ".lock", "lock"]
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.python.test;
+
+binding lockOpen {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["selector:lock_file", "selector:.lock", "selector:lock"])
+  emit issue custom.LockOpen at node
 }
 `)
 	if err != nil {
@@ -868,13 +854,12 @@ adapter python {
 }
 
 func TestContextFlagAstScopedBinaryPredicate(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter go {
-  flag custom.EmptyPayloadCheck in function {
-    lang "go"
-    binary "len(payload)==0"
-    not binary "len(checked)==0"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.go.test;
+
+binding emptyPayloadCheck {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "binary:len(payload)==0" and not (node.token contains "binary:len(checked)==0")
+  emit issue custom.EmptyPayloadCheck at node
 }
 `)
 	if err != nil {
@@ -929,20 +914,12 @@ adapter go {
 }
 
 func TestCContextFlagMatchesICMPEchoLengthUnderflowTokens(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter c {
-  flag custom.IcmpEchoPayloadLengthUnderflow in function {
-    lang "c"
-    name "prvProcessICMPMessage_IPv6"
-    token switch_case "ipICMP_PING_REPLY_IPv6"
-    selector contains "usPayloadLength"
-    assign contains "uxDataLength=uxDataLength-sizeof"
-    selector "pxICMPEchoHeader.usIdentifier"
-    call path "FreeRTOS_ntohs"
-    call path "vApplicationPingReplyHook"
-    binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
-    not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.c.test;
+
+binding icmpEchoPayloadLengthUnderflow {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=prvProcessICMPMessage_IPv6" and node.token contains "switch_case:ipICMP_PING_REPLY_IPv6" and node.token contains "selector:usPayloadLength" and node.token contains "assign:uxDataLength=uxDataLength-sizeof" and node.token contains "selector:pxICMPEchoHeader.usIdentifier" and node.token contains "call_path:FreeRTOS_ntohs" and node.token contains "call_path:vApplicationPingReplyHook" and containsAny(node.token, ["binary:uxDataLength-sizeof(*pxICMPEchoHeader)", "binary:uxDataLength-sizeof"]) and not containsAny(node.token, ["binary:uxDataLength<sizeof(*pxICMPEchoHeader)", "binary:sizeof(*pxICMPEchoHeader)>uxDataLength"])
+  emit issue custom.IcmpEchoPayloadLengthUnderflow at node
 }
 `)
 	if err != nil {
@@ -985,16 +962,12 @@ adapter c {
 }
 
 func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter python {
-  flag custom.LockNoFollow in function {
-    lang "python"
-    call path "os.open"
-    selector "os.O_CREAT"
-    selector "os.O_EXCL"
-    selector contains_any ["lock_file", ".lock", "lock"]
-    not literal "O_NOFOLLOW"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.python.test;
+
+binding lockNoFollow {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=python" and node.token contains "call_path:os.open" and node.token contains "selector:os.O_CREAT" and node.token contains "selector:os.O_EXCL" and containsAny(node.token, ["selector:lock_file", "selector:.lock", "selector:lock"]) and not (node.token contains "literal:O_NOFOLLOW")
+  emit issue custom.LockNoFollow at node
 }
 `)
 	if err != nil {
@@ -1032,13 +1005,12 @@ adapter python {
 }
 
 func TestContextFlagAstScopedCallArgPredicates(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter php {
-  flag custom.DirectJsonEncode in function {
-    lang "php"
-    call arg "json_encode:$data[$field_name]"
-    not call arg "json_encode:$value"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.php.test;
+
+binding directJsonEncode {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "call_arg:json_encode:$data[$field_name]" and not (node.token contains "call_arg:json_encode:$value")
+  emit issue custom.DirectJsonEncode at node
 }
 `)
 	if err != nil {
@@ -1089,12 +1061,12 @@ adapter php {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectArgumentNodes(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.GitCloneWrapper in function {
-    call path "utils.run"
-    call arg contains "utils.run:git clone"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding gitCloneWrapper {
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:utils.run" and node.token contains "call_arg:utils.run:git clone"
+  emit issue custom.GitCloneWrapper at node
 }
 `)
 	if err != nil {
@@ -1122,12 +1094,12 @@ adapter javascript {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNestedCallArguments(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter go {
-  flag custom.BulkMailRecipients in function {
-    call path "SendMail"
-    call arg contains "SendMail:getUserEmailsByNames"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.go.test;
+
+binding bulkMailRecipients {
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:SendMail" and node.token contains "call_arg:SendMail:getUserEmailsByNames"
+  emit issue custom.BulkMailRecipients at node
 }
 `)
 	if err != nil {
@@ -1156,13 +1128,12 @@ adapter go {
 }
 
 func TestContextFlagAstScopedCallArgPredicatesInspectNamePath(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter go {
-  flag custom.BulkMailRecipients in function {
-    call path "SendMail"
-    call arg "SendMail:tos"
-    not call arg "SendMail:__object_literal"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.go.test;
+
+binding bulkMailRecipients {
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:SendMail" and node.token contains "call_arg:SendMail:tos" and not (node.token contains "call_arg:SendMail:__object_literal")
+  emit issue custom.BulkMailRecipients at node
 }
 `)
 	if err != nil {
@@ -1204,13 +1175,12 @@ adapter go {
 }
 
 func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter python {
-  flag custom.UnhardenedXmlParser on call {
-    path "etree.XMLParser"
-    call arg "etree.XMLParser:huge_tree=True"
-    not call arg "etree.XMLParser:resolve_entities=False"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.python.test;
+
+binding unhardenedXmlParser {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "etree.XMLParser" and node.token contains "call_arg:etree.XMLParser:huge_tree=True" and not (node.token contains "call_arg:etree.XMLParser:resolve_entities=False")
+  emit issue custom.UnhardenedXmlParser at node
 }
 `)
 	if err != nil {
@@ -1246,14 +1216,12 @@ adapter python {
 }
 
 func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter php {
-  flag custom.PasswordOnlySessionHash in function {
-    lang "php"
-    name "authenticate"
-    token subscript "$u['password']"
-    not token subscript "$u['permissions']"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.php.test;
+
+binding passwordOnlySessionHash {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=authenticate" and node.token contains "subscript:$u['password']" and not (node.token contains "subscript:$u['permissions']")
+  emit issue custom.PasswordOnlySessionHash at node
 }
 `)
 	if err != nil {
@@ -1295,14 +1263,12 @@ adapter php {
 }
 
 func TestContextFlagIgnoresUnscopedParamsFromOtherFunctions(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.RemoteUrlDebugLog in function {
-    lang "javascript"
-    name "fetchRepo"
-    call path "logger.debug"
-    token identifier "url"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding remoteUrlDebugLog {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=fetchRepo" and node.token contains "call_path:logger.debug" and node.token contains "identifier:url"
+  emit issue custom.RemoteUrlDebugLog at node
 }
 `)
 	if err != nil {
@@ -1354,12 +1320,12 @@ adapter javascript {
 }
 
 func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter php {
-  flag custom.DirectJsonEncode in function {
-    lang "php"
-    call arg "json_encode:$data[$field_name]"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.php.test;
+
+binding directJsonEncode {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "call_arg:json_encode:$data[$field_name]"
+  emit issue custom.DirectJsonEncode at node
 }
 `)
 	if err != nil {
@@ -1380,11 +1346,12 @@ adapter php {
 }
 
 func TestContextFlagStructuredTokenEqualsUsesTokenBoundary(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter ruby {
-  flag custom.ExactParse in function {
-    function equals "parse"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.ruby.test;
+
+binding exactParse {
+  query pattern presenceNode where node.scope == "function" and node.token == "function_name:parse"
+  emit issue custom.ExactParse at node
 }
 `)
 	if err != nil {
@@ -1417,13 +1384,12 @@ adapter ruby {
 }
 
 func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter php {
-  flag custom.ScopedLiteral in function {
-    lang "php"
-    literal "multiple_dropdown_action"
-    call arg "json_encode:$data[$field_name]"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.php.test;
+
+binding scopedLiteral {
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "literal:multiple_dropdown_action" and node.token contains "call_arg:json_encode:$data[$field_name]"
+  emit issue custom.ScopedLiteral at node
 }
 `)
 	if err != nil {
@@ -1463,13 +1429,12 @@ adapter php {
 }
 
 func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter ruby {
-  flag custom.RailsSecretToken in module {
-    lang "ruby"
-    assign contains_any [".config.secret_token="]
-    not expr "Rails.env=='test'"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.ruby.test;
+
+binding railsSecretToken {
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=ruby" and containsAny(node.token, ["assign:.config.secret_token="]) and not (node.token contains "expr:Rails.env=='test'")
+  emit issue custom.RailsSecretToken at node
 }
 `)
 	if err != nil {
@@ -1508,14 +1473,12 @@ adapter ruby {
 }
 
 func TestModuleContextFlagStructuredPredicatesUseAstNodes(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter c {
-  flag custom.PathBasedSandboxExposeBindRace in module {
-    lang "c"
-    call path "filesystem_sandbox_arg"
-    literal "sandbox-expose"
-    not call path "fd_map_remap_fd"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.c.test;
+
+binding pathBasedSandboxExposeBindRace {
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=c" and node.token contains "call_path:filesystem_sandbox_arg" and node.token contains "literal:sandbox-expose" and not (node.token contains "call_path:fd_map_remap_fd")
+  emit issue custom.PathBasedSandboxExposeBindRace at node
 }
 `)
 	if err != nil {
@@ -1582,16 +1545,12 @@ adapter c {
 }
 
 func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter cpp {
-  flag custom.PointerAddOverflow on binop {
-    op "+"
-    operand {
-      path "alignPointer"
-    }
-    flows to op ">"
-    not flows to op "<"
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.cpp.test;
+
+binding pointerAddOverflow {
+  query pattern presenceNode where node.kind == "binop" and node.op contains "+" and operand(node, where: operand.path ~= "alignPointer") and node.flowTo.op contains ">" and not (node.flowTo.op contains "<")
+  emit issue custom.PointerAddOverflow at node
 }
 `)
 	if err != nil {
@@ -1636,14 +1595,12 @@ adapter cpp {
 }
 
 func TestAstFlagCallOperandMatchesTransitiveFlow(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.RemoteUrlDebugLog on call {
-    path "logger.debug"
-    operand {
-      identifier contains_any ["url", "uri"]
-    }
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding remoteUrlDebugLog {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "logger.debug" and operand(node, where: containsAny(operand.identifier, ["url", "uri"]))
+  emit issue custom.RemoteUrlDebugLog at node
 }
 `)
 	if err != nil {
@@ -1689,15 +1646,12 @@ adapter javascript {
 }
 
 func TestAstFlagCallOperandFallsBackToIncomingArgFlow(t *testing.T) {
-	decls, err := parser.Parse(`
-adapter javascript {
-  flag custom.ZipCompressedSizeRead on call {
-    path "tokenizer.readToken"
-    operand {
-      path "Token.StringType"
-      path "zipHeader.compressedSize"
-    }
-  }
+	decls, err := parser.ParseRuntime(`
+module bindings.javascript.test;
+
+binding zipCompressedSizeRead {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "tokenizer.readToken" and operand(node, where: operand.path ~= "Token.StringType" and operand.path ~= "zipHeader.compressedSize")
+  emit issue custom.ZipCompressedSizeRead at node
 }
 `)
 	if err != nil {

@@ -11,11 +11,11 @@ import (
 )
 
 const sqliRule = `
-package vypr.injection;
+module vypr.injection;
 rule Sql {
   meta { id: "VYQL-INJ-001", severity: high }
-  taint code.HttpInput -> code.SqlExecution
-  unless sanitized_by core.SqlParameterization
+  taint code.HttpInput -> code.SqlExecution as sink
+  unless sink.path coveredBy core.SqlParameterization
 }
 `
 
@@ -24,7 +24,7 @@ rule Sql {
 func evalSQLI(t *testing.T, store usg.Store) []*finding {
 	t.Helper()
 	onto := ontology.Seed()
-	decls, err := parser.Parse(sqliRule)
+	decls, err := parser.ParseRuntime(sqliRule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -150,10 +150,10 @@ func TestConfidenceMinOverDerivation(t *testing.T) {
 	}
 
 	cases := []struct {
-		name      string
-		sinkAd    adapters.Adapter
-		want      string
-		srcOneAd  bool // when true a single adapter labels both nodes high
+		name     string
+		sinkAd   adapters.Adapter
+		want     string
+		srcOneAd bool // when true a single adapter labels both nodes high
 	}{
 		{"high+high->high", adapters.Adapter{}, "high", true},
 		{"high+low->low", sink("heuristic", "low", "syntactic"), "low", false},

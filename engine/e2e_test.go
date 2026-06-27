@@ -14,22 +14,22 @@ func TestToyEndToEndSlice(t *testing.T) {
 	s := buildToyGraph(t)
 
 	rules := `
-package test;
+module test;
 rule FirstFlow {
   meta { id: "TEST-FLOW-001", severity: high }
-  taint custom.Input -> custom.Target
-  unless sanitized_by custom.Transform
+  taint custom.Input -> custom.Target as sink
+  unless sink.path coveredBy custom.Transform
 }
 rule SecondFlow {
   meta { id: "TEST-FLOW-002", severity: critical }
-  taint custom.Input -> custom.OtherTarget
-  unless sanitized_by custom.OtherTargetTransform
+  taint custom.Input -> custom.OtherTarget as sink
+  unless sink.path coveredBy custom.OtherTargetTransform
 }
 
 rule ReachAsset {
   meta { id: "TEST-REACH-003", severity: critical }
   reach custom.Edge -> custom.Asset
-  where custom.Asset holds_asset_kind [custom.Important]
+  where holdsAssetKind(custom.Asset, [custom.Important])
 }
 
 rule ActorCapability {
@@ -38,11 +38,11 @@ rule ActorCapability {
 }
 rule ComposedMatch {
   meta { id: "TEST-MATCH-005", severity: critical }
-  match custom.WorkItem as w
+  issue custom.WorkItem as w
   where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
-	decls, err := parser.Parse(rules)
+	decls, err := parser.ParseRuntime(rules)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

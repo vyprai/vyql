@@ -11,7 +11,7 @@ import (
 func compileEval(t *testing.T, src string, s usg.Store) []int {
 	t.Helper()
 	onto := solverContractOntology()
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -56,9 +56,9 @@ func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
 
 func TestMatchComposesReachAndAssume(t *testing.T) {
 	src := `
-package test;
+module test;
 rule ComposedMatch {
-  match custom.WorkItem as w
+  issue custom.WorkItem as w
   where reach(custom.Edge, w.workload) and assume(w, custom.Capability)
 }
 `
@@ -87,13 +87,13 @@ rule ComposedMatch {
 
 func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule PreciseMatch {
   meta { id: "X-MATCH", confidence_floor: high }
-  match custom.Precise as p
+  issue custom.Precise as p
 }
 `
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -123,11 +123,11 @@ rule PreciseMatch {
 
 func TestConceptMatchAndTransition(t *testing.T) {
 	actionRule := `
-package test;
+module test;
 rule UnguardedAction {
-  match custom.Action as a
+  issue custom.Action as a
   where a.actor is custom.ActorKind and a.resource is custom.ResourceKind
-  unless guarded_by custom.Transform
+  unless sink.endpoint coveredBy custom.Transform
 }
 `
 	g := usg.NewInMemStore()
@@ -148,10 +148,9 @@ rule UnguardedAction {
 	}
 
 	transitionRule := `
-package test;
+module test;
 rule InvalidTransition {
-  match transition * -> Done on Workflow as t
-  unless t.from == Allowed
+  query state as t where t.machine == Workflow and t.from == Started and t.to == Done select t
 }
 `
 	gt := usg.NewInMemStore()
@@ -168,10 +167,10 @@ rule InvalidTransition {
 
 func TestMatchGuardedByDominatingBranchCondition(t *testing.T) {
 	actionRule := `
-package test;
+module test;
 rule GuardedAction {
-  match custom.Action as a
-  unless guarded_by custom.Transform
+  issue custom.Action as a
+  unless a.endpoint coveredBy custom.Transform
 }
 `
 	g := usg.NewInMemStore()
@@ -342,11 +341,11 @@ rule DominatedFlow {
 
 func TestMatchGuardedByDominatingBranchConditionWithQualifiedConcepts(t *testing.T) {
 	rule := `
-package vypr.memory;
+module vypr.memory;
 rule CountDerivedElementAccess {
   meta { id: "TEST-MEM", severity: medium, cwe: [CWE_125] }
-  match code.CountDerivedElementAccess as idx
-  unless guarded_by core.MemoryBoundsCheck
+  issue code.CountDerivedElementAccess as idx
+  unless idx.endpoint coveredBy core.MemoryBoundsCheck
 }
 `
 	g := usg.NewInMemStore()
@@ -355,7 +354,7 @@ rule CountDerivedElementAccess {
 	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
 	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
 
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -374,11 +373,11 @@ rule CountDerivedElementAccess {
 
 func TestMatchGuardedBySameXmlFactoryHardening(t *testing.T) {
 	rule := `
-package vypr.deserialization;
+module vypr.deserialization;
 rule XxeUnhardened {
   meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
-  match code.XmlParserCreate as p
-  unless guarded_by core.XmlHardening
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.XmlHardening
 }
 `
 	g := usg.NewInMemStore()
@@ -387,7 +386,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -406,11 +405,11 @@ rule XxeUnhardened {
 
 func TestMatchGuardedBySameReceiverNodeLabel(t *testing.T) {
 	rule := `
-package vypr.deserialization;
+module vypr.deserialization;
 rule XxeUnhardened {
   meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
-  match code.XmlParserCreate as p
-  unless guarded_by core.XmlHardening
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.XmlHardening
 }
 `
 	g := usg.NewInMemStore()
@@ -419,7 +418,7 @@ rule XxeUnhardened {
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
-	decls, err := parser.Parse(rule)
+	decls, err := parser.ParseRuntime(rule)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}

@@ -13,7 +13,7 @@ import (
 func evalOne(t *testing.T, src string, s usg.Store) int {
 	t.Helper()
 	onto := runtimeTestOntology()
-	decls, err := parser.Parse(src)
+	decls, err := parser.ParseRuntime(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -47,11 +47,11 @@ func runtimeTestOntology() *ontology.Ontology {
 
 func TestRuntimeLinkToLabeledTarget(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule LinkToLabeledTarget {
   meta { id: "TEST-RUNTIME-004", severity: high }
-  match custom.Link as c
-  where c.dst labeled custom.Indicator
+  issue custom.Link as c
+  where has(c.dst, custom.Indicator)
 }
 `
 	s := usg.NewInMemStore()
@@ -70,10 +70,10 @@ rule LinkToLabeledTarget {
 
 func TestRuntimePropertyDrift(t *testing.T) {
 	rule := `
-package test;
+module test;
 rule PropertyDrift {
   meta { id: "TEST-RUNTIME-003", severity: high }
-  match custom.Process as p
+  issue custom.Process as p
   where p.image not in [expectedA, expectedB]
 }
 `
@@ -93,7 +93,7 @@ func TestRuntimeConfirmationEscalatesRisk(t *testing.T) {
 	if edge, err := onto.Get("custom.Edge"); err == nil {
 		edge.ContextReachLabel = "internet-reachable"
 	}
-	decls, _ := parser.Parse(flowRule)
+	decls, _ := parser.ParseRuntime(flowRule)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)

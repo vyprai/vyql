@@ -11,15 +11,15 @@ import (
 
 func TestReachWithAssetFilter(t *testing.T) {
 	src := `
-package test;
+module test;
 rule ReachAsset {
   meta { id: "TEST-REACH", severity: critical }
   reach custom.Edge -> custom.Asset
-  where custom.Asset holds_asset_kind [custom.Important]
+  where holdsAssetKind(custom.Asset, [custom.Important])
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.Parse(src)
+	decls, _ := parser.ParseRuntime(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -53,14 +53,14 @@ rule ReachAsset {
 
 func TestAssumeEscalation(t *testing.T) {
 	src := `
-package test;
+module test;
 rule ActorToCapability {
   meta { id: "TEST-ASSUME", severity: critical }
   assume custom.Actor -> custom.Capability
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.Parse(src)
+	decls, _ := parser.ParseRuntime(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -91,14 +91,14 @@ rule ActorToCapability {
 
 func TestGrantEscalationUsesGrantWitness(t *testing.T) {
 	src := `
-package test;
+module test;
 rule ActorToCapability {
   meta { id: "TEST-GRANT", severity: critical }
   grant custom.Actor -> custom.Capability
 }
 `
 	onto := solverContractOntology()
-	decls, _ := parser.Parse(src)
+	decls, _ := parser.ParseRuntime(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
@@ -138,7 +138,7 @@ rule ExternalToElevated {
 	for _, c := range cs {
 		onto.Add(c)
 	}
-	decls, _ := parser.Parse(src)
+	decls, _ := parser.ParseRuntime(src)
 	compiled, errs := CompileRules(decls, onto)
 	if len(errs) != 0 {
 		t.Fatalf("compile: %v", errs)
