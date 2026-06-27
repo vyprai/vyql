@@ -300,6 +300,7 @@ func collectReviewItemsWithPolicy(g usg.Store, reviewConcepts map[string]reviewC
 	}
 	out := []reviewItem{}
 	seen := map[string]bool{}
+	identity := resultpolicy.MustDefaultIdentity()
 	for _, n := range nodes {
 		labels, _ := g.Labels(n.ID)
 		for _, l := range labels {
@@ -307,7 +308,7 @@ func collectReviewItemsWithPolicy(g usg.Store, reviewConcepts map[string]reviewC
 			if !lifecycle.FlagWhenIssue(ok) {
 				continue
 			}
-			key := reviewDedupKey(l.Concept, n)
+			key := reviewDedupKey(identity, l.Concept, n)
 			if seen[key] {
 				continue
 			}
@@ -337,12 +338,18 @@ func collectReviewItemsWithPolicy(g usg.Store, reviewConcepts map[string]reviewC
 	return out
 }
 
-func reviewDedupKey(concept string, n usg.Node) string {
+func reviewDedupKey(identity resultpolicy.IdentityPolicy, concept string, n usg.Node) string {
 	loc := n.Prop("loc")
 	if loc == "" {
 		loc = n.ID
 	}
-	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
+	return identity.FlagKeyFor(resultpolicy.FlagIdentity{
+		Concept:    concept,
+		Location:   loc,
+		CallPath:   n.Prop("path"),
+		CallMethod: n.Prop("method"),
+		NodeID:     n.ID,
+	})
 }
 
 func relatedReviewChecks(g usg.Store, nodes map[string]usg.Node, targetID string, expected []string, reviewConcepts map[string]reviewConceptInfo, limit int, lifecycle resultpolicy.LifecyclePolicy) []reviewRelatedCheck {

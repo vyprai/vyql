@@ -22,6 +22,14 @@ type IdentityPolicy struct {
 	StableAcross []string
 }
 
+type FlagIdentity struct {
+	Concept    string
+	Location   string
+	CallPath   string
+	CallMethod string
+	NodeID     string
+}
+
 var (
 	identityOnce sync.Once
 	identityCfg  IdentityPolicy
@@ -160,6 +168,14 @@ func (p IdentityPolicy) FindingKeyFor(f *findings.Finding) string {
 	return p.joinFindingFields(p.FindingKey, f)
 }
 
+func (p IdentityPolicy) FlagKeyFor(flag FlagIdentity) string {
+	parts := make([]string, 0, len(p.FlagKey))
+	for _, field := range p.FlagKey {
+		parts = append(parts, field+"="+flagField(flag, field))
+	}
+	return strings.Join(parts, "|")
+}
+
 func (p IdentityPolicy) FingerprintFinding(f *findings.Finding) string {
 	parts := p.Fingerprint
 	if len(parts) == 0 {
@@ -175,6 +191,23 @@ func (p IdentityPolicy) joinFindingFields(fields []string, f *findings.Finding) 
 		parts = append(parts, field+"="+findingField(f, field))
 	}
 	return strings.Join(parts, "|")
+}
+
+func flagField(flag FlagIdentity, field string) string {
+	switch field {
+	case "concept":
+		return flag.Concept
+	case "location":
+		return flag.Location
+	case "call.path":
+		return flag.CallPath
+	case "call.method":
+		return flag.CallMethod
+	case "nodeID":
+		return flag.NodeID
+	default:
+		return ""
+	}
 }
 
 func findingField(f *findings.Finding, field string) string {
@@ -275,6 +308,11 @@ func identityPolicyFromDecl(p *parser.V2PolicyDecl) (IdentityPolicy, error) {
 			return IdentityPolicy{}, fmt.Errorf("unsupported finding identity field %q", field)
 		}
 	}
+	for _, field := range out.FlagKey {
+		if !supportedFlagIdentityField(field) {
+			return IdentityPolicy{}, fmt.Errorf("unsupported flag identity field %q", field)
+		}
+	}
 	return out, nil
 }
 
@@ -297,6 +335,15 @@ func supportedFindingIdentityField(field string) bool {
 	case "rule.id", "rule", "primaryTarget.location", "target.location", "location",
 		"primaryTarget.concept", "target.concept", "concept", "primaryTarget.nodeID",
 		"target.nodeID", "nodeID", "primaryTarget.binding", "target.binding":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedFlagIdentityField(field string) bool {
+	switch field {
+	case "concept", "location", "call.path", "call.method", "nodeID":
 		return true
 	default:
 		return false

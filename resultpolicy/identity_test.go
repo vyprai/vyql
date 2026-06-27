@@ -55,6 +55,16 @@ policy resultIdentity default {
 	if got := policy.FingerprintFinding(differentSinkConcept); got == fp {
 		t.Fatalf("target concept did not affect policy fingerprint: %s", got)
 	}
+	flagKey := policy.FlagKeyFor(FlagIdentity{
+		Concept:    "code.StructuredInputDecode",
+		Location:   "app.go:10",
+		CallPath:   "decode",
+		CallMethod: "Decode",
+		NodeID:     "node-1",
+	})
+	if flagKey != "concept=code.StructuredInputDecode|location=app.go:10|call.path=decode|call.method=Decode" {
+		t.Fatalf("flag key = %q", flagKey)
+	}
 }
 
 func TestConfidencePolicyFromV2Decl(t *testing.T) {
