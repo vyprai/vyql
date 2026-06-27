@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding regexLineCommentStripWithoutCharWhitelist40 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=strip_comments" and node.token contains "Regex::new" and node.token contains "(?m)//.*$" and node.token contains "replace_all" and not (node.token contains "verify_string") and not (node.token contains "is_permitted_char") and not (node.token contains "strip_comments_and_verify")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=strip_comments" and node.token contains "Regex::new" and node.token contains "(?m)//.*$" and node.token contains "replace_all" and not (node.token contains "verify_string") and not (node.token contains "is_permitted_char") and not (node.token contains "strip_comments_and_verify")
   emit issue code.RegexLineCommentStripWithoutCharWhitelist at node
 }

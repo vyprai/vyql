@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding packageVersionSpecifierValidationReview562 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "re.compile" and node.token contains "^black([^A-Z0-9._-]+.*)$"
+  query pattern presenceNode where node.kind == "any" and node.path == "re.compile" and node.token contains "^black([^A-Z0-9._-]+.*)$"
   emit issue code.PackageVersionSpecifierValidationReview at node
 }

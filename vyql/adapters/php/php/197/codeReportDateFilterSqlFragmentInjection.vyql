@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding reportDateFilterSqlFragmentInjection197 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and containsAny(node.token, ["subscript:$_POST['dropdown_calendar']", "subscript:$_POST[\"dropdown_calendar\"]", "subscript:$_GET['dropdown_calendar']", "subscript:$_GET[\"dropdown_calendar\"]"]) and containsAny(node.token, ["subscript:$_POST['dropdown_sup_inf']", "subscript:$_POST[\"dropdown_sup_inf\"]", "subscript:$_GET['dropdown_sup_inf']", "subscript:$_GET[\"dropdown_sup_inf\"]"]) and containsAny(node.token, ["literal: LIKE '", "literal:date_mod", "literal: ORDER BY "]) and node.token contains "call_path:$DB.doQuery" and not (containsAny(node.token, ["call_path:DateTime.createFromFormat", "call_path:createFromFormat", "call_path:filter_var", "call_path:QueryParam", "call_path:$DB.request", "call_path:$DB.prepare", "call_path:prepare"]))
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and containsAny(node.token, ["subscript:$_POST['dropdown_calendar']", "subscript:$_POST[\"dropdown_calendar\"]", "subscript:$_GET['dropdown_calendar']", "subscript:$_GET[\"dropdown_calendar\"]"]) and containsAny(node.token, ["subscript:$_POST['dropdown_sup_inf']", "subscript:$_POST[\"dropdown_sup_inf\"]", "subscript:$_GET['dropdown_sup_inf']", "subscript:$_GET[\"dropdown_sup_inf\"]"]) and containsAny(node.token, ["literal: LIKE '", "literal:date_mod", "literal: ORDER BY "]) and node.token contains "call_path:$DB.doQuery" and not (containsAny(node.token, ["call_path:DateTime.createFromFormat", "call_path:createFromFormat", "call_path:filter_var", "call_path:QueryParam", "call_path:$DB.request", "call_path:$DB.prepare", "call_path:prepare"]))
   emit issue code.ReportDateFilterSqlFragmentInjection at node
 }

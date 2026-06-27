@@ -1,10 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding unboundedAllocationReview64 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "count_vertices+=*itf;" and node.token contains "newaiVector3D[count_vertices]" and not (node.token contains "AI_MAX_FACE_INDICES") and not (node.token contains "count_vertices>vertices.size()")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "count_vertices+=*itf;" and node.token contains "newaiVector3D[count_vertices]" and not (node.token contains "AI_MAX_FACE_INDICES") and not (node.token contains "count_vertices>vertices.size()")
   emit issue code.UnboundedAllocationReview at node
 }

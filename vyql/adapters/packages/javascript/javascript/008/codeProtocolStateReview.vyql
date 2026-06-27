@@ -4,10 +4,6 @@ binding protocolStateReview8 {
   requires {
     dependency("next")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=updateSession" and node.token contains "request.headers" and node.token contains "getSessionFromCookie" and node.token contains "verifyAccessToken" and node.token contains "newRequestHeaders.set(sessionHeaderName" and node.token contains "NextResponse.next" and not (node.token contains "newRequestHeaders.delete(sessionHeaderName)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=updateSession" and node.token contains "request.headers" and node.token contains "getSessionFromCookie" and node.token contains "verifyAccessToken" and node.token contains "newRequestHeaders.set(sessionHeaderName" and node.token contains "NextResponse.next" and not (node.token contains "newRequestHeaders.delete(sessionHeaderName)")
   emit issue code.ProtocolStateReview at node
 }

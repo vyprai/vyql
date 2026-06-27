@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding clientLightboxOptionXss114 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "setHTMLContent" and node.token contains "setMessage(html)" and not (node.token contains "DOMPurify") and not (node.token contains "sanitize(html)") and not (node.token contains "sanitizeHtml(html)")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "setHTMLContent" and node.token contains "setMessage(html)" and not (node.token contains "DOMPurify") and not (node.token contains "sanitize(html)") and not (node.token contains "sanitizeHtml(html)")
   emit issue code.ClientLightboxOptionXss at node
 }

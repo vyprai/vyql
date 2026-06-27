@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding oversizedWebsocketPayloadDefault554 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=javascript" and node.token contains "maxHttpBufferSize:10e7" and node.token contains "newwsModule.Server({" and node.token contains "maxPayload:this.opts.maxHttpBufferSize" and not (node.token contains "maxHttpBufferSize:1e6")
+  query pattern presenceNode where node.scope == "class" and node.token contains "lang=javascript" and node.token contains "maxHttpBufferSize:10e7" and node.token contains "newwsModule.Server({" and node.token contains "maxPayload:this.opts.maxHttpBufferSize" and not (node.token contains "maxHttpBufferSize:1e6")
   emit issue code.OversizedWebsocketPayloadDefault at node
 }

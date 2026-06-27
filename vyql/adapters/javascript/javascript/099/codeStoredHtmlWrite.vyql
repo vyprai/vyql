@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding storedHtmlWrite99 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and containsAny(node.token, ["call_path:copyIn", "call_path:Promise.promisify"]) and node.token contains "call_path:path.extname" and node.token contains "selector:file.path" and node.token contains "selector:info.extension" and not (node.token contains "call_path:sanitizeSvg") and not (node.token contains "call_path:DOMPurify")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and containsAny(node.token, ["call_path:copyIn", "call_path:Promise.promisify"]) and node.token contains "call_path:path.extname" and node.token contains "selector:file.path" and node.token contains "selector:info.extension" and not (node.token contains "call_path:sanitizeSvg") and not (node.token contains "call_path:DOMPurify")
   emit issue code.StoredHtmlWrite at node
 }

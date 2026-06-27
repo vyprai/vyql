@@ -495,9 +495,6 @@ func v2BindingTechnology(module string) string {
 }
 
 func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver) ([]AdapterMapping, error) {
-	if b.Query.Expr != nil && b.Query.Expr.Family == "unstable.legacyFlag" {
-		return lowerV2LegacyFlagBinding(b, names)
-	}
 	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
 		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
@@ -769,19 +766,27 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	var out []AdapterMapping
 	for _, action := range b.Outputs {
 		action.Concept = names.concept(action.Concept)
+		action.About = names.concept(action.About)
 		if action.Kind != "emit issue" && action.Kind != "emit sink" && action.Kind != "emit source" && action.Kind != "emit check" {
 			return nil, true, fmt.Errorf("binding %s: presenceNode only supports emit issue/source/sink/check", b.Name)
 		}
 		if action.Location != alias {
 			return nil, true, fmt.Errorf("binding %s: presenceNode emit location must be %q", b.Name, alias)
 		}
-		if len(action.Covers) != 0 || action.Advisory != nil || action.About != "" {
-			return nil, true, fmt.Errorf("binding %s: presenceNode does not support coverage, advisory, or about metadata", b.Name)
+		coverage := ""
+		if len(action.Covers) > 1 {
+			return nil, true, fmt.Errorf("binding %s: presenceNode supports at most one coverage mode", b.Name)
+		}
+		if len(action.Covers) == 1 {
+			coverage = action.Covers[0].Mode
 		}
 		flag := *fl
 		out = append(out, AdapterMapping{
 			Kind:     "flag",
 			Concept:  action.Concept,
+			About:    action.About,
+			Advisory: action.Advisory != nil && *action.Advisory,
+			Coverage: coverage,
 			Packages: pkgs,
 			Flag:     &flag,
 		})
@@ -801,12 +806,23 @@ func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*AdapterFlag, bool, err
 			neg = true
 			atom = u.X
 		}
-		pred, err := lowerV2PresencePredicate(alias, atom, neg)
+		if handledOperand, err := lowerV2PresenceOperand(fl, alias, atom, neg); handledOperand || err != nil {
+			if err != nil {
+				return nil, true, err
+			}
+			handled = true
+			continue
+		}
+		if handledMeta, err := lowerV2PresenceMeta(fl, alias, atom, neg); handledMeta || err != nil {
+			if err != nil {
+				return nil, true, err
+			}
+			handled = true
+			continue
+		}
+		pred, err := lowerV2PresencePredicate(alias, "node", atom, neg)
 		if err != nil {
 			return nil, true, err
-		}
-		if pred.Property == "" {
-			return nil, false, nil
 		}
 		handled = true
 		fl.Predicates = append(fl.Predicates, pred)
@@ -815,21 +831,6 @@ func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*AdapterFlag, bool, err
 		return nil, false, nil
 	}
 	return fl, true, nil
-}
-
-func lowerV2PresencePredicate(alias string, expr V2Expr, neg bool) (AdapterFlagPredicate, error) {
-	cmp, ok := expr.(V2BinaryExpr)
-	if !ok {
-		return AdapterFlagPredicate{}, nil
-	}
-	field, ok := v2LegacyFlagField(alias, cmp.Left)
-	if !ok {
-		return AdapterFlagPredicate{}, nil
-	}
-	if field != "path" && field != "method" {
-		return AdapterFlagPredicate{}, fmt.Errorf("presenceNode only supports %s.path or %s.method predicates", alias, alias)
-	}
-	return lowerV2LegacyFlagPredicate(alias, "node", cmp, neg)
 }
 
 func andV2Expr(left, right V2Expr) V2Expr {
@@ -908,88 +909,7 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Adapte
 	return out, nil
 }
 
-func lowerV2AnalysisPathPredicate(alias string, expr V2Expr) (string, bool) {
-	cmp, ok := expr.(V2BinaryExpr)
-	if !ok || cmp.Op != "==" {
-		return "", false
-	}
-	left, ok := cmp.Left.(V2RefExpr)
-	if !ok || left.Name != alias+".path" {
-		return "", false
-	}
-	lit, ok := cmp.Right.(V2LiteralExpr)
-	if !ok {
-		return "", false
-	}
-	s, ok := lit.Value.(string)
-	return s, ok
-}
-
-func lowerV2LegacyFlagBinding(b *V2BindingDecl, names v2NameResolver) ([]AdapterMapping, error) {
-	if b.Query.Expr == nil {
-		return nil, fmt.Errorf("binding %s: missing legacy flag query", b.Name)
-	}
-	fl, err := lowerV2LegacyFlagExpr(b.Query.Expr.Alias, b.Query.Expr.Where)
-	if err != nil {
-		return nil, fmt.Errorf("binding %s: legacy flag query: %w", b.Name, err)
-	}
-	pkgs, err := lowerV2RequirementsToPackages(b.Requirements)
-	if err != nil {
-		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
-	}
-	var out []AdapterMapping
-	for _, action := range b.Outputs {
-		action.Concept = names.concept(action.Concept)
-		if action.Kind != "emit issue" && action.Kind != "emit sink" && action.Kind != "emit source" && action.Kind != "emit check" {
-			return nil, fmt.Errorf("binding %s: legacy flag query only supports emit issue/source/sink/check", b.Name)
-		}
-		if action.Location != b.Query.Expr.Alias {
-			return nil, fmt.Errorf("binding %s: legacy flag emit location must be %q", b.Name, b.Query.Expr.Alias)
-		}
-		flag := *fl
-		out = append(out, AdapterMapping{
-			Kind:     "flag",
-			Concept:  action.Concept,
-			Packages: pkgs,
-			Flag:     &flag,
-		})
-	}
-	return out, nil
-}
-
-func lowerV2LegacyFlagExpr(alias string, expr V2Expr) (*AdapterFlag, error) {
-	if alias == "" {
-		return nil, fmt.Errorf("query alias is required")
-	}
-	fl := &AdapterFlag{NodeKind: "any"}
-	for _, atom := range flattenV2And(expr) {
-		neg := false
-		if u, ok := atom.(V2UnaryExpr); ok && u.Op == "not" {
-			neg = true
-			atom = u.X
-		}
-		if handled, err := lowerV2LegacyFlagOperand(fl, alias, atom, neg); handled || err != nil {
-			if err != nil {
-				return nil, err
-			}
-			continue
-		}
-		if handled, err := lowerV2LegacyFlagMeta(fl, alias, atom, neg); handled || err != nil {
-			if err != nil {
-				return nil, err
-			}
-			continue
-		}
-		pred, err := lowerV2LegacyFlagPredicate(alias, "node", atom, neg)
-		if err != nil {
-			return nil, err
-		}
-		fl.Predicates = append(fl.Predicates, pred)
-	}
-	return fl, nil
-}
-
-func lowerV2LegacyFlagOperand(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
+func lowerV2PresenceOperand(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
 	if neg {
 		return false, nil
 	}
@@ -1021,7 +941,7 @@ func lowerV2LegacyFlagOperand(fl *AdapterFlag, alias string, expr V2Expr, neg bo
 			opNeg = true
 			atom = u.X
 		}
-		pred, err := lowerV2LegacyFlagPredicate("operand", "operand", atom, opNeg)
+		pred, err := lowerV2PresencePredicate("operand", "operand", atom, opNeg)
 		if err != nil {
 			return true, err
 		}
@@ -1046,7 +966,7 @@ func flattenV2AndInto(expr V2Expr, out *[]V2Expr) {
 	*out = append(*out, expr)
 }
 
-func lowerV2LegacyFlagMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
+func lowerV2PresenceMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
 	if neg {
 		return false, nil
 	}
@@ -1054,7 +974,7 @@ func lowerV2LegacyFlagMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool)
 	if !ok || b.Op != "==" {
 		return false, nil
 	}
-	field, ok := v2LegacyFlagField(alias, b.Left)
+	field, ok := v2PresenceField(alias, b.Left)
 	if !ok || (field != "kind" && field != "scope") {
 		return false, nil
 	}
@@ -1070,23 +990,23 @@ func lowerV2LegacyFlagMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool)
 	return true, nil
 }
 
-func lowerV2LegacyFlagPredicate(alias, defaultSubject string, expr V2Expr, neg bool) (AdapterFlagPredicate, error) {
+func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg bool) (AdapterFlagPredicate, error) {
 	switch x := expr.(type) {
 	case V2BinaryExpr:
-		return lowerV2LegacyFlagBinary(alias, defaultSubject, x, neg)
+		return lowerV2PresenceBinary(alias, defaultSubject, x, neg)
 	case V2CallExpr:
-		return lowerV2LegacyFlagCall(alias, defaultSubject, x, neg)
+		return lowerV2PresenceCall(alias, defaultSubject, x, neg)
 	default:
 		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate expression %T", expr)
 	}
 }
 
-func lowerV2LegacyFlagBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool) (AdapterFlagPredicate, error) {
-	field, ok := v2LegacyFlagField(alias, x.Left)
+func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool) (AdapterFlagPredicate, error) {
+	field, ok := v2PresenceField(alias, x.Left)
 	if !ok {
 		return AdapterFlagPredicate{}, fmt.Errorf("predicate left side must be %s.<field>", alias)
 	}
-	subject, prop, ok := v2LegacyFlagProperty(defaultSubject, field)
+	subject, prop, ok := v2PresenceProperty(defaultSubject, field)
 	if !ok {
 		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
@@ -1120,18 +1040,18 @@ func lowerV2LegacyFlagBinary(alias, defaultSubject string, x V2BinaryExpr, neg b
 	}
 }
 
-func lowerV2LegacyFlagCall(alias, defaultSubject string, x V2CallExpr, neg bool) (AdapterFlagPredicate, error) {
+func lowerV2PresenceCall(alias, defaultSubject string, x V2CallExpr, neg bool) (AdapterFlagPredicate, error) {
 	if x.Name != "containsAny" {
 		return AdapterFlagPredicate{}, fmt.Errorf("unsupported call %q", x.Name)
 	}
 	if len(x.Args) != 2 || len(x.NamedArgs) != 0 {
 		return AdapterFlagPredicate{}, fmt.Errorf("containsAny requires two positional args")
 	}
-	field, ok := v2LegacyFlagField(alias, x.Args[0])
+	field, ok := v2PresenceField(alias, x.Args[0])
 	if !ok {
 		return AdapterFlagPredicate{}, fmt.Errorf("containsAny first arg must be %s.<field>", alias)
 	}
-	subject, prop, ok := v2LegacyFlagProperty(defaultSubject, field)
+	subject, prop, ok := v2PresenceProperty(defaultSubject, field)
 	if !ok {
 		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
@@ -1142,7 +1062,7 @@ func lowerV2LegacyFlagCall(alias, defaultSubject string, x V2CallExpr, neg bool)
 	return AdapterFlagPredicate{Subject: subject, Property: prop, Op: "contains_any", Values: values, Negative: neg}, nil
 }
 
-func v2LegacyFlagField(alias string, expr V2Expr) (string, bool) {
+func v2PresenceField(alias string, expr V2Expr) (string, bool) {
 	ref, ok := expr.(V2RefExpr)
 	if !ok {
 		return "", false
@@ -1154,7 +1074,7 @@ func v2LegacyFlagField(alias string, expr V2Expr) (string, bool) {
 	return strings.TrimPrefix(ref.Name, prefix), true
 }
 
-func v2LegacyFlagProperty(defaultSubject, field string) (string, string, bool) {
+func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 	if rest, ok := strings.CutPrefix(field, "scopeCall."); ok {
 		return "scope_call", rest, true
 	}

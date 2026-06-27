@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedChartTooltipHtml106 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "selector:tooltipModel.body" and node.token contains "selector:tooltipModel.labelColors" and node.token contains "call_path:generateTooltipContent" and node.token contains "selector:innerHTML" and not (node.token contains "call_path:replaceChildren") and not (node.token contains "selector:textContent")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "selector:tooltipModel.body" and node.token contains "selector:tooltipModel.labelColors" and node.token contains "call_path:generateTooltipContent" and node.token contains "selector:innerHTML" and not (node.token contains "call_path:replaceChildren") and not (node.token contains "selector:textContent")
   emit issue code.UnescapedChartTooltipHtml at node
 }

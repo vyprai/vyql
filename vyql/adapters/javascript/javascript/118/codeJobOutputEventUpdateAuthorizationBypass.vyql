@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding jobOutputEventUpdateAuthorizationBypass118 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "literal:Got job update from child" and node.token contains "literal:update_event" and node.token contains "assign:job[]=data[key]" and node.token contains "subscript:data[key]" and not (node.token contains "literal:allow_event_updates_from_jobs") and not (node.token contains "selector:data.update_event")
+  query pattern presenceNode where node.scope == "function" and node.token contains "literal:Got job update from child" and node.token contains "literal:update_event" and node.token contains "assign:job[]=data[key]" and node.token contains "subscript:data[key]" and not (node.token contains "literal:allow_event_updates_from_jobs") and not (node.token contains "selector:data.update_event")
   emit issue code.JobOutputEventUpdateAuthorizationBypass at node
 }

@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unboundedProtocolStateByIdentifier255 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:MessageReceived" and node.token contains "call:Wantlist" and node.token contains "call:splitWantsCancels" and node.token contains "call:Wants" and node.token contains "call:PushTasksTruncated" and not (node.scopeCall.any contains "ByteLen") and not (node.token contains "mh.IDENTITY")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:MessageReceived" and node.token contains "call:Wantlist" and node.token contains "call:splitWantsCancels" and node.token contains "call:Wants" and node.token contains "call:PushTasksTruncated" and not (node.scopeCall.any contains "ByteLen") and not (node.token contains "mh.IDENTITY")
   emit issue code.UnboundedProtocolStateByIdentifier at node
 }

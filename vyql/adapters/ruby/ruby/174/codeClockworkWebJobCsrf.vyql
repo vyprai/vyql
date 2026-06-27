@@ -1,10 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding clockworkWebJobCsrf174 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=ruby" and node.token contains "name=HomeController" and node.token contains "params[:job]" and node.token contains "params[:enable]" and node.token contains "ClockworkWeb.enable(job)" and node.token contains "ClockworkWeb.disable(job)" and not (node.token contains "protect_from_forgery")
+  query pattern presenceNode where node.scope == "class" and node.token contains "lang=ruby" and node.token contains "name=HomeController" and node.token contains "params[:job]" and node.token contains "params[:enable]" and node.token contains "ClockworkWeb.enable(job)" and node.token contains "ClockworkWeb.disable(job)" and not (node.token contains "protect_from_forgery")
   emit issue code.ClockworkWebJobCsrf at node
 }

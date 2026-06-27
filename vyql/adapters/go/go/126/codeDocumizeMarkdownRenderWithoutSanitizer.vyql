@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding documizeMarkdownRenderWithoutSanitizer126 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:Render" and node.token contains "call_path:blackfriday.Run" and node.token contains "call:string" and not (node.token contains "call_path:bluemonday.UGCPolicy") and not (node.scopeCall.any contains "SanitizeBytes")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:Render" and node.token contains "call_path:blackfriday.Run" and node.token contains "call:string" and not (node.token contains "call_path:bluemonday.UGCPolicy") and not (node.scopeCall.any contains "SanitizeBytes")
   emit issue code.DocumizeMarkdownRenderWithoutSanitizer at node
 }

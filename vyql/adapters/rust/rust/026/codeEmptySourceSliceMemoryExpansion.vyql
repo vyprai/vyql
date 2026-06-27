@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding emptySourceSliceMemoryExpansion26 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=set" and node.token contains "lettarget_size=target_size.unwrap_or(value.len());" and node.token contains "self.data.resize(offset+target_size,0)" and node.token contains "forindexin0..target_size" and node.token contains "value.len()>index" and not (node.token contains "value.is_empty()")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=set" and node.token contains "lettarget_size=target_size.unwrap_or(value.len());" and node.token contains "self.data.resize(offset+target_size,0)" and node.token contains "forindexin0..target_size" and node.token contains "value.len()>index" and not (node.token contains "value.is_empty()")
   emit issue code.EmptySourceSliceMemoryExpansion at node
 }

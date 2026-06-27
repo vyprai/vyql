@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsTestResultNameXss90 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:getName" and node.token contains "class_base:TestResult" and node.token contains "return_identifier:name" and not (containsAny(node.token, ["return_call_path:hudson.Util.escape", "return_call_path:Util.escape", "return_call_path:StringEscapeUtils.escapeHtml", "return_call_path:StringEscapeUtils.escapeHtml4"]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:getName" and node.token contains "class_base:TestResult" and node.token contains "return_identifier:name" and not (containsAny(node.token, ["return_call_path:hudson.Util.escape", "return_call_path:Util.escape", "return_call_path:StringEscapeUtils.escapeHtml", "return_call_path:StringEscapeUtils.escapeHtml4"]))
   emit issue code.JenkinsTestResultNameXss at node
 }

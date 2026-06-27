@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding unsafeAutoTraitImpl17 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.rust.unsafe_impl" and node.token contains "trait:Send" and not (node.token contains "bound:Send")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.rust.unsafe_impl" and node.token contains "trait:Send" and not (node.token contains "bound:Send")
   emit issue code.UnsafeAutoTraitImpl at node
 }

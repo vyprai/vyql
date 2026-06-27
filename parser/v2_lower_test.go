@@ -1135,15 +1135,11 @@ binding containmentCheck {
 	}
 }
 
-func TestV2LegacyFlagBindingLowering(t *testing.T) {
+func TestV2PresenceNodeTokenAndKindLowering(t *testing.T) {
 	decls, err := ParseV2Runtime(`
 module bindings.perl.migration;
 binding cleartextChannel {
-  unstable: {
-    owner: "test"
-    reason: "exercise transitional legacy flag lowering"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")
+  query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")
   emit issue code.CleartextChannel at node
 }
 `)
@@ -1159,10 +1155,10 @@ binding cleartextChannel {
 	}
 	m := adapter.Mappings[0]
 	if m.Kind != "flag" || m.Concept != "code.CleartextChannel" || m.Flag == nil {
-		t.Fatalf("legacy flag mapping wrong: %+v", m)
+		t.Fatalf("presenceNode mapping wrong: %+v", m)
 	}
 	if m.Flag.NodeKind != "any" || len(m.Flag.Predicates) != 3 {
-		t.Fatalf("legacy flag shape wrong: %+v", m.Flag)
+		t.Fatalf("presenceNode shape wrong: %+v", m.Flag)
 	}
 	if got := m.Flag.Predicates[0]; got.Property != "path" || got.Op != "match" || got.Values[0] != "getstore" {
 		t.Fatalf("path predicate wrong: %+v", got)
@@ -1248,6 +1244,29 @@ binding logWrite {
 	}
 }
 
+func TestV2PresenceNodePreservesAdvisoryCheckMetadata(t *testing.T) {
+	decls, err := ParseV2Runtime(`
+module bindings.go.memory;
+binding memoryBounds {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne"
+  emit check core.MemoryBoundsCheck at node {
+    advisory: true
+    about: code.BufferAccess
+    covers sameScope {
+      anchor: node
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	m := decls[0].(*AdapterDecl).Mappings[0]
+	if m.Kind != "flag" || !m.Advisory || m.About != "code.BufferAccess" || m.Coverage != "sameScope" {
+		t.Fatalf("presenceNode metadata not preserved: %+v", m)
+	}
+}
+
 func TestV2ImportedPresenceNodePatternLowering(t *testing.T) {
 	decls, err := ParseV2Runtime(`
 module bindings.lua.crypto;
@@ -1269,31 +1288,27 @@ binding weakHash {
 	}
 }
 
-func TestV2PresenceNodeRejectsNonPresencePredicates(t *testing.T) {
+func TestV2PresenceNodeRejectsUnknownPredicates(t *testing.T) {
 	_, err := ParseV2Runtime(`
 module bindings.javascript.web;
 binding unsupported {
-  query pattern presenceNode where node.token contains "secret"
+  query pattern presenceNode where node.receiver == "req"
   emit issue code.SecretValue at node
 }
 `)
 	if err == nil {
-		t.Fatal("presenceNode lowered unsupported token predicate")
+		t.Fatal("presenceNode lowered unsupported predicate")
 	}
-	if !strings.Contains(err.Error(), "presenceNode only supports") {
+	if !strings.Contains(err.Error(), `unsupported predicate field "receiver"`) {
 		t.Fatalf("presenceNode error = %v", err)
 	}
 }
 
-func TestV2LegacyFlagOperandAndPseudoSubjectLowering(t *testing.T) {
+func TestV2PresenceNodeOperandAndPseudoSubjectLowering(t *testing.T) {
 	decls, err := ParseV2Runtime(`
 module bindings.javascript.migration;
 binding secretCompare {
-  unstable: {
-    owner: "test"
-    reason: "exercise transitional legacy flag operand lowering"
-  }
-  query unstable.legacyFlag as node where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, ["token", "secret"]))
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="] and not (containsAny(node.scopeCall.any, ["scmp", "timingSafeEqual"])) and operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, ["token", "secret"]))
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -1316,15 +1331,11 @@ binding secretCompare {
 	}
 }
 
-func TestV2LegacyFlagSnakeCasePseudoSubjectLowering(t *testing.T) {
+func TestV2PresenceNodeSnakeCasePseudoSubjectLowering(t *testing.T) {
 	decls, err := ParseV2Runtime(`
 module bindings.javascript.migration;
 binding secretCompare {
-  unstable: {
-    owner: "test"
-    reason: "exercise transitional snake-case pseudo subjects"
-  }
-  query unstable.legacyFlag as node where node.kind == "binop" and not (containsAny(node.scope_call.any, [scmp])) and containsAny(node.flow_to.op, [return])
+  query pattern presenceNode where node.kind == "binop" and not (containsAny(node.scope_call.any, [scmp])) and containsAny(node.flow_to.op, [return])
   emit issue code.SecretComparisonReview at node
 }
 `)

@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding repeatedKeyfileSubstitutionTables189 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "keyFile!=NULL" and node.token contains "fread(extractedString,1,BUFFER_SIZE,keyFile)" and node.token contains "scrambleAsciiTables[j][i%256]=scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]" and node.token contains "scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]=temp" and not (node.token contains "generateNumber()^extractedString[i]") and not (node.token contains "scramblingTablesOrder") and not (node.token contains "usingKeyFile")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "keyFile!=NULL" and node.token contains "fread(extractedString,1,BUFFER_SIZE,keyFile)" and node.token contains "scrambleAsciiTables[j][i%256]=scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]" and node.token contains "scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]=temp" and not (node.token contains "generateNumber()^extractedString[i]") and not (node.token contains "scramblingTablesOrder") and not (node.token contains "usingKeyFile")
   emit issue code.RepeatedKeyfileSubstitutionTables at node
 }

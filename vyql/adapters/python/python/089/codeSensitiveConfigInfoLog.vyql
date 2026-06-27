@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding sensitiveConfigInfoLog89 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=load_config" and node.token contains "yaml.safe_load" and node.token contains "LOG.info" and node.token contains "Config file:" and not (node.token contains "LOG.debug(\"Config file:")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=load_config" and node.token contains "yaml.safe_load" and node.token contains "LOG.info" and node.token contains "Config file:" and not (node.token contains "LOG.debug(\"Config file:")
   emit issue code.SensitiveConfigInfoLog at node
 }

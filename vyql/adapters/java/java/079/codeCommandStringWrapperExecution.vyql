@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding commandStringWrapperExecution79 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "literal:/bin/sh" and node.token contains "literal:-c" and node.token contains "identifier:scriptPath" and node.token contains "expr:scriptPath+ALERT_TITLE_OPTION" and node.token contains "call_path:ProcessUtils.executeScript" and not (node.token contains "call_path:File") and not (node.scopeCall.any contains "exists") and not (node.scopeCall.any contains "isFile")
+  query pattern presenceNode where node.scope == "function" and node.token contains "literal:/bin/sh" and node.token contains "literal:-c" and node.token contains "identifier:scriptPath" and node.token contains "expr:scriptPath+ALERT_TITLE_OPTION" and node.token contains "call_path:ProcessUtils.executeScript" and not (node.token contains "call_path:File") and not (node.scopeCall.any contains "exists") and not (node.scopeCall.any contains "isFile")
   emit issue code.CommandStringWrapperExecution at node
 }

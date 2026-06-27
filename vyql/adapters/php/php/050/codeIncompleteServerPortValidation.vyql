@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding incompleteServerPortValidation50 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "connect(" and node.token contains "is_numeric($port)" and node.token contains "explode(" and node.token contains "server" and node.token contains "1024>$port"
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "connect(" and node.token contains "is_numeric($port)" and node.token contains "explode(" and node.token contains "server" and node.token contains "1024>$port"
   emit issue code.IncompleteServerPortValidation at node
 }

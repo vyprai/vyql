@@ -1,10 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding requestTokenCacheCleanupBypass170 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=AddParameterToEndpoint" and node.token contains "ParameterBasedFrom<IToken<IUser>>" and node.token contains "returnthis.AuthenticateToken(context,database);" and node.token contains "returntoken.User;" and node.token contains "this._tokenCache.Value=null;"
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=AddParameterToEndpoint" and node.token contains "ParameterBasedFrom<IToken<IUser>>" and node.token contains "returnthis.AuthenticateToken(context,database);" and node.token contains "returntoken.User;" and node.token contains "this._tokenCache.Value=null;"
   emit issue code.RequestTokenCacheCleanupBypass at node
 }

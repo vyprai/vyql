@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding tempPathJoinBeforeSeparatorCheck81 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=zipdl" and node.token contains "assign_call_method:getTempPath" and node.token contains "assign_literal:DIRECTORY_SEPARATOR" and node.token contains "global_subscript_write=true" and node.token contains "$GLOBALS['elFinderTempFiles'][$path]=true;" and not (node.token contains "strpos($file,DIRECTORY_SEPARATOR)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=zipdl" and node.token contains "assign_call_method:getTempPath" and node.token contains "assign_literal:DIRECTORY_SEPARATOR" and node.token contains "global_subscript_write=true" and node.token contains "$GLOBALS['elFinderTempFiles'][$path]=true;" and not (node.token contains "strpos($file,DIRECTORY_SEPARATOR)")
   emit issue code.TempPathJoinBeforeSeparatorCheck at node
 }

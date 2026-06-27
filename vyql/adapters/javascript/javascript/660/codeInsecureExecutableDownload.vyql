@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding insecureExecutableDownload660 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "jrePrefix" and node.token contains "OpenJDK-JRE" and node.token contains "http://bundled-openjdk-jre" and node.token contains "download(jreUrl,jreTempFile" and node.token contains "http.request" and not (node.token contains "https://storage.googleapis.com")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "jrePrefix" and node.token contains "OpenJDK-JRE" and node.token contains "http://bundled-openjdk-jre" and node.token contains "download(jreUrl,jreTempFile" and node.token contains "http.request" and not (node.token contains "https://storage.googleapis.com")
   emit issue code.InsecureExecutableDownload at node
 }

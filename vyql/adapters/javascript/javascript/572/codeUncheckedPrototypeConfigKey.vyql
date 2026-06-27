@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding uncheckedPrototypeConfigKey572 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=separateExposeGlobals" and node.token contains "Object.keys(shims).forEach" and node.token contains "exposeGlobals[k]=exp" and node.token contains "onlyShims[k]=val" and not (node.token contains "k==='__proto__'||k==='constructor'")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=separateExposeGlobals" and node.token contains "Object.keys(shims).forEach" and node.token contains "exposeGlobals[k]=exp" and node.token contains "onlyShims[k]=val" and not (node.token contains "k==='__proto__'||k==='constructor'")
   emit issue code.UncheckedPrototypeConfigKey at node
 }

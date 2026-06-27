@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding commandStringWrapperExecution251 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["call_path:child_process.execSync", "call_path:execSync"]) and containsAny(node.token, ["identifier:command", "identifier:cmd"]) and not (containsAny(node.token, ["call_path:execFile", "call_path:execFileSync", "call_path:spawn", "call_path:spawnSync"]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["call_path:child_process.execSync", "call_path:execSync"]) and containsAny(node.token, ["identifier:command", "identifier:cmd"]) and not (containsAny(node.token, ["call_path:execFile", "call_path:execFileSync", "call_path:spawn", "call_path:spawnSync"]))
   emit issue code.CommandStringWrapperExecution at node
 }

@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding incompleteGeneratedJsIdentifierReservedWords268 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "JS_RESERVED_WORDS" and node.token contains "isValidJsIdentifier" and node.token contains "compileShellApiFunctionName" and node.token contains "dbgateApi.${functionName}" and node.token contains "'enum'" and not (node.token contains "'eval'") and not (node.token contains "'arguments'")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "JS_RESERVED_WORDS" and node.token contains "isValidJsIdentifier" and node.token contains "compileShellApiFunctionName" and node.token contains "dbgateApi.${functionName}" and node.token contains "'enum'" and not (node.token contains "'eval'") and not (node.token contains "'arguments'")
   emit issue code.IncompleteGeneratedJsIdentifierReservedWords at node
 }

@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding electronNodeIntegration210 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "will-attach-webview" and node.token contains "webPreferences.nodeIntegration=false" and not (node.token contains "webPreferences.contextIsolation=true")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "will-attach-webview" and node.token contains "webPreferences.nodeIntegration=false" and not (node.token contains "webPreferences.contextIsolation=true")
   emit issue code.ElectronNodeIntegration at node
 }

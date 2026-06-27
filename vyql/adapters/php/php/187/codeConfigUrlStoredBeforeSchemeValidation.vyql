@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding configUrlStoredBeforeSchemeValidation187 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=configureJob", "name=store", "name=update"]) and node.token contains "subscript:$data['fints_url']" and node.token contains "subscript:$config['fints_url']" and node.token contains "call_path:$this.repository.setConfiguration" and node.token contains "call_path:$finTS.checkConnection" and not (node.token contains "call_path:$this.validURI") and not (node.token contains "call_path:filter_var") and not (node.token contains "call_path:parse_url")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["name=configureJob", "name=store", "name=update"]) and node.token contains "subscript:$data['fints_url']" and node.token contains "subscript:$config['fints_url']" and node.token contains "call_path:$this.repository.setConfiguration" and node.token contains "call_path:$finTS.checkConnection" and not (node.token contains "call_path:$this.validURI") and not (node.token contains "call_path:filter_var") and not (node.token contains "call_path:parse_url")
   emit issue code.ConfigUrlStoredBeforeSchemeValidation at node
 }

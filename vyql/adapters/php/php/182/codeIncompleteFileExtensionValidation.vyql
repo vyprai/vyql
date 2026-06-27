@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding incompleteFileExtensionValidation182 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=fileExt" and node.token contains "decodeContent" and node.token contains "$file['type']" and node.token contains "$file['name']" and node.token contains "in_array($ext,$exts)" and not (node.token contains "pathinfo") and not (node.token contains "PATHINFO_EXTENSION") and not (node.token contains "is_string")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=fileExt" and node.token contains "decodeContent" and node.token contains "$file['type']" and node.token contains "$file['name']" and node.token contains "in_array($ext,$exts)" and not (node.token contains "pathinfo") and not (node.token contains "PATHINFO_EXTENSION") and not (node.token contains "is_string")
   emit issue code.IncompleteFileExtensionValidation at node
 }

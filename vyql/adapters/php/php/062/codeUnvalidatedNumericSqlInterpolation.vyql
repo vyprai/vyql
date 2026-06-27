@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation62 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "subscript:$HTTP_GET_VARS['lid']" and node.token contains "call_path:$xoopsDB.query" and node.token contains "literal: where " and not (node.token contains "call_arg:is_numeric:$lid")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "subscript:$HTTP_GET_VARS['lid']" and node.token contains "call_path:$xoopsDB.query" and node.token contains "literal: where " and not (node.token contains "call_arg:is_numeric:$lid")
   emit issue code.UnvalidatedNumericSqlInterpolation at node
 }

@@ -1,10 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding ocppEvccIdSharedMapRace120 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.module.context" and node.token contains "lang=cpp" and node.token contains "classOCPP201" and node.token contains "std::map<int32_t,std::string>evse_evcc_id" and not (node.token contains "monitor<std::map<int32_t,std::string>>evse_evcc_id") and not (node.token contains "evse_evcc_id.handle()")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.module.context" and node.token contains "lang=cpp" and node.token contains "classOCPP201" and node.token contains "std::map<int32_t,std::string>evse_evcc_id" and not (node.token contains "monitor<std::map<int32_t,std::string>>evse_evcc_id") and not (node.token contains "evse_evcc_id.handle()")
   emit issue code.OcppEvccIdSharedMapRace at node
 }

@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding protocolRelativeSavedRequestRedirect76 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["function_name:savedRequestURL", "function_name:savedRequestUrl", "function_name:getSavedRequestURL", "function_name:getSavedRequestUrl"]) and containsAny(node.token, ["call_path:saved.getRequestURI", "call_path:saved.getRequestURL", "call_path:saved.getQueryString"]) and node.token contains "call_path:StringBuilder" and containsAny(node.token, ["call_path:sb.append", "call_path:url.append", "call_path:redirect.append"]) and containsAny(node.token, ["return_call_path:sb.toString", "return_call_path:url.toString", "return_call_path:redirect.toString"]) and not (containsAny(node.token, ["call_path:deleteCharAt", "call_path:stripLeading", "call_path:normalize", "call_path:isSafeToRedirectTo"])) and not (containsAny(node.token, ["expr:charAt(1)=='/'", "expr:charAt(1)==\"/\""]))
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:savedRequestURL", "function_name:savedRequestUrl", "function_name:getSavedRequestURL", "function_name:getSavedRequestUrl"]) and containsAny(node.token, ["call_path:saved.getRequestURI", "call_path:saved.getRequestURL", "call_path:saved.getQueryString"]) and node.token contains "call_path:StringBuilder" and containsAny(node.token, ["call_path:sb.append", "call_path:url.append", "call_path:redirect.append"]) and containsAny(node.token, ["return_call_path:sb.toString", "return_call_path:url.toString", "return_call_path:redirect.toString"]) and not (containsAny(node.token, ["call_path:deleteCharAt", "call_path:stripLeading", "call_path:normalize", "call_path:isSafeToRedirectTo"])) and not (containsAny(node.token, ["expr:charAt(1)=='/'", "expr:charAt(1)==\"/\""]))
   emit issue code.ProtocolRelativeSavedRequestRedirect at node
 }

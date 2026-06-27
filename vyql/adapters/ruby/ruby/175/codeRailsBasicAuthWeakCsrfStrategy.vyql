@@ -1,10 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding railsBasicAuthWeakCsrfStrategy175 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=ruby" and node.token contains "class_base:ActionController.Base" and node.token contains "call_path:protect_from_forgery" and node.token contains "call_path:http_basic_authenticate_with" and not (node.token contains "call_arg:protect_from_forgery:with=exception")
+  query pattern presenceNode where node.scope == "class" and node.token contains "lang=ruby" and node.token contains "class_base:ActionController.Base" and node.token contains "call_path:protect_from_forgery" and node.token contains "call_path:http_basic_authenticate_with" and not (node.token contains "call_arg:protect_from_forgery:with=exception")
   emit issue code.RailsBasicAuthWeakCsrfStrategy at node
 }

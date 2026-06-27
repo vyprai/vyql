@@ -1,10 +1,6 @@
 module bindings.ruby.migration.m5a48bf47;
 
 binding unescapedQueueQueryStringXss179 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=url_path" and node.token contains "?queues=#{@queues.join(\",\")}" and not (node.token contains "CGI.escape(@queues.join")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=ruby" and node.token contains "name=url_path" and node.token contains "?queues=#{@queues.join(\",\")}" and not (node.token contains "CGI.escape(@queues.join")
   emit issue code.UnescapedQueueQueryStringXss at node
 }

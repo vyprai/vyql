@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding sessionStoredRedirectTarget75 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:determineTargetUrl" and node.token contains "SimpleUrlAuthenticationSuccessHandler" and node.token contains "session.getAttribute" and node.token contains "targetUrlSessionAttribute" and node.token contains "targetUrl.substring" and not (node.token contains "Util.isSafeToRedirectTo")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:determineTargetUrl" and node.token contains "SimpleUrlAuthenticationSuccessHandler" and node.token contains "session.getAttribute" and node.token contains "targetUrlSessionAttribute" and node.token contains "targetUrl.substring" and not (node.token contains "Util.isSafeToRedirectTo")
   emit issue code.SessionStoredRedirectTarget at node
 }

@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding clientLightboxOptionXss116 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "setSlideshowContent" and node.token contains "options.slides.forEach" and node.token contains "data-elementor-slideshow-video" and node.token contains "slide.image" and not (node.token contains "isValidUrl") and not (node.token contains "startsWith(protocol)")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "setSlideshowContent" and node.token contains "options.slides.forEach" and node.token contains "data-elementor-slideshow-video" and node.token contains "slide.image" and not (node.token contains "isValidUrl") and not (node.token contains "startsWith(protocol)")
   emit issue code.ClientLightboxOptionXss at node
 }

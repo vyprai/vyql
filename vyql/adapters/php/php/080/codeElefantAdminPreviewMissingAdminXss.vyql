@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding elefantAdminPreviewMissingAdminXss80 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=php" and node.token contains "$wp=newWebpage($_POST);" and node.token contains "$page->title=$_POST['title'];" and node.token contains "$tpl->run_includes($_POST['body']);" and not (node.token contains "$this->require_admin();")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=php" and node.token contains "$wp=newWebpage($_POST);" and node.token contains "$page->title=$_POST['title'];" and node.token contains "$tpl->run_includes($_POST['body']);" and not (node.token contains "$this->require_admin();")
   emit issue code.ElefantAdminPreviewMissingAdminXss at node
 }

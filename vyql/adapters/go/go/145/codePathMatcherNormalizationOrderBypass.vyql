@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding pathMatcherNormalizationOrderBypass145 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:Match" and node.token contains "call_path:url.PathUnescape" and node.token contains "selector:r.URL.Path" and node.token contains "call_order:strings.TrimRight>path.Clean" and node.token contains "call:HasSuffix"
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:Match" and node.token contains "call_path:url.PathUnescape" and node.token contains "selector:r.URL.Path" and node.token contains "call_order:strings.TrimRight>path.Clean" and node.token contains "call:HasSuffix"
   emit issue code.PathMatcherNormalizationOrderBypass at node
 }

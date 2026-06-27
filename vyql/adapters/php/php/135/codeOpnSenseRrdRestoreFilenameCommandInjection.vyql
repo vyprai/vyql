@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding opnSenseRrdRestoreFilenameCommandInjection135 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=rrd_import" and node.token contains "$rrd_file=\"/var/db/rrd/{$rrd['filename']}\"" and node.token contains "file_put_contents($xml_file,gzinflate(base64_decode($rrd['xmldata'])))" and node.token contains "exec(\"/usr/local/bin/rrdtoolrestore-f'{$xml_file}''{$rrd_file}'\"" and not (node.token contains "basename($rrd['filename'])") and not (node.token contains "shell_safe")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=rrd_import" and node.token contains "$rrd_file=\"/var/db/rrd/{$rrd['filename']}\"" and node.token contains "file_put_contents($xml_file,gzinflate(base64_decode($rrd['xmldata'])))" and node.token contains "exec(\"/usr/local/bin/rrdtoolrestore-f'{$xml_file}''{$rrd_file}'\"" and not (node.token contains "basename($rrd['filename'])") and not (node.token contains "shell_safe")
   emit issue code.OpnSenseRrdRestoreFilenameCommandInjection at node
 }

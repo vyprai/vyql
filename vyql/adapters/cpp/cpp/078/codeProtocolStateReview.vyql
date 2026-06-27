@@ -1,10 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding protocolStateReview78 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "Record_Type::ApplicationData" and node.token contains "callbacks().tls_record_received" and not (node.token contains "can_decrypt_application_traffic")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "Record_Type::ApplicationData" and node.token contains "callbacks().tls_record_received" and not (node.token contains "can_decrypt_application_traffic")
   emit issue code.ProtocolStateReview at node
 }

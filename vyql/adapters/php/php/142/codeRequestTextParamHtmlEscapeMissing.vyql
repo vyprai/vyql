@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding requestTextParamHtmlEscapeMissing142 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "$_GET[$paramname]" and node.token contains "$_POST[$paramname]" and node.token contains "$check=='alpha'" and node.token contains "$out=trim($out)" and node.token contains "return$out" and not (node.token contains "htmlspecialchars($out") and not (node.token contains "htmlentities($out") and not (node.token contains "dol_htmlentities($out") and not (node.token contains "html_escape($out")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "$_GET[$paramname]" and node.token contains "$_POST[$paramname]" and node.token contains "$check=='alpha'" and node.token contains "$out=trim($out)" and node.token contains "return$out" and not (node.token contains "htmlspecialchars($out") and not (node.token contains "htmlentities($out") and not (node.token contains "dol_htmlentities($out") and not (node.token contains "html_escape($out")
   emit issue code.RequestTextParamHtmlEscapeMissing at node
 }

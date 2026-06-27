@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding dnsInterfaceNewlineValidationMissing42 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=initConfig" and node.token contains "literal:dns.interface" and node.token contains "attr_path:conf.dns.interface.c" and node.token contains "attr_path:conf.dns.interface.t" and node.token contains "assign:conf.dns.interface.c=validate_stub" and not (containsAny(node.token, ["assign:conf.dns.interface.c=validate_str_no_newline"]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=initConfig" and node.token contains "literal:dns.interface" and node.token contains "attr_path:conf.dns.interface.c" and node.token contains "attr_path:conf.dns.interface.t" and node.token contains "assign:conf.dns.interface.c=validate_stub" and not (containsAny(node.token, ["assign:conf.dns.interface.c=validate_str_no_newline"]))
   emit issue code.DnsInterfaceNewlineValidationMissing at node
 }

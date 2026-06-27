@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding threadLocalScopeOverwriteWithoutCleanup331 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "class_name:RequestScopedCache" and node.token contains "function_name:beginRequest" and node.token contains "call_path:CACHE.set" and not (node.scopeCall.any contains "endRequest") and not (node.token contains "call_path:CACHE.remove")
+  query pattern presenceNode where node.scope == "function" and node.token contains "class_name:RequestScopedCache" and node.token contains "function_name:beginRequest" and node.token contains "call_path:CACHE.set" and not (node.scopeCall.any contains "endRequest") and not (node.token contains "call_path:CACHE.remove")
   emit issue code.ThreadLocalScopeOverwriteWithoutCleanup at node
 }

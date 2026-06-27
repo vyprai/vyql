@@ -1,11 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex549 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.method == "split" and node.token contains "\\s*,\\s*"
+  query pattern presenceNode where node.kind == "any" and node.method == "split" and node.token contains "\\s*,\\s*"
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

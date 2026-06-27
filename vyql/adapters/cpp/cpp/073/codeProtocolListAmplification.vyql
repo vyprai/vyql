@@ -1,10 +1,6 @@
 module bindings.cpp.migration.m4e783366;
 
 binding protocolListAmplification73 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "elementSize" and node.token contains "ElementSize::VOID" and node.token contains "ListReader" and not (node.token contains "amplifiedRead")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=cpp" and node.token contains "elementSize" and node.token contains "ElementSize::VOID" and node.token contains "ListReader" and not (node.token contains "amplifiedRead")
   emit issue code.ProtocolListAmplification at node
 }

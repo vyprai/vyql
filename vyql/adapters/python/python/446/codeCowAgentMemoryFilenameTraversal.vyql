@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding cowAgentMemoryFilenameTraversal446 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=_resolve_path" and node.token contains "os.path.join(self.memory_dir,filename)" and node.token contains "os.path.join(self.workspace_root,filename)" and not (node.token contains "os.path.realpath") and not (node.token contains "startswith(allowed+os.sep)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=_resolve_path" and node.token contains "os.path.join(self.memory_dir,filename)" and node.token contains "os.path.join(self.workspace_root,filename)" and not (node.token contains "os.path.realpath") and not (node.token contains "startswith(allowed+os.sep)")
   emit issue code.CowAgentMemoryFilenameTraversal at node
 }

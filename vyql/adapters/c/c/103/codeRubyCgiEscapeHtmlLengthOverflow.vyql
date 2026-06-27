@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding rubyCgiEscapeHtmlLengthOverflow103 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=optimized_escape_html" and node.token contains "HTML_ESCAPE_MAX_LEN" and node.token contains "RSTRING_LEN(str)" and node.token contains "ALLOCV_N(char,vbuf,RSTRING_LEN(str)*HTML_ESCAPE_MAX_LEN)" and not (node.token contains "ALLOCV_N(escape_buf,vbuf,RSTRING_LEN(str))") and not (node.token contains "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=optimized_escape_html" and node.token contains "HTML_ESCAPE_MAX_LEN" and node.token contains "RSTRING_LEN(str)" and node.token contains "ALLOCV_N(char,vbuf,RSTRING_LEN(str)*HTML_ESCAPE_MAX_LEN)" and not (node.token contains "ALLOCV_N(escape_buf,vbuf,RSTRING_LEN(str))") and not (node.token contains "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]")
   emit issue code.RubyCgiEscapeHtmlLengthOverflow at node
 }

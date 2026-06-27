@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding grpcGatewayCommonNameAuthenticationBypass312 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:peer.FromContext" and node.token contains "selector:tlsInfo.State.VerifiedChains" and node.token contains "selector:chains.Subject.CommonName" and not (node.token contains "literal:grpcgateway-accept")
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:peer.FromContext" and node.token contains "selector:tlsInfo.State.VerifiedChains" and node.token contains "selector:chains.Subject.CommonName" and not (node.token contains "literal:grpcgateway-accept")
   emit issue code.GrpcGatewayCommonNameAuthenticationBypass at node
 }

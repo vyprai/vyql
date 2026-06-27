@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding configExposureReview228 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.type.context" and node.token contains "field:Repositories" and node.token contains "field:Keyring" and not (node.token contains "method:MarshalYAML")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.type.context" and node.token contains "field:Repositories" and node.token contains "field:Keyring" and not (node.token contains "method:MarshalYAML")
   emit issue code.ConfigExposureReview at node
 }

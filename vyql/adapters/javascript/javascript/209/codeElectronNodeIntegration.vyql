@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding electronNodeIntegration209 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "webPreferences" and node.token contains "nodeIntegration=true"
+  query pattern presenceNode where node.kind == "any" and node.path ~= "webPreferences" and node.token contains "nodeIntegration=true"
   emit issue code.ElectronNodeIntegration at node
 }

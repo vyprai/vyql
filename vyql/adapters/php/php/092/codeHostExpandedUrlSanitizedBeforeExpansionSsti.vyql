@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding hostExpandedUrlSanitizedBeforeExpansionSsti92 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=safeCanonicalUrl" and node.token contains "$url=Craft::$app->getRequest()->getPathInfo()" and node.token contains "$url=DynamicMetaHelper::sanitizeUrl($url)" and node.token contains "returnUrlHelper::absoluteUrlWithProtocol($url)" and not (node.token contains "returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=safeCanonicalUrl" and node.token contains "$url=Craft::$app->getRequest()->getPathInfo()" and node.token contains "$url=DynamicMetaHelper::sanitizeUrl($url)" and node.token contains "returnUrlHelper::absoluteUrlWithProtocol($url)" and not (node.token contains "returnDynamicMetaHelper::sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))")
   emit issue code.HostExpandedUrlSanitizedBeforeExpansionSsti at node
 }

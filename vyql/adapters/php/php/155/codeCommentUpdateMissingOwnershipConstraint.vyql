@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding commentUpdateMissingOwnershipConstraint155 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=updateComment" and node.token contains "comment_comment" and node.token contains "comment_id" and node.token contains "$sql->update" and not (node.token contains "comment_author_id") and not (node.token contains "USERID")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "name=updateComment" and node.token contains "comment_comment" and node.token contains "comment_id" and node.token contains "$sql->update" and not (node.token contains "comment_author_id") and not (node.token contains "USERID")
   emit issue code.CommentUpdateMissingOwnershipConstraint at node
 }

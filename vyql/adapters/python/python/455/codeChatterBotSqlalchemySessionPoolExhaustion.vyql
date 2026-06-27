@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding chatterBotSqlalchemySessionPoolExhaustion455 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "class_name=SQLStorageAdapter" and node.token contains "name=filter" and node.token contains "session=self.Session()" and node.token contains "yieldself.model_to_object(statement)" and not (node.token contains "finally")
+  query pattern presenceNode where node.scope == "function" and node.token contains "class_name=SQLStorageAdapter" and node.token contains "name=filter" and node.token contains "session=self.Session()" and node.token contains "yieldself.model_to_object(statement)" and not (node.token contains "finally")
   emit issue code.ChatterBotSqlalchemySessionPoolExhaustion at node
 }

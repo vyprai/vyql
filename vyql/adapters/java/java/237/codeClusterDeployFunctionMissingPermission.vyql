@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding clusterDeployFunctionMissingPermission237 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "class_base:Function" and containsAny(node.token, ["class_name:DeployFunction", "class_name:InstallFunction", "class_name:UploadFunction"]) and containsAny(node.token, ["call_path:getJarDeployer.deploy", "call_path:ClassPathLoader.getLatest.getJarDeployer.deploy"]) and containsAny(node.token, ["call_path:stageJarContent", "call_path:RemoteInputStreamClient.wrap", "call_path:IOUtils.copyLarge"]) and not (node.token contains "function_name:getRequiredPermissions") and not (node.token contains "class_base:InternalFunction")
+  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:Function" and containsAny(node.token, ["class_name:DeployFunction", "class_name:InstallFunction", "class_name:UploadFunction"]) and containsAny(node.token, ["call_path:getJarDeployer.deploy", "call_path:ClassPathLoader.getLatest.getJarDeployer.deploy"]) and containsAny(node.token, ["call_path:stageJarContent", "call_path:RemoteInputStreamClient.wrap", "call_path:IOUtils.copyLarge"]) and not (node.token contains "function_name:getRequiredPermissions") and not (node.token contains "class_base:InternalFunction")
   emit issue code.ClusterDeployFunctionMissingPermission at node
 }

@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding pairwiseConstraintIntersectionDos88 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and containsAny(node.token, ["call_path:intersect_nodes", "call_path:name_constraints_intersect_nodes"]) and containsAny(node.token, ["call_path:node_list_add", "call_path:name_constraints_node_list_add"]) and containsAny(node.token, ["selector:permitted.size", "selector:permitted2.size", "selector:removed.size"]) and containsAny(node.token, ["binary:i<permitted2->size", "binary:j<removed.size", "binary:j<permitted2->size"]) and not (containsAny(node.token, ["call_path:ensure_sorted", "call_path:compare_name_constraint_nodes"])) and not (node.token contains "selector:sorted_view")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and containsAny(node.token, ["call_path:intersect_nodes", "call_path:name_constraints_intersect_nodes"]) and containsAny(node.token, ["call_path:node_list_add", "call_path:name_constraints_node_list_add"]) and containsAny(node.token, ["selector:permitted.size", "selector:permitted2.size", "selector:removed.size"]) and containsAny(node.token, ["binary:i<permitted2->size", "binary:j<removed.size", "binary:j<permitted2->size"]) and not (containsAny(node.token, ["call_path:ensure_sorted", "call_path:compare_name_constraint_nodes"])) and not (node.token contains "selector:sorted_view")
   emit issue code.PairwiseConstraintIntersectionDos at node
 }

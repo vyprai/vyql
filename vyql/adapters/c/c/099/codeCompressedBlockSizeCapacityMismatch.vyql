@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding compressedBlockSizeCapacityMismatch99 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=blosc_c" and node.token contains "_sw32(dest-4,-value)" and node.token contains "ntbytes+maxout>maxbytes" and node.token contains "maxout=(int64_t)maxbytes-(int64_t)ntbytes" and node.token contains "(ntbytes+neblock)>maxbytes" and not (node.token contains "destsize") and not (node.token contains "ntbytes>destsize")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=blosc_c" and node.token contains "_sw32(dest-4,-value)" and node.token contains "ntbytes+maxout>maxbytes" and node.token contains "maxout=(int64_t)maxbytes-(int64_t)ntbytes" and node.token contains "(ntbytes+neblock)>maxbytes" and not (node.token contains "destsize") and not (node.token contains "ntbytes>destsize")
   emit issue code.CompressedBlockSizeCapacityMismatch at node
 }

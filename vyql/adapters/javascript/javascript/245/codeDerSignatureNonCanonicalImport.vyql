@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding derSignatureNonCanonicalImport245 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:getLength" and node.token contains "call_path:data.slice" and node.token contains "newBN(r)" and node.token contains "newBN(s)" and node.token contains "r[0]===0&&(r[1]&0x80)" and node.token contains "s[0]===0&&(s[1]&0x80)" and not (node.token contains "else{returnfalse;}") and not (node.token contains "val>>>=0") and not (node.token contains "val<=0x7f")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:getLength" and node.token contains "call_path:data.slice" and node.token contains "newBN(r)" and node.token contains "newBN(s)" and node.token contains "r[0]===0&&(r[1]&0x80)" and node.token contains "s[0]===0&&(s[1]&0x80)" and not (node.token contains "else{returnfalse;}") and not (node.token contains "val>>>=0") and not (node.token contains "val<=0x7f")
   emit issue code.DerSignatureNonCanonicalImport at node
 }

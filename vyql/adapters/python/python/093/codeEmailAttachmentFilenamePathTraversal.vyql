@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding emailAttachmentFilenamePathTraversal93 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "include_attachment_data=True" and node.token contains "for a in m['attachment']:" and node.token contains "out_path / a['filename']" and node.token contains "out_filepath.open('wb')" and node.token contains "base64.b64decode(a['raw'])" and not (node.token contains "pathlib.Path(a['filename']).name") and not (node.token contains "os.path.basename(a['filename'])")
+  query pattern presenceNode where node.scope == "function" and node.token contains "include_attachment_data=True" and node.token contains "for a in m['attachment']:" and node.token contains "out_path / a['filename']" and node.token contains "out_filepath.open('wb')" and node.token contains "base64.b64decode(a['raw'])" and not (node.token contains "pathlib.Path(a['filename']).name") and not (node.token contains "os.path.basename(a['filename'])")
   emit issue code.EmailAttachmentFilenamePathTraversal at node
 }

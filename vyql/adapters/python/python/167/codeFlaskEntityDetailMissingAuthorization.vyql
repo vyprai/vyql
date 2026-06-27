@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding flaskEntityDetailMissingAuthorization167 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "decorator_method:route" and node.token contains ".query.get_or_404" and node.token contains "jsonify" and node.token contains "permissions" and not (node.token contains "current_user.admin") and not (node.token contains "has_permission") and not (node.token contains "permission_required")
+  query pattern presenceNode where node.scope == "function" and node.token contains "decorator_method:route" and node.token contains ".query.get_or_404" and node.token contains "jsonify" and node.token contains "permissions" and not (node.token contains "current_user.admin") and not (node.token contains "has_permission") and not (node.token contains "permission_required")
   emit issue code.FlaskEntityDetailMissingAuthorization at node
 }

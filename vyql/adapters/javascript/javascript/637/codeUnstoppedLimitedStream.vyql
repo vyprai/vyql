@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unstoppedLimitedStream637 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "maxContentLength" and node.token contains "Buffer.concat(responseBuffer).length>config.maxContentLength" and node.token contains "reject(createError" and not (node.token contains "stream.destroy")
+  query pattern presenceNode where node.scope == "function" and node.token contains "maxContentLength" and node.token contains "Buffer.concat(responseBuffer).length>config.maxContentLength" and node.token contains "reject(createError" and not (node.token contains "stream.destroy")
   emit issue code.UnstoppedLimitedStream at node
 }

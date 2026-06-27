@@ -4,10 +4,6 @@ binding packageEntryPointScriptWrite56 {
   requires {
     dependency("pip")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "PipScriptMaker" and node.token contains "super().make" and node.token contains "_raise_for_invalid_entrypoint(specification)" and not (node.token contains "self.target_dir")
+  query pattern presenceNode where node.scope == "function" and node.token contains "PipScriptMaker" and node.token contains "super().make" and node.token contains "_raise_for_invalid_entrypoint(specification)" and not (node.token contains "self.target_dir")
   emit issue code.PackageEntryPointScriptWrite at node
 }

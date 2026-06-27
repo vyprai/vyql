@@ -83,6 +83,7 @@ type flagSpec struct {
 	Predicates []flagPredicate
 	Operands   []flagOperandSpec
 	Packages   []string
+	Detail     map[string]string
 }
 
 // activeSources, when non-nil, restricts which source concepts the input adapters
@@ -1107,7 +1108,7 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "flag":
 			if mp.Flag != nil {
-				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages}
+				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Detail: adapterMappingDetail(mp)}
 				for _, pred := range mp.Flag.Predicates {
 					fs.Predicates = append(fs.Predicates, newFlagPredicate(pred.Subject, pred.Property, pred.Op, pred.Values, pred.Exact, pred.Negative))
 				}
@@ -1792,6 +1793,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 							continue
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
+						detail = mergeMappingDetail(detail, fl.Detail)
 						specificity := 0
 						if len(fl.Packages) > 0 {
 							specificity = 3

@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsProjectDisplayNameXss89 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:getName" and node.token contains "call_path:project.getFullDisplayName" and not (node.token contains "call_path:StringEscapeUtils.escapeHtml") and not (node.token contains "call_path:Util.escape")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:getName" and node.token contains "call_path:project.getFullDisplayName" and not (node.token contains "call_path:StringEscapeUtils.escapeHtml") and not (node.token contains "call_path:Util.escape")
   emit issue code.JenkinsProjectDisplayNameXss at node
 }

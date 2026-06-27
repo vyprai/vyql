@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding bufferedErrorPageRequestMetadataXss274 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "$out.=" and node.token contains "REQUEST_URI" and node.token contains "print$out" and not (node.token contains "dol_htmlentities") and not (node.token contains "htmlentities($_SERVER") and not (node.token contains "htmlspecialchars($_SERVER") and not (node.token contains "html_escape($_SERVER")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "$out.=" and node.token contains "REQUEST_URI" and node.token contains "print$out" and not (node.token contains "dol_htmlentities") and not (node.token contains "htmlentities($_SERVER") and not (node.token contains "htmlspecialchars($_SERVER") and not (node.token contains "html_escape($_SERVER")
   emit issue code.BufferedErrorPageRequestMetadataXss at node
 }

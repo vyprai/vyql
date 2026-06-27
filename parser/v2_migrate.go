@@ -836,21 +836,18 @@ func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m Ad
 	}
 	fmt.Fprintf(&b, "binding %s%d {\n", strings.ToLower(bindingName[:1])+bindingName[1:], idx)
 	writeV2PackageRequires(&b, m.Packages)
-	_, legacyFlag := v2LegacyFlagPredicate(m)
+	presenceFlagExpr, presenceFlag := v2PresenceFlagPredicate(m)
 	simpleFlagExpr, simpleFlag := v2SimpleFlagPredicate(m)
 	callValueFlagExpr, callValueFlag := "", false
 	if c.kindPlan.ConceptKinds[m.Concept] != "check" {
 		callValueFlagExpr, callValueFlag = v2CallValueFlagPredicate(m)
 	}
-	if m.Kind == "flag" && legacyFlag && !simpleFlag && !callValueFlag {
-		reason := "flag predicates require reviewed stable v2 patterns/matchers"
-		c.unresolved(adapter, "flag", reason, "")
-		return c.todoFile(module, fmt.Sprintf("%s%d", adapter, idx), reason), false
-	}
 	if simpleFlag {
 		fmt.Fprintf(&b, "  query pattern callExpr where %s\n", simpleFlagExpr)
 	} else if callValueFlag {
 		fmt.Fprintf(&b, "  query pattern callExpr where %s\n", callValueFlagExpr)
+	} else if m.Kind == "flag" && presenceFlag {
+		fmt.Fprintf(&b, "  query pattern presenceNode where %s\n", presenceFlagExpr)
 	} else if m.Kind == "source_param" {
 		fmt.Fprintf(&b, "  query param as param\n")
 	} else {
@@ -908,9 +905,18 @@ func (c *v2Migrator) convertAdapterMapping(module, adapter string, idx int, m Ad
 		c.writeAliasEmits(&b, m.Concept, "call")
 		c.record(adapter, "mark", "v1 mark converted to v2 issue; confirm concept kind is issue", true, "emit issue")
 	case "flag":
-		fmt.Fprintf(&b, "  emit issue %s at call\n", c.refForKind(m.Concept, "issue"))
-		c.writeAliasEmits(&b, m.Concept, "call")
-		c.record(adapter, "flag", "v1 flag converted to v2 issue; confirm concept kind and pattern family", true, "emit issue")
+		location := "call"
+		if presenceFlag && !simpleFlag && !callValueFlag {
+			location = "node"
+		}
+		if c.kindPlan.ConceptKinds[m.Concept] == "check" {
+			fmt.Fprintf(&b, "  emit check %s at %s\n", c.refForKind(m.Concept, "check"), location)
+			c.record(adapter, "flag", "v1 flag converted to v2 presence check; confirm coverage semantics", true, "emit check")
+		} else {
+			fmt.Fprintf(&b, "  emit issue %s at %s\n", c.refForKind(m.Concept, "issue"), location)
+			c.writeAliasEmits(&b, m.Concept, location)
+			c.record(adapter, "flag", "v1 flag converted to v2 issue; confirm concept kind and pattern family", true, "emit issue")
+		}
 	case "assume_guard_path", "assume_guard_method", "assume_sanitizer_path", "assume_sanitizer_method":
 		fmt.Fprintf(&b, "  emit check %s at call {\n", c.refForKind("core.Assumption", "check"))
 		fmt.Fprintf(&b, "    advisory: true\n")
@@ -939,7 +945,10 @@ func unsupportedAdapterMappingReason(m AdapterMapping) string {
 		if _, ok := v2CallValueFlagPredicate(m); ok {
 			return ""
 		}
-		return "flag predicates require reviewed stable v2 patterns/matchers"
+		if _, ok := v2PresenceFlagPredicate(m); ok {
+			return ""
+		}
+		return "flag predicates require native v2 presence support"
 	case m.Kind == "flow_prefix":
 		return "adapter flow prefix requires native v2 prefix query support"
 	case strings.HasPrefix(m.Kind, "flow"):
@@ -1212,7 +1221,7 @@ func v2CallValueFlagLiteral(value string) (string, bool) {
 	return "", false
 }
 
-func v2LegacyFlagPredicate(m AdapterMapping) (string, bool) {
+func v2PresenceFlagPredicate(m AdapterMapping) (string, bool) {
 	if m.Flag == nil {
 		return "", false
 	}
@@ -1227,7 +1236,7 @@ func v2LegacyFlagPredicate(m AdapterMapping) (string, bool) {
 		parts = append(parts, fmt.Sprintf("node.kind == %q", kind))
 	}
 	for _, pred := range m.Flag.Predicates {
-		expr, ok := v2LegacyFlagPredicateAtom(pred)
+		expr, ok := v2PresenceFlagPredicateAtom(pred)
 		if !ok {
 			return "", false
 		}
@@ -1236,7 +1245,7 @@ func v2LegacyFlagPredicate(m AdapterMapping) (string, bool) {
 	for _, operand := range m.Flag.Operands {
 		var opParts []string
 		for _, pred := range operand.Predicates {
-			expr, ok := v2LegacyFlagPredicateAtom(pred)
+			expr, ok := v2PresenceFlagPredicateAtom(pred)
 			if !ok {
 				return "", false
 			}
@@ -1250,8 +1259,8 @@ func v2LegacyFlagPredicate(m AdapterMapping) (string, bool) {
 	return strings.Join(parts, " and "), true
 }
 
-func v2LegacyFlagPredicateAtom(pred AdapterFlagPredicate) (string, bool) {
-	field, ok := v2LegacyFlagPredicateField(pred)
+func v2PresenceFlagPredicateAtom(pred AdapterFlagPredicate) (string, bool) {
+	field, ok := v2PresenceFlagPredicateField(pred)
 	if !ok {
 		return "", false
 	}
@@ -1274,7 +1283,7 @@ func v2LegacyFlagPredicateAtom(pred AdapterFlagPredicate) (string, bool) {
 			return "", false
 		}
 	}
-	atom, ok := v2LegacyFlagValueAtom(field, pred.Op, pred.Values)
+	atom, ok := v2PresenceFlagValueAtom(field, pred.Op, pred.Values)
 	if !ok {
 		return "", false
 	}
@@ -1284,7 +1293,7 @@ func v2LegacyFlagPredicateAtom(pred AdapterFlagPredicate) (string, bool) {
 	return atom, true
 }
 
-func v2LegacyFlagPredicateField(pred AdapterFlagPredicate) (string, bool) {
+func v2PresenceFlagPredicateField(pred AdapterFlagPredicate) (string, bool) {
 	base := ""
 	switch pred.Subject {
 	case "node":
@@ -1312,7 +1321,7 @@ func v2LegacyFlagPredicateField(pred AdapterFlagPredicate) (string, bool) {
 	}
 }
 
-func v2LegacyFlagValueAtom(field, op string, values []string) (string, bool) {
+func v2PresenceFlagValueAtom(field, op string, values []string) (string, bool) {
 	switch op {
 	case "contains":
 		if len(values) != 1 {

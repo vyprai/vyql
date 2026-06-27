@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unescapedDiagnosticHtml85 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:IOUtils.toString" and node.token contains "literal:text/html" and node.token contains "call_path:Fault" and not (node.token contains "call_path:MessageUtils.isRequestor") and not (node.token contains "call_path:StringEscapeUtils.escapeHtml") and not (node.token contains "call_path:HtmlUtils.htmlEscape")
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:IOUtils.toString" and node.token contains "literal:text/html" and node.token contains "call_path:Fault" and not (node.token contains "call_path:MessageUtils.isRequestor") and not (node.token contains "call_path:StringEscapeUtils.escapeHtml") and not (node.token contains "call_path:HtmlUtils.htmlEscape")
   emit issue code.UnescapedDiagnosticHtml at node
 }

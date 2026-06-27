@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding commandStringWrapperExecution249 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=writeConfigRemote" and node.token contains "call_path:execAsyncRemote" and node.token contains "identifier:traefikConfig" and node.token contains "identifier:configPath" and node.token contains "literal:echo" and not (node.token contains "call_arg:encodeBase64:traefikConfig") and not (node.token contains "literal:base64 -d") and not (node.token contains "literal:shell-quote") and not (node.token contains "call_path:shellQuote.quote")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=writeConfigRemote" and node.token contains "call_path:execAsyncRemote" and node.token contains "identifier:traefikConfig" and node.token contains "identifier:configPath" and node.token contains "literal:echo" and not (node.token contains "call_arg:encodeBase64:traefikConfig") and not (node.token contains "literal:base64 -d") and not (node.token contains "literal:shell-quote") and not (node.token contains "call_path:shellQuote.quote")
   emit issue code.CommandStringWrapperExecution at node
 }

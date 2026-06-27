@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding authenticatedDecryptionTagReview409 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "openssl_decrypt" and node.token contains "VAL_CRYPTO_ALGO" and node.token contains "base64_decode" and node.token contains "['tag']" and not (node.token contains "strlen($tag)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "openssl_decrypt" and node.token contains "VAL_CRYPTO_ALGO" and node.token contains "base64_decode" and node.token contains "['tag']" and not (node.token contains "strlen($tag)")
   emit issue code.AuthenticatedDecryptionTagReview at node
 }

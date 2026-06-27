@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding absolutePathDisclosure88 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=configure" and node.token contains "CASE_DEMO_NONRANDOM_UUID_BASE" and node.token contains "sys.argv[0]" and node.token contains "command_original_path.resolve()" and node.token contains "command_resolved_path.relative_to" and node.token contains "demo_uuid_base_parts.append(str(command_resolved_path))" and not (node.token contains "_is_relative_to(command_resolved_path,venv_resolved_path)") and not (node.token contains "demo_uuid_base_parts.append(str(command_original_path))")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=configure" and node.token contains "CASE_DEMO_NONRANDOM_UUID_BASE" and node.token contains "sys.argv[0]" and node.token contains "command_original_path.resolve()" and node.token contains "command_resolved_path.relative_to" and node.token contains "demo_uuid_base_parts.append(str(command_resolved_path))" and not (node.token contains "_is_relative_to(command_resolved_path,venv_resolved_path)") and not (node.token contains "demo_uuid_base_parts.append(str(command_original_path))")
   emit issue code.AbsolutePathDisclosure at node
 }

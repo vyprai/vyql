@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding cinnyServiceWorkerMediaAuthLeak188 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:event.respondWith" and node.token contains "call_path:askForAccessToken" and node.token contains "call_path:fetchConfig" and node.token contains "literal:/_matrix/client/v1/media/download" and node.token contains "literal:/_matrix/client/v1/media/thumbnail" and not (node.token contains "call_path:validMediaRequest")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:event.respondWith" and node.token contains "call_path:askForAccessToken" and node.token contains "call_path:fetchConfig" and node.token contains "literal:/_matrix/client/v1/media/download" and node.token contains "literal:/_matrix/client/v1/media/thumbnail" and not (node.token contains "call_path:validMediaRequest")
   emit issue code.CinnyServiceWorkerMediaAuthLeak at node
 }

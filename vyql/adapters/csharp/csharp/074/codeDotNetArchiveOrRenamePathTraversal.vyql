@@ -1,10 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding dotNetArchiveOrRenamePathTraversal74 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=ExtractAsync" and node.token contains "Path.Combine(rootPath,entry.FullName)" and node.token contains "entry.ExtractToFile(file,true)" and not (node.token contains "Path.GetFullPath(file)") and not (node.token contains "StartsWith(rootPath")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "name=ExtractAsync" and node.token contains "Path.Combine(rootPath,entry.FullName)" and node.token contains "entry.ExtractToFile(file,true)" and not (node.token contains "Path.GetFullPath(file)") and not (node.token contains "StartsWith(rootPath")
   emit issue code.DotNetArchiveOrRenamePathTraversal at node
 }

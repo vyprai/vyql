@@ -133,10 +133,14 @@ adapter ruby {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
 	var stable string
+	var presence string
 	blocked := 0
 	for _, f := range res.Files {
 		if strings.Contains(f.Source, "binding insecureCookie") {
 			stable = f.Source
+		}
+		if strings.Contains(f.Source, "binding hardcodedSecret") {
+			presence = f.Source
 		}
 		if strings.Contains(f.Source, "TODO_v2Migrate") {
 			blocked++
@@ -151,12 +155,18 @@ adapter ruby {
 	if _, err := ParseV2Runtime(stable); err != nil {
 		t.Fatalf("ParseV2Runtime stable flag: %v\n%s", err, stable)
 	}
-	if blocked != 1 {
-		t.Fatalf("metadata-token flag should become one blocking migration stub; files=%+v", res.Files)
+	if !strings.Contains(presence, `query pattern presenceNode where node.scope == "module" and node.token contains "contains:lang=ruby" and node.token contains "contains:assign:config.secret_token="`) {
+		t.Fatalf("metadata-token flag did not become presenceNode:\n%s", presence)
+	}
+	if _, err := ParseV2Runtime(presence); err != nil {
+		t.Fatalf("ParseV2Runtime presence flag: %v\n%s", err, presence)
+	}
+	if blocked != 0 {
+		t.Fatalf("metadata-token flag should not become a blocking migration stub; files=%+v", res.Files)
 	}
 }
 
-func TestConvertV1TokenFlagCheckRequiresStableCoverageMigration(t *testing.T) {
+func TestConvertV1TokenFlagCheckBecomesPresenceCheck(t *testing.T) {
 	res, err := ConvertV1ToV2WithConceptKinds(`
 adapter go {
   flag core.MemoryBoundsCheck on any {
@@ -173,8 +183,14 @@ adapter go {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if !strings.Contains(src, "TODO_v2Migrate") {
-		t.Fatalf("check-kind token flag should require stable coverage migration:\n%s", src)
+	if !strings.Contains(src, `query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne" and node.token contains "literal:Count" and node.token contains "literal:0"`) {
+		t.Fatalf("check-kind token flag did not become presenceNode:\n%s", src)
+	}
+	if !strings.Contains(src, `emit check core.MemoryBoundsCheck at node`) {
+		t.Fatalf("check-kind token flag did not emit check at node:\n%s", src)
+	}
+	if _, err := ParseV2Runtime(src); err != nil {
+		t.Fatalf("ParseV2Runtime check-kind presence flag: %v\n%s", err, src)
 	}
 }
 
@@ -195,8 +211,8 @@ rule NeedsAlong {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", false) {
-		t.Fatalf("ledger missing unresolved flag: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", true) {
+		t.Fatalf("ledger missing resolved flag: %+v", res.Ledger)
 	}
 	if !migrationLedgerHas(res.Ledger, "along", false) {
 		t.Fatalf("ledger missing unresolved along clause: %+v", res.Ledger)
@@ -210,8 +226,8 @@ rule NeedsAlong {
 			}
 		}
 	}
-	if blocking != 2 {
-		t.Fatalf("blocking stubs = %d, want 2; files=%+v", blocking, res.Files)
+	if blocking != 1 {
+		t.Fatalf("blocking stubs = %d, want 1; files=%+v", blocking, res.Files)
 	}
 }
 
@@ -372,7 +388,7 @@ adapter javascript {
 	}
 }
 
-func TestConvertV1ToV2UnsupportedLegacyFlagPredicatesProduceBlockingStub(t *testing.T) {
+func TestConvertV1ToV2TokenFlagPredicatesBecomePresenceNode(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter perl {
   flag code.CleartextChannel on any {
@@ -389,15 +405,18 @@ adapter perl {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if !strings.Contains(src, "TODO_v2Migrate") {
-		t.Fatalf("unsupported legacy flag should produce blocking stub:\n%s", src)
+	if !strings.Contains(src, `query pattern presenceNode where node.kind == "any" and node.path ~= "getstore" and node.token contains "http://" and not (node.token contains "127.0")`) {
+		t.Fatalf("legacy token flag did not become presenceNode:\n%s", src)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", false) {
-		t.Fatalf("ledger missing unresolved legacy flag conversion: %+v", res.Ledger)
+	if _, err := ParseV2Runtime(src); err != nil {
+		t.Fatalf("ParseV2Runtime token presence flag: %v\n%s", err, src)
+	}
+	if !migrationLedgerHas(res.Ledger, "flag", true) {
+		t.Fatalf("ledger missing resolved legacy flag conversion: %+v", res.Ledger)
 	}
 }
 
-func TestConvertV1ToV2AnalysisPathFlagProducesBlockingStub(t *testing.T) {
+func TestConvertV1ToV2AnalysisPathFlagBecomesPresenceNode(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter sca {
   flag sbom.VulnerableDependency on any {
@@ -408,15 +427,18 @@ adapter sca {
 	if err != nil {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", false) {
-		t.Fatalf("ledger missing unresolved analysis flag: %+v", res.Ledger)
+	if !migrationLedgerHas(res.Ledger, "flag", true) {
+		t.Fatalf("ledger missing resolved analysis flag: %+v", res.Ledger)
 	}
-	if len(res.Files) != 1 || !strings.Contains(res.Files[0].Source, "TODO_v2Migrate") {
-		t.Fatalf("analysis path flag should produce blocking stub: %+v", res.Files)
+	if len(res.Files) != 1 || !strings.Contains(res.Files[0].Source, `query pattern presenceNode where node.kind == "any" and node.path == "analysis.sca.package"`) {
+		t.Fatalf("analysis path flag should produce presenceNode: %+v", res.Files)
+	}
+	if _, err := ParseV2Runtime(res.Files[0].Source); err != nil {
+		t.Fatalf("ParseV2Runtime analysis presence flag: %v\n%s", err, res.Files[0].Source)
 	}
 }
 
-func TestConvertV1ToV2ComplexFlagProducesBlockingStub(t *testing.T) {
+func TestConvertV1ToV2ComplexFlagBecomesPresenceNode(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter javascript {
   flag code.SecretComparisonReview on binop {
@@ -436,15 +458,19 @@ adapter javascript {
 		t.Fatalf("files = %d, want 1: %+v", len(res.Files), res.Files)
 	}
 	src := res.Files[0].Source
-	if !strings.Contains(src, "TODO_v2Migrate") {
-		t.Fatalf("complex flag should produce blocking stub:\n%s", src)
+	if !strings.Contains(src, `query pattern presenceNode where node.kind == "binop" and node.op in ["==", "==="]`) ||
+		!strings.Contains(src, `operand(node, where: operand.path ~= "__binop.operand" and containsAny(operand.identifier, [token, secret]))`) {
+		t.Fatalf("complex flag should produce presenceNode:\n%s", src)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", false) {
-		t.Fatalf("ledger missing unresolved flag conversion: %+v", res.Ledger)
+	if _, err := ParseV2Runtime(src); err != nil {
+		t.Fatalf("ParseV2Runtime complex presence flag: %v\n%s", err, src)
+	}
+	if !migrationLedgerHas(res.Ledger, "flag", true) {
+		t.Fatalf("ledger missing resolved flag conversion: %+v", res.Ledger)
 	}
 }
 
-func TestConvertV1ToV2OperandFlagProducesBlockingStub(t *testing.T) {
+func TestConvertV1ToV2OperandFlagBecomesPresenceNode(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter go {
   flag code.SecretComparisonReview on binop {
@@ -458,11 +484,14 @@ adapter go {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
 	src := res.Files[0].Source
-	if !strings.Contains(src, "TODO_v2Migrate") {
-		t.Fatalf("operand flag should produce blocking stub:\n%s", src)
+	if !strings.Contains(src, `query pattern presenceNode where node.kind == "binop" and operand(node, where: containsAny(operand.key, [".Password", ".Token"]))`) {
+		t.Fatalf("operand flag should produce presenceNode:\n%s", src)
 	}
-	if !migrationLedgerHas(res.Ledger, "flag", false) {
-		t.Fatalf("ledger missing unresolved operand flag: %+v", res.Ledger)
+	if _, err := ParseV2Runtime(src); err != nil {
+		t.Fatalf("ParseV2Runtime operand presence flag: %v\n%s", err, src)
+	}
+	if !migrationLedgerHas(res.Ledger, "flag", true) {
+		t.Fatalf("ledger missing resolved operand flag: %+v", res.Ledger)
 	}
 }
 
@@ -989,15 +1018,28 @@ adapter textpattern {
 		t.Fatalf("ConvertV1ToV2: %v", err)
 	}
 	if len(res.Files) != 2 {
-		t.Fatalf("files = %d, want metadata TODO plus mapping TODO: %+v", len(res.Files), res.Files)
+		t.Fatalf("files = %d, want metadata TODO plus stable mapping: %+v", len(res.Files), res.Files)
 	}
+	blocking := 0
+	stable := 0
 	for _, f := range res.Files {
-		if !strings.Contains(f.Source, "TODO_v2Migrate") {
-			t.Fatalf("metadata-backed migration should block until stable v2 facts exist:\n%s", f.Source)
+		if strings.Contains(f.Source, "TODO_v2Migrate") {
+			blocking++
+			if _, err := ParseV2(f.Source); err == nil {
+				t.Fatalf("blocking stub parsed successfully:\n%s", f.Source)
+			}
+			continue
 		}
-		if _, err := ParseV2(f.Source); err == nil {
-			t.Fatalf("blocking stub parsed successfully:\n%s", f.Source)
+		stable++
+		if !strings.Contains(f.Source, `query pattern presenceNode where node.kind == "any" and node.path ~= "analysis.text_pattern.credential_literal"`) {
+			t.Fatalf("metadata-backed mapping did not become presenceNode:\n%s", f.Source)
 		}
+		if _, err := ParseV2Runtime(f.Source); err != nil {
+			t.Fatalf("stable metadata-backed mapping did not lower: %v\n%s", err, f.Source)
+		}
+	}
+	if blocking != 1 || stable != 1 {
+		t.Fatalf("metadata migration blocking=%d stable=%d; files=%+v", blocking, stable, res.Files)
 	}
 	if !migrationLedgerHas(res.Ledger, "adapter meta", false) {
 		t.Fatalf("ledger missing unresolved adapter metadata: %+v", res.Ledger)
@@ -1099,11 +1141,11 @@ adapter javascript {
   }
 }
 `,
-			resolved:   []string{"flag"},
-			unresolved: []string{"flag"},
+			resolved: []string{"flag"},
 			want: []string{
 				"emit issue code.CleartextChannel",
-				"TODO_v2Migrate",
+				"query pattern presenceNode",
+				"operand(node, where: containsAny(operand.identifier, [token, secret]))",
 			},
 		},
 		{

@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding codeRedProtectedMediaPathTraversal448 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=serve_protected_file" and node.token contains "os.path.join(cr_settings['PROTECTED_MEDIA_ROOT'],path)" and node.token contains "os.path.isfile(fullpath)" and node.token contains "open(fullpath,'rb')" and not (node.token contains "fullpath.startswith(mediapath)") and not (node.token contains "os.path.abspath(os.path.join(mediapath,path))")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=serve_protected_file" and node.token contains "os.path.join(cr_settings['PROTECTED_MEDIA_ROOT'],path)" and node.token contains "os.path.isfile(fullpath)" and node.token contains "open(fullpath,'rb')" and not (node.token contains "fullpath.startswith(mediapath)") and not (node.token contains "os.path.abspath(os.path.join(mediapath,path))")
   emit issue code.CodeRedProtectedMediaPathTraversal at node
 }

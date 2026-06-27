@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedHtmlPresenter104 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "assign:presentType=html" and node.token contains "identifier:present" and node.token contains "identifier:encodings" and node.token contains "call_path:Utils.printable" and node.token contains "literal:<td>${value}</td>" and not (node.token contains "call_path:Utils.escapeHtml") and not (node.token contains "call_path:DOMPurify")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "assign:presentType=html" and node.token contains "identifier:present" and node.token contains "identifier:encodings" and node.token contains "call_path:Utils.printable" and node.token contains "literal:<td>${value}</td>" and not (node.token contains "call_path:Utils.escapeHtml") and not (node.token contains "call_path:DOMPurify")
   emit issue code.UnescapedHtmlPresenter at node
 }

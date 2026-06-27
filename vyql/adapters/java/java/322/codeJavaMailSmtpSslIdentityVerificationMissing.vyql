@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding javaMailSmtpSslIdentityVerificationMissing322 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:createSession" and node.token contains "call_path:props.put" and node.token contains "literal:mail.smtp.socketFactory.class" and node.token contains "literal:javax.net.ssl.SSLSocketFactory" and node.token contains "literal:mail.smtp.socketFactory.fallback" and not (node.token contains "literal:mail.smtp.ssl.checkserveridentity")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:createSession" and node.token contains "call_path:props.put" and node.token contains "literal:mail.smtp.socketFactory.class" and node.token contains "literal:javax.net.ssl.SSLSocketFactory" and node.token contains "literal:mail.smtp.socketFactory.fallback" and not (node.token contains "literal:mail.smtp.ssl.checkserveridentity")
   emit issue code.JavaMailSmtpSslIdentityVerificationMissing at node
 }

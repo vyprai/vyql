@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding callFutureRawWeakStateRef33 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=poll" and node.token contains "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();" and node.token contains "state.waker.is_none()" and node.token contains "ic0::call_new"
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "name=poll" and node.token contains "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();" and node.token contains "state.waker.is_none()" and node.token contains "ic0::call_new"
   emit issue code.CallFutureRawWeakStateRef at node
 }

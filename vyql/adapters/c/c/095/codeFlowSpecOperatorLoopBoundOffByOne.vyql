@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding flowSpecOperatorLoopBoundOffByOne95 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "call_path:hex2bin" and node.token contains "call_path:hexstr2num" and node.token contains "selector:mval.value" and node.token contains "binary:loop>BGP_PBR_MATCH_VAL_MAX" and not (node.token contains "binary:loop>=BGP_PBR_MATCH_VAL_MAX")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "call_path:hex2bin" and node.token contains "call_path:hexstr2num" and node.token contains "selector:mval.value" and node.token contains "binary:loop>BGP_PBR_MATCH_VAL_MAX" and not (node.token contains "binary:loop>=BGP_PBR_MATCH_VAL_MAX")
   emit issue code.FlowSpecOperatorLoopBoundOffByOne at node
 }

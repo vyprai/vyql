@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding ecdsaSignatureScalarBoundsMissing64 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:verify" and node.token contains "selector:signature.r" and node.token contains "selector:signature.s" and node.token contains "selector:publicKey.point" and node.token contains "call_path:Math.inv" and node.token contains "call_path:Math.multiply" and not (node.token contains "expr:r.compareTo(curve.N)>=0") and not (node.token contains "expr:s.compareTo(curve.N)>=0")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:verify" and node.token contains "selector:signature.r" and node.token contains "selector:signature.s" and node.token contains "selector:publicKey.point" and node.token contains "call_path:Math.inv" and node.token contains "call_path:Math.multiply" and not (node.token contains "expr:r.compareTo(curve.N)>=0") and not (node.token contains "expr:s.compareTo(curve.N)>=0")
   emit issue code.EcdsaSignatureScalarBoundsMissing at node
 }

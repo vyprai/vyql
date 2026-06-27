@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding icmpEchoPayloadLengthUnderflow93 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=prvProcessICMPMessage_IPv6" and node.token contains "switch_case:ipICMP_PING_REPLY_IPv6" and node.token contains "selector:usPayloadLength" and node.token contains "assign:uxDataLength=uxDataLength-sizeof" and node.token contains "selector:pxICMPEchoHeader.usIdentifier" and node.token contains "call_path:FreeRTOS_ntohs" and node.token contains "call_path:vApplicationPingReplyHook" and containsAny(node.token, ["binary:uxDataLength-sizeof(*pxICMPEchoHeader)", "binary:uxDataLength-sizeof"]) and not (containsAny(node.token, ["binary:uxDataLength<sizeof(*pxICMPEchoHeader)", "binary:sizeof(*pxICMPEchoHeader)>uxDataLength"]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=prvProcessICMPMessage_IPv6" and node.token contains "switch_case:ipICMP_PING_REPLY_IPv6" and node.token contains "selector:usPayloadLength" and node.token contains "assign:uxDataLength=uxDataLength-sizeof" and node.token contains "selector:pxICMPEchoHeader.usIdentifier" and node.token contains "call_path:FreeRTOS_ntohs" and node.token contains "call_path:vApplicationPingReplyHook" and containsAny(node.token, ["binary:uxDataLength-sizeof(*pxICMPEchoHeader)", "binary:uxDataLength-sizeof"]) and not (containsAny(node.token, ["binary:uxDataLength<sizeof(*pxICMPEchoHeader)", "binary:sizeof(*pxICMPEchoHeader)>uxDataLength"]))
   emit issue code.IcmpEchoPayloadLengthUnderflow at node
 }

@@ -4,10 +4,6 @@ binding protocolStateReview11 {
   requires {
     dependency("authentik")
   }
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "name=__post_init_code" and node.token contains "self.authorization_code.code_challenge" and node.token contains "self.code_verifier" and node.token contains "new_code_challenge!=self.authorization_code.code_challenge" and not (node.token contains "ifnotself.authorization_code.code_challengeandself.code_verifier")
+  query pattern presenceNode where node.scope == "function" and node.token contains "name=__post_init_code" and node.token contains "self.authorization_code.code_challenge" and node.token contains "self.code_verifier" and node.token contains "new_code_challenge!=self.authorization_code.code_challenge" and not (node.token contains "ifnotself.authorization_code.code_challengeandself.code_verifier")
   emit issue code.ProtocolStateReview at node
 }

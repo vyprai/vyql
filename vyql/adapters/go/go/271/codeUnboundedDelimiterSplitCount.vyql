@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding unboundedDelimiterSplitCount271 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:strings.Split" and node.token contains "literal:." and node.token contains "call_path:len" and node.token contains "index:parts:1" and node.token contains "call_path:base64.RawURLEncoding.DecodeString" and not (node.token contains "call_path:strings.Count") and not (node.token contains "call_path:strings.SplitN")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=go" and node.token contains "call_path:strings.Split" and node.token contains "literal:." and node.token contains "call_path:len" and node.token contains "index:parts:1" and node.token contains "call_path:base64.RawURLEncoding.DecodeString" and not (node.token contains "call_path:strings.Count") and not (node.token contains "call_path:strings.SplitN")
   emit issue code.UnboundedDelimiterSplitCount at node
 }

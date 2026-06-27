@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding fieldDerivedIndexAccess269 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:readObject" and node.token contains "index:ber:offset" and node.token contains "binary:contentEnd>len(ber)" and node.token contains "literal:ber2der: BER tag length is more than available data" and not (node.token contains "binary:len(ber)<=offset")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:readObject" and node.token contains "index:ber:offset" and node.token contains "binary:contentEnd>len(ber)" and node.token contains "literal:ber2der: BER tag length is more than available data" and not (node.token contains "binary:len(ber)<=offset")
   emit issue code.FieldDerivedIndexAccess at node
 }

@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedTableExportHtml103 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "prop:onCellHtmlData" and node.token contains "identifier:htmlData" and node.token contains "call_path:tableExport" and node.token contains "prop:escape=false" and not (node.token contains "prop:escape=true") and not (node.token contains "call_path:cell.text")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "prop:onCellHtmlData" and node.token contains "identifier:htmlData" and node.token contains "call_path:tableExport" and node.token contains "prop:escape=false" and not (node.token contains "prop:escape=true") and not (node.token contains "call_path:cell.text")
   emit issue code.UnescapedTableExportHtml at node
 }

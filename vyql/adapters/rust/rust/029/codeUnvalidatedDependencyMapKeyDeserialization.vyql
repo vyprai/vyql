@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding unvalidatedDependencyMapKeyDeserialization29 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path == "analysis.rust.serde_field" and node.token contains "derive:Deserialize" and node.token contains "semantic:dependency_map" and containsAny(node.token, ["field:depend", "field:package", "field:plugin"]) and containsAny(node.token, ["field_type:Map", "field_type:Dependencies", "field_type:Packages", "field_type:Plugins"]) and not (node.token contains "serde_attr:deserialize_with")
+  query pattern presenceNode where node.kind == "any" and node.path == "analysis.rust.serde_field" and node.token contains "derive:Deserialize" and node.token contains "semantic:dependency_map" and containsAny(node.token, ["field:depend", "field:package", "field:plugin"]) and containsAny(node.token, ["field_type:Map", "field_type:Dependencies", "field_type:Packages", "field_type:Plugins"]) and not (node.token contains "serde_attr:deserialize_with")
   emit issue code.UnvalidatedDependencyMapKeyDeserialization at node
 }

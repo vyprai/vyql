@@ -1,11 +1,7 @@
 module bindings.php.migration.mfbe84119;
 
 binding commandOptionInjection132 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "escapeshellarg($keyId)" and node.token contains "$operation='--utf8-strings--list-secret-keys'.escapeshellarg($keyId)" and not (node.token contains "$operation='--utf8-strings--list-secret-keys--'.escapeshellarg($keyId)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "escapeshellarg($keyId)" and node.token contains "$operation='--utf8-strings--list-secret-keys'.escapeshellarg($keyId)" and not (node.token contains "$operation='--utf8-strings--list-secret-keys--'.escapeshellarg($keyId)")
   emit issue code.CommandOptionInjection at node
   emit sink code.CommandOptionInjectionSink at node
 }

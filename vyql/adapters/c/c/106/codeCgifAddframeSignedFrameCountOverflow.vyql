@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding cgifAddframeSignedFrameCountOverflow106 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=cgif_addframe" and node.token contains "for(i=0;i<pGIF->config.width*pGIF->config.height;i++)" and node.token contains "cmpPixel(pGIF,pConfig,&pGIF->aFrames[pGIF->iHEAD]->config,pConfig->pImageData[i],pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])" and not (node.token contains "for(i=0;i<MULU16(pGIF->config.width,pGIF->config.height);i++)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=cgif_addframe" and node.token contains "for(i=0;i<pGIF->config.width*pGIF->config.height;i++)" and node.token contains "cmpPixel(pGIF,pConfig,&pGIF->aFrames[pGIF->iHEAD]->config,pConfig->pImageData[i],pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])" and not (node.token contains "for(i=0;i<MULU16(pGIF->config.width,pGIF->config.height);i++)")
   emit issue code.CgifAddframeSignedFrameCountOverflow at node
 }

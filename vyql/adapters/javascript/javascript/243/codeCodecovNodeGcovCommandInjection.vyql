@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding codecovNodeGcovCommandInjection243 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "functionsanitizeVar(arg)" and node.token contains "arg.replace(/&/g,'')" and node.token contains "args.options['gcov-root']" and node.token contains "args.options['gcov-exec']" and node.token contains "args.options['gcov-args']" and node.token contains "execSync(gcov)" and not (node.token contains "execFileSync(gcov)")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "functionsanitizeVar(arg)" and node.token contains "arg.replace(/&/g,'')" and node.token contains "args.options['gcov-root']" and node.token contains "args.options['gcov-exec']" and node.token contains "args.options['gcov-args']" and node.token contains "execSync(gcov)" and not (node.token contains "execFileSync(gcov)")
   emit issue code.CodecovNodeGcovCommandInjection at node
 }

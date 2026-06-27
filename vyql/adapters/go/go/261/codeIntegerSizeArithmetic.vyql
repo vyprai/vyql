@@ -1,11 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding integerSizeArithmetic261 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call:SkipNBytes" and node.token contains "call:int" and not (node.scopeCall.any contains "SkipNBytesInt64") and not (node.token contains "function_name:SkipNBytesInt64")
+  query pattern presenceNode where node.scope == "function" and node.token contains "call:SkipNBytes" and node.token contains "call:int" and not (node.scopeCall.any contains "SkipNBytesInt64") and not (node.token contains "function_name:SkipNBytesInt64")
   emit issue code.IntegerSizeArithmetic at node
   emit sink code.IntegerSizeArithmeticSink at node
 }

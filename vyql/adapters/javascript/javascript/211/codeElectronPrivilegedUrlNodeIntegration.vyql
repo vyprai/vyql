@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding electronPrivilegedUrlNodeIntegration211 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "expr:window.location.protocol==='chrome-devtools:'" and node.token contains "assign:nodeIntegration=true"
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "expr:window.location.protocol==='chrome-devtools:'" and node.token contains "assign:nodeIntegration=true"
   emit issue code.ElectronPrivilegedUrlNodeIntegration at node
 }

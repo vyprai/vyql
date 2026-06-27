@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding cordysRequestParamXssFilterDisabled81 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:jackson2ObjectMapperBuilderCustomizer" and node.token contains "call_path:jacksonObjectMapperBuilder.deserializerByType" and node.token contains "call_path:StringUtils.trim" and node.token contains "call_path:jsonParser.getValueAsString" and node.token contains "call_path:HtmlUtils.htmlEscape" and node.token contains "identifier:escape" and not (node.scopeCall.any contains "shouldEscapeXss") and not (node.token contains "identifier:xssFilterUrlList")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:jackson2ObjectMapperBuilderCustomizer" and node.token contains "call_path:jacksonObjectMapperBuilder.deserializerByType" and node.token contains "call_path:StringUtils.trim" and node.token contains "call_path:jsonParser.getValueAsString" and node.token contains "call_path:HtmlUtils.htmlEscape" and node.token contains "identifier:escape" and not (node.scopeCall.any contains "shouldEscapeXss") and not (node.token contains "identifier:xssFilterUrlList")
   emit issue code.CordysRequestParamXssFilterDisabled at node
 }

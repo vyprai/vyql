@@ -1,10 +1,6 @@
 module bindings.csharp.migration.m1caa8bf2;
 
 binding csharpEnumParseMissCacheGrowth168 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "ConcurrentDictionary<string,Enum>" and node.token contains "GetOrAdd(lowerStringValue" and node.token contains "TryParseStringValueToEnum_Uncached" and node.token contains "returnparseSucceededForDictionary?(Enum)parsedValueForDictionary:null;" and not (node.token contains "BuildCacheDictionaryForParseStringValue") and not (node.token contains "TryGetValue(lowerStringValue")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=csharp" and node.token contains "ConcurrentDictionary<string,Enum>" and node.token contains "GetOrAdd(lowerStringValue" and node.token contains "TryParseStringValueToEnum_Uncached" and node.token contains "returnparseSucceededForDictionary?(Enum)parsedValueForDictionary:null;" and not (node.token contains "BuildCacheDictionaryForParseStringValue") and not (node.token contains "TryGetValue(lowerStringValue")
   emit issue code.CsharpEnumParseMissCacheGrowth at node
 }

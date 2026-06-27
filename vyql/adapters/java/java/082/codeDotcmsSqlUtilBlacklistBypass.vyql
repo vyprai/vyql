@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding dotcmsSqlUtilBlacklistBypass82 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:sanitizeParameter" and node.token contains "call_path:StringEscapeUtils.escapeSql" and node.token contains "identifier:EVIL_SQL_WORDS" and node.token contains "call:isValidSQLCharacter" and not (node.scopeCall.any contains "sanitizeSQL") and not (node.token contains "identifier:EVIL_SQL_CONDITION_WORDS")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:sanitizeParameter" and node.token contains "call_path:StringEscapeUtils.escapeSql" and node.token contains "identifier:EVIL_SQL_WORDS" and node.token contains "call:isValidSQLCharacter" and not (node.scopeCall.any contains "sanitizeSQL") and not (node.token contains "identifier:EVIL_SQL_CONDITION_WORDS")
   emit issue code.DotcmsSqlUtilBlacklistBypass at node
 }

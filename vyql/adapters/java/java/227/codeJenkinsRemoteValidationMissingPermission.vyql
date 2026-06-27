@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsRemoteValidationMissingPermission227 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:doCheck" and node.token contains "annotation:RequirePOST" and node.token contains "call:DynatraceClient" and node.token contains "call:getSystemProfiles" and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:doCheck" and node.token contains "annotation:RequirePOST" and node.token contains "call:DynatraceClient" and node.token contains "call:getSystemProfiles" and not (node.scopeCall.any contains "checkPermission") and not (node.scopeCall.any contains "hasPermission")
   emit issue code.JenkinsRemoteValidationMissingPermission at node
 }

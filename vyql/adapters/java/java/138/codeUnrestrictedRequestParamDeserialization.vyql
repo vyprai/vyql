@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding unrestrictedRequestParamDeserialization138 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:createXStream" and node.token contains "call_path:XStream" and node.token contains "call:registerConverter" and not (node.scopeCall.any contains "addDefaultPermissions") and not (node.scopeCall.any contains "addPermissions") and not (node.scopeCall.any contains "addPermission") and not (node.scopeCall.any contains "denyPermission")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:createXStream" and node.token contains "call_path:XStream" and node.token contains "call:registerConverter" and not (node.scopeCall.any contains "addDefaultPermissions") and not (node.scopeCall.any contains "addPermissions") and not (node.scopeCall.any contains "addPermission") and not (node.scopeCall.any contains "denyPermission")
   emit issue code.UnrestrictedRequestParamDeserialization at node
 }

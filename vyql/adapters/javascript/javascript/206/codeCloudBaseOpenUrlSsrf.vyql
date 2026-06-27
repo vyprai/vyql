@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding cloudBaseOpenUrlSsrf206 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "/api/open-url" and node.token contains "req.body" and node.token contains "awaitopenUrl(url,undefined,this._mcpServer);" and not (node.token contains "isUrlSafeToOpen(url)") and not (node.token contains "validation.safe")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "/api/open-url" and node.token contains "req.body" and node.token contains "awaitopenUrl(url,undefined,this._mcpServer);" and not (node.token contains "isUrlSafeToOpen(url)") and not (node.token contains "validation.safe")
   emit issue code.CloudBaseOpenUrlSsrf at node
 }

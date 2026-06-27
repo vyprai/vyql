@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding hardlinkedFileOverwriteWithoutClobber275 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:filepath.Abs" and node.token contains "call_path:os.Stat" and node.token contains "call_path:os.Create" and containsAny(node.token, ["identifier:filename", "identifier:filePath", "identifier:filepath", "identifier:path"]) and not (node.token contains "call_path:os.Lstat") and not (node.token contains "call_path:os.Remove") and not (node.token contains "call_path:os.OpenFile") and not (node.token contains "selector:os.O_EXCL")
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:filepath.Abs" and node.token contains "call_path:os.Stat" and node.token contains "call_path:os.Create" and containsAny(node.token, ["identifier:filename", "identifier:filePath", "identifier:filepath", "identifier:path"]) and not (node.token contains "call_path:os.Lstat") and not (node.token contains "call_path:os.Remove") and not (node.token contains "call_path:os.OpenFile") and not (node.token contains "selector:os.O_EXCL")
   emit issue code.HardlinkedFileOverwriteWithoutClobber at node
 }

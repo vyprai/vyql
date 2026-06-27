@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding codeServerPathProxyPortConfusedProxy192 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=getProxyTarget" and node.token contains "req.params.port" and node.token contains "0.0.0.0:" and node.token contains "req.originalUrl.slice(base.length)" and not (node.token contains "parseInt(req.params.port,10)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=getProxyTarget" and node.token contains "req.params.port" and node.token contains "0.0.0.0:" and node.token contains "req.originalUrl.slice(base.length)" and not (node.token contains "parseInt(req.params.port,10)")
   emit issue code.CodeServerPathProxyPortConfusedProxy at node
 }

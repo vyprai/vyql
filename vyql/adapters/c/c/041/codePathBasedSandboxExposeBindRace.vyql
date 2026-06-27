@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding pathBasedSandboxExposeBindRace41 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=c" and node.token contains "call_path:g_variant_lookup" and node.token contains "literal:sandbox-expose" and node.token contains "call_path:filesystem_sandbox_arg" and node.token contains "call_path:get_path_for_fd" and node.token contains "call_path:filesystem_arg" and node.token contains "call_path:g_ptr_array_add" and not (node.token contains "call_path:fd_map_remap_fd") and not (node.token contains "call_path:validate_opath_fd") and not (node.token contains "call_path:glnx_chaseat") and not (node.token contains "literal:--bind-fd=%d") and not (node.token contains "literal:--ro-bind-fd=%d")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=c" and node.token contains "call_path:g_variant_lookup" and node.token contains "literal:sandbox-expose" and node.token contains "call_path:filesystem_sandbox_arg" and node.token contains "call_path:get_path_for_fd" and node.token contains "call_path:filesystem_arg" and node.token contains "call_path:g_ptr_array_add" and not (node.token contains "call_path:fd_map_remap_fd") and not (node.token contains "call_path:validate_opath_fd") and not (node.token contains "call_path:glnx_chaseat") and not (node.token contains "literal:--bind-fd=%d") and not (node.token contains "literal:--ro-bind-fd=%d")
   emit issue code.PathBasedSandboxExposeBindRace at node
 }

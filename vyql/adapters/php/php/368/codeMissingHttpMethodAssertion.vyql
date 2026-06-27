@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding missingHttpMethodAssertion368 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "Action" and node.token contains "$this->backendUserSessionRepository->terminateSessionByIdentifier" and not (node.token contains "$this->assertAllowedHttpMethod")
+  query pattern presenceNode where node.scope == "class" and node.token contains "Action" and node.token contains "$this->backendUserSessionRepository->terminateSessionByIdentifier" and not (node.token contains "$this->assertAllowedHttpMethod")
   emit issue code.MissingHttpMethodAssertion at node
 }

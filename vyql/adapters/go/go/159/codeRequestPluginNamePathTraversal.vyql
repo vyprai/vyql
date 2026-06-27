@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding requestPluginNamePathTraversal159 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:ShouldBindJSON" and node.token contains "selector:.PlugName" and node.token contains "selector:.Snake" and containsAny(node.token, ["call_path:CreatePlug", "call_path:GeneratePlug", "call_path:CreatePlugin", "call_path:GeneratePlugin", "call_path:CreateModule", "call_path:GenerateModule"]) and not (containsAny(node.token, ["call_path:filepath.Base", "call_path:path.Base", "call_path:regexp.MatchString"])) and not (containsAny(node.token, ["call_arg:strings.Contains:filepath.Separator", "call_arg:strings.Contains:os.PathSeparator", "call_arg:strings.Contains:/", "call_arg:strings.Contains:\\"]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:ShouldBindJSON" and node.token contains "selector:.PlugName" and node.token contains "selector:.Snake" and containsAny(node.token, ["call_path:CreatePlug", "call_path:GeneratePlug", "call_path:CreatePlugin", "call_path:GeneratePlugin", "call_path:CreateModule", "call_path:GenerateModule"]) and not (containsAny(node.token, ["call_path:filepath.Base", "call_path:path.Base", "call_path:regexp.MatchString"])) and not (containsAny(node.token, ["call_arg:strings.Contains:filepath.Separator", "call_arg:strings.Contains:os.PathSeparator", "call_arg:strings.Contains:/", "call_arg:strings.Contains:\\"]))
   emit issue code.RequestPluginNamePathTraversal at node
 }

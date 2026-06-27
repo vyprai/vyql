@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding manualZipEntryFileWrite273 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:Decode" and node.token contains "call_path:zip.NewReader" and node.token contains "call_path:filepath.Join" and node.token contains "selector:f.Name" and node.token contains "call_path:copy" and not (node.token contains "call_path:sanitizeArchivePath") and not (node.token contains "call_path:strings.HasPrefix")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:Decode" and node.token contains "call_path:zip.NewReader" and node.token contains "call_path:filepath.Join" and node.token contains "selector:f.Name" and node.token contains "call_path:copy" and not (node.token contains "call_path:sanitizeArchivePath") and not (node.token contains "call_path:strings.HasPrefix")
   emit issue code.ManualZipEntryFileWrite at node
 }

@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding oAuthStateCookieValidationMissing253 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and containsAny(node.token, ["function_name:verify_and_process", "function_name:oauth_callback", "function_name:auth_callback", "function_name:callback"]) and node.token contains "literal:state" and node.token contains "call_path:request.query_params.get" and containsAny(node.token, ["call:process_login", "call:exchange_code", "call:fetch_token"]) and not (node.token contains "literal:sso_state")
+  query pattern presenceNode where node.scope == "function" and containsAny(node.token, ["function_name:verify_and_process", "function_name:oauth_callback", "function_name:auth_callback", "function_name:callback"]) and node.token contains "literal:state" and node.token contains "call_path:request.query_params.get" and containsAny(node.token, ["call:process_login", "call:exchange_code", "call:fetch_token"]) and not (node.token contains "literal:sso_state")
   emit issue code.OAuthStateCookieValidationMissing at node
 }

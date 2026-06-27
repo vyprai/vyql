@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding deserializableInvocationHandler136 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "class_base:InvocationHandler" and node.token contains "call:getMethod" and node.token contains "call:invokeMethod" and not (node.token contains "function_name:readResolve") and not (node.token contains "function_name:readObject") and not (node.scopeCall.any contains "NotSerializableException")
+  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:InvocationHandler" and node.token contains "call:getMethod" and node.token contains "call:invokeMethod" and not (node.token contains "function_name:readResolve") and not (node.token contains "function_name:readObject") and not (node.scopeCall.any contains "NotSerializableException")
   emit issue code.DeserializableInvocationHandler at node
 }

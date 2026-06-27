@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding dokuwikiRemoteAclMissingAdminCheck386 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and node.token contains "plugin_load('admin','acl')" and node.token contains "$apa->_acl_del" and not (node.token contains "auth_isadmin") and not (node.token contains "RemoteAccessDeniedException")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and node.token contains "plugin_load('admin','acl')" and node.token contains "$apa->_acl_del" and not (node.token contains "auth_isadmin") and not (node.token contains "RemoteAccessDeniedException")
   emit issue code.DokuwikiRemoteAclMissingAdminCheck at node
 }

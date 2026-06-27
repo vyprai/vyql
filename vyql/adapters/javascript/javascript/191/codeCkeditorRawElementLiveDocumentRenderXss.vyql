@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding ckeditorRawElementLiveDocumentRenderXss191 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=viewToPlainText" and node.token contains "viewItem.is('rawElement')" and node.token contains "document.createElement('div')" and node.token contains "viewItem.render(tempElement,converter)" and node.token contains "domElementToPlainText(tempElement)" and not (node.token contains "createHTMLDocument")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=viewToPlainText" and node.token contains "viewItem.is('rawElement')" and node.token contains "document.createElement('div')" and node.token contains "viewItem.render(tempElement,converter)" and node.token contains "domElementToPlainText(tempElement)" and not (node.token contains "createHTMLDocument")
   emit issue code.CkeditorRawElementLiveDocumentRenderXss at node
 }

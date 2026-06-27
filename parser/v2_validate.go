@@ -1160,7 +1160,7 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		errs = append(errs, validateV2EmitConceptKind("binding "+b.Name, out.Kind, out.Concept, conceptKinds)...)
 		if out.Kind == "emit check" {
 			advisory := out.Advisory != nil && *out.Advisory
-			if !advisory && len(out.Covers) == 0 {
+			if !advisory && len(out.Covers) == 0 && !isV2PresenceNodeBinding(b) {
 				errs = append(errs, fmt.Errorf("binding %s: non-advisory check %s requires concrete covers metadata", b.Name, out.Concept))
 			}
 		}
@@ -1172,6 +1172,10 @@ func validateV2Binding(b *V2BindingDecl, conceptKinds map[string]string) []error
 		}
 	}
 	return errs
+}
+
+func isV2PresenceNodeBinding(b *V2BindingDecl) bool {
+	return b.Query.Expr == nil && b.Query.Pattern == "presenceNode"
 }
 
 func validateV2CoverageBlock(ctx string, cov V2Coverage) []error {

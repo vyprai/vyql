@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding internalAssetRoutePathTraversal94 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.path == "analysis.function.context" and node.token contains "path.startswith(\"/__emmett__\")" and node.token contains "file_name = path[12:]" and node.token contains "os.path.join(os.path.dirname(__file__), \"..\", \"assets\", file_name)" and node.token contains "self._static_response(static_file)" and not (node.token contains "os.path.realpath") and not (node.token contains "static_file.startswith") and not (node.token contains ".relative_to")
+  query pattern presenceNode where node.scope == "function" and node.path == "analysis.function.context" and node.token contains "path.startswith(\"/__emmett__\")" and node.token contains "file_name = path[12:]" and node.token contains "os.path.join(os.path.dirname(__file__), \"..\", \"assets\", file_name)" and node.token contains "self._static_response(static_file)" and not (node.token contains "os.path.realpath") and not (node.token contains "static_file.startswith") and not (node.token contains ".relative_to")
   emit issue code.InternalAssetRoutePathTraversal at node
 }

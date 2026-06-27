@@ -1,11 +1,7 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding catastrophicRegex551 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "literal:[0-9]*\\.?[0-9]*" and node.token contains "call_path:current.match" and not (node.token contains "literal:(\\.[0-9]*)?")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "literal:[0-9]*\\.?[0-9]*" and node.token contains "call_path:current.match" and not (node.token contains "literal:(\\.[0-9]*)?")
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

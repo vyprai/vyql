@@ -1,10 +1,6 @@
 module bindings.go.migration.m48a985c1;
 
 binding hopByHopHeaderAuthBypass247 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:impersonateHandler" and node.token contains "call_path:hr.GetUserAndGroups" and node.token contains "call_path:request.Header.Set" and node.token contains "call_path:request.Header.Add" and node.token contains "literal:Authorization" and node.token contains "literal:Impersonate-User" and node.token contains "literal:Impersonate-Group" and not (node.token contains "call_path:n.removingHopByHopHeaders") and not (node.token contains "call_path:httpguts.HeaderValuesContainsToken")
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:impersonateHandler" and node.token contains "call_path:hr.GetUserAndGroups" and node.token contains "call_path:request.Header.Set" and node.token contains "call_path:request.Header.Add" and node.token contains "literal:Authorization" and node.token contains "literal:Impersonate-User" and node.token contains "literal:Impersonate-Group" and not (node.token contains "call_path:n.removingHopByHopHeaders") and not (node.token contains "call_path:httpguts.HeaderValuesContainsToken")
   emit issue code.HopByHopHeaderAuthBypass at node
 }

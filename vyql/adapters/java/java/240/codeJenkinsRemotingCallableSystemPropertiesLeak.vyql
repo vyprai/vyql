@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding jenkinsRemotingCallableSystemPropertiesLeak240 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "class_base:Callable" and node.token contains "function_name:call" and node.token contains "function_name:checkRoles" and node.token contains "call_path:System.getProperties" and not (node.token contains "class_base:MasterToSlaveCallable") and not (node.scopeCall.any contains "Roles.SLAVE")
+  query pattern presenceNode where node.scope == "class" and node.token contains "class_base:Callable" and node.token contains "function_name:call" and node.token contains "function_name:checkRoles" and node.token contains "call_path:System.getProperties" and not (node.token contains "class_base:MasterToSlaveCallable") and not (node.scopeCall.any contains "Roles.SLAVE")
   emit issue code.JenkinsRemotingCallableSystemPropertiesLeak at node
 }

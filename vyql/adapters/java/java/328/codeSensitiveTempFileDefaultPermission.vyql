@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding sensitiveTempFileDefaultPermission328 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "call_path:File.createTempFile" and containsAny(node.token, ["call_path:java.io.PrintWriter", "call_path:PrintWriter"]) and containsAny(node.token, ["call_path:Secret.toString", "call_path:getPrivateKeys"]) and not (containsAny(node.token, ["call_path:Files.createTempFile", "call_path:setReadable", "call_path:setWritable", "call_path:Files.setPosixFilePermissions", "call_path:PosixFilePermissions.asFileAttribute"]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "call_path:File.createTempFile" and containsAny(node.token, ["call_path:java.io.PrintWriter", "call_path:PrintWriter"]) and containsAny(node.token, ["call_path:Secret.toString", "call_path:getPrivateKeys"]) and not (containsAny(node.token, ["call_path:Files.createTempFile", "call_path:setReadable", "call_path:setWritable", "call_path:Files.setPosixFilePermissions", "call_path:PosixFilePermissions.asFileAttribute"]))
   emit issue code.SensitiveTempFileDefaultPermission at node
 }

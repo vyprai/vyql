@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding fullSizeMediaFileMissingViewFullAuthorization276 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["selector:size"]) and node.token contains "literal:full" and node.token contains "literal:view" and node.token contains "call_path:access.required" and node.token contains "call_path:$item.file_path" and containsAny(node.token, ["call_path:readfile", "call_path:file_get_contents"]) and not (node.token contains "literal:view_full")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=php" and containsAny(node.token, ["selector:size"]) and node.token contains "literal:full" and node.token contains "literal:view" and node.token contains "call_path:access.required" and node.token contains "call_path:$item.file_path" and containsAny(node.token, ["call_path:readfile", "call_path:file_get_contents"]) and not (node.token contains "literal:view_full")
   emit issue code.FullSizeMediaFileMissingViewFullAuthorization at node
 }

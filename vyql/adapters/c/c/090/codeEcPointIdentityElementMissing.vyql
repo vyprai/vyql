@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding ecPointIdentityElementMissing90 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "param_type:PointZZ_p" and containsAny(node.token, ["name=pointZZ_pMul"]) and node.token contains "call_path:pointZZ_pDouble" and node.token contains "call_path:pointZZ_pAdd" and not (containsAny(node.scopeCall.any, [IsIdentityElement, SetToIdentityElement, is_at_infinity, set_at_infinity, isInfinity, setInfinity]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "param_type:PointZZ_p" and containsAny(node.token, ["name=pointZZ_pMul"]) and node.token contains "call_path:pointZZ_pDouble" and node.token contains "call_path:pointZZ_pAdd" and not (containsAny(node.scopeCall.any, [IsIdentityElement, SetToIdentityElement, is_at_infinity, set_at_infinity, isInfinity, setInfinity]))
   emit issue code.EcPointIdentityElementMissing at node
 }

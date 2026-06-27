@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding incompleteHtmlEntityEscape494 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.kind == "any" and node.path ~= "string.replace" and node.token contains "&amp;" and node.token contains "\\w+;" and not (node.token contains "#\\d") and not (node.token contains "#x")
+  query pattern presenceNode where node.kind == "any" and node.path ~= "string.replace" and node.token contains "&amp;" and node.token contains "\\w+;" and not (node.token contains "#\\d") and not (node.token contains "#x")
   emit issue code.IncompleteHtmlEntityEscape at node
 }

@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding remoteListingDownloadPath40 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=c" and node.token contains "sink(intargc,char**argv)" and node.token contains "atomicio(read,remin,cp,1)" and node.token contains "strchr(cp,'/')!=NULL" and node.token contains "strcmp(cp,\"..\")==0" and node.token contains "snprintf(namebuf,need,\"%s%s%s\",targ" and node.token contains "open(np,O_WRONLY|O_CREAT,mode)" and not (node.token contains "strcmp(cp,\".\")==0") and not (node.token contains "*cp=='\\0'")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=c" and node.token contains "sink(intargc,char**argv)" and node.token contains "atomicio(read,remin,cp,1)" and node.token contains "strchr(cp,'/')!=NULL" and node.token contains "strcmp(cp,\"..\")==0" and node.token contains "snprintf(namebuf,need,\"%s%s%s\",targ" and node.token contains "open(np,O_WRONLY|O_CREAT,mode)" and not (node.token contains "strcmp(cp,\".\")==0") and not (node.token contains "*cp=='\\0'")
   emit issue code.RemoteListingDownloadPath at node
 }

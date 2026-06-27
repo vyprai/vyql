@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding envFileVariableInjection270 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=updateEnvFile" and node.token contains "call_path:Object.entries" and node.token contains "literal:${key}=\"${value}\"" and node.token contains "call_path:fs.writeFileSync" and not (node.token contains "call_path:dotenv.parse") and not (containsAny(node.scopeCall.any, [stringify, JSON.stringify]))
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "name=updateEnvFile" and node.token contains "call_path:Object.entries" and node.token contains "literal:${key}=\"${value}\"" and node.token contains "call_path:fs.writeFileSync" and not (node.token contains "call_path:dotenv.parse") and not (containsAny(node.scopeCall.any, [stringify, JSON.stringify]))
   emit issue code.EnvFileVariableInjection at node
 }

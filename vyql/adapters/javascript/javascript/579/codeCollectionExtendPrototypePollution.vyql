@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding collectionExtendPrototypePollution579 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "Collection.prototype.extend" and node.token contains "forEach((el,key)=>" and node.token contains "byLink" and node.token contains "setVal(data,key,val)" and not (node.token contains "key==='__proto__'")
+  query pattern presenceNode where node.scope == "module" and node.token contains "lang=javascript" and node.token contains "Collection.prototype.extend" and node.token contains "forEach((el,key)=>" and node.token contains "byLink" and node.token contains "setVal(data,key,val)" and not (node.token contains "key==='__proto__'")
   emit issue code.CollectionExtendPrototypePollution at node
 }

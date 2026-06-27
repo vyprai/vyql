@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding dynamicFunctionMutableObjectEval256 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "newFunction('node'" and node.token contains "props(expr,'node.')" and not (node.token contains "Object.freeze(node)")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "newFunction('node'" and node.token contains "props(expr,'node.')" and not (node.token contains "Object.freeze(node)")
   emit issue code.DynamicFunctionMutableObjectEval at node
 }

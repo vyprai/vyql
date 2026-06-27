@@ -1,10 +1,6 @@
 module bindings.python.migration.m21017d75;
 
 binding publicUploadChunkPathTraversal452 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["name=Chunk", "name=chunk"]) and containsAny(node.token, ["literal:/api/uploadChunked/public", "literal:/uploadChunked/public"]) and node.token contains "call_path:request.form.get" and node.token contains "literal:checkSum" and node.token contains "call_path:os.path.join" and node.token contains "call_path:open" and not (node.token contains "call_path:re.sub") and not (node.token contains "call_path:os.path.realpath.startswith")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=python" and containsAny(node.token, ["name=Chunk", "name=chunk"]) and containsAny(node.token, ["literal:/api/uploadChunked/public", "literal:/uploadChunked/public"]) and node.token contains "call_path:request.form.get" and node.token contains "literal:checkSum" and node.token contains "call_path:os.path.join" and node.token contains "call_path:open" and not (node.token contains "call_path:re.sub") and not (node.token contains "call_path:os.path.realpath.startswith")
   emit issue code.PublicUploadChunkPathTraversal at node
 }

@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding missingPostCopyBoundsCheck83 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=patch" and node.token contains "newpos+=x" and node.token contains "memcpy(newData+newpos,extraPtr,y)" and not (node.token contains "newpos+y>newDataLength")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=patch" and node.token contains "newpos+=x" and node.token contains "memcpy(newData+newpos,extraPtr,y)" and not (node.token contains "newpos+y>newDataLength")
   emit issue code.MissingPostCopyBoundsCheck at node
 }

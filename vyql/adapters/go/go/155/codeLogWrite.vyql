@@ -1,11 +1,7 @@
 module bindings.go.migration.m48a985c1;
 
 binding logWrite155 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "function_name:NewClient" and node.token contains "call_path:log.Infof" and node.token contains "literal:Loaded client config: %#v" and node.token contains "selector:cfg.Spec"
+  query pattern presenceNode where node.scope == "function" and node.token contains "function_name:NewClient" and node.token contains "call_path:log.Infof" and node.token contains "literal:Loaded client config: %#v" and node.token contains "selector:cfg.Spec"
   emit issue code.LogWrite at node
   emit sink code.LogWriteSink at node
 }

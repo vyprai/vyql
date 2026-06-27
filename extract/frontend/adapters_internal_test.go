@@ -2149,6 +2149,33 @@ func TestControlAdapterPreservesCoverageDetail(t *testing.T) {
 	}
 }
 
+func TestFlagAdapterPreservesAdvisoryDetail(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
+	}})
+
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Flags: []flagSpec{{
+			Concept:  "custom.Control",
+			NodeKind: "any",
+			Predicates: []flagPredicate{
+				newFlagPredicate("node", "path", "match", []string{"samplepkg.normalize"}, false, false),
+			},
+			Detail: map[string]string{"advisory": "true", "coverage": "sameScope"},
+		}},
+	}
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
+		t.Fatalf("flag mapping wrong: %+v", got)
+	}
+	if got[0].Detail["advisory"] != "true" || got[0].Detail["coverage"] != "sameScope" {
+		t.Fatalf("flag detail not preserved: %+v", got[0])
+	}
+}
+
 func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 	store := usg.NewInMemStore()
 	store.AddNode(usg.Node{ID: "recv", Type: "code.Name", Props: map[string]string{"loc": "sample.x:1"}})

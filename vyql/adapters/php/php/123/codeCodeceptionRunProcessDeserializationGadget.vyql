@@ -1,10 +1,6 @@
 module bindings.php.migration.mfbe84119;
 
 binding codeceptionRunProcessDeserializationGadget123 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=RunProcess" and node.token contains "Process::fromShellCommandline($command" and node.token contains "function__destruct()" and node.token contains "$this->stopProcess()" and not (node.token contains "function__sleep()") and not (node.token contains "function__wakeup()")
+  query pattern presenceNode where node.scope == "class" and node.token contains "lang=php" and node.token contains "name=RunProcess" and node.token contains "Process::fromShellCommandline($command" and node.token contains "function__destruct()" and node.token contains "$this->stopProcess()" and not (node.token contains "function__sleep()") and not (node.token contains "function__wakeup()")
   emit issue code.CodeceptionRunProcessDeserializationGadget at node
 }

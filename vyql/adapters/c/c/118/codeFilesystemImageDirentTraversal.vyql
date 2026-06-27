@@ -1,10 +1,6 @@
 module bindings.c.migration.mce54b166;
 
 binding filesystemImageDirentTraversal118 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=do_directory" and node.token contains "memcpy(newpath+pathlen,romfs_read(offset),newlen)" and node.token contains "newpath[pathlen+newlen]=0" and node.token contains "expand_fs(newpath,child)" and not (node.token contains "strchr(name,'/')") and not (node.token contains "strcmp(name,\"..\")")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=c" and node.token contains "name=do_directory" and node.token contains "memcpy(newpath+pathlen,romfs_read(offset),newlen)" and node.token contains "newpath[pathlen+newlen]=0" and node.token contains "expand_fs(newpath,child)" and not (node.token contains "strchr(name,'/')") and not (node.token contains "strcmp(name,\"..\")")
   emit issue code.FilesystemImageDirentTraversal at node
 }

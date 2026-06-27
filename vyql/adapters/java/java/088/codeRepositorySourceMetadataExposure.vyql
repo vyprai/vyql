@@ -1,10 +1,6 @@
 module bindings.java.migration.m420f6b67;
 
 binding repositorySourceMetadataExposure88 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "metadata_export_after_sensitive_key:repoSource" and node.token contains "metadata_export_writer:metadata"
+  query pattern presenceNode where node.scope == "function" and node.token contains "metadata_export_after_sensitive_key:repoSource" and node.token contains "metadata_export_writer:metadata"
   emit issue code.RepositorySourceMetadataExposure at node
 }

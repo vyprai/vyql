@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding unescapedHtmlOptionRenderer100 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:TomSelect" and node.token contains "selector:directoryName" and node.token contains "literal:<" and not (node.token contains "call_path:sanitizeDirectoryName") and not (node.token contains "selector:textContent") and not (node.token contains "selector:innerHTML")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "call_path:TomSelect" and node.token contains "selector:directoryName" and node.token contains "literal:<" and not (node.token contains "call_path:sanitizeDirectoryName") and not (node.token contains "selector:textContent") and not (node.token contains "selector:innerHTML")
   emit issue code.UnescapedHtmlOptionRenderer at node
 }

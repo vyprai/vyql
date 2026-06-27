@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding nestedPathInheritedPropertyPrototypePollution586 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "index:keys.__subscript" and node.token contains "index:object.__subscript" and node.token contains "expr:nextinobject" and node.token contains "call_path:__js_dynamic_property_write" and not (node.token contains "literal:__proto__") and not (node.token contains "literal:constructor") and not (node.token contains "literal:prototype")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "index:keys.__subscript" and node.token contains "index:object.__subscript" and node.token contains "expr:nextinobject" and node.token contains "call_path:__js_dynamic_property_write" and not (node.token contains "literal:__proto__") and not (node.token contains "literal:constructor") and not (node.token contains "literal:prototype")
   emit issue code.NestedPathInheritedPropertyPrototypePollution at node
 }

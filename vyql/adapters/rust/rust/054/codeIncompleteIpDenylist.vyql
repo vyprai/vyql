@@ -1,10 +1,6 @@
 module bindings.rust.migration.mdc4f74cd;
 
 binding incompleteIpDenylist54 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=rust" and node.token contains "is_private" and node.token contains "is_loopback" and node.token contains "is_link_local" and node.token contains "is_multicast" and node.token contains "is_documentation" and not (node.token contains "is_unspecified")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=rust" and node.token contains "is_private" and node.token contains "is_loopback" and node.token contains "is_link_local" and node.token contains "is_multicast" and node.token contains "is_documentation" and not (node.token contains "is_unspecified")
   emit issue code.IncompleteIpDenylist at node
 }

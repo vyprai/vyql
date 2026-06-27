@@ -1,10 +1,6 @@
 module bindings.javascript.migration.mfb63017a;
 
 binding expressionEvaluatorPrototypeNameAccess589 {
-  unstable: {
-    owner: "migration"
-    reason: "v1 flag predicates depend on legacy token/path matching not yet promoted to stable v2 facts"
-  }
-  query unstable.legacyFlag as node where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "expr:type===IVAR" and node.token contains "expr:type===IMEMBER" and node.token contains "expr:item.valueinexpr.functions" and node.token contains "selector:item.value" and node.token contains "selector:expr.functions" and node.token contains "index_base:values" and node.token contains "index_key:item.value" and not (node.token contains "prototype_name_guard=true")
+  query pattern presenceNode where node.scope == "function" and node.token contains "lang=javascript" and node.token contains "expr:type===IVAR" and node.token contains "expr:type===IMEMBER" and node.token contains "expr:item.valueinexpr.functions" and node.token contains "selector:item.value" and node.token contains "selector:expr.functions" and node.token contains "index_base:values" and node.token contains "index_key:item.value" and not (node.token contains "prototype_name_guard=true")
   emit issue code.ExpressionEvaluatorPrototypeNameAccess at node
 }
