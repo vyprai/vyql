@@ -1114,6 +1114,30 @@ binding secretAssignment {
 	}
 }
 
+func TestV2AssignmentNegativeMembershipLowersToConjunctiveAbsence(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.assignments;
+binding secretAssignment {
+  query assignment as a where a.item not in ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"]
+  emit issue code.SecretValue at a
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	mappings := decls[0].(*BindingSet).Mappings
+	if len(mappings) != 1 {
+		t.Fatalf("mappings = %#v, want one conjunction with all absences", mappings)
+	}
+	got := mappings[0]
+	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || len(got.ValMatches) != 1 || got.ValMatches[0] != "assign:" {
+		t.Fatalf("assignment not in mapping wrong: %+v", got)
+	}
+	if len(got.ValAbsents) != 2 || got.ValAbsents[0] != "assign_item:viewer_scopes:CONFIG_READ" || got.ValAbsents[1] != "assign_item:guest_scopes:CONFIG_READ" {
+		t.Fatalf("assignment ValAbsents wrong: %+v", got.ValAbsents)
+	}
+}
+
 func TestV2AssignmentPatternLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.assignments;
@@ -1433,6 +1457,27 @@ binding dangerInHandler {
 	}
 }
 
+func TestV2BindingQueryScopeCallNotInLowersToNegativeScopePredicate(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+binding dangerWithoutGuard {
+  query call as c where c.callee.method == "danger" references call as other where other.callee.method not in ["safe", "sanitize"]
+  emit sink code.CommandExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	got := decls[0].(*BindingSet).Mappings[0]
+	if got.Kind != "sink_method" || got.Pattern != "danger" || len(got.ScopePredicates) != 1 {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	pred := got.ScopePredicates[0]
+	if pred.Subject != "scope_call" || pred.Property != "method" || !pred.Negative || len(pred.Values) != 2 || pred.Values[0] != "safe" || pred.Values[1] != "sanitize" {
+		t.Fatalf("negative scope predicate wrong: %+v", pred)
+	}
+}
+
 func TestV2CallPredicateOrExpandsWithSharedConstraints(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.web;
@@ -1665,6 +1710,27 @@ binding sqlLiteral {
 	}
 	if !seen["SELECT"] || !seen["UPDATE"] {
 		t.Fatalf("literal containsAny values missing from mappings: %+v", seen)
+	}
+}
+
+func TestV2NodeValueNegativeMembershipLowersToConjunctiveAbsence(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.java.sql;
+binding nonSqlLiteral {
+  query stringLiteral as lit where lit.value not in ["SELECT", "UPDATE"]
+  emit issue code.SqlLiteral at lit
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	mappings := decls[0].(*BindingSet).Mappings
+	if len(mappings) != 1 {
+		t.Fatalf("mappings = %#v, want one conjunction with all absences", mappings)
+	}
+	got := mappings[0]
+	if got.Kind != "mark" || got.NodeType != "code.Literal" || len(got.ValAbsents) != 2 || got.ValAbsents[0] != "SELECT" || got.ValAbsents[1] != "UPDATE" {
+		t.Fatalf("literal not in mapping wrong: %+v", got)
 	}
 }
 

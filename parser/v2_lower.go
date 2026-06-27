@@ -2292,17 +2292,7 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool, family str
 }
 
 func lowerV2NodeValueShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
-	if cmp.Op != "contains" && cmp.Op != "==" {
-		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
-	}
-	value, ok := v2LiteralString(cmp.Right)
-	if !ok {
-		return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
-	}
-	if neg {
-		return []v2CallShape{{ValAbsents: []string{value}}}, nil
-	}
-	return []v2CallShape{{ValMatches: []string{value}}}, nil
+	return lowerV2TokenValueShapes(binding, field, cmp, neg, "")
 }
 
 func lowerV2ScopeCallShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
@@ -2313,13 +2303,13 @@ func lowerV2ScopeCallShapes(binding, field string, cmp V2BinaryExpr, neg bool) (
 		property = "method"
 	case "scope.call.path":
 		property = "path"
-		exact = cmp.Op == "==" || cmp.Op == "in"
+		exact = cmp.Op == "==" || cmp.Op == "!=" || cmp.Op == "in" || cmp.Op == "not in"
 	default:
 		return nil, fmt.Errorf("binding %s: scope relation field %q is not implemented in scanner IR lowering", binding, field)
 	}
 	var values []string
 	switch cmp.Op {
-	case "==", "~=":
+	case "==", "!=", "~=":
 		if field == "scope.call.method" && cmp.Op == "~=" {
 			return nil, fmt.Errorf("binding %s: scope call method does not support ~=; use == or in", binding)
 		}
@@ -2328,11 +2318,11 @@ func lowerV2ScopeCallShapes(binding, field string, cmp V2BinaryExpr, neg bool) (
 			return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
 		}
 		values = []string{value}
-	case "in":
+	case "in", "not in":
 		var ok bool
 		values, ok = v2RuleWhereStringList(cmp.Right)
 		if !ok || len(values) == 0 {
-			return nil, fmt.Errorf("binding %s: %s in predicate requires a non-empty string list", binding, field)
+			return nil, fmt.Errorf("binding %s: %s %s predicate requires a non-empty string list", binding, field, cmp.Op)
 		}
 	default:
 		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
@@ -2345,7 +2335,7 @@ func lowerV2ScopeCallShapes(binding, field string, cmp V2BinaryExpr, neg bool) (
 		Property: property,
 		Values:   values,
 		Exact:    exact,
-		Negative: neg,
+		Negative: neg != (cmp.Op == "!=" || cmp.Op == "not in"),
 	}}}}, nil
 }
 
@@ -2354,19 +2344,23 @@ func lowerV2AssignmentTokenShapes(binding, field string, cmp V2BinaryExpr, neg b
 	if !ok {
 		return nil, fmt.Errorf("binding %s: assignment field %q is not implemented in scanner IR lowering", binding, field)
 	}
+	return lowerV2TokenValueShapes(binding, field, cmp, neg, prefix)
+}
+
+func lowerV2TokenValueShapes(binding, field string, cmp V2BinaryExpr, neg bool, prefix string) ([]v2CallShape, error) {
 	var values []string
 	switch cmp.Op {
-	case "contains", "==":
+	case "contains", "==", "!=":
 		value, ok := v2LiteralString(cmp.Right)
 		if !ok {
 			return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
 		}
 		values = []string{value}
-	case "in":
+	case "in", "not in":
 		var ok bool
 		values, ok = v2RuleWhereStringList(cmp.Right)
 		if !ok || len(values) == 0 {
-			return nil, fmt.Errorf("binding %s: %s in predicate requires a non-empty string list", binding, field)
+			return nil, fmt.Errorf("binding %s: %s %s predicate requires a non-empty string list", binding, field, cmp.Op)
 		}
 	default:
 		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
@@ -2374,17 +2368,18 @@ func lowerV2AssignmentTokenShapes(binding, field string, cmp V2BinaryExpr, neg b
 	if err := checkV2CallShapeExpansion(binding, field, len(values)); err != nil {
 		return nil, err
 	}
+	for i, value := range values {
+		if prefix != "" && !strings.HasPrefix(value, prefix) {
+			values[i] = prefix + value
+		}
+	}
+	negative := neg != (cmp.Op == "!=" || cmp.Op == "not in")
+	if negative {
+		return []v2CallShape{{ValAbsents: append([]string(nil), values...)}}, nil
+	}
 	out := make([]v2CallShape, 0, len(values))
 	for _, value := range values {
-		if prefix != "" && !strings.HasPrefix(value, prefix) {
-			value = prefix + value
-		}
-		shape := v2CallShape{ValMatches: []string{value}}
-		if neg {
-			shape.ValMatches = nil
-			shape.ValAbsents = []string{value}
-		}
-		out = append(out, shape)
+		out = append(out, v2CallShape{ValMatches: []string{value}})
 	}
 	return out, nil
 }
