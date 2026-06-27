@@ -641,6 +641,7 @@ func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 				}
 			}
 			if strings.HasPrefix(trimmed, "assume ") ||
+				strings.HasPrefix(trimmed, "analysisRole:") ||
 				strings.HasPrefix(trimmed, "where assume(") ||
 				strings.Contains(trimmed, " assume(") ||
 				strings.Contains(trimmed, " and assume(") ||

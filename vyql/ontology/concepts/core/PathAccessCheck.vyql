@@ -1,7 +1,6 @@
 module core;
 
 concept PathAccessCheck : check {
-  analysisRole: path_access_check
   applies: endpoint
   covers: [endpoint, path]
   cwe: [CWE_22, CWE_98]

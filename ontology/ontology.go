@@ -69,6 +69,26 @@ const (
 	AnalysisRoleSameReceiverTarget = "same_receiver_guard_target"
 )
 
+var internalAnalysisRoleConcepts = map[string][]string{
+	AnalysisRoleAttributeSink:      {"code.ProtoPollute"},
+	AnalysisRoleCharFilter:         {"threat.CharFilter"},
+	AnalysisRoleDomInput:           {"code.DomInput"},
+	AnalysisRolePathAccessCheck:    {"core.PathAccessCheck", "core.PathAccessCheckIssue"},
+	AnalysisRoleProcessArgVector:   {"core.ProcessArgVector"},
+	AnalysisRoleSameReceiverGuard:  {"core.XmlHardening", "core.XmlHardeningIssue"},
+	AnalysisRoleSameReceiverTarget: {"code.XmlParserCreate"},
+}
+
+// AnalysisRoles returns the Go-owned internal concept-role names.
+func AnalysisRoles() []string {
+	out := make([]string, 0, len(internalAnalysisRoleConcepts))
+	for role := range internalAnalysisRoleConcepts {
+		out = append(out, role)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // QualifiedName returns the namespaced id `<package>.<Name>`.
 func (c Concept) QualifiedName() string {
 	if c.Package == "" {
@@ -122,17 +142,16 @@ func (o *Ontology) AllConcepts() []Concept {
 	return out
 }
 
-// ConceptsWithAnalysisRole returns the concepts tagged for an internal engine
-// role. The role names are generic mechanics; the concrete concept identities
-// live in ontology data.
+// ConceptsWithAnalysisRole returns the concepts assigned to an internal engine
+// role. The roles are Go-owned language mechanics, not authored ontology fields.
 func (o *Ontology) ConceptsWithAnalysisRole(role string) map[string]bool {
 	out := map[string]bool{}
 	if role == "" {
 		return out
 	}
-	for _, c := range o.concepts {
-		if c.AnalysisRole == role {
-			out[c.QualifiedName()] = true
+	for _, concept := range internalAnalysisRoleConcepts[role] {
+		if _, ok := o.concepts[concept]; ok {
+			out[concept] = true
 		}
 	}
 	return out

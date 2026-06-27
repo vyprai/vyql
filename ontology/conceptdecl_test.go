@@ -91,7 +91,7 @@ concept AdminPrivilege : privilege {
 `, `
 module core;
 concept CharFilter : check {
-  analysisRole: char_filter
+  covers: [path]
 }
 `}
 	var got []Concept
@@ -108,7 +108,24 @@ concept CharFilter : check {
 	if got[0].GrantMinLevel != "ADMIN" {
 		t.Fatalf("grantMinLevel = %q, want ADMIN", got[0].GrantMinLevel)
 	}
-	if got[1].AnalysisRole != AnalysisRoleCharFilter {
-		t.Fatalf("analysisRole = %q, want %q", got[1].AnalysisRole, AnalysisRoleCharFilter)
+	if got[1].AnalysisRole != "" {
+		t.Fatalf("analysisRole should be Go-owned, got authored value %q", got[1].AnalysisRole)
+	}
+}
+
+func TestOntologyResolvesGoOwnedAnalysisRoles(t *testing.T) {
+	o := Seed()
+	for role, want := range map[string]string{
+		AnalysisRoleAttributeSink:      "code.ProtoPollute",
+		AnalysisRoleCharFilter:         "threat.CharFilter",
+		AnalysisRoleDomInput:           "code.DomInput",
+		AnalysisRolePathAccessCheck:    "core.PathAccessCheck",
+		AnalysisRoleProcessArgVector:   "core.ProcessArgVector",
+		AnalysisRoleSameReceiverGuard:  "core.XmlHardening",
+		AnalysisRoleSameReceiverTarget: "code.XmlParserCreate",
+	} {
+		if got := o.ConceptsWithAnalysisRole(role); !got[want] {
+			t.Fatalf("role %s concepts = %v, want %s", role, got, want)
+		}
 	}
 }

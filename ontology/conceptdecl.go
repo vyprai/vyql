@@ -39,7 +39,6 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		SourceAssumption:        str(d.Fields, "source_assumption"),
 		SourceConfidence:        str(d.Fields, "source_confidence"),
 		GrantMinLevel:           str(d.Fields, "grantMinLevel"),
-		AnalysisRole:            str(d.Fields, "analysisRole"),
 		ContextReachSource:      str(d.Fields, "context_reach_source"),
 		ContextReachLabel:       str(d.Fields, "context_reach_label"),
 		ContextReachTargetProp:  str(d.Fields, "context_reach_target_prop"),

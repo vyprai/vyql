@@ -705,14 +705,9 @@ func ontologyConceptDetails() map[string]map[string]string {
 func ontologyRoleConcepts(role string) map[string]bool {
 	conceptRoleOnce.Do(func() {
 		conceptRoles = map[string]map[string]bool{}
-		for _, c := range ontology.Seed().AllConcepts() {
-			if c.AnalysisRole == "" {
-				continue
-			}
-			if conceptRoles[c.AnalysisRole] == nil {
-				conceptRoles[c.AnalysisRole] = map[string]bool{}
-			}
-			conceptRoles[c.AnalysisRole][c.QualifiedName()] = true
+		o := ontology.Seed()
+		for _, role := range ontology.AnalysisRoles() {
+			conceptRoles[role] = o.ConceptsWithAnalysisRole(role)
 		}
 	})
 	return conceptRoles[role]

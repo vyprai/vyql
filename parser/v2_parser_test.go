@@ -1410,6 +1410,21 @@ mechanic coverage assume {
 	}
 }
 
+func TestParseV2RejectsAuthoredAnalysisRole(t *testing.T) {
+	_, err := ParseV2(`
+module core;
+concept CharFilter : check {
+  analysisRole: char_filter
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2 succeeded, want authored analysisRole rejection")
+	}
+	if !strings.Contains(err.Error(), "analysisRole is a Go-owned language mechanic") {
+		t.Fatalf("error = %v, want Go-owned analysisRole diagnostic", err)
+	}
+}
+
 func TestValidateV2CorpusRejectsAuthoredBuiltInRuleVerbClausePolicy(t *testing.T) {
 	sources := parseV2CorpusForTest(t, `
 module code;

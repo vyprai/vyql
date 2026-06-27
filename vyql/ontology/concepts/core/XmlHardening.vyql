@@ -1,7 +1,6 @@
 module core;
 
 concept XmlHardening : check {
-  analysisRole: same_receiver_guard
   applies: path
   covers: [endpoint, sameReceiver, path]
   cwe: [CWE_611]

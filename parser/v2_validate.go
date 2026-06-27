@@ -825,6 +825,9 @@ func validateV2Concept(c *V2ConceptDecl) []error {
 	if !v2ConceptKinds[c.Kind] {
 		errs = append(errs, fmt.Errorf("concept %s: unknown v2 concept kind %q", c.Name, c.Kind))
 	}
+	if _, ok := c.Fields["analysisRole"]; ok {
+		errs = append(errs, fmt.Errorf("concept %s: analysisRole is a Go-owned language mechanic and must not be authored in VyQL", c.Name))
+	}
 	if raw, ok := c.Fields["covers"]; ok {
 		values, ok := raw.([]string)
 		if !ok {

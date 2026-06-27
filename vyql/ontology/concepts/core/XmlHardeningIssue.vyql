@@ -1,7 +1,6 @@
 module core;
 
 concept XmlHardeningIssue : issue {
-  analysisRole: same_receiver_guard
   applies: path
   cwe: [CWE_611]
   neutralizes: [deserialization.Xxe]

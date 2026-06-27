@@ -1,7 +1,6 @@
 module code;
 
 concept DomInput : source {
-  analysisRole: dom_input
   cwe: [CWE_20]
   refines: core.UserControlledData
   taint: [taint.UntrustedData]
