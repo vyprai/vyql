@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// ParseV2Definitions parses authored VyQL v2 definition modules and materializes
-// them into the scanner declaration model.
+// ParseV2Definitions parses authored VyQL v2 definition modules and compiles
+// them into the scanner IR.
 func ParseV2Definitions(src string) ([]Decl, error) {
 	if chunks := splitV2ModuleChunks(src); len(chunks) > 1 {
 		programs := make([]*V2Program, 0, len(chunks))
@@ -107,8 +107,7 @@ func splitV2ModuleChunks(src string) []string {
 	return chunks
 }
 
-// lowerV2ProgramToDeclarations materializes authored v2 definitions into the
-// scanner declaration model.
+// lowerV2ProgramToDeclarations compiles authored v2 definitions into scanner IR.
 func lowerV2ProgramToDeclarations(prog *V2Program) ([]Decl, error) {
 	return lowerV2ProgramToDeclarationsWithMechanics(prog, runtimeMechanicsFromProgram(prog))
 }
@@ -202,15 +201,15 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtim
 	out := make([]Decl, 0, len(prog.Decls))
 	names := newV2NameResolver(prog)
 	patterns := newV2PatternResolver(prog)
-	adaptersByTech := map[string]*AdapterDecl{}
-	adapterFor := func(tech string) *AdapterDecl {
-		ad := adaptersByTech[tech]
-		if ad == nil {
-			ad = &AdapterDecl{Name: tech, Meta: map[string]any{}}
-			adaptersByTech[tech] = ad
-			out = append(out, ad)
+	bindingsByTech := map[string]*BindingSet{}
+	bindingSetFor := func(tech string) *BindingSet {
+		set := bindingsByTech[tech]
+		if set == nil {
+			set = &BindingSet{Name: tech, Meta: map[string]any{}}
+			bindingsByTech[tech] = set
+			out = append(out, set)
 		}
-		return ad
+		return set
 	}
 	for _, d := range prog.Decls {
 		switch x := d.(type) {
@@ -224,9 +223,9 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtim
 				return nil, err
 			}
 			if tech != "" {
-				ad := adapterFor(tech)
+				set := bindingSetFor(tech)
 				for k, v := range meta {
-					ad.Meta[k] = v
+					set.Meta[k] = v
 				}
 			}
 		case *V2ReviewDecl:
@@ -238,12 +237,12 @@ func lowerV2ProgramToDeclarationsWithMechanics(prog *V2Program, mechanics runtim
 			if tech == "" {
 				return nil, fmt.Errorf("binding %s: cannot infer technology from module %q", x.Name, x.Module)
 			}
-			ad := adapterFor(tech)
+			set := bindingSetFor(tech)
 			maps, err := lowerV2Binding(x, names, patterns, mechanics)
 			if err != nil {
 				return nil, err
 			}
-			ad.Mappings = append(ad.Mappings, maps...)
+			set.Mappings = append(set.Mappings, maps...)
 		case *V2RuleDecl:
 			r, err := lowerV2Rule(x, names, mechanics)
 			if err != nil {
@@ -499,7 +498,7 @@ func v2BindingTechnology(module string) string {
 	return ""
 }
 
-func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics runtimeMechanics) ([]AdapterMapping, error) {
+func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternResolver, mechanics runtimeMechanics) ([]BindingAction, error) {
 	if b.Query.Expr != nil && strings.HasPrefix(b.Query.Expr.Family, "unstable.") {
 		return nil, fmt.Errorf("binding %s: unsupported unstable query family %q; migrate to stable v2", b.Name, b.Query.Expr.Family)
 	}
@@ -536,7 +535,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	if err != nil {
 		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
-	var out []AdapterMapping
+	var out []BindingAction
 	for _, shape := range shapes {
 		for _, action := range b.Outputs {
 			action.Concept = names.concept(action.Concept)
@@ -546,11 +545,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			}
 			switch {
 			case action.Kind == "emit source":
-				m := shape.mapping(AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit sink":
 				if action.Location == "call" || action.Location == "node" {
-					m := shape.mapping(AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+					m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 					out = append(out, m)
 					continue
 				}
@@ -564,7 +563,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 					}
 				}
-				m := shape.mapping(AdapterMapping{
+				m := shape.mapping(BindingAction{
 					Kind:            kind,
 					Pattern:         shape.Pattern,
 					Exact:           shape.Exact,
@@ -613,7 +612,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if lowerV2CharFilterGlobal(queryWhere) {
 						constraint = "global"
 					}
-					out = append(out, shape.mapping(AdapterMapping{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}))
+					out = append(out, shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}))
 					continue
 				}
 				if isV2GlobalCheck(action) {
@@ -641,13 +640,13 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 				}
-				m := shape.mapping(AdapterMapping{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit issue":
-				m := shape.mapping(AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
-				m := shape.mapping(AdapterMapping{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+				m := shape.mapping(BindingAction{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case strings.HasPrefix(action.Kind, "propagate "):
 				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs)
@@ -667,14 +666,14 @@ func isV2GlobalCheck(action V2BindingOutput) bool {
 	return len(action.Covers) == 1 && action.Covers[0].Mode == "global"
 }
 
-func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (AdapterMapping, error) {
+func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, error) {
 	if action.Location != "call" && action.Location != "node" {
-		return AdapterMapping{}, fmt.Errorf("binding %s: global checks currently lower at call/node only", binding)
+		return BindingAction{}, fmt.Errorf("binding %s: global checks currently lower at call/node only", binding)
 	}
 	if action.About != "" {
-		return AdapterMapping{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
+		return BindingAction{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
 	}
-	return shape.mapping(AdapterMapping{
+	return shape.mapping(BindingAction{
 		Kind:       shape.markKind(),
 		Pattern:    shape.Pattern,
 		Exact:      shape.Exact,
@@ -686,15 +685,15 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 	}), nil
 }
 
-func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (AdapterMapping, error) {
+func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, error) {
 	if action.Location != "call" && action.Location != "node" {
-		return AdapterMapping{}, fmt.Errorf("binding %s: advisory checks currently lower at call/node only", binding)
+		return BindingAction{}, fmt.Errorf("binding %s: advisory checks currently lower at call/node only", binding)
 	}
 	if len(action.Covers) != 1 {
-		return AdapterMapping{}, fmt.Errorf("binding %s: advisory check requires exactly one coverage mode", binding)
+		return BindingAction{}, fmt.Errorf("binding %s: advisory check requires exactly one coverage mode", binding)
 	}
 	kind := shape.markKind()
-	return shape.mapping(AdapterMapping{
+	return shape.mapping(BindingAction{
 		Kind:       kind,
 		Pattern:    shape.Pattern,
 		Exact:      shape.Exact,
@@ -764,7 +763,7 @@ func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl) (V2Expr, 
 	return where, alias, binds, nil
 }
 
-func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics runtimeMechanics) ([]AdapterMapping, bool, error) {
+func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr, alias string, mechanics runtimeMechanics) ([]BindingAction, bool, error) {
 	fl, ok, err := lowerV2PresenceFlagExpr(alias, expr)
 	if err != nil || !ok {
 		return nil, ok, err
@@ -773,7 +772,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	if err != nil {
 		return nil, true, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
-	var out []AdapterMapping
+	var out []BindingAction
 	for _, action := range b.Outputs {
 		action.Concept = names.concept(action.Concept)
 		action.About = names.concept(action.About)
@@ -794,7 +793,7 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 			coverage = action.Covers[0].Mode
 		}
 		flag := *fl
-		out = append(out, AdapterMapping{
+		out = append(out, BindingAction{
 			Kind:     "flag",
 			Concept:  action.Concept,
 			About:    action.About,
@@ -807,11 +806,11 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	return out, true, nil
 }
 
-func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*AdapterFlag, bool, error) {
+func lowerV2PresenceFlagExpr(alias string, expr V2Expr) (*BindingPresence, bool, error) {
 	if alias == "" {
 		return nil, true, fmt.Errorf("query alias is required")
 	}
-	fl := &AdapterFlag{NodeKind: "any"}
+	fl := &BindingPresence{NodeKind: "any"}
 	handled := false
 	for _, atom := range flattenV2And(expr) {
 		neg := false
@@ -903,7 +902,7 @@ func rewriteV2PatternRefName(name string, binds map[string]string) (string, bool
 	return target, true
 }
 
-func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]AdapterMapping, error) {
+func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]BindingAction, error) {
 	if b.Query.Expr.Alias != "param" || b.Query.Expr.Where != nil || len(b.Query.Expr.Steps) != 0 {
 		return nil, fmt.Errorf("binding %s: param source lowering requires query param as param", b.Name)
 	}
@@ -911,18 +910,18 @@ func lowerV2ParamSourceBinding(b *V2BindingDecl, names v2NameResolver) ([]Adapte
 	if err != nil {
 		return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
-	var out []AdapterMapping
+	var out []BindingAction
 	for _, action := range b.Outputs {
 		action.Concept = names.concept(action.Concept)
 		if action.Kind != "emit source" || action.Location != "param" {
 			return nil, fmt.Errorf("binding %s: param query only supports emit source at param", b.Name)
 		}
-		out = append(out, AdapterMapping{Kind: "source_param", Concept: action.Concept, Packages: pkgs})
+		out = append(out, BindingAction{Kind: "source_param", Concept: action.Concept, Packages: pkgs})
 	}
 	return out, nil
 }
 
-func lowerV2PresenceOperand(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
+func lowerV2PresenceOperand(fl *BindingPresence, alias string, expr V2Expr, neg bool) (bool, error) {
 	if neg {
 		return false, nil
 	}
@@ -947,7 +946,7 @@ func lowerV2PresenceOperand(fl *AdapterFlag, alias string, expr V2Expr, neg bool
 	if where == nil {
 		return true, fmt.Errorf("operand requires where")
 	}
-	var operand AdapterFlagOperand
+	var operand BindingPresenceOperand
 	for _, atom := range flattenV2And(where) {
 		opNeg := false
 		if u, ok := atom.(V2UnaryExpr); ok && u.Op == "not" {
@@ -979,7 +978,7 @@ func flattenV2AndInto(expr V2Expr, out *[]V2Expr) {
 	*out = append(*out, expr)
 }
 
-func lowerV2PresenceMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (bool, error) {
+func lowerV2PresenceMeta(fl *BindingPresence, alias string, expr V2Expr, neg bool) (bool, error) {
 	if neg {
 		return false, nil
 	}
@@ -1003,33 +1002,33 @@ func lowerV2PresenceMeta(fl *AdapterFlag, alias string, expr V2Expr, neg bool) (
 	return true, nil
 }
 
-func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg bool) (AdapterFlagPredicate, error) {
+func lowerV2PresencePredicate(alias, defaultSubject string, expr V2Expr, neg bool) (BindingPresencePredicate, error) {
 	switch x := expr.(type) {
 	case V2BinaryExpr:
 		return lowerV2PresenceBinary(alias, defaultSubject, x, neg)
 	case V2CallExpr:
 		return lowerV2PresenceCall(alias, defaultSubject, x, neg)
 	default:
-		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate expression %T", expr)
+		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate expression %T", expr)
 	}
 }
 
-func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool) (AdapterFlagPredicate, error) {
+func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg bool) (BindingPresencePredicate, error) {
 	field, ok := v2PresenceField(alias, x.Left)
 	if !ok {
-		return AdapterFlagPredicate{}, fmt.Errorf("predicate left side must be %s.<field>", alias)
+		return BindingPresencePredicate{}, fmt.Errorf("predicate left side must be %s.<field>", alias)
 	}
 	subject, prop, ok := v2PresenceProperty(defaultSubject, field)
 	if !ok {
-		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate field %q", field)
+		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
 	switch x.Op {
 	case "~=", "==", "contains":
 		value, ok := v2LiteralString(x.Right)
 		if !ok {
-			return AdapterFlagPredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
+			return BindingPresencePredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
 		}
-		pred := AdapterFlagPredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg}
+		pred := BindingPresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg}
 		switch {
 		case prop == "path":
 			pred.Op = "match"
@@ -1039,40 +1038,40 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x V2BinaryExpr, neg boo
 		case x.Op == "==":
 			pred.Op = "equals"
 		default:
-			return AdapterFlagPredicate{}, fmt.Errorf("unsupported operator %q for %s", x.Op, field)
+			return BindingPresencePredicate{}, fmt.Errorf("unsupported operator %q for %s", x.Op, field)
 		}
 		return pred, nil
 	case "in":
 		values, ok := v2RuleWhereStringList(x.Right)
 		if !ok {
-			return AdapterFlagPredicate{}, fmt.Errorf("%s in predicate requires a string list", field)
+			return BindingPresencePredicate{}, fmt.Errorf("%s in predicate requires a string list", field)
 		}
-		return AdapterFlagPredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg}, nil
+		return BindingPresencePredicate{Subject: subject, Property: prop, Op: "equals_any", Values: values, Negative: neg}, nil
 	default:
-		return AdapterFlagPredicate{}, fmt.Errorf("unsupported operator %q", x.Op)
+		return BindingPresencePredicate{}, fmt.Errorf("unsupported operator %q", x.Op)
 	}
 }
 
-func lowerV2PresenceCall(alias, defaultSubject string, x V2CallExpr, neg bool) (AdapterFlagPredicate, error) {
+func lowerV2PresenceCall(alias, defaultSubject string, x V2CallExpr, neg bool) (BindingPresencePredicate, error) {
 	if x.Name != "containsAny" {
-		return AdapterFlagPredicate{}, fmt.Errorf("unsupported call %q", x.Name)
+		return BindingPresencePredicate{}, fmt.Errorf("unsupported call %q", x.Name)
 	}
 	if len(x.Args) != 2 || len(x.NamedArgs) != 0 {
-		return AdapterFlagPredicate{}, fmt.Errorf("containsAny requires two positional args")
+		return BindingPresencePredicate{}, fmt.Errorf("containsAny requires two positional args")
 	}
 	field, ok := v2PresenceField(alias, x.Args[0])
 	if !ok {
-		return AdapterFlagPredicate{}, fmt.Errorf("containsAny first arg must be %s.<field>", alias)
+		return BindingPresencePredicate{}, fmt.Errorf("containsAny first arg must be %s.<field>", alias)
 	}
 	subject, prop, ok := v2PresenceProperty(defaultSubject, field)
 	if !ok {
-		return AdapterFlagPredicate{}, fmt.Errorf("unsupported predicate field %q", field)
+		return BindingPresencePredicate{}, fmt.Errorf("unsupported predicate field %q", field)
 	}
 	values, ok := v2RuleWhereStringList(x.Args[1])
 	if !ok {
-		return AdapterFlagPredicate{}, fmt.Errorf("containsAny second arg must be a string list")
+		return BindingPresencePredicate{}, fmt.Errorf("containsAny second arg must be a string list")
 	}
-	return AdapterFlagPredicate{Subject: subject, Property: prop, Op: "contains_any", Values: values, Negative: neg}, nil
+	return BindingPresencePredicate{Subject: subject, Property: prop, Op: "contains_any", Values: values, Negative: neg}, nil
 }
 
 func v2PresenceField(alias string, expr V2Expr) (string, bool) {
@@ -1197,16 +1196,16 @@ func validateV2PathOnlyCheck(binding string, action V2BindingOutput) error {
 	return nil
 }
 
-func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (AdapterMapping, bool, error) {
+func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (BindingAction, bool, error) {
 	advisory := action.Advisory != nil && *action.Advisory
 	if !advisory || action.About == "" {
-		return AdapterMapping{}, false, nil
+		return BindingAction{}, false, nil
 	}
 	if action.Location != "call" {
-		return AdapterMapping{}, true, fmt.Errorf("binding %s: Assumption check must be emitted at call", binding)
+		return BindingAction{}, true, fmt.Errorf("binding %s: Assumption check must be emitted at call", binding)
 	}
 	if len(action.Covers) != 1 {
-		return AdapterMapping{}, true, fmt.Errorf("binding %s: Assumption check requires exactly one coverage mode", binding)
+		return BindingAction{}, true, fmt.Errorf("binding %s: Assumption check requires exactly one coverage mode", binding)
 	}
 	mode := ""
 	switch action.Covers[0].Mode {
@@ -1215,13 +1214,13 @@ func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingO
 	case "path":
 		mode = "sanitizer"
 	default:
-		return AdapterMapping{}, true, fmt.Errorf("binding %s: unsupported Assumption coverage mode %q", binding, action.Covers[0].Mode)
+		return BindingAction{}, true, fmt.Errorf("binding %s: unsupported Assumption coverage mode %q", binding, action.Covers[0].Mode)
 	}
 	kind := "assume_" + mode + "_path"
 	if shape.Field == "callee.method" {
 		kind = "assume_" + mode + "_method"
 	}
-	return shape.mapping(AdapterMapping{
+	return shape.mapping(BindingAction{
 		Kind:       kind,
 		Pattern:    shape.Pattern,
 		About:      action.About,
@@ -1263,7 +1262,7 @@ type v2CallShape struct {
 	ValAbsents  []string
 }
 
-func (s v2CallShape) mapping(m AdapterMapping) AdapterMapping {
+func (s v2CallShape) mapping(m BindingAction) BindingAction {
 	if s.ArgCountSet {
 		m.ArgCountSet = true
 		m.ArgCountMin = s.ArgCountMin
@@ -1633,9 +1632,9 @@ func lowerV2ReceiverConstraint(cmp V2BinaryExpr) (string, bool) {
 	}
 }
 
-func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string) (AdapterMapping, error) {
+func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string) (BindingAction, error) {
 	if action.Kind != "propagate value" {
-		return AdapterMapping{}, fmt.Errorf("binding %s: unsupported propagation kind %q", binding, action.Kind)
+		return BindingAction{}, fmt.Errorf("binding %s: unsupported propagation kind %q", binding, action.Kind)
 	}
 	kind := "flow_path"
 	if shape.Field == "callee.method" {
@@ -1643,13 +1642,13 @@ func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, ac
 	}
 	dest, err := v2PropagationDestArg(v2NormalizeQueryLocation(action.To, queryAlias))
 	if err != nil {
-		return AdapterMapping{}, fmt.Errorf("binding %s: %w", binding, err)
+		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
 	}
 	srcArg, srcResult, err := v2PropagationSource(v2NormalizeQueryLocation(action.From, queryAlias))
 	if err != nil {
-		return AdapterMapping{}, fmt.Errorf("binding %s: %w", binding, err)
+		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
 	}
-	return shape.mapping(AdapterMapping{
+	return shape.mapping(BindingAction{
 		Kind:             kind,
 		Pattern:          shape.Pattern,
 		FlowDestArg:      dest,

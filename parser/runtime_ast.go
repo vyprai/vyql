@@ -1,13 +1,13 @@
-// Package parser implements the VyQL v2 definition parser and materializes
-// authored definitions into the runtime declarations consumed by the scanner.
+// Package parser implements the VyQL v2 definition parser and compiles authored
+// definitions into the scanner IR consumed by the engine and graph labeler.
 package parser
 
 // --- declarations --------------------------------------------------------
 
-// Decl is a scanner runtime declaration materialized from a VyQL v2 definition.
+// Decl is a scanner IR declaration compiled from a VyQL v2 definition.
 type Decl interface{ isDecl() }
 
-// Rule is a runtime finding/query rule. Name is the short PascalCase rule name;
+// Rule is a compiled finding/query rule. Name is the short PascalCase rule name;
 // Package is the enclosing v2 module. QualifiedName joins them as
 // module.RuleName.
 type Rule struct {
@@ -58,20 +58,20 @@ func (c *ConceptDecl) QualifiedName() string {
 	return c.Package + "." + c.Name
 }
 
-// AdapterDecl is the runtime binding set for one technology. V2 binding
-// declarations in modules such as bindings.javascript.express lower into these
-// framework-to-concept mappings.
-type AdapterDecl struct {
+// BindingSet is the compiled v2 binding set for one technology. Binding
+// declarations in modules such as bindings.javascript.express compile into
+// graph-labeling actions.
+type BindingSet struct {
 	Name     string
 	Meta     map[string]any
-	Mappings []AdapterMapping
+	Mappings []BindingAction
 }
 
-func (*AdapterDecl) isDecl() {}
+func (*BindingSet) isDecl() {}
 
-// AdapterMapping is one runtime binding action produced from a v2 binding.
-type AdapterMapping struct {
-	Kind             string   // "source" | "sink_method" | "sink_path" | "type" | "control" variants
+// BindingAction is one compiled action produced from a v2 binding.
+type BindingAction struct {
+	Kind             string   // compiled v2 action family consumed by the graph labeler
 	Pattern          string   // the callee path / method token (a string literal or dotted name)
 	Concept          string   // the concept it maps to (qualified); for "type", the type name
 	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
@@ -92,19 +92,19 @@ type AdapterMapping struct {
 	FlowSourceResult bool     // call result flows into destination out-param
 	Advisory         bool     // advisory check evidence; must not suppress findings
 	Coverage         string   // v2 coverage mode for advisory check evidence
-	Flag             *AdapterFlag
+	Flag             *BindingPresence
 }
 
-// AdapterFlag is an AST/graph-shaped presence annotation produced by v2
+// BindingPresence is an AST/graph-shaped presence annotation produced by v2
 // presenceNode bindings.
-type AdapterFlag struct {
+type BindingPresence struct {
 	NodeKind   string
 	Scope      string
-	Predicates []AdapterFlagPredicate
-	Operands   []AdapterFlagOperand
+	Predicates []BindingPresencePredicate
+	Operands   []BindingPresenceOperand
 }
 
-type AdapterFlagPredicate struct {
+type BindingPresencePredicate struct {
 	Subject  string
 	Property string
 	Op       string
@@ -113,8 +113,8 @@ type AdapterFlagPredicate struct {
 	Negative bool
 }
 
-type AdapterFlagOperand struct {
-	Predicates []AdapterFlagPredicate
+type BindingPresenceOperand struct {
+	Predicates []BindingPresencePredicate
 }
 
 // ThreatDecl is a weakness-class declaration from the v2 typing vocabulary.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -262,5 +263,5 @@ func v2SingleFingerprint(t *testing.T, onto *ontology.Ontology, store usg.Store,
 	if len(fs) != 1 {
 		t.Fatalf("findings = %d, want 1: %+v", len(fs), fs)
 	}
-	return fs[0].Fingerprint()
+	return resultpolicy.Fingerprint(fs[0])
 }

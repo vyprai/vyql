@@ -3,7 +3,10 @@
 // finding to its graph neighborhood. Port of the Nexus output shape.
 package nexus
 
-import "github.com/vyprai/vyql/findings"
+import (
+	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/resultpolicy"
+)
 
 const SchemaVersion = "1.0"
 
@@ -46,7 +49,7 @@ func findingToNexus(f *findings.Finding) map[string]any {
 		"ruleId":           f.RuleID,
 		"severity":         f.Severity,
 		"confidence":       f.Confidence,
-		"fingerprint":      f.Fingerprint(),
+		"fingerprint":      resultpolicy.Fingerprint(f),
 		"witnessKind":      f.WitnessKind,
 		"witness":          f.Witness,
 		"bindings":         bindings,

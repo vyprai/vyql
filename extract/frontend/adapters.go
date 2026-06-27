@@ -626,7 +626,7 @@ var (
 	conceptDetails    map[string]map[string]string
 	conceptRoleOnce   sync.Once
 	conceptRoles      map[string]map[string]bool
-	adapterDeclCache  sync.Map // map[adapterDeclCacheKey]*parser.AdapterDecl
+	bindingSetCache   sync.Map // map[bindingSetCacheKey]*parser.BindingSet
 )
 
 func reviewDetail(concept, pattern string) (map[string]string, string) {
@@ -760,8 +760,8 @@ type adapterSpec struct {
 	ParamSources  []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
 }
 
-// AdaptersFor loads the framework adapters for a technology from
-// vyql/adapters/<tech>.vyql and builds the input + sink + control adapters.
+// AdaptersFor loads v2 bindings for a technology and builds the graph-labeling
+// adapters that apply those bindings to an extracted graph.
 func AdaptersFor(tech string) []adapters.Adapter {
 	out := adaptersFromSpec(loadSpec(tech))
 	if tech == "javascript" {
@@ -816,14 +816,14 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 			return nil, err
 		}
 		for _, d := range decls {
-			ad, ok := d.(*parser.AdapterDecl)
+			ad, ok := d.(*parser.BindingSet)
 			if !ok {
 				continue
 			}
 			if len(allowed) > 0 && !allowed[ad.Name] {
 				return nil, fmt.Errorf("overlay adapter %s declares %q, which is not present in this scan", file, ad.Name)
 			}
-			spec := specFromDecl(ad)
+			spec := specFromBindingSet(ad)
 			spec.Name = "overlay." + spec.Name
 			out = append(out, adaptersFromSpec(spec)...)
 		}
@@ -831,8 +831,9 @@ func OverlayAdapters(root string, techs []string) ([]adapters.Adapter, error) {
 	return out, nil
 }
 
-// adaptersFromSpec turns a built adapterSpec into the concrete adapter set (one adapter
-// per mapping kind present). Shared by AdaptersFor and the dynamic package loader.
+// adaptersFromSpec turns a compiled binding spec into concrete graph-labeling
+// adapters, one per action family present. Shared by AdaptersFor and the
+// dynamic package loader.
 func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
 	var out []adapters.Adapter
 	if len(spec.Inputs) > 0 {
@@ -970,11 +971,11 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 	}
 }
 
-// CtorTypesFor returns the constructor→type table declared in the adapter (for example,
-// `type "pkg.Open" -> pkg.Handle`), used by the lowering to stamp recv_type.
+// CtorTypesFor returns the constructor-to-type table declared by v2 bindings,
+// used by lowering to stamp recv_type.
 func CtorTypesFor(tech string) map[string]string {
 	out := map[string]string{}
-	for _, mp := range loadDecl(tech).Mappings {
+	for _, mp := range loadBindingSet(tech).Mappings {
 		if mp.Kind == "type" {
 			out[mp.Pattern] = mp.Concept
 		}
@@ -982,10 +983,10 @@ func CtorTypesFor(tech string) map[string]string {
 	return out
 }
 
-func loadDecl(tech string) *parser.AdapterDecl {
-	key := adapterDeclCacheKey{tech: tech}
-	if cached, ok := adapterDeclCache.Load(key); ok {
-		return cached.(*parser.AdapterDecl)
+func loadBindingSet(tech string) *parser.BindingSet {
+	key := bindingSetCacheKey{tech: tech}
+	if cached, ok := bindingSetCache.Load(key); ok {
+		return cached.(*parser.BindingSet)
 	}
 	sources, err := datadir.ReadVYQL("adapters/" + tech + ".vyql")
 	if err != nil {
@@ -998,14 +999,14 @@ func loadDecl(tech string) *parser.AdapterDecl {
 	if err != nil {
 		panic("frontend: invalid adapter corpus for " + tech + ": " + err.Error())
 	}
-	var merged *parser.AdapterDecl
+	var merged *parser.BindingSet
 	for _, d := range decls {
-		a, ok := d.(*parser.AdapterDecl)
+		a, ok := d.(*parser.BindingSet)
 		if !ok || a.Name != tech {
 			continue
 		}
 		if merged == nil {
-			merged = &parser.AdapterDecl{Name: a.Name, Meta: a.Meta}
+			merged = &parser.BindingSet{Name: a.Name, Meta: a.Meta}
 		} else {
 			for k, v := range a.Meta {
 				merged.Meta[k] = v
@@ -1014,13 +1015,13 @@ func loadDecl(tech string) *parser.AdapterDecl {
 		merged.Mappings = append(merged.Mappings, a.Mappings...)
 	}
 	if merged != nil {
-		actual, _ := adapterDeclCache.LoadOrStore(key, merged)
-		return actual.(*parser.AdapterDecl)
+		actual, _ := bindingSetCache.LoadOrStore(key, merged)
+		return actual.(*parser.BindingSet)
 	}
-	panic("frontend: no adapter declaration in adapters/" + tech + ".vyql")
+	panic("frontend: no v2 binding set in adapters/" + tech + ".vyql")
 }
 
-type adapterDeclCacheKey struct {
+type bindingSetCacheKey struct {
 	tech string
 }
 
@@ -1067,13 +1068,13 @@ func parseV2AdapterSources(sources []datadir.Source) ([]parser.Decl, error) {
 }
 
 func loadSpec(tech string) adapterSpec {
-	return specFromDecl(loadDecl(tech))
+	return specFromBindingSet(loadBindingSet(tech))
 }
 
-// specFromDecl builds an adapterSpec from an already-parsed adapter declaration.
-// Split out of loadSpec so the dynamic per-package adapter loader (packages.go) can
-// reuse the exact same mapping→spec lowering for the generated catalog.
-func specFromDecl(d *parser.AdapterDecl) adapterSpec {
+// specFromBindingSet builds an adapterSpec from an already-compiled v2 binding
+// set. Split out of loadSpec so the dynamic per-package adapter loader
+// (packages.go) can reuse the exact same action-to-spec compilation.
+func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 	s := adapterSpec{Name: d.Name, Technology: d.Name}
 	if m, _ := d.Meta["match"].(string); m == "contains" {
 		s.containsMatch = true
@@ -1194,7 +1195,7 @@ func adapterMetaBool(meta map[string]any, key string) bool {
 	}
 }
 
-func adapterMappingDetail(mp parser.AdapterMapping) map[string]string {
+func adapterMappingDetail(mp parser.BindingAction) map[string]string {
 	if !mp.Advisory && mp.About == "" && mp.Coverage == "" {
 		return nil
 	}
@@ -3061,7 +3062,7 @@ func matchPath(path string, patterns []string, mode string) bool {
 func ConfigAdapters() []adapters.Adapter      { return AdaptersFor("config") }
 func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern") }
 
-// AutoAdapters returns adapter declarations that opt into whole-graph application through
+// AutoAdapters returns v2 binding sets that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
 func AutoAdapters() []adapters.Adapter {
 	const key = "v2"
@@ -3087,20 +3088,20 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("frontend: read auto adapters: %w", err)
 	}
-	byName := map[string]*parser.AdapterDecl{}
+	byName := map[string]*parser.BindingSet{}
 	var order []string
 	decls, err := parseV2AdapterSources(sources)
 	if err != nil {
 		return nil, fmt.Errorf("frontend: parse auto adapter corpus: %w", err)
 	}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
 		merged := byName[ad.Name]
 		if merged == nil {
-			merged = &parser.AdapterDecl{Name: ad.Name, Meta: map[string]any{}}
+			merged = &parser.BindingSet{Name: ad.Name, Meta: map[string]any{}}
 			byName[ad.Name] = merged
 			order = append(order, ad.Name)
 		}
@@ -3113,7 +3114,7 @@ func loadAutoAdapters() ([]adapters.Adapter, error) {
 	for _, name := range order {
 		ad := byName[name]
 		if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
-			out = append(out, adaptersFromSpec(specFromDecl(ad))...)
+			out = append(out, adaptersFromSpec(specFromBindingSet(ad))...)
 		}
 	}
 	return out, nil

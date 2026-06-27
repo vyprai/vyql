@@ -86,7 +86,7 @@ rule SqlInjection {
 			return
 		}
 	}
-	t.Fatalf("loaded runtime declarations did not retain mechanic ruleVerb taint")
+	t.Fatalf("loaded scanner IR did not retain mechanic ruleVerb taint")
 }
 
 func TestRuleActiveForProfileHonorsV2RequiredProfiles(t *testing.T) {

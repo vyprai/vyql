@@ -615,7 +615,7 @@ func loadProfile() configProfile {
 		}
 		var meta map[string]any
 		for _, d := range decls {
-			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "config" {
+			if ad, ok := d.(*parser.BindingSet); ok && ad.Name == "config" {
 				meta = ad.Meta
 				break
 			}

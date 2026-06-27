@@ -63,11 +63,19 @@ func (f *Finding) Fingerprint() string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
+func (f *Finding) RenderWithFingerprint(fp string) string {
+	return f.render(fp)
+}
+
 // Render produces a human-readable proof tree from the finding's fields.
 func (f *Finding) Render() string {
+	return f.render(f.Fingerprint())
+}
+
+func (f *Finding) render(fp string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[%s] %s  (conf=%s, fp=%s)\n",
-		strings.ToUpper(f.Severity), f.RuleID, f.Confidence, f.Fingerprint())
+		strings.ToUpper(f.Severity), f.RuleID, f.Confidence, fp)
 	for _, bd := range f.Bindings {
 		prov := ""
 		if bd.LabelProvenance != "" {

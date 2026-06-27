@@ -59,7 +59,7 @@ func loadCallFlowProfiles() {
 		panic("frontend: parse adapter call-flow corpus: " + err.Error())
 	}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}

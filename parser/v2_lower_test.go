@@ -35,12 +35,12 @@ rule SqlInjection {
   unless sqlSink.path coveredBy core.SqlParameterization
 }
 `)
-	var adapter *AdapterDecl
+	var adapter *BindingSet
 	var rule *Rule
 	var concept *ConceptDecl
 	for _, d := range decls {
 		switch x := d.(type) {
-		case *AdapterDecl:
+		case *BindingSet:
 			adapter = x
 		case *Rule:
 			rule = x
@@ -335,7 +335,7 @@ binding requestBody {
   emit source code.HttpInput at call.result
 }
 `)
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -356,7 +356,7 @@ binding execute {
   emit sink code.SqlExecution at args[0]
 }
 `)
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -418,7 +418,7 @@ binding requestBody {
   emit source code.HttpInput at call.result
 }
 `)
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %+v, want one", adapter.Mappings)
 	}
@@ -463,11 +463,11 @@ rule SqlInjectionAlias {
   where has(sink, Guard) and sink is Exec
 }
 `)
-	var adapter *AdapterDecl
+	var adapter *BindingSet
 	var rule *Rule
 	for _, d := range decls {
 		switch x := d.(type) {
-		case *AdapterDecl:
+		case *BindingSet:
 			adapter = x
 		case *Rule:
 			rule = x
@@ -543,7 +543,7 @@ binding parameterizedQuery {
 	}
 }
 
-func TestParseV2DefinitionsFallsThroughToV2Lowering(t *testing.T) {
+func TestParseV2DefinitionsCompilesV2BindingSet(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.python.dbapi;
 binding cursorExecuteQuery {
@@ -557,12 +557,12 @@ binding cursorExecuteQuery {
 	if len(decls) != 1 {
 		t.Fatalf("decls = %d, want 1", len(decls))
 	}
-	adapter := decls[0].(*AdapterDecl)
-	if adapter.Name != "python" || len(adapter.Mappings) != 1 {
-		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	bindings := decls[0].(*BindingSet)
+	if bindings.Name != "python" || len(bindings.Mappings) != 1 {
+		t.Fatalf("binding compilation wrong: %+v", bindings)
 	}
-	if got := adapter.Mappings[0]; got.Kind != "sink_method" || got.Pattern != "execute" || got.Concept != "code.SqlExecution" {
-		t.Fatalf("mapping lowering wrong: %+v", got)
+	if got := bindings.Mappings[0]; got.Kind != "sink_method" || got.Pattern != "execute" || got.Concept != "code.SqlExecution" {
+		t.Fatalf("binding action compilation wrong: %+v", got)
 	}
 }
 
@@ -625,7 +625,7 @@ binding requestBody {
 			if err != nil {
 				t.Fatalf("ParseV2Definitions: %v", err)
 			}
-			adapter := decls[0].(*AdapterDecl)
+			adapter := decls[0].(*BindingSet)
 			if got := adapter.Mappings[0].Packages; !stringSlicesEqual(got, tc.want) {
 				t.Fatalf("packages = %#v, want %#v", got, tc.want)
 			}
@@ -740,7 +740,7 @@ binding catPath {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -760,7 +760,7 @@ binding jqueryRoot {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -788,7 +788,7 @@ binding execAll {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "python" || len(adapter.Mappings) != 3 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -822,7 +822,7 @@ binding urlOpen {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "java" || len(adapter.Mappings) != 3 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -851,7 +851,7 @@ binding sqlExecMethods {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "java" || len(adapter.Mappings) != 4 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -883,7 +883,7 @@ binding requestBodies {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "python" || len(adapter.Mappings) != 2 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -910,7 +910,7 @@ binding parseResult {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "c" || len(adapter.Mappings) != 2 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -955,7 +955,7 @@ binding sqlOpenType {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "go" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -988,7 +988,7 @@ binding unsafeMarker {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 3 {
 		t.Fatalf("adapter mappings = %d, want 3: %+v", len(adapter.Mappings), adapter)
 	}
@@ -1032,7 +1032,7 @@ binding normpathSanitizer {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 2 {
 		t.Fatalf("adapter mappings = %d, want 2: %+v", len(adapter.Mappings), adapter)
 	}
@@ -1061,7 +1061,7 @@ binding possiblePathValidation {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
@@ -1087,7 +1087,7 @@ binding globalHardening {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
 	}
@@ -1108,7 +1108,7 @@ binding externalEntryInput {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "library" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1132,7 +1132,7 @@ binding relativeTo {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "python" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1157,7 +1157,7 @@ binding gsubFilter {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "ruby" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1182,7 +1182,7 @@ binding replaceFilter {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1232,7 +1232,7 @@ binding cleartextChannel {
 	if len(decls) != 1 {
 		t.Fatalf("decls = %d, want 1", len(decls))
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "perl" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1262,7 +1262,7 @@ binding weakRandom {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "bash" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1289,7 +1289,7 @@ binding weakRandom {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
 	if flag == nil || len(flag.Predicates) != 1 {
 		t.Fatalf("presenceNode flag wrong: %+v", flag)
 	}
@@ -1313,7 +1313,7 @@ binding logWrite {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "ruby" || len(adapter.Mappings) != 2 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1344,7 +1344,7 @@ binding memoryBounds {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	m := decls[0].(*AdapterDecl).Mappings[0]
+	m := decls[0].(*BindingSet).Mappings[0]
 	if m.Kind != "flag" || !m.Advisory || m.About != "code.BufferAccess" || m.Coverage != "sameScope" {
 		t.Fatalf("presenceNode metadata not preserved: %+v", m)
 	}
@@ -1362,7 +1362,7 @@ binding weakHash {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
 	if flag == nil || len(flag.Predicates) != 1 {
 		t.Fatalf("presenceNode import flag wrong: %+v", flag)
 	}
@@ -1398,7 +1398,7 @@ binding secretCompare {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
@@ -1425,7 +1425,7 @@ binding secretCompare {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	flag := decls[0].(*AdapterDecl).Mappings[0].Flag
+	flag := decls[0].(*BindingSet).Mappings[0].Flag
 	if got := flag.Predicates[0]; got.Subject != "scope_call" || got.Property != "any" || !got.Negative {
 		t.Fatalf("scope_call predicate wrong: %+v", got)
 	}
@@ -1601,7 +1601,7 @@ binding executeWithParams {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	ad := decls[0].(*AdapterDecl)
+	ad := decls[0].(*BindingSet)
 	if len(ad.Mappings) != 1 {
 		t.Fatalf("mappings = %#v, want one", ad.Mappings)
 	}
@@ -1623,7 +1623,7 @@ binding executeWithParamCounts {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	mappings := decls[0].(*AdapterDecl).Mappings
+	mappings := decls[0].(*BindingSet).Mappings
 	if len(mappings) != 2 {
 		t.Fatalf("mappings = %#v, want two exact arity mappings", mappings)
 	}
@@ -1665,7 +1665,7 @@ binding dominatingHardening {
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	adapter := decls[0].(*AdapterDecl)
+	adapter := decls[0].(*BindingSet)
 	if len(adapter.Mappings) != 4 {
 		t.Fatalf("adapter mappings = %d, want 4: %+v", len(adapter.Mappings), adapter)
 	}
@@ -1795,7 +1795,7 @@ pattern adapterMetadata {
 	if len(decls) != 1 {
 		t.Fatalf("decls = %d, want metadata adapter only", len(decls))
 	}
-	ad := decls[0].(*AdapterDecl)
+	ad := decls[0].(*BindingSet)
 	if ad.Name != "textpattern" || len(ad.Mappings) != 0 {
 		t.Fatalf("adapter metadata decl wrong: %+v", ad)
 	}

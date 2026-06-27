@@ -111,6 +111,13 @@ mechanic coverage global {
   suppresses: true
 }
 
+policy resultIdentity default {
+  findingKey: [rule.id, primaryTarget.location, primaryTarget.concept]
+  flagKey: [concept, location, call.path, call.method]
+  fingerprint: [rule.id, primaryTarget.location, primaryTarget.concept]
+  stableAcross: [formatting, requirementDiagnosticText, traversalOrder]
+}
+
 policy confidence default {
   values: [low, medium, high]
   order: [low, medium, high]

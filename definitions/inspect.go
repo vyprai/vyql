@@ -236,7 +236,7 @@ func addDecl(cat *Catalog, source string, d parser.Decl) {
 			Concepts: ruleConcepts(x),
 			Source:   source,
 		})
-	case *parser.AdapterDecl:
+	case *parser.BindingSet:
 		for _, m := range x.Mappings {
 			item := MappingSummary{
 				Language:   x.Name,

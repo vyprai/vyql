@@ -205,7 +205,7 @@ func loadProfile() textPatternProfile {
 		}
 		var meta map[string]any
 		for _, d := range decls {
-			if ad, ok := d.(*parser.AdapterDecl); ok && ad.Name == "textpattern" {
+			if ad, ok := d.(*parser.BindingSet); ok && ad.Name == "textpattern" {
 				meta = ad.Meta
 				break
 			}

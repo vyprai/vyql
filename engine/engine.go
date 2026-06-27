@@ -8,6 +8,7 @@ import (
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/solvers"
 	"github.com/vyprai/vyql/usg"
 )
@@ -58,7 +59,7 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	return e.applyConfidenceFloor(cr, dedup(fs)), nil
+	return e.applyConfidenceFloor(cr, resultpolicy.Dedup(fs)), nil
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -1360,19 +1361,6 @@ func (e *Engine) hasCFG(id string) bool {
 	v := hasCFG(e.Store, id)
 	e.cfg[id] = v
 	return v
-}
-
-func dedup(fs []*findings.Finding) []*findings.Finding {
-	seen := map[string]bool{}
-	var out []*findings.Finding
-	for _, f := range fs {
-		fp := f.Fingerprint()
-		if !seen[fp] {
-			seen[fp] = true
-			out = append(out, f)
-		}
-	}
-	return out
 }
 
 func (e *Engine) applyConfidenceFloor(cr *CompiledRule, fs []*findings.Finding) []*findings.Finding {

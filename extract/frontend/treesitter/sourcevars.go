@@ -104,7 +104,7 @@ func loadSourceVarProfiles() {
 		panic("treesitter: parse adapter source-var corpus: " + err.Error())
 	}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}

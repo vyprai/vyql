@@ -16,8 +16,8 @@ type Provenance struct {
 	Fidelity   string `json:"fidelity,omitempty"`   // syntactic | resolved | semantic
 }
 
-// Label is a concept annotation attached to a node by an adapter — the bridge
-// between the graph and the ontology (docs/04, docs/06).
+// Label is a concept annotation attached to a graph node by a v2 binding
+// action or another graph-labeling primitive (docs/04, docs/06).
 type Label struct {
 	Concept    string            `json:"concept"`
 	Provenance Provenance        `json:"provenance"`

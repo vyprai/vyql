@@ -62,7 +62,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 	if len(index) == 0 {
 		return nil
 	}
-	merged := &parser.AdapterDecl{Name: tech, Meta: map[string]any{}}
+	merged := &parser.BindingSet{Name: tech, Meta: map[string]any{}}
 	for _, stem := range generatedPackageCandidateStems(deps) {
 		actual, ok := index[strings.ToLower(stem)]
 		if !ok {
@@ -78,7 +78,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 				panic(err.Error())
 			}
 			for _, d := range decls {
-				a, ok := d.(*parser.AdapterDecl)
+				a, ok := d.(*parser.BindingSet)
 				if !ok || a.Name != tech {
 					continue
 				}
@@ -89,7 +89,7 @@ func GeneratedPackageAdaptersFor(tech string, deps map[string]bool) []adapters.A
 	if len(merged.Mappings) == 0 {
 		return nil
 	}
-	return adaptersFromSpec(specFromDecl(merged))
+	return adaptersFromSpec(specFromBindingSet(merged))
 }
 
 func parseGeneratedPackageAdapterSource(source datadir.Source) ([]parser.Decl, error) {

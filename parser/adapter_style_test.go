@@ -75,7 +75,7 @@ func TestSecretComparisonReviewUsesStructuredFlagPredicates(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -132,7 +132,7 @@ func TestMultipleDropdownScalarFallbackUsesAstPredicates(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -202,7 +202,7 @@ func TestJavaScriptContextFlowFlagsUseAstPredicates(t *testing.T) {
 
 	var hits []string
 	for _, decl := range decls {
-		ad, ok := decl.(*AdapterDecl)
+		ad, ok := decl.(*BindingSet)
 		if !ok {
 			continue
 		}
@@ -253,7 +253,7 @@ func TestFlowAwareFlagsUseAstPredicates(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -336,7 +336,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		for _, decl := range decls {
-			ad, ok := decl.(*AdapterDecl)
+			ad, ok := decl.(*BindingSet)
 			if !ok {
 				continue
 			}
@@ -366,7 +366,7 @@ func TestConvertedContextFlagsUseStructuredPredicates(t *testing.T) {
 	}
 }
 
-func flagHasFlowPredicate(flag *AdapterFlag) bool {
+func flagHasFlowPredicate(flag *BindingPresence) bool {
 	for _, pred := range flag.Predicates {
 		if pred.Subject == "flow_to" {
 			return true

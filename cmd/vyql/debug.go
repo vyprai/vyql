@@ -13,6 +13,7 @@ import (
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
+	"github.com/vyprai/vyql/resultpolicy"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -241,7 +242,7 @@ func cmdExplain(args []string) error {
 	}
 	fmt.Printf("%d finding(s):\n", len(all))
 	for _, f := range all {
-		fmt.Printf("\n[%s] %s  (fp=%s)\n", f.Severity, f.RuleID, f.Fingerprint())
+		fmt.Printf("\n[%s] %s  (fp=%s)\n", f.Severity, f.RuleID, resultpolicy.Fingerprint(f))
 		for _, b := range f.Bindings {
 			fmt.Printf("  %-6s %-22s @ %s  ← %s\n", b.Name+":", b.Concept, b.Loc, b.LabelProvenance)
 		}
@@ -464,7 +465,7 @@ func cmdAdapters(args []string) error {
 	}
 	byKind := map[string][]string{}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
@@ -543,7 +544,7 @@ func cmdValidateAdapter(args []string) error {
 		Adapters []adapterSummary `json:"adapters"`
 	}{OK: true}
 	for _, d := range decls {
-		ad, ok := d.(*parser.AdapterDecl)
+		ad, ok := d.(*parser.BindingSet)
 		if !ok {
 			continue
 		}
@@ -567,7 +568,7 @@ func cmdValidateAdapter(args []string) error {
 		summary.Adapters = append(summary.Adapters, item)
 	}
 	if len(summary.Adapters) == 0 {
-		return fmt.Errorf("adapter parse: no adapter declaration found")
+		return fmt.Errorf("adapter parse: no v2 binding set found")
 	}
 	out, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -598,7 +599,7 @@ type jsonFinding struct {
 func findingsJSON(all []*findings.Finding) []jsonFinding {
 	out := make([]jsonFinding, 0, len(all))
 	for _, f := range all {
-		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, Confidence: f.Confidence, WitnessKind: f.WitnessKind, FP: f.Fingerprint()}
+		jf := jsonFinding{RuleID: f.RuleID, Severity: f.Severity, Confidence: f.Confidence, WitnessKind: f.WitnessKind, FP: resultpolicy.Fingerprint(f)}
 		for _, b := range f.Bindings {
 			if b.Name == "source" {
 				jf.Source = b.Loc

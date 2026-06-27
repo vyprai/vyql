@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/findings"
+	"github.com/vyprai/vyql/resultpolicy"
 )
 
 func sampleFinding() *findings.Finding {
@@ -43,8 +44,8 @@ func TestEmitAndValidate(t *testing.T) {
 	if res["level"] != "error" {
 		t.Fatalf("high severity should map to error, got %v", res["level"])
 	}
-	fp := res["partialFingerprints"].(map[string]any)["vyqlFingerprint/v1"]
-	if fp != sampleFinding().Fingerprint() {
+	fp := res["partialFingerprints"].(map[string]any)["vyqlFingerprint/v2"]
+	if fp != resultpolicy.Fingerprint(sampleFinding()) {
 		t.Fatalf("SARIF fingerprint mismatch: %v", fp)
 	}
 	if _, ok := res["codeFlows"]; !ok {

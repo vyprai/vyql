@@ -213,7 +213,7 @@ func conceptRefsByFile(t *testing.T, sub, suffix string) map[string]map[string]b
 		refs := map[string]bool{}
 		for _, decl := range decls {
 			switch d := decl.(type) {
-			case *parser.AdapterDecl:
+			case *parser.BindingSet:
 				for _, m := range d.Mappings {
 					if m.Concept != "" && m.Kind != "type" {
 						addCoverageConceptRef(refs, m.Concept)
@@ -614,6 +614,9 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"parser.RuntimeSource",
 		"parser.RuntimeSourcesFromText",
 		"parser.LowerRuntimeSources",
+		"parser.AdapterDecl",
+		"parser.AdapterMapping",
+		"parser.AdapterFlag",
 	}
 	legacyParserDefinitions := []string{
 		"func Parse(",
@@ -622,6 +625,9 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"type RuntimeSource",
 		"func RuntimeSourcesFromText",
 		"func LowerRuntimeSources",
+		"type AdapterDecl",
+		"type AdapterMapping",
+		"type AdapterFlag",
 	}
 	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -727,7 +733,7 @@ func countV2TaintEndpointMappings(t *testing.T, subs ...string) (int, int) {
 				t.Fatalf("parse %s: %v", path, err)
 			}
 			for _, decl := range decls {
-				adapter, ok := decl.(*parser.AdapterDecl)
+				adapter, ok := decl.(*parser.BindingSet)
 				if !ok {
 					continue
 				}
