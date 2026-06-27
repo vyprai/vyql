@@ -1863,6 +1863,53 @@ binding cursorExecuteQuery {
 	}
 }
 
+func TestV2ArgsCountPredicateFiltersSinkMappings(t *testing.T) {
+	decls, err := parser.ParseRuntime(`
+module bindings.python.db;
+concept custom.SqlExecution : sink {}
+binding executeParameterized {
+  query pattern callExpr where callee.method == "execute" and args.count >= 2
+  emit sink custom.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseRuntime: %v", err)
+	}
+	var ad *parser.AdapterDecl
+	for _, decl := range decls {
+		if got, ok := decl.(*parser.AdapterDecl); ok {
+			ad = got
+			break
+		}
+	}
+	if ad == nil {
+		t.Fatalf("ParseRuntime decls = %#v, want adapter decl", decls)
+	}
+	spec := specFromDecl(ad)
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "oneArg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.py:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "oneArgCall", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.py:2", "callee_path": "cursor.execute", "method": "execute", "arg0": "oneArg0",
+	}})
+	store.AddNode(usg.Node{ID: "twoArg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.py:3", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "twoArg1", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.py:3", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "twoArgCall", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.py:3", "callee_path": "cursor.execute", "method": "execute", "arg0": "twoArg0", "arg1": "twoArg1",
+	}})
+
+	got := spec.sinkAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "twoArg0" || got[0].Concept != "custom.SqlExecution" {
+		t.Fatalf("args.count-gated sink labels = %+v, want only twoArg0", got)
+	}
+}
+
 func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

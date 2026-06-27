@@ -23,15 +23,18 @@ import (
 )
 
 type inputSpec struct {
-	Concept    string
-	Paths      []string
-	Methods    []string // receiver-agnostic: match the call's `method` prop (last segment)
-	Match      string   // "prefix" (default) | "contains"
-	Receiver   bool     // match a receiver attribute/method with a recv_type constraint
-	Constraint string   // optional `on <type>` receiver-type constraint
-	ValMatches []string // `val "substr"` (AND) — only a source when an arg literal matches
-	ValAbsents []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
-	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Concept     string
+	Paths       []string
+	Methods     []string // receiver-agnostic: match the call's `method` prop (last segment)
+	Match       string   // "prefix" (default) | "contains"
+	Receiver    bool     // match a receiver attribute/method with a recv_type constraint
+	Constraint  string   // optional `on <type>` receiver-type constraint
+	ValMatches  []string // `val "substr"` (AND) — only a source when an arg literal matches
+	ValAbsents  []string // `nval "substr"` (AND) — not a source if any arg literal contains a substr
+	ArgCountSet bool
+	ArgCountMin int
+	ArgCountMax int
+	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 }
 
 type sinkSpec struct {
@@ -44,6 +47,9 @@ type sinkSpec struct {
 	ArgIndex        int      // which argument position is targeted (default 0)
 	ValMatches      []string // `val "substr"` (AND) — every substr must be in some arg/option literal
 	ValAbsents      []string // `nval "substr"` (AND) — no arg/option literal may contain any substr
+	ArgCountSet     bool
+	ArgCountMin     int
+	ArgCountMax     int
 	Packages        []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
 	Collection      bool     // also flag a Seq/collection-literal arg
 	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
@@ -51,15 +57,18 @@ type sinkSpec struct {
 }
 
 type controlSpec struct {
-	Concept    string
-	Pattern    string
-	ByMethod   bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
-	Receiver   bool     // label the call receiver node instead of the call result
-	Exact      bool     // exact path match instead of segment-prefix path matching
-	ValMatches []string // `val "substr"` (AND — marks AND controls)
-	ValAbsents []string // `nval "substr"` (AND — marks AND controls)
-	Packages   []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
-	Detail     map[string]string
+	Concept     string
+	Pattern     string
+	ByMethod    bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
+	Receiver    bool     // label the call receiver node instead of the call result
+	Exact       bool     // exact path match instead of segment-prefix path matching
+	ValMatches  []string // `val "substr"` (AND — marks AND controls)
+	ValAbsents  []string // `nval "substr"` (AND — marks AND controls)
+	ArgCountSet bool
+	ArgCountMin int
+	ArgCountMax int
+	Packages    []string // inherited from `package "name" { ... }` — require matching import/SBOM package evidence
+	Detail      map[string]string
 }
 
 type flagPredicate struct {
@@ -386,6 +395,25 @@ func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
 	return len(vals) == 0 && len(nvals) == 0 || valConds(n.Prop("str_args"), vals, nvals)
 }
 
+func callArgCount(n usg.Node) int {
+	for i := 0; ; i++ {
+		if n.Prop("arg"+strconv.Itoa(i)) == "" {
+			return i
+		}
+	}
+}
+
+func callArgCountMatches(n usg.Node, set bool, min, max int) bool {
+	if !set {
+		return true
+	}
+	count := callArgCount(n)
+	if count < min {
+		return false
+	}
+	return max < 0 || count <= max
+}
+
 func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpec) bool {
 	if len(sk.ValMatches) == 0 && len(sk.ValAbsents) == 0 {
 		return true
@@ -687,23 +715,29 @@ func singleOntologyRoleConcept(role string) string {
 }
 
 type filterSpec struct {
-	Pattern  string
-	ByMethod bool // match the bare method name (x.replace) vs the dotted path (re.sub)
-	Global   bool // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
-	Packages []string
+	Pattern     string
+	ByMethod    bool // match the bare method name (x.replace) vs the dotted path (re.sub)
+	Global      bool // always-global replace (gsub/replaceAll/re.sub); else needs the /g flag
+	ArgCountSet bool
+	ArgCountMin int
+	ArgCountMax int
+	Packages    []string
 }
 
 // assumeSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
 // might apply but cannot be proven to. It never kills a flow; the engine
 // attaches an assumption note instead.
 type assumeSpec struct {
-	Pattern    string
-	ByMethod   bool
-	Mode       string // "guard" (must dominate the sink) | "sanitizer" (must lie on the path)
-	About      string // the sink concept it purports to cover
-	ValMatches []string
-	ValAbsents []string
-	Packages   []string
+	Pattern     string
+	ByMethod    bool
+	Mode        string // "guard" (must dominate the sink) | "sanitizer" (must lie on the path)
+	About       string // the sink concept it purports to cover
+	ValMatches  []string
+	ValAbsents  []string
+	ArgCountSet bool
+	ArgCountMin int
+	ArgCountMax int
+	Packages    []string
 }
 
 type paramSourceSpec struct {
@@ -860,6 +894,9 @@ func (spec adapterSpec) assumeAdapter() adapters.Adapter {
 					if !(as.ByMethod && method == as.Pattern || !as.ByMethod && matchSinkPath(path, as.Pattern)) {
 						continue
 					}
+					if !callArgCountMatches(n, as.ArgCountSet, as.ArgCountMin, as.ArgCountMax) {
+						continue
+					}
 					if !valCondsDirectForNode(n, as.ValMatches, as.ValAbsents) {
 						continue
 					}
@@ -907,7 +944,8 @@ func (spec adapterSpec) filterAdapter() adapters.Adapter {
 					if !allowed[fi] {
 						continue
 					}
-					if f.ByMethod && method == f.Pattern || !f.ByMethod && matchSinkPath(path, f.Pattern) {
+					if (f.ByMethod && method == f.Pattern || !f.ByMethod && matchSinkPath(path, f.Pattern)) &&
+						callArgCountMatches(n, f.ArgCountSet, f.ArgCountMin, f.ArgCountMax) {
 						matched, global = true, f.Global
 						break
 					}
@@ -1053,9 +1091,10 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "source":
 			// a value-constrained source gets its own spec so the
 			// val/nval filter is not shared with other patterns mapping to the same concept.
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
-					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+					Paths: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1066,9 +1105,10 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 			}
 			s.Inputs[i].Paths = append(s.Inputs[i].Paths, mp.Pattern)
 		case "source_method":
-			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 {
+			if len(mp.ValMatches) > 0 || len(mp.ValAbsents) > 0 || len(mp.Packages) > 0 || mp.ArgCountSet {
 				s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
-					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+					Methods: []string{mp.Pattern}, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+					ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 				break
 			}
 			i, ok := srcByConcept[mp.Concept]
@@ -1083,29 +1123,34 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 		case "sink_method":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_path":
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ArgIndex: mp.ArgIndex, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex})
 		case "sink_receiver":
 			// the tainted DATA is the receiver of a no-arg method; match the bare
 			// method name and label the call node itself.
-			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 		case "control":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "control_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "control_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "mark":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "mark_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
+				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Detail: adapterMappingDetail(mp)})
 		case "flag":
 			if mp.Flag != nil {
 				fs := flagSpec{Concept: mp.Concept, NodeKind: mp.Flag.NodeKind, Scope: mp.Flag.Scope, Packages: mp.Packages, Detail: adapterMappingDetail(mp)}
@@ -1122,16 +1167,17 @@ func specFromDecl(d *parser.AdapterDecl) adapterSpec {
 				s.Flags = append(s.Flags, fs)
 			}
 		case "filter_method":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", Packages: mp.Packages})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, ByMethod: true, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 		case "filter_path":
-			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", Packages: mp.Packages})
+			s.Filters = append(s.Filters, filterSpec{Pattern: mp.Pattern, Global: mp.Constraint == "global", ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 		case "assume_guard_method", "assume_guard_path", "assume_sanitizer_method", "assume_sanitizer_path":
 			mode := "guard"
 			if strings.Contains(mp.Kind, "sanitizer") {
 				mode = "sanitizer"
 			}
 			s.Assumes = append(s.Assumes, assumeSpec{Pattern: mp.Pattern, ByMethod: strings.HasSuffix(mp.Kind, "_method"),
-				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, Packages: mp.Packages})
+				Mode: mode, About: mp.About, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages})
 		}
 	}
 	return s
@@ -1208,6 +1254,9 @@ func (spec adapterSpec) inputAdapter() adapters.Adapter {
 							constraintAllows(in.Constraint, n.Prop("recv_type"))
 					}
 					if matched {
+						if !callArgCountMatches(n, in.ArgCountSet, in.ArgCountMin, in.ArgCountMax) {
+							continue
+						}
 						// value-constrained source: only a source when configured literal
 						// tokens are present or absent as declared by the adapter.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
@@ -1293,6 +1342,9 @@ func (spec adapterSpec) sinkAdapter() adapters.Adapter {
 					// value-matched sink: every `val` must be present and every `nval`
 					// absent among the literal arg/option tokens (case-insensitive).
 					if hit && !valCondsForSink(s, &flowIdx, n, sk) {
+						hit = false
+					}
+					if hit && !callArgCountMatches(n, sk.ArgCountSet, sk.ArgCountMin, sk.ArgCountMax) {
 						hit = false
 					}
 					if !hit {
@@ -1464,6 +1516,9 @@ func (spec adapterSpec) controlAdapter() adapters.Adapter {
 					}
 					// no break: a single call can be MULTIPLE controls, so attach every match.
 					hit := c.ByMethod && method == c.Pattern || !c.ByMethod && matchPath(path, []string{c.Pattern}, "prefix")
+					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
+						hit = false
+					}
 					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) {
 						nodeID := id
 						if c.Receiver {
@@ -2824,6 +2879,9 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						hit := m.ByMethod && method == m.Pattern ||
 							!m.ByMethod && ((m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
 						if !hit {
+							continue
+						}
+						if !callArgCountMatches(n, m.ArgCountSet, m.ArgCountMin, m.ArgCountMax) {
 							continue
 						}
 						if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {

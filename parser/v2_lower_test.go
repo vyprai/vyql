@@ -1517,15 +1517,15 @@ binding unsupported {
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
-	if _, err := lowerProgramToRuntime(prog); err == nil {
-		t.Fatal("unsupported binding query lowered without diagnostic")
+	if _, err := lowerProgramToRuntime(prog); err == nil || !strings.Contains(err.Error(), "needs a callee.method/path predicate") {
+		t.Fatalf("unsupported binding query error = %v, want callee predicate diagnostic", err)
 	}
 }
 
-func TestV2LoweringRejectsUnsupportedBindingPredicate(t *testing.T) {
-	prog, err := ParseV2(`
+func TestV2LoweringSupportsArgsCountBindingPredicate(t *testing.T) {
+	decls, err := ParseRuntime(`
 module bindings.javascript.express;
-binding unsupported {
+binding executeWithParams {
   query pattern callExpr where callee.method == "execute" and args.count >= 2
   emit check core.SqlParameterization at args[0] {
     covers path { from: args[0] to: call }
@@ -1533,10 +1533,38 @@ binding unsupported {
 }
 `)
 	if err != nil {
-		t.Fatalf("ParseV2: %v", err)
+		t.Fatalf("ParseRuntime: %v", err)
 	}
-	if _, err := lowerProgramToRuntime(prog); err == nil {
-		t.Fatal("unsupported binding predicate lowered without diagnostic")
+	ad := decls[0].(*AdapterDecl)
+	if len(ad.Mappings) != 1 {
+		t.Fatalf("mappings = %#v, want one", ad.Mappings)
+	}
+	got := ad.Mappings[0]
+	if got.Kind != "control_method" || got.Pattern != "execute" || got.Concept != "core.SqlParameterization" ||
+		!got.ArgCountSet || got.ArgCountMin != 2 || got.ArgCountMax != -1 {
+		t.Fatalf("args.count mapping = %#v, want arity-gated control_method", got)
+	}
+}
+
+func TestV2LoweringExpandsArgsCountInList(t *testing.T) {
+	decls, err := ParseRuntime(`
+module bindings.javascript.express;
+binding executeWithParamCounts {
+  query pattern callExpr where callee.method == "execute" and args.count in [1, 3]
+  emit sink code.SqlExecution at args[0]
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseRuntime: %v", err)
+	}
+	mappings := decls[0].(*AdapterDecl).Mappings
+	if len(mappings) != 2 {
+		t.Fatalf("mappings = %#v, want two exact arity mappings", mappings)
+	}
+	got := []int{mappings[0].ArgCountMin, mappings[1].ArgCountMin}
+	if got[0] != 1 || got[1] != 3 ||
+		mappings[0].ArgCountMax != 1 || mappings[1].ArgCountMax != 3 {
+		t.Fatalf("args.count in list mappings = %#v, want exact 1 and 3", mappings)
 	}
 }
 

@@ -522,11 +522,11 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			action.About = names.concept(action.About)
 			switch {
 			case action.Kind == "emit source":
-				m := AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				m := shape.mapping(AdapterMapping{Kind: shape.sourceKind(), Pattern: shape.Pattern, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit sink":
 				if action.Location == "call" || action.Location == "node" {
-					m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+					m := shape.mapping(AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 					out = append(out, m)
 					continue
 				}
@@ -540,7 +540,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 					}
 				}
-				m := AdapterMapping{
+				m := shape.mapping(AdapterMapping{
 					Kind:            kind,
 					Pattern:         shape.Pattern,
 					Exact:           shape.Exact,
@@ -553,7 +553,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					CollectionFirst: loc.CollectionFirst,
 					CollectionIndex: loc.CollectionIndex,
 					Packages:        pkgs,
-				}
+				})
 				out = append(out, m)
 			case action.Kind == "emit check":
 				if action.Concept == "core.Assumption" {
@@ -589,7 +589,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 					if lowerV2CharFilterGlobal(queryWhere) {
 						constraint = "global"
 					}
-					out = append(out, AdapterMapping{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
+					out = append(out, shape.mapping(AdapterMapping{Kind: kind, Pattern: shape.Pattern, Concept: action.Concept, Constraint: constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}))
 					continue
 				}
 				if isV2GlobalCheck(action) {
@@ -617,13 +617,13 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 						return nil, err
 					}
 				}
-				m := AdapterMapping{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				m := shape.mapping(AdapterMapping{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit issue":
-				m := AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				m := shape.mapping(AdapterMapping{Kind: shape.markKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case action.Kind == "emit fact" && action.Location == "call.result" && action.About != "":
-				m := AdapterMapping{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs}
+				m := shape.mapping(AdapterMapping{Kind: "type", Pattern: shape.Pattern, Concept: action.About, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs})
 				out = append(out, m)
 			case strings.HasPrefix(action.Kind, "propagate "):
 				m, err := lowerV2Propagation(b.Name, shape, queryAlias, action, pkgs)
@@ -650,7 +650,7 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 	if action.About != "" {
 		return AdapterMapping{}, fmt.Errorf("binding %s: global check about metadata is only supported on advisory checks", binding)
 	}
-	return AdapterMapping{
+	return shape.mapping(AdapterMapping{
 		Kind:       shape.markKind(),
 		Pattern:    shape.Pattern,
 		Exact:      shape.Exact,
@@ -659,7 +659,7 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action V2BindingOutpu
 		ValMatches: shape.ValMatches,
 		ValAbsents: shape.ValAbsents,
 		Packages:   pkgs,
-	}, nil
+	}), nil
 }
 
 func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOutput, pkgs []string) (AdapterMapping, error) {
@@ -670,7 +670,7 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 		return AdapterMapping{}, fmt.Errorf("binding %s: advisory check requires exactly one coverage mode", binding)
 	}
 	kind := shape.markKind()
-	return AdapterMapping{
+	return shape.mapping(AdapterMapping{
 		Kind:       kind,
 		Pattern:    shape.Pattern,
 		Exact:      shape.Exact,
@@ -681,7 +681,7 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 		ValMatches: shape.ValMatches,
 		ValAbsents: shape.ValAbsents,
 		Packages:   pkgs,
-	}, nil
+	}), nil
 }
 
 func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2PatternResolver) (V2Expr, string, error) {
@@ -1099,6 +1099,35 @@ func v2LiteralString(expr V2Expr) (string, bool) {
 	return s, ok
 }
 
+func v2LiteralInt(expr V2Expr) (int, bool) {
+	lit, ok := expr.(V2LiteralExpr)
+	if !ok {
+		return 0, false
+	}
+	n, ok := lit.Value.(int)
+	return n, ok && n >= 0
+}
+
+func v2LiteralIntList(expr V2Expr) ([]int, bool) {
+	lit, ok := expr.(V2LiteralExpr)
+	if !ok {
+		return nil, false
+	}
+	raw, ok := lit.Value.([]string)
+	if !ok {
+		return nil, false
+	}
+	out := make([]int, 0, len(raw))
+	for _, item := range raw {
+		n, err := strconv.Atoi(item)
+		if err != nil || n < 0 {
+			return nil, false
+		}
+		out = append(out, n)
+	}
+	return out, true
+}
+
 func validateV2ConcreteCheck(binding string, action V2BindingOutput) error {
 	if action.Advisory != nil && *action.Advisory {
 		return fmt.Errorf("binding %s: advisory checks must lower through advisory coverage support", binding)
@@ -1153,14 +1182,14 @@ func lowerV2AssumptionCheck(binding string, shape v2CallShape, action V2BindingO
 	if shape.Field == "callee.method" {
 		kind = "assume_" + mode + "_method"
 	}
-	return AdapterMapping{
+	return shape.mapping(AdapterMapping{
 		Kind:       kind,
 		Pattern:    shape.Pattern,
 		About:      action.About,
 		ValMatches: shape.ValMatches,
 		ValAbsents: shape.ValAbsents,
 		Packages:   pkgs,
-	}, true, nil
+	}), true, nil
 }
 
 func lowerV2CharFilterGlobal(expr V2Expr) bool {
@@ -1184,12 +1213,24 @@ func lowerV2CharFilterGlobal(expr V2Expr) bool {
 }
 
 type v2CallShape struct {
-	Field      string
-	Pattern    string
-	Exact      bool
-	Constraint string
-	ValMatches []string
-	ValAbsents []string
+	Field       string
+	Pattern     string
+	Exact       bool
+	Constraint  string
+	ArgCountSet bool
+	ArgCountMin int
+	ArgCountMax int
+	ValMatches  []string
+	ValAbsents  []string
+}
+
+func (s v2CallShape) mapping(m AdapterMapping) AdapterMapping {
+	if s.ArgCountSet {
+		m.ArgCountSet = true
+		m.ArgCountMin = s.ArgCountMin
+		m.ArgCountMax = s.ArgCountMax
+	}
+	return m
 }
 
 func (s v2CallShape) sourceKind() string {
@@ -1330,6 +1371,12 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 			return []v2CallShape{{ValAbsents: []string{value}}}, nil
 		}
 		return []v2CallShape{{ValMatches: []string{value}}}, nil
+	case "args.count", "call.args.count":
+		shapes, ok := lowerV2ArgsCountShapes(cmp, cmpNeg)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: args.count predicate must compare to a non-negative integer or integer list", binding)
+		}
+		return shapes, nil
 	case "call.filter.global", "filter.global":
 		if cmpNeg || cmp.Op != "==" {
 			return nil, fmt.Errorf("binding %s: call.filter.global predicate must be == true", binding)
@@ -1396,6 +1443,20 @@ func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, er
 		}
 		out.Constraint = right.Constraint
 	}
+	if right.ArgCountSet {
+		if out.ArgCountSet {
+			min, max, ok := intersectV2ArgCount(out.ArgCountMin, out.ArgCountMax, right.ArgCountMin, right.ArgCountMax)
+			if !ok {
+				return v2CallShape{}, fmt.Errorf("binding %s: contradictory args.count predicates in one conjunction", binding)
+			}
+			out.ArgCountMin = min
+			out.ArgCountMax = max
+		} else {
+			out.ArgCountSet = true
+			out.ArgCountMin = right.ArgCountMin
+			out.ArgCountMax = right.ArgCountMax
+		}
+	}
 	out.ValMatches = append(out.ValMatches, right.ValMatches...)
 	out.ValAbsents = append(out.ValAbsents, right.ValAbsents...)
 	return out, nil
@@ -1410,6 +1471,9 @@ func dedupeV2CallShapes(shapes []v2CallShape) []v2CallShape {
 			shape.Pattern,
 			strconv.FormatBool(shape.Exact),
 			shape.Constraint,
+			strconv.FormatBool(shape.ArgCountSet),
+			strconv.Itoa(shape.ArgCountMin),
+			strconv.Itoa(shape.ArgCountMax),
 			strings.Join(shape.ValMatches, "\x00"),
 			strings.Join(shape.ValAbsents, "\x00"),
 		}, "\x01")
@@ -1437,11 +1501,77 @@ func v2IsKnownCallQueryField(name string) bool {
 	case "callee.method", "call.callee.method", "callee.path", "call.callee.path",
 		"callee.receiver.type", "call.callee.receiver.type",
 		"args.any.literal", "call.args.any.literal",
+		"args.count", "call.args.count",
 		"call.filter.global", "filter.global":
 		return true
 	default:
 		return false
 	}
+}
+
+func lowerV2ArgsCountShapes(cmp V2BinaryExpr, neg bool) ([]v2CallShape, bool) {
+	if neg {
+		return nil, false
+	}
+	value, ok := v2LiteralInt(cmp.Right)
+	switch cmp.Op {
+	case "==":
+		if !ok {
+			return nil, false
+		}
+		return []v2CallShape{v2ArgCountShape(value, value)}, true
+	case ">=":
+		if !ok {
+			return nil, false
+		}
+		return []v2CallShape{v2ArgCountShape(value, -1)}, true
+	case ">":
+		if !ok {
+			return nil, false
+		}
+		return []v2CallShape{v2ArgCountShape(value+1, -1)}, true
+	case "<=":
+		if !ok {
+			return nil, false
+		}
+		return []v2CallShape{v2ArgCountShape(0, value)}, true
+	case "<":
+		if !ok || value == 0 {
+			return nil, false
+		}
+		return []v2CallShape{v2ArgCountShape(0, value-1)}, true
+	case "in":
+		values, ok := v2LiteralIntList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, false
+		}
+		out := make([]v2CallShape, 0, len(values))
+		for _, v := range values {
+			out = append(out, v2ArgCountShape(v, v))
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func v2ArgCountShape(min, max int) v2CallShape {
+	return v2CallShape{ArgCountSet: true, ArgCountMin: min, ArgCountMax: max}
+}
+
+func intersectV2ArgCount(aMin, aMax, bMin, bMax int) (int, int, bool) {
+	min := aMin
+	if bMin > min {
+		min = bMin
+	}
+	max := aMax
+	if max < 0 || (bMax >= 0 && bMax < max) {
+		max = bMax
+	}
+	if max >= 0 && min > max {
+		return 0, 0, false
+	}
+	return min, max, true
 }
 
 func lowerV2ReceiverConstraint(cmp V2BinaryExpr) (string, bool) {
@@ -1480,14 +1610,14 @@ func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, ac
 	if err != nil {
 		return AdapterMapping{}, fmt.Errorf("binding %s: %w", binding, err)
 	}
-	return AdapterMapping{
+	return shape.mapping(AdapterMapping{
 		Kind:             kind,
 		Pattern:          shape.Pattern,
 		FlowDestArg:      dest,
 		FlowSourceArg:    srcArg,
 		FlowSourceResult: srcResult,
 		Packages:         pkgs,
-	}, nil
+	}), nil
 }
 
 func v2NormalizeQueryLocation(location, alias string) string {
