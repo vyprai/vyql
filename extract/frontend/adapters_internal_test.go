@@ -2397,6 +2397,36 @@ binding adminClass {
 	}
 }
 
+func TestV2AssignmentQueryLabelsAssignmentContextNodes(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.assignments;
+binding secretAssignment {
+  query assignment as a where a.target contains "token" and a.value contains "secret"
+  emit issue custom.SecretAssignment at a
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "assignment", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:1", "callee_path": "analysis.function.context", "method": "context", "str_args": "assign:token=secretValue",
+	}})
+	store.AddNode(usg.Node{ID: "ordinary-call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:2", "callee_path": "log", "method": "log", "str_args": "assign:token=secretValue",
+	}})
+	store.AddNode(usg.Node{ID: "other-assignment", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:3", "callee_path": "analysis.function.context", "method": "context", "str_args": "assign:other=secretValue",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "assignment" || got[0].Concept != "custom.SecretAssignment" {
+		t.Fatalf("assignment query matched wrong nodes: %+v", got)
+	}
+}
+
 func TestV2FactEmitLabelsMatchedCall(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.facts;

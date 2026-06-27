@@ -847,6 +847,58 @@ binding weakCompare {
 	}
 }
 
+func TestV2AssignmentInlineQueryLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.assignments;
+binding secretAssignment {
+  query assignment as a where a.target contains "token" and a.value contains "secret"
+  emit issue code.SecretValue at a
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
+		t.Fatalf("assignment mapping wrong: %+v", got)
+	}
+	if len(got.ValMatches) != 3 || got.ValMatches[0] != "assign:" || got.ValMatches[1] != "assign:token" || got.ValMatches[2] != "=secret" {
+		t.Fatalf("assignment val predicates wrong: %+v", got.ValMatches)
+	}
+}
+
+func TestV2AssignmentPatternLowering(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.assignments;
+pattern secretAssignmentPattern as a {
+  node: assignment
+  where a.targetValue contains "config.secret"
+}
+binding secretAssignment {
+  query pattern secretAssignmentPattern
+  emit issue code.SecretValue at a
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 1 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "mark" || got.Pattern != "analysis.function.context" || !got.Exact || got.Concept != "code.SecretValue" {
+		t.Fatalf("assignment pattern mapping wrong: %+v", got)
+	}
+	if len(got.ValMatches) != 2 || got.ValMatches[0] != "assign:" || got.ValMatches[1] != "assign:config.secret" {
+		t.Fatalf("assignment pattern val predicates wrong: %+v", got.ValMatches)
+	}
+}
+
 func TestV2ComposedSingleNodePatternLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.composed;

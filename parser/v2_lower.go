@@ -606,8 +606,10 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 	queryWhere := b.Query.Where
 	queryAlias := ""
 	queryNodeType := ""
+	queryFamily := ""
 	if b.Query.Expr != nil {
-		nodeType, ok := v2QueryFamilyNodeType(b.Query.Expr.Family)
+		queryFamily = normalizedV2CodeFamily(b.Query.Expr.Family)
+		nodeType, ok := v2QueryFamilyNodeType(queryFamily)
 		if !ok {
 			return nil, fmt.Errorf("binding %s: inline query lowering is not implemented for query family %q", b.Name, b.Query.Expr.Family)
 		}
@@ -618,11 +620,12 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			return nil, err
 		}
 		queryAlias = b.Query.Expr.Alias
+		queryWhere = addV2FamilyImplicitPredicates(queryWhere, queryFamily)
 	} else if b.Query.Pattern == "" {
 		return nil, fmt.Errorf("binding %s: missing query", b.Name)
 	} else {
 		var err error
-		queryWhere, queryAlias, queryNodeType, err = lowerV2PatternQuery(b.Name, b.Query, patterns)
+		queryWhere, queryAlias, queryNodeType, queryFamily, err = lowerV2PatternQuery(b.Name, b.Query, patterns)
 		if err != nil {
 			return nil, err
 		}
@@ -632,7 +635,7 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 			return out, err
 		}
 	}
-	shapes, err := lowerV2CallShapes(b.Name, queryWhere, queryNodeType != "")
+	shapes, err := lowerV2CallShapes(b.Name, queryWhere, queryNodeType != "", queryFamily)
 	if err != nil {
 		return nil, err
 	}
@@ -808,6 +811,8 @@ func v2QueryFamilyNodeType(family string) (string, bool) {
 	switch family {
 	case "call":
 		return "", true
+	case "assignment":
+		return "", true
 	case "memberAccess":
 		return "code.Attr", true
 	case "binaryExpr":
@@ -822,6 +827,31 @@ func v2QueryFamilyNodeType(family string) (string, bool) {
 		return "code.Import", true
 	default:
 		return "", false
+	}
+}
+
+func normalizedV2CodeFamily(family string) string {
+	switch family {
+	case "callExpr", "node":
+		return "call"
+	default:
+		return family
+	}
+}
+
+func addV2FamilyImplicitPredicates(expr V2Expr, family string) V2Expr {
+	switch family {
+	case "assignment":
+		return andV2Expr(v2AssignmentImplicitExpr(), expr)
+	default:
+		return expr
+	}
+}
+
+func v2AssignmentImplicitExpr() V2Expr {
+	return V2BinaryExpr{Op: "and",
+		Left:  V2BinaryExpr{Op: "==", Left: V2RefExpr{Name: "callee.analysis"}, Right: V2LiteralExpr{Value: "function.context"}},
+		Right: V2BinaryExpr{Op: "contains", Left: V2RefExpr{Name: "assignment.any"}, Right: V2LiteralExpr{Value: ""}},
 	}
 }
 
@@ -1030,39 +1060,40 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action V2BindingOut
 	return out, nil
 }
 
-func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2PatternResolver) (V2Expr, string, string, error) {
+func lowerV2PatternQuery(binding string, query V2BindingQuery, patterns v2PatternResolver) (V2Expr, string, string, string, error) {
 	pat, ok, err := patterns.resolve(query.Pattern)
 	if err != nil {
-		return nil, "", "", fmt.Errorf("binding %s: pattern %s: %w", binding, query.Pattern, err)
+		return nil, "", "", "", fmt.Errorf("binding %s: pattern %s: %w", binding, query.Pattern, err)
 	}
 	if !ok {
-		return nil, "", "", fmt.Errorf("binding %s: pattern %s is not declared in this module", binding, query.Pattern)
+		return nil, "", "", "", fmt.Errorf("binding %s: pattern %s is not declared in this module", binding, query.Pattern)
 	}
-	where, alias, nodeType, binds, err := lowerV2PatternRecognitionExpr(binding, pat, patterns)
+	where, alias, nodeType, family, binds, err := lowerV2PatternRecognitionExpr(binding, pat, patterns)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", "", "", err
 	}
 	queryWhere := rewriteV2PatternRefs(query.Where, binds)
-	return andV2Expr(where, queryWhere), alias, nodeType, nil
+	return andV2Expr(where, queryWhere), alias, nodeType, family, nil
 }
 
-func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl, patterns v2PatternResolver) (V2Expr, string, string, map[string]string, error) {
-	where, alias, nodeType, binds, _, err := lowerV2PatternRecognitionExprSeen(binding, pat, patterns, map[*V2PatternDecl]bool{})
-	return where, alias, nodeType, binds, err
+func lowerV2PatternRecognitionExpr(binding string, pat *V2PatternDecl, patterns v2PatternResolver) (V2Expr, string, string, string, map[string]string, error) {
+	where, alias, nodeType, family, binds, _, err := lowerV2PatternRecognitionExprSeen(binding, pat, patterns, map[*V2PatternDecl]bool{})
+	return where, alias, nodeType, family, binds, err
 }
 
-func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patterns v2PatternResolver, seen map[*V2PatternDecl]bool) (V2Expr, string, string, map[string]string, int, error) {
+func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patterns v2PatternResolver, seen map[*V2PatternDecl]bool) (V2Expr, string, string, string, map[string]string, int, error) {
 	if pat == nil {
-		return nil, "", "", nil, 0, fmt.Errorf("binding %s: nil pattern", binding)
+		return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: nil pattern", binding)
 	}
 	if seen[pat] {
-		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s has cyclic use", binding, pat.Name)
+		return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s has cyclic use", binding, pat.Name)
 	}
 	seen[pat] = true
 	defer delete(seen, pat)
 
 	alias := pat.Alias
 	nodeType := ""
+	nodeFamily := ""
 	binds := map[string]string{}
 	var where V2Expr
 	nodeCount := 0
@@ -1070,41 +1101,39 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 		switch item.Kind {
 		case "node":
 			nodeCount++
-			family := item.Name
-			if family == "callExpr" || family == "node" {
-				family = "call"
-			}
+			family := normalizedV2CodeFamily(item.Name)
 			itemNodeType, ok := v2QueryFamilyNodeType(family)
 			if !ok {
-				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s node family %q needs native pattern lowering", binding, pat.Name, item.Name)
 			}
 			nodeType = itemNodeType
+			nodeFamily = family
 			if alias == "" {
 				alias = item.Alias
 			}
 		case "bind":
 			ref, ok := item.Expr.(V2RefExpr)
 			if !ok {
-				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s bind %s needs native expression lowering", binding, pat.Name, item.Name)
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s bind %s needs native expression lowering", binding, pat.Name, item.Name)
 			}
 			if err := addV2PatternBind(binding, pat.Name, binds, item.Name, ref.Name); err != nil {
-				return nil, "", "", nil, 0, err
+				return nil, "", "", "", nil, 0, err
 			}
 		case "where":
 			where = andV2Expr(where, rewriteV2PatternRefs(item.Expr, binds))
 		case "unstable":
-			return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s unstable items need native pattern lowering", binding, pat.Name)
+			return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s unstable items need native pattern lowering", binding, pat.Name)
 		case "use":
 			sub, ok, err := patterns.resolve(item.Name)
 			if err != nil {
-				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s: %w", binding, pat.Name, item.Name, err)
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s: %w", binding, pat.Name, item.Name, err)
 			}
 			if !ok {
-				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s is not declared in this module", binding, pat.Name, item.Name)
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s use %s is not declared in this module", binding, pat.Name, item.Name)
 			}
-			subWhere, subAlias, subNodeType, subBinds, subNodes, err := lowerV2PatternRecognitionExprSeen(binding, sub, patterns, seen)
+			subWhere, subAlias, subNodeType, subFamily, subBinds, subNodes, err := lowerV2PatternRecognitionExprSeen(binding, sub, patterns, seen)
 			if err != nil {
-				return nil, "", "", nil, 0, err
+				return nil, "", "", "", nil, 0, err
 			}
 			if alias == "" {
 				alias = item.Alias
@@ -1120,32 +1149,39 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 			where = andV2Expr(where, rewriteV2PatternRefs(subWhere, aliasBinds))
 			nodeCount += subNodes
 			if nodeType != "" && subNodeType != "" && nodeType != subNodeType {
-				return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s composes incompatible node families", binding, pat.Name)
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s composes incompatible node families", binding, pat.Name)
 			}
 			if nodeType == "" {
 				nodeType = subNodeType
+			}
+			if nodeFamily != "" && subFamily != "" && nodeFamily != subFamily {
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s composes incompatible node families", binding, pat.Name)
+			}
+			if nodeFamily == "" {
+				nodeFamily = subFamily
 			}
 			for name, target := range subBinds {
 				if rewritten, ok := rewriteV2PatternRefName(target, aliasBinds); ok {
 					target = rewritten
 				}
 				if err := addV2PatternBind(binding, pat.Name, binds, name, target); err != nil {
-					return nil, "", "", nil, 0, err
+					return nil, "", "", "", nil, 0, err
 				}
 			}
 			if item.Alias != "" && targetAlias != "" {
 				if err := addV2PatternBind(binding, pat.Name, binds, item.Alias, targetAlias); err != nil {
-					return nil, "", "", nil, 0, err
+					return nil, "", "", "", nil, 0, err
 				}
 			}
 		default:
-			return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s item %q needs native pattern lowering", binding, pat.Name, item.Kind)
+			return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s item %q needs native pattern lowering", binding, pat.Name, item.Kind)
 		}
 	}
 	if nodeCount != 1 {
-		return nil, "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one stable code node for scanner IR lowering", binding, pat.Name)
+		return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one stable code node for scanner IR lowering", binding, pat.Name)
 	}
-	return where, alias, nodeType, binds, nodeCount, nil
+	where = addV2FamilyImplicitPredicates(where, nodeFamily)
+	return where, alias, nodeType, nodeFamily, binds, nodeCount, nil
 }
 
 func addV2PatternBind(binding, pattern string, binds map[string]string, name, target string) error {
@@ -1971,11 +2007,11 @@ func (s v2CallShape) factKind() string {
 	return "fact"
 }
 
-func lowerV2CallShapes(binding string, expr V2Expr, allowNodeOnly bool) ([]v2CallShape, error) {
+func lowerV2CallShapes(binding string, expr V2Expr, allowNodeOnly bool, family string) ([]v2CallShape, error) {
 	if expr == nil && allowNodeOnly {
 		return []v2CallShape{{}}, nil
 	}
-	shapes, err := lowerV2CallShapeExpr(binding, expr, false)
+	shapes, err := lowerV2CallShapeExpr(binding, expr, false, family)
 	if err != nil {
 		return nil, err
 	}
@@ -1987,9 +2023,9 @@ func lowerV2CallShapes(binding string, expr V2Expr, allowNodeOnly bool) ([]v2Cal
 	return dedupeV2CallShapes(shapes), nil
 }
 
-func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool) ([]v2CallShape, error) {
+func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool, family string) ([]v2CallShape, error) {
 	if u, ok := expr.(V2UnaryExpr); ok && u.Op == "not" {
-		return lowerV2CallShapeExpr(binding, u.X, !neg)
+		return lowerV2CallShapeExpr(binding, u.X, !neg, family)
 	}
 	cmp, ok := expr.(V2BinaryExpr)
 	if !ok {
@@ -1998,25 +2034,25 @@ func lowerV2CallShapeExpr(binding string, expr V2Expr, neg bool) ([]v2CallShape,
 	switch cmp.Op {
 	case "and":
 		if neg {
-			return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, true)
+			return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, true, family)
 		}
-		return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, false)
+		return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, false, family)
 	case "or":
 		if neg {
-			return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, true)
+			return lowerV2CallShapeAnd(binding, cmp.Left, cmp.Right, true, family)
 		}
-		return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, false)
+		return lowerV2CallShapeOr(binding, cmp.Left, cmp.Right, false, family)
 	default:
-		return lowerV2CallShapeAtom(binding, cmp, neg)
+		return lowerV2CallShapeAtom(binding, cmp, neg, family)
 	}
 }
 
-func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool) ([]v2CallShape, error) {
-	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg)
+func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool, family string) ([]v2CallShape, error) {
+	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg, family)
 	if err != nil {
 		return nil, err
 	}
-	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg)
+	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg, family)
 	if err != nil {
 		return nil, err
 	}
@@ -2036,12 +2072,12 @@ func lowerV2CallShapeAnd(binding string, left, right V2Expr, neg bool) ([]v2Call
 	return out, nil
 }
 
-func lowerV2CallShapeOr(binding string, left, right V2Expr, neg bool) ([]v2CallShape, error) {
-	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg)
+func lowerV2CallShapeOr(binding string, left, right V2Expr, neg bool, family string) ([]v2CallShape, error) {
+	leftShapes, err := lowerV2CallShapeExpr(binding, left, neg, family)
 	if err != nil {
 		return nil, err
 	}
-	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg)
+	rightShapes, err := lowerV2CallShapeExpr(binding, right, neg, family)
 	if err != nil {
 		return nil, err
 	}
@@ -2051,7 +2087,7 @@ func lowerV2CallShapeOr(binding string, left, right V2Expr, neg bool) ([]v2CallS
 	return append(leftShapes, rightShapes...), nil
 }
 
-func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool, family string) ([]v2CallShape, error) {
 	leftExpr := cmp.Left
 	cmpNeg := neg
 	if u, ok := leftExpr.(V2UnaryExpr); ok && u.Op == "not" {
@@ -2062,7 +2098,7 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 	if !ok {
 		return nil, fmt.Errorf("binding %s: unsupported query predicate left side %T", binding, cmp.Left)
 	}
-	field := v2CallQueryField(left.Name)
+	field := v2CallQueryField(left.Name, family)
 	if _, prefix, ok := v2ArgsAnyContextField(field); ok {
 		if cmp.Op != "contains" {
 			return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
@@ -2080,6 +2116,9 @@ func lowerV2CallShapeAtom(binding string, cmp V2BinaryExpr, neg bool) ([]v2CallS
 		return []v2CallShape{{ValMatches: []string{value}}}, nil
 	}
 	switch field {
+	case "assignment.any", "assignment.target", "assignment.value", "assignment.targetValue",
+		"assignment.call", "assignment.callMethod", "assignment.item", "assignment.literal":
+		return lowerV2AssignmentTokenShapes(binding, field, cmp, cmpNeg)
 	case "node.value", "node.name", "node.module":
 		return lowerV2NodeValueShapes(binding, field, cmp, cmpNeg)
 	case "operator":
@@ -2150,6 +2189,67 @@ func lowerV2NodeValueShapes(binding, field string, cmp V2BinaryExpr, neg bool) (
 		return []v2CallShape{{ValAbsents: []string{value}}}, nil
 	}
 	return []v2CallShape{{ValMatches: []string{value}}}, nil
+}
+
+func lowerV2AssignmentTokenShapes(binding, field string, cmp V2BinaryExpr, neg bool) ([]v2CallShape, error) {
+	prefix, ok := v2AssignmentTokenPrefix(field)
+	if !ok {
+		return nil, fmt.Errorf("binding %s: assignment field %q is not implemented in scanner IR lowering", binding, field)
+	}
+	var values []string
+	switch cmp.Op {
+	case "contains", "==":
+		value, ok := v2LiteralString(cmp.Right)
+		if !ok {
+			return nil, fmt.Errorf("binding %s: %s predicate right side must be a string", binding, field)
+		}
+		values = []string{value}
+	case "in":
+		var ok bool
+		values, ok = v2RuleWhereStringList(cmp.Right)
+		if !ok || len(values) == 0 {
+			return nil, fmt.Errorf("binding %s: %s in predicate requires a non-empty string list", binding, field)
+		}
+	default:
+		return nil, fmt.Errorf("binding %s: %s operator %q is not implemented in scanner IR lowering", binding, field, cmp.Op)
+	}
+	if err := checkV2CallShapeExpansion(binding, field, len(values)); err != nil {
+		return nil, err
+	}
+	out := make([]v2CallShape, 0, len(values))
+	for _, value := range values {
+		if prefix != "" && !strings.HasPrefix(value, prefix) {
+			value = prefix + value
+		}
+		shape := v2CallShape{ValMatches: []string{value}}
+		if neg {
+			shape.ValMatches = nil
+			shape.ValAbsents = []string{value}
+		}
+		out = append(out, shape)
+	}
+	return out, nil
+}
+
+func v2AssignmentTokenPrefix(field string) (string, bool) {
+	switch field {
+	case "assignment.any":
+		return "assign:", true
+	case "assignment.target", "assignment.targetValue":
+		return "assign:", true
+	case "assignment.value":
+		return "=", true
+	case "assignment.call":
+		return "assign_call:", true
+	case "assignment.callMethod":
+		return "assign_call_method:", true
+	case "assignment.item":
+		return "assign_item:", true
+	case "assignment.literal":
+		return "assign_literal:", true
+	default:
+		return "", false
+	}
 }
 
 func v2ArgsAnyContextField(field string) (string, string, bool) {
@@ -2351,22 +2451,42 @@ func dedupeV2CallShapes(shapes []v2CallShape) []v2CallShape {
 	return out
 }
 
-func v2CallQueryField(name string) string {
-	if mapped := v2MappedCallQueryField(name); mapped != "" {
+func v2CallQueryField(name, family string) string {
+	if mapped := v2MappedCallQueryField(name, family); mapped != "" {
 		return mapped
 	}
 	if _, rest, ok := strings.Cut(name, "."); ok && v2IsKnownCallQueryField(rest) {
 		return rest
 	}
 	if _, rest, ok := strings.Cut(name, "."); ok {
-		if mapped := v2MappedCallQueryField(rest); mapped != "" {
+		if mapped := v2MappedCallQueryField(rest, family); mapped != "" {
 			return mapped
 		}
 	}
 	return name
 }
 
-func v2MappedCallQueryField(name string) string {
+func v2MappedCallQueryField(name, family string) string {
+	if family == "assignment" {
+		switch name {
+		case "any", "assignment.any":
+			return "assignment.any"
+		case "target", "assignment.target":
+			return "assignment.target"
+		case "value", "assignment.value":
+			return "assignment.value"
+		case "targetValue", "text", "assignment.targetValue", "assignment.text":
+			return "assignment.targetValue"
+		case "call", "assignment.call":
+			return "assignment.call"
+		case "callMethod", "assignment.callMethod":
+			return "assignment.callMethod"
+		case "item", "assignment.item":
+			return "assignment.item"
+		case "literal", "assignment.literal":
+			return "assignment.literal"
+		}
+	}
 	switch name {
 	case "property", "memberAccess.property":
 		return "callee.method"
@@ -2380,6 +2500,22 @@ func v2MappedCallQueryField(name string) string {
 		return "node.name"
 	case "module", "import.module", "import.symbol", "import.package":
 		return "node.module"
+	case "assignment.any":
+		return "assignment.any"
+	case "assignment.target":
+		return "assignment.target"
+	case "assignment.value":
+		return "assignment.value"
+	case "assignment.targetValue", "assignment.text":
+		return "assignment.targetValue"
+	case "assignment.call":
+		return "assignment.call"
+	case "assignment.callMethod":
+		return "assignment.callMethod"
+	case "assignment.item":
+		return "assignment.item"
+	case "assignment.literal":
+		return "assignment.literal"
 	default:
 		if v2IsKnownCallQueryField(name) {
 			return name
@@ -2394,6 +2530,8 @@ func v2IsKnownCallQueryField(name string) bool {
 		"callee.analysis", "call.callee.analysis",
 		"callee.receiver.type", "call.callee.receiver.type",
 		"node.value", "node.name", "node.module",
+		"assignment.any", "assignment.target", "assignment.value", "assignment.targetValue",
+		"assignment.call", "assignment.callMethod", "assignment.item", "assignment.literal",
 		"args.any.literal", "call.args.any.literal",
 		"args.count", "call.args.count",
 		"call.filter.global", "filter.global":
