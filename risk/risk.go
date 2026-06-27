@@ -247,6 +247,8 @@ func v2PolicyBlockExpr(items []parser.V2BlockItem, key string) (parser.V2Expr, b
 type priorityFact struct {
 	Bool    bool
 	Scalar  string
+	Number  int
+	HasNum  bool
 	Witness string
 }
 
@@ -254,7 +256,9 @@ type priorityFactSet map[string]priorityFact
 
 func priorityFactsForFinding(f *findings.Finding) priorityFactSet {
 	out := priorityFactSet{
-		"finding.confidence": {Bool: f.Confidence != "", Scalar: strings.ToLower(f.Confidence), Witness: "confidence: " + orUnset(strings.ToLower(f.Confidence))},
+		"finding.confidence":   {Bool: f.Confidence != "", Scalar: strings.ToLower(f.Confidence), Witness: "confidence: " + orUnset(strings.ToLower(f.Confidence))},
+		"finding.bindingCount": {Bool: len(f.Bindings) > 0, Number: len(f.Bindings), HasNum: true, Scalar: fmt.Sprint(len(f.Bindings)), Witness: fmt.Sprintf("bindings: %d", len(f.Bindings))},
+		"finding.contextCount": {Bool: len(f.Context) > 0, Number: len(f.Context), HasNum: true, Scalar: fmt.Sprint(len(f.Context)), Witness: fmt.Sprintf("context entries: %d", len(f.Context))},
 	}
 	for _, c := range f.Context {
 		lower := strings.ToLower(c)
@@ -344,6 +348,27 @@ func evalPriorityBool(expr parser.V2Expr, facts priorityFactSet) (bool, []string
 				return false, nil
 			}
 			return true, append(leftWitnesses, rightWitnesses...)
+		case ">=", "<=", ">", "<":
+			left, leftOK, leftWitnesses := evalPriorityNumber(x.Left, facts)
+			right, rightOK, rightWitnesses := evalPriorityNumber(x.Right, facts)
+			if !leftOK || !rightOK {
+				return false, nil
+			}
+			var matches bool
+			switch x.Op {
+			case ">=":
+				matches = left >= right
+			case "<=":
+				matches = left <= right
+			case ">":
+				matches = left > right
+			case "<":
+				matches = left < right
+			}
+			if !matches {
+				return false, nil
+			}
+			return true, append(leftWitnesses, rightWitnesses...)
 		default:
 			return false, nil
 		}
@@ -378,6 +403,21 @@ func evalPriorityScalar(expr parser.V2Expr, facts priorityFactSet) (string, bool
 		return "", false, nil
 	default:
 		return "", false, nil
+	}
+}
+
+func evalPriorityNumber(expr parser.V2Expr, facts priorityFactSet) (int, bool, []string) {
+	switch x := expr.(type) {
+	case parser.V2LiteralExpr:
+		n, ok := x.Value.(int)
+		return n, ok, nil
+	case parser.V2RefExpr:
+		if fact, ok := facts[x.Name]; ok && fact.HasNum {
+			return fact.Number, true, compactWitnesses(fact.Witness)
+		}
+		return 0, false, nil
+	default:
+		return 0, false, nil
 	}
 }
 
@@ -428,7 +468,7 @@ func validatePriorityRuntimeExpr(expr parser.V2Expr) error {
 		return validatePriorityRuntimeExpr(x.X)
 	case parser.V2BinaryExpr:
 		switch x.Op {
-		case "and", "or", "==", "!=":
+		case "and", "or", "==", "!=", ">=", "<=", ">", "<":
 		default:
 			return fmt.Errorf("unsupported binary operator %q", x.Op)
 		}
@@ -448,7 +488,9 @@ func isPriorityRuntimeRef(ref string) bool {
 		"context.holdsAsset",
 		"finding.exploitSignal",
 		"finding.nearMissControl",
-		"finding.confidence":
+		"finding.confidence",
+		"finding.bindingCount",
+		"finding.contextCount":
 		return true
 	default:
 		return false

@@ -133,6 +133,41 @@ func TestPriorityUsesAuthoredWhenExpressions(t *testing.T) {
 	}
 }
 
+func TestPriorityPolicyNumericComparisons(t *testing.T) {
+	when := parser.V2BinaryExpr{
+		Left:  parser.V2RefExpr{Name: "finding.bindingCount"},
+		Op:    ">=",
+		Right: parser.V2LiteralExpr{Value: 2},
+	}
+	if err := validatePriorityRuntimeExpr(when); err != nil {
+		t.Fatalf("validate numeric priority expression: %v", err)
+	}
+	m := model{
+		Severity: map[string]int{"default": 1, "high": 3},
+		Factors: map[string]priorityFactor{
+			"multiBinding": {Weight: 4, When: when},
+		},
+		FactorOrder: []string{"multiBinding"},
+		Bands: []struct {
+			Band string
+			Min  int
+		}{{Band: "P1", Min: 7}, {Band: "P4", Min: 0}},
+	}
+
+	twoBindings := mkFinding("high", "high", nil)
+	got := prioritizeWithModel(twoBindings, m)
+	if got.Total != 7 || !hasFactor(got, "multiBinding") || !strings.Contains(got.Render(), "bindings: 2") {
+		t.Fatalf("numeric bindingCount factor did not fire with witness: %+v\n%s", got, got.Render())
+	}
+
+	oneBinding := mkFinding("high", "high", nil)
+	oneBinding.Bindings = oneBinding.Bindings[:1]
+	got = prioritizeWithModel(oneBinding, m)
+	if got.Total != 3 || hasFactor(got, "multiBinding") {
+		t.Fatalf("numeric bindingCount factor fired unexpectedly: %+v", got)
+	}
+}
+
 // PrioritizeAll orders most-urgent first.
 func TestPrioritizeAllOrdering(t *testing.T) {
 	fs := []*findings.Finding{
