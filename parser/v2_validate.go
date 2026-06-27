@@ -35,7 +35,7 @@ var (
 	v2EmitKinds                = map[string]bool{"source": true, "sink": true, "check": true, "issue": true, "fact": true}
 	v2FactEmitKinds            = map[string]bool{"fact": true, "asset": true, "exposure": true, "principal": true, "privilege": true, "state": true, "observation": true}
 	v2PropagateKinds           = map[string]bool{"value": true, "taint": true, "identity": true, "receiver": true}
-	v2ProductionPropagateKinds = map[string]bool{"value": true, "taint": true}
+	v2ProductionPropagateKinds = map[string]bool{"value": true, "taint": true, "identity": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
 	v2CoverageSolversByMode    = map[string][]string{
 		"path":          {"solver.pathCovered"},

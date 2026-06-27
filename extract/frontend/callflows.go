@@ -75,6 +75,7 @@ func loadCallFlowProfiles() {
 					DestArg:      mp.FlowDestArg,
 					SourceArg:    mp.FlowSourceArg,
 					SourceResult: mp.FlowSourceResult,
+					Identity:     mp.FlowIdentity,
 				},
 			})
 		}

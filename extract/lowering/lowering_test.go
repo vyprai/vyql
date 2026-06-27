@@ -519,6 +519,63 @@ func findNodeID(t *testing.T, g usg.Store, typ string, props ...string) string {
 	return ""
 }
 
+func TestCallEffectIdentityAliasesOutParam(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:   "handler",
+				Params: []string{"payload", "stale"},
+				Loc:    "app.py:1",
+				Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"out"}, Value: nir.Name{ID: "stale", Loc: "app.py:2"}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "alias", Loc: "app.py:3"},
+						Path:   "alias",
+						Method: "alias",
+						Loc:    "app.py:3",
+						Args: []nir.Expr{
+							nir.Name{ID: "payload", Loc: "app.py:3"},
+							nir.Name{ID: "out", Loc: "app.py:3"},
+						},
+						Effects: []nir.CallEffect{{SourceArg: 0, DestArg: 1, Identity: true}},
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "app.py:4"},
+						Path:   "sink",
+						Method: "sink",
+						Loc:    "app.py:4",
+						Args:   []nir.Expr{nir.Name{ID: "out", Loc: "app.py:4"}},
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	payload := findNodeID(t, g, "code.Param", "name", "payload")
+	stale := findNodeID(t, g, "code.Param", "name", "stale")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:4")
+	reachable, err := usg.BFS(g, payload, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("identity call effect did not route payload to out-param sink")
+	}
+	reachable, err = usg.BFS(g, stale, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[sinkArg] {
+		t.Fatalf("identity call effect behaved like a join; stale value reached out-param sink")
+	}
+}
+
 func TestLowerMaterializesImportNodes(t *testing.T) {
 	g, err := Lower(nir.Program{Modules: []nir.Module{{
 		Key:  "app",

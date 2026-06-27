@@ -391,11 +391,6 @@ func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
 			want: `unknown propagate kind "alias"`,
 		},
 		{
-			name: "propagate identity not implemented",
-			body: `propagate identity from args[0] to args[1]`,
-			want: `propagate kind "identity" is not implemented in production v2`,
-		},
-		{
 			name: "propagate receiver not implemented",
 			body: `propagate receiver from args[0] to args[1]`,
 			want: `propagate kind "receiver" is not implemented in production v2`,

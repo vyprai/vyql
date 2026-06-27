@@ -2910,6 +2910,11 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result strin
 		if effect.SourceArg < 0 || effect.SourceArg >= len(argVals) {
 			continue
 		}
+		if effect.Identity {
+			sc.node[dest] = argVals[effect.SourceArg]
+			delete(sc.cnst, dest)
+			continue
+		}
 		n := l.node("Concat", call.Loc, nil)
 		if cur := sc.node[dest]; cur != "" {
 			l.flow(cur, n)
