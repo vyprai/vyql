@@ -19,8 +19,17 @@ func cmdDefinitions(args []string) error {
 	if len(args) > 0 && args[0] == "check-v2" {
 		return cmdDefinitionsCheckV2(args[1:])
 	}
+	if len(args) > 0 && args[0] == "validate" {
+		return cmdDefinitionsValidate(args[1:])
+	}
 	if len(args) > 0 && args[0] == "lint" {
 		return cmdDefinitionsLint(args[1:])
+	}
+	if len(args) > 0 && args[0] == "search" {
+		return cmdDefinitionsSearch(args[1:])
+	}
+	if len(args) > 0 && args[0] == "refs" {
+		return cmdDefinitionsRefs(args[1:])
 	}
 	if len(args) > 0 && args[0] == "show-policy" {
 		return cmdDefinitionsShowPolicy(args[1:])
@@ -80,6 +89,83 @@ type v2MechanicView struct {
 type v2BlockItemView struct {
 	Key   string `json:"key"`
 	Value string `json:"value,omitempty"`
+}
+
+type v2RefView struct {
+	Target string `json:"target"`
+	Source string `json:"source"`
+	Module string `json:"module,omitempty"`
+	Kind   string `json:"kind"`
+	Name   string `json:"name"`
+	Field  string `json:"field,omitempty"`
+	Value  string `json:"value,omitempty"`
+}
+
+func cmdDefinitionsSearch(args []string) error {
+	fs := flag.NewFlagSet("definitions search", flag.ExitOnError)
+	kind := fs.String("kind", "all", "definition kind: all | concepts | rules | adapters | reviews | packs")
+	lang := fs.String("lang", "", "adapter language filter, e.g. python, javascript, go")
+	max := fs.Int("max", 80, "maximum rows per section")
+	format := fs.String("format", "text", "output format: text | json")
+	_ = fs.Parse(args)
+	query := strings.Join(fs.Args(), " ")
+	if strings.TrimSpace(query) == "" {
+		return fmt.Errorf("definitions search requires query text")
+	}
+	cat, err := definitions.Inspect(definitions.InspectOptions{
+		Kind:     *kind,
+		Language: *lang,
+		Query:    query,
+		Max:      *max,
+	})
+	if err != nil {
+		return err
+	}
+	switch *format {
+	case "json":
+		b, err := json.MarshalIndent(cat, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+	case "text":
+		printDefinitions(cat)
+	default:
+		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+	}
+	return nil
+}
+
+func cmdDefinitionsRefs(args []string) error {
+	fs := flag.NewFlagSet("definitions refs", flag.ExitOnError)
+	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to inspect")
+	format := fs.String("format", "text", "output format: text | json")
+	_ = fs.Parse(args)
+	if fs.NArg() != 1 {
+		return fmt.Errorf("definitions refs requires <definition-or-concept>, e.g. core.SqlParameterization")
+	}
+	target := strings.TrimSpace(fs.Arg(0))
+	files, err := vyqlFilesUnder(*in)
+	if err != nil {
+		return err
+	}
+	refs, err := collectV2Refs(files, target)
+	if err != nil {
+		return err
+	}
+	switch *format {
+	case "json":
+		b, err := json.MarshalIndent(refs, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+	case "text":
+		printV2Refs(target, refs)
+	default:
+		return fmt.Errorf("unknown -format %q (use text or json)", *format)
+	}
+	return nil
 }
 
 func cmdDefinitionsShowPolicy(args []string) error {
@@ -359,6 +445,229 @@ func printV2MechanicView(mechanic v2MechanicView) {
 	}
 }
 
+func collectV2Refs(files []string, target string) ([]v2RefView, error) {
+	var refs []v2RefView
+	for _, path := range files {
+		prog, err := parseV2File(path)
+		if err != nil {
+			return nil, err
+		}
+		source := relPathFromDataRoot(path)
+		for _, use := range prog.Uses {
+			if v2RefMatches(target, use.Name) || v2RefMatches(target, use.Alias) {
+				refs = append(refs, v2RefView{Target: target, Source: source, Module: prog.Module, Kind: "uses", Name: use.Name, Field: "uses", Value: use.Alias})
+			}
+		}
+		for _, decl := range prog.Decls {
+			refs = append(refs, collectV2DeclRefs(source, prog.Module, target, decl)...)
+		}
+	}
+	sort.Slice(refs, func(i, j int) bool {
+		a, b := refs[i], refs[j]
+		return strings.Join([]string{a.Source, a.Module, a.Kind, a.Name, a.Field, a.Value}, "\x00") <
+			strings.Join([]string{b.Source, b.Module, b.Kind, b.Name, b.Field, b.Value}, "\x00")
+	})
+	return refs, nil
+}
+
+func collectV2DeclRefs(source, module, target string, decl parser.V2Decl) []v2RefView {
+	addValueRefs := func(kind, name, field string, value any) []v2RefView {
+		var refs []v2RefView
+		collectV2ValueRefs(target, field, value, func(f, v string) {
+			refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: kind, Name: name, Field: f, Value: v})
+		})
+		return refs
+	}
+	switch x := decl.(type) {
+	case *parser.V2ConceptDecl:
+		return addValueRefs("concept", x.Name, "fields", x.Fields)
+	case *parser.V2ThreatDecl:
+		return addValueRefs("threat", x.Name, "fields", x.Fields)
+	case *parser.V2PatternDecl:
+		var refs []v2RefView
+		for _, item := range x.Items {
+			if v2RefMatches(target, item.Name) {
+				refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: "pattern", Name: x.Name, Field: item.Kind, Value: item.Name})
+			}
+			refs = append(refs, addValueRefs("pattern", x.Name, item.Kind, item.Expr)...)
+			refs = append(refs, addValueRefs("pattern", x.Name, item.Kind+".meta", item.Meta)...)
+		}
+		return refs
+	case *parser.V2MatcherDecl:
+		var refs []v2RefView
+		for _, item := range x.Items {
+			refs = append(refs, addValueRefs("matcher", x.Name, item.Kind, item.Values)...)
+		}
+		return refs
+	case *parser.V2BindingDecl:
+		var refs []v2RefView
+		for _, req := range x.Requirements {
+			refs = append(refs, addValueRefs("binding", x.Name, "requires."+req.Name, req.Args)...)
+		}
+		refs = append(refs, collectV2QueryRefs(source, module, "binding", x.Name, target, x.Query.Expr)...)
+		refs = append(refs, addValueRefs("binding", x.Name, "query.pattern", x.Query.Pattern)...)
+		refs = append(refs, addValueRefs("binding", x.Name, "query.where", x.Query.Where)...)
+		for _, out := range x.Outputs {
+			refs = append(refs, addValueRefs("binding", x.Name, out.Kind+".concept", out.Concept)...)
+			refs = append(refs, addValueRefs("binding", x.Name, out.Kind+".about", out.About)...)
+			for _, cov := range out.Covers {
+				refs = append(refs, addValueRefs("binding", x.Name, out.Kind+".covers."+cov.Mode, cov.Items)...)
+			}
+		}
+		return refs
+	case *parser.V2RuleDecl:
+		var refs []v2RefView
+		refs = append(refs, addValueRefs("rule", x.Name, "meta", x.Meta)...)
+		refs = append(refs, addValueRefs("rule", x.Name, "body.from", x.Body.From.Concept)...)
+		refs = append(refs, addValueRefs("rule", x.Name, "body.to", x.Body.To.Concept)...)
+		refs = append(refs, addValueRefs("rule", x.Name, "body.issue", x.Body.Issue.Concept)...)
+		refs = append(refs, collectV2QueryRefs(source, module, "rule", x.Name, target, x.Body.Query)...)
+		for _, cl := range x.Clauses {
+			refs = append(refs, addValueRefs("rule", x.Name, cl.Kind+".concept", cl.Concept)...)
+			refs = append(refs, addValueRefs("rule", x.Name, cl.Kind+".expr", cl.Expr)...)
+			refs = append(refs, addValueRefs("rule", x.Name, cl.Kind+".value", cl.Value)...)
+		}
+		return refs
+	case *parser.V2ReviewDecl:
+		refs := addValueRefs("review", x.Concept, "concept", x.Concept)
+		return append(refs, addValueRefs("review", x.Concept, "fields", x.Fields)...)
+	case *parser.V2ProfileDecl:
+		return addValueRefs("profile", x.Name, "fields", x.Fields)
+	case *parser.V2PackDecl:
+		return addValueRefs("pack", x.Name, "fields", x.Fields)
+	case *parser.V2MechanicDecl:
+		return addValueRefs("mechanic", x.Kind+"."+x.Name, "items", x.Items)
+	case *parser.V2PolicyDecl:
+		return addValueRefs("policy", x.Kind+"."+x.Name, "items", x.Items)
+	default:
+		return nil
+	}
+}
+
+func collectV2QueryRefs(source, module, kind, name, target string, q *parser.V2QueryExpr) []v2RefView {
+	if q == nil {
+		return nil
+	}
+	var refs []v2RefView
+	if v2RefMatches(target, q.Family) {
+		refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: kind, Name: name, Field: "query.family", Value: q.Family})
+	}
+	collectV2ValueRefs(target, "query.where", q.Where, func(field, value string) {
+		refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: kind, Name: name, Field: field, Value: value})
+	})
+	for _, step := range q.Steps {
+		if v2RefMatches(target, step.Family) {
+			refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: kind, Name: name, Field: "query." + step.Relation, Value: step.Family})
+		}
+		collectV2ValueRefs(target, "query."+step.Relation+".where", step.Where, func(field, value string) {
+			refs = append(refs, v2RefView{Target: target, Source: source, Module: module, Kind: kind, Name: name, Field: field, Value: value})
+		})
+	}
+	return refs
+}
+
+func collectV2ValueRefs(target, field string, value any, add func(field, value string)) {
+	switch v := value.(type) {
+	case nil:
+	case string:
+		if v2RefMatches(target, v) {
+			add(field, v)
+		}
+	case []string:
+		for _, item := range v {
+			collectV2ValueRefs(target, field, item, add)
+		}
+	case []any:
+		for _, item := range v {
+			collectV2ValueRefs(target, field, item, add)
+		}
+	case map[string]any:
+		keys := make([]string, 0, len(v))
+		for key := range v {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			collectV2ValueRefs(target, field+"."+key, v[key], add)
+		}
+	case parser.V2Requirement:
+		for _, arg := range v.Args {
+			collectV2ValueRefs(target, field+"."+v.Name, arg, add)
+		}
+	case parser.V2NamedArg:
+		collectV2ValueRefs(target, field+"."+v.Name, v.Value, add)
+	case parser.V2BlockItem:
+		itemField := field
+		if len(v.Key) > 0 {
+			itemField += "." + strings.Join(v.Key, ".")
+		}
+		collectV2ValueRefs(target, itemField, v.Value, add)
+		for _, child := range v.Block {
+			collectV2ValueRefs(target, itemField, child, add)
+		}
+		for _, child := range v.Items {
+			collectV2ValueRefs(target, itemField, child, add)
+		}
+	case []parser.V2BlockItem:
+		for _, item := range v {
+			collectV2ValueRefs(target, field, item, add)
+		}
+	case parser.V2RefExpr:
+		collectV2ValueRefs(target, field, v.Name, add)
+	case parser.V2LiteralExpr:
+		collectV2ValueRefs(target, field, v.Value, add)
+	case parser.V2UnaryExpr:
+		collectV2ValueRefs(target, field, v.X, add)
+	case parser.V2BinaryExpr:
+		collectV2ValueRefs(target, field, v.Left, add)
+		collectV2ValueRefs(target, field, v.Right, add)
+	case parser.V2CallExpr:
+		if v2RefMatches(target, v.Name) {
+			add(field, v.Name)
+		}
+		for _, arg := range v.Args {
+			collectV2ValueRefs(target, field+"."+v.Name, arg, add)
+		}
+		for _, arg := range v.NamedArgs {
+			collectV2ValueRefs(target, field+"."+v.Name+"."+arg.Name, arg.Expr, add)
+		}
+	case parser.V2SequenceExpr:
+		for _, item := range v.Items {
+			collectV2ValueRefs(target, field, item, add)
+		}
+	}
+}
+
+func v2RefMatches(target, value string) bool {
+	target = strings.TrimSpace(target)
+	value = strings.TrimSpace(value)
+	if target == "" || value == "" {
+		return false
+	}
+	return value == target || lastSeg(value) == target || lastSeg(target) == value
+}
+
+func lastSeg(value string) string {
+	if i := strings.LastIndex(value, "."); i >= 0 {
+		return value[i+1:]
+	}
+	return value
+}
+
+func printV2Refs(target string, refs []v2RefView) {
+	fmt.Printf("refs %s: %d\n", target, len(refs))
+	for _, ref := range refs {
+		parts := []string{ref.Kind, ref.Name}
+		if ref.Field != "" {
+			parts = append(parts, ref.Field)
+		}
+		if ref.Value != "" {
+			parts = append(parts, "="+ref.Value)
+		}
+		fmt.Printf("  %s  (%s)\n", strings.Join(parts, " "), ref.Source)
+	}
+}
+
 type v2UnstableUse struct {
 	Source string
 	Module string
@@ -507,6 +816,22 @@ func cmdDefinitionsCheckV2(args []string) error {
 		return err
 	}
 	fmt.Printf("checked %d v2 definition file(s) under %s\n", checked, *in)
+	return nil
+}
+
+func cmdDefinitionsValidate(args []string) error {
+	fs := flag.NewFlagSet("definitions validate", flag.ExitOnError)
+	in := fs.String("in", datadirRoot(), "v2 .vyql file or directory to verify")
+	_ = fs.Parse(args)
+	files, err := vyqlFilesUnder(*in)
+	if err != nil {
+		return err
+	}
+	checked, err := checkV2DefinitionFiles(files)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("validated %d v2 definition file(s) under %s\n", checked, *in)
 	return nil
 }
 
