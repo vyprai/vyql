@@ -2024,7 +2024,7 @@ func lowerV2ReceiverConstraint(cmp V2BinaryExpr) (string, bool) {
 }
 
 func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
-	if action.Kind != "propagate value" {
+	if action.Kind != "propagate value" && action.Kind != "propagate taint" {
 		return BindingAction{}, fmt.Errorf("binding %s: unsupported propagation kind %q", binding, action.Kind)
 	}
 	kind := "flow_path"

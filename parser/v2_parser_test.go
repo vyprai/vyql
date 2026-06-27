@@ -391,11 +391,6 @@ func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
 			want: `unknown propagate kind "alias"`,
 		},
 		{
-			name: "propagate taint not implemented",
-			body: `propagate taint from args[0] to args[1]`,
-			want: `propagate kind "taint" is not implemented in production v2`,
-		},
-		{
 			name: "propagate identity not implemented",
 			body: `propagate identity from args[0] to args[1]`,
 			want: `propagate kind "identity" is not implemented in production v2`,

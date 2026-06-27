@@ -945,7 +945,7 @@ binding cartesian {
 	}
 }
 
-func TestV2PropagateValueLowering(t *testing.T) {
+func TestV2PropagateValueAndTaintLowering(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.c.migration;
 binding decodeOutParam {
@@ -956,12 +956,16 @@ binding parseResult {
   query pattern callExpr where callee.path ~= "parse"
   propagate value from call.result to args[0].pointee
 }
+binding copyTaint {
+  query pattern callExpr where callee.method == "copy"
+  propagate taint from args[0] to args[1].pointee
+}
 `)
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	adapter := decls[0].(*BindingSet)
-	if adapter.Name != "c" || len(adapter.Mappings) != 2 {
+	if adapter.Name != "c" || len(adapter.Mappings) != 3 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	if got := adapter.Mappings[0]; got.Kind != "flow_method" || got.Pattern != "decode" || got.FlowSourceArg != 0 || got.FlowSourceResult || got.FlowDestArg != 1 {
@@ -970,11 +974,15 @@ binding parseResult {
 	if got := adapter.Mappings[1]; got.Kind != "flow_path" || got.Pattern != "parse" || !got.FlowSourceResult || got.FlowSourceArg != -1 || got.FlowDestArg != 0 {
 		t.Fatalf("result-to-out-param propagation wrong: %+v", got)
 	}
+	if got := adapter.Mappings[2]; got.Kind != "flow_method" || got.Pattern != "copy" || got.FlowSourceArg != 0 || got.FlowSourceResult || got.FlowDestArg != 1 {
+		t.Fatalf("taint propagation wrong: %+v", got)
+	}
 }
 
 func TestV2PropagateValueRejectsUnsupportedShape(t *testing.T) {
 	cases := []string{
-		`propagate taint from args[0] to args[1].pointee`,
+		`propagate identity from args[0] to args[1].pointee`,
+		`propagate receiver from args[0] to args[1].pointee`,
 		`propagate value from args[0].field to args[1].pointee`,
 		`propagate value from args[0] to call.result`,
 	}
