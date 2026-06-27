@@ -1032,8 +1032,11 @@ func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 	src := string(data)
 	forbidden := []string{
 		"unstable.legacyFlag",
+		"legacyFlagBridgeEntries",
+		"adapterMetadataBridgeEntries",
 		"unstable adapter metadata",
 		"adapter metadata bridge",
+		"legacy flag bridge",
 		"v1 flag converted",
 		"v1 adapter metadata converted",
 	}
