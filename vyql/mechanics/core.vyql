@@ -174,3 +174,10 @@ policy priority default {
     { band: "P4", min: 0 }
   ]
 }
+
+policy display default {
+  scanAll: [findings, flags, checks, advisoryEvidence, requirementDiagnostics]
+  flagSort: [severity, category, location, concept]
+  includeNearbyChecks: true
+  nearbyCheckLimit: 5
+}
