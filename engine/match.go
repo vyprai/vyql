@@ -41,6 +41,9 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 
 	var out []*findings.Finding
 	for _, node := range candidates {
+		if !e.matchRelationSatisfied(body, node) {
+			continue
+		}
 		env := map[string]string{body.Binding: node}
 		ctx := []string{}
 		if where != nil {
@@ -95,6 +98,27 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		})
 	}
 	return out, nil
+}
+
+func (e *Engine) matchRelationSatisfied(body *parser.MatchStmt, node string) bool {
+	switch body.Relation {
+	case "":
+		return true
+	case "labeledAs":
+		return body.RelatedConcept != "" && e.nodeHasConcept(node, body.RelatedConcept)
+	case "references":
+		if body.RelatedConcept == "" || body.RelationProp == "" {
+			return false
+		}
+		n, ok, _ := e.Store.GetNode(node)
+		if !ok {
+			return false
+		}
+		target := n.Prop(body.RelationProp)
+		return target != "" && e.nodeHasConcept(target, body.RelatedConcept)
+	default:
+		return false
+	}
 }
 
 // evalTransition evaluates `match transition F -> T on M as t unless <expr>`.
@@ -167,9 +191,6 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 			req[k] = true
 		}
 		return id != "" && intersect(e.assetKinds(id), req), nil
-	case parser.Has:
-		id := e.resolveRef(a.Ref, env)
-		return id != "" && e.nodeHasConcept(id, a.Concept), nil
 	case parser.Is:
 		return e.resolveScalar(a.Ref, env) == a.Concept, nil
 	case parser.NotIn:

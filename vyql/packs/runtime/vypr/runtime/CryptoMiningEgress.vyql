@@ -5,6 +5,7 @@ rule CryptoMiningEgress {
     id: "VYQL-RTM-001"
     severity: high
   }
-  fact runtime.Connection as c
-  where has(c.dst, threat.MiningPool)
+  query concept as c where c.concept == runtime.Connection
+    references concept as dst where dst.concept == threat.MiningPool and dst.id == c.dst
+    select c
 }

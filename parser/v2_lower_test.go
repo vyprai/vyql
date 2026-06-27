@@ -464,7 +464,7 @@ uses core.SqlParameterization as Guard;
 rule SqlInjectionAlias {
   taint Input as input -> Exec as sink
   unless sink.endpoint coveredBy Guard
-  where has(sink, Guard) and sink is Exec
+  where sink is Exec
 }
 `)
 	var adapter *BindingSet
@@ -490,15 +490,21 @@ rule SqlInjectionAlias {
 	if gb, ok := rule.Clauses[0].Unless.(EndpointCoveredBy); !ok || gb.Concept != "core.SqlParameterization" {
 		t.Fatalf("alias in coveredBy did not lower: %+v", rule.Clauses[0])
 	}
-	where, ok := rule.Clauses[1].Where.(And)
-	if !ok || len(where.Parts) != 2 {
-		t.Fatalf("where did not lower to two-part conjunction: %+v", rule.Clauses[1])
+	if is, ok := rule.Clauses[1].Where.(Is); !ok || is.Concept != "code.SqlExecution" {
+		t.Fatalf("alias in is did not lower: %+v", rule.Clauses[1].Where)
 	}
-	if has, ok := where.Parts[0].(Has); !ok || has.Concept != "core.SqlParameterization" {
-		t.Fatalf("alias in has() did not lower: %+v", where.Parts[0])
-	}
-	if is, ok := where.Parts[1].(Is); !ok || is.Concept != "code.SqlExecution" {
-		t.Fatalf("alias in is did not lower: %+v", where.Parts[1])
+}
+
+func TestV2LoweringRejectsLegacyHasWhereCall(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module rules.legacy;
+rule LegacyHas {
+  issue runtime.Connection as c
+  where has(c.dst, threat.MiningPool)
+}
+`)
+	if err == nil || !strings.Contains(err.Error(), `unsupported call "has"`) {
+		t.Fatalf("ParseV2Definitions error = %v, want unsupported has diagnostic", err)
 	}
 }
 
@@ -1547,8 +1553,9 @@ rule PublicSensitiveDatabase {
   where holdsAssetKind(cloud.Database, [data.Pii])
 }
 rule CryptoMiningEgress {
-  issue runtime.Connection as c
-  where has(c.dst, threat.MiningPool)
+  query concept as c where c.concept == runtime.Connection
+    references concept as dst where dst.concept == threat.MiningPool and dst.id == c.dst
+    select c
 }
 rule WorkloadDrift {
   issue runtime.Process as p
@@ -1574,9 +1581,9 @@ rule Confidence {
 	if got, ok := asset.Clauses[0].Where.(HoldsAssetKind); !ok || got.Ref.String() != "cloud.Database" || len(got.Kinds) != 1 || got.Kinds[0] != "data.Pii" {
 		t.Fatalf("asset where = %#v, want HoldsAssetKind", asset.Clauses[0].Where)
 	}
-	irRule := decls[2].(*Rule)
-	if got, ok := irRule.Clauses[0].Where.(Has); !ok || got.Ref.String() != "c.dst" || got.Concept != "threat.MiningPool" {
-		t.Fatalf("scanner IR where = %#v, want Has", irRule.Clauses[0].Where)
+	irRule := decls[2].(*Rule).Body.(*MatchStmt)
+	if irRule.TargetKind != "concept" || irRule.Concept != "runtime.Connection" || irRule.Binding != "c" || irRule.Relation != "references" || irRule.RelationProp != "dst" || irRule.RelatedConcept != "threat.MiningPool" {
+		t.Fatalf("semantic reference query lowering wrong: %+v", irRule)
 	}
 	drift := decls[3].(*Rule)
 	if got, ok := drift.Clauses[0].Where.(NotIn); !ok || got.Ref.String() != "p.image" || !got.Negate || len(got.Values) != 3 {
@@ -1672,6 +1679,18 @@ rule LateralReachToSecretStore {
 rule InvalidRefundTransition {
   query state as t where t.machine == Order and t.from == "*" and t.to == Refunded select t
 }
+
+rule ReachableVulnerableDependency {
+  query concept as p where p.concept == sbom.VulnerableDependency
+    labeledAs concept as reachable where reachable.concept == sbom.ReachableSymbol
+    select p
+}
+
+rule CryptoMiningEgress {
+  query concept as c where c.concept == runtime.Connection
+    references concept as dst where dst.concept == threat.MiningPool and dst.id == c.dst
+    select c
+}
 `)
 	order := decls[0].(*Rule).Body.(*OrderStmt)
 	if order.First.Concept != "code.FileCheck" || order.First.Binding != "first" || order.Second.Concept != "code.FileUse" || order.Second.Binding != "second" {
@@ -1684,6 +1703,14 @@ rule InvalidRefundTransition {
 	transition := decls[2].(*Rule).Body.(*MatchStmt)
 	if transition.TargetKind != "transition" || transition.Binding != "t" || transition.Machine != "Order" || transition.FromState != "*" || transition.ToState != "Refunded" {
 		t.Fatalf("transition lowering wrong: %+v", transition)
+	}
+	labeled := decls[3].(*Rule).Body.(*MatchStmt)
+	if labeled.TargetKind != "concept" || labeled.Concept != "sbom.VulnerableDependency" || labeled.Binding != "p" || labeled.Relation != "labeledAs" || labeled.RelatedConcept != "sbom.ReachableSymbol" {
+		t.Fatalf("labeledAs lowering wrong: %+v", labeled)
+	}
+	reference := decls[4].(*Rule).Body.(*MatchStmt)
+	if reference.TargetKind != "concept" || reference.Concept != "runtime.Connection" || reference.Binding != "c" || reference.Relation != "references" || reference.RelationProp != "dst" || reference.RelatedConcept != "threat.MiningPool" {
+		t.Fatalf("references lowering wrong: %+v", reference)
 	}
 }
 

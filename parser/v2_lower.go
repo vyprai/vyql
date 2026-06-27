@@ -2100,6 +2100,9 @@ func lowerV2RuleQuery(body V2RuleBody, names v2NameResolver) (Stmt, error) {
 	if transition, ok := lowerV2TransitionQuery(*body.Query, body.Select); ok {
 		return transition, nil
 	}
+	if labeled, ok := lowerV2SemanticLabelQuery(*body.Query, body.Select, names); ok {
+		return labeled, nil
+	}
 	return nil, fmt.Errorf("unsupported semantic query shape")
 }
 
@@ -2152,6 +2155,90 @@ func lowerV2TransitionQuery(q V2QueryExpr, selectAlias string) (*MatchStmt, bool
 		FromState:  from,
 		ToState:    to,
 	}, true
+}
+
+func lowerV2SemanticLabelQuery(q V2QueryExpr, selectAlias string, names v2NameResolver) (*MatchStmt, bool) {
+	if !v2SemanticConceptFamily(q.Family) || q.Alias == "" || len(q.Steps) != 1 || selectAlias != q.Alias {
+		return nil, false
+	}
+	step := q.Steps[0]
+	if !v2SemanticConceptFamily(step.Family) || step.Alias == "" {
+		return nil, false
+	}
+	if step.Relation != "labeledAs" && step.Relation != "references" {
+		return nil, false
+	}
+	baseConcept, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
+	if !ok {
+		return nil, false
+	}
+	relatedConcept, ok := v2QueryWhereFieldEquals(step.Where, step.Alias, "concept")
+	if !ok {
+		return nil, false
+	}
+	out := &MatchStmt{
+		TargetKind:     "concept",
+		Concept:        names.concept(baseConcept),
+		Binding:        q.Alias,
+		Relation:       step.Relation,
+		RelatedConcept: names.concept(relatedConcept),
+	}
+	if step.Relation == "references" {
+		prop, ok := v2QueryWhereIDEqualsBaseProp(step.Where, step.Alias, q.Alias)
+		if !ok {
+			return nil, false
+		}
+		out.RelationProp = prop
+	}
+	return out, true
+}
+
+func v2QueryWhereIDEqualsBaseProp(expr V2Expr, stepAlias, baseAlias string) (string, bool) {
+	var out string
+	var visit func(V2Expr)
+	visit = func(e V2Expr) {
+		if out != "" {
+			return
+		}
+		x, ok := e.(V2BinaryExpr)
+		if !ok {
+			return
+		}
+		if x.Op == "and" {
+			visit(x.Left)
+			visit(x.Right)
+			return
+		}
+		if x.Op != "==" {
+			return
+		}
+		if prop, ok := v2IDBasePropJoin(x.Left, x.Right, stepAlias, baseAlias); ok {
+			out = prop
+			return
+		}
+		if prop, ok := v2IDBasePropJoin(x.Right, x.Left, stepAlias, baseAlias); ok {
+			out = prop
+		}
+	}
+	visit(expr)
+	return out, out != ""
+}
+
+func v2IDBasePropJoin(left, right V2Expr, stepAlias, baseAlias string) (string, bool) {
+	lref, lok := left.(V2RefExpr)
+	rref, rok := right.(V2RefExpr)
+	if !lok || !rok || lref.Name != stepAlias+".id" {
+		return "", false
+	}
+	prefix := baseAlias + "."
+	if !strings.HasPrefix(rref.Name, prefix) {
+		return "", false
+	}
+	prop := strings.TrimPrefix(rref.Name, prefix)
+	if prop == "" || prop == "id" || strings.Contains(prop, ".") {
+		return "", false
+	}
+	return prop, true
 }
 
 func v2QueryWhereFieldEquals(expr V2Expr, alias, field string) (string, bool) {
@@ -2282,19 +2369,6 @@ func lowerV2RuleWhereCall(x V2CallExpr, names v2NameResolver) (Expr, error) {
 		return nil, fmt.Errorf("named call args are not supported")
 	}
 	switch x.Name {
-	case "has":
-		if len(x.Args) != 2 {
-			return nil, fmt.Errorf("has requires two args")
-		}
-		ref, ok := v2RuleWhereRef(x.Args[0])
-		if !ok {
-			return nil, fmt.Errorf("has first arg must be a field reference")
-		}
-		concept, ok := v2RuleWhereRefString(x.Args[1])
-		if !ok {
-			return nil, fmt.Errorf("has second arg must be a concept reference")
-		}
-		return Has{Ref: ref, Concept: names.concept(concept)}, nil
 	case "holdsAssetKind":
 		if len(x.Args) != 2 {
 			return nil, fmt.Errorf("holdsAssetKind requires two args")

@@ -222,6 +222,11 @@ func compileOne(r *parser.Rule, onto *ontology.Ontology, ruleVerbs ruleVerbMecha
 			if err := requireConcept(onto, body.Concept, "match target of "+r.QualifiedName()); err != nil {
 				return nil, err
 			}
+			if body.RelatedConcept != "" {
+				if err := requireConcept(onto, body.RelatedConcept, "match related concept of "+r.QualifiedName()); err != nil {
+					return nil, err
+				}
+			}
 		}
 		for _, cl := range r.Clauses {
 			if cl.Kind != "unless" {

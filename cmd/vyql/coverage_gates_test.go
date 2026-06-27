@@ -243,6 +243,9 @@ func collectRuleConceptRefs(r *parser.Rule, refs map[string]bool) {
 		if body.Concept != "" {
 			addCoverageConceptRef(refs, body.Concept)
 		}
+		if body.RelatedConcept != "" {
+			addCoverageConceptRef(refs, body.RelatedConcept)
+		}
 	}
 	for _, cl := range r.Clauses {
 		collectExprConceptRefs(cl.Where, refs)
@@ -277,8 +280,6 @@ func collectExprConceptRefs(expr parser.Expr, refs map[string]bool) {
 		}
 	case parser.Not:
 		collectExprConceptRefs(e.Inner, refs)
-	case parser.Has:
-		addCoverageConceptRef(refs, e.Concept)
 	case parser.Is:
 		addCoverageConceptRef(refs, e.Concept)
 	case parser.SolverCall:

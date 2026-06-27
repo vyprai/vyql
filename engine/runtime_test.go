@@ -49,8 +49,9 @@ func TestRuntimeLinkToLabeledTarget(t *testing.T) {
 module test;
 rule LinkToLabeledTarget {
   meta { id: "TEST-RUNTIME-004", severity: high }
-  issue custom.Link as c
-  where has(c.dst, custom.Indicator)
+  query concept as c where c.concept == custom.Link
+    references concept as dst where dst.concept == custom.Indicator and dst.id == c.dst
+    select c
 }
 `
 	s := usg.NewInMemStore()

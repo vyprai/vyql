@@ -196,12 +196,15 @@ func (*OrderStmt) isStmt() {}
 
 // MatchStmt fires on an existing concept or transition fact.
 type MatchStmt struct {
-	TargetKind string // "concept" | "transition" (action concepts are "concept")
-	Concept    string
-	Binding    string
-	FromState  string // transition
-	ToState    string
-	Machine    string
+	TargetKind     string // "concept" | "transition" (action concepts are "concept")
+	Concept        string
+	Binding        string
+	Relation       string
+	RelationProp   string
+	RelatedConcept string
+	FromState      string // transition
+	ToState        string
+	Machine        string
 }
 
 func (*MatchStmt) isStmt() {}
@@ -277,11 +280,6 @@ type HoldsAssetKind struct {
 	Kinds []string
 }
 
-type Has struct {
-	Ref     Ref
-	Concept string
-}
-
 type Is struct {
 	Ref     Ref
 	Concept string
@@ -305,7 +303,6 @@ func (And) isExpr()            {}
 func (Not) isExpr()            {}
 func (SolverCall) isExpr()     {}
 func (HoldsAssetKind) isExpr() {}
-func (Has) isExpr()            {}
 func (Is) isExpr()             {}
 func (Cmp) isExpr()            {}
 func (NotIn) isExpr()          {}

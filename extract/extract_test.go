@@ -153,8 +153,9 @@ const scaGated = `
 module vypr.sca;
 rule ReachableVulnerableDependency {
   meta { id: "VYQL-SCA-002", severity: high }
-  issue sbom.VulnerableDependency as p
-  where has(p, sbom.ReachableSymbol)
+  query concept as p where p.concept == sbom.VulnerableDependency
+    labeledAs concept as reachable where reachable.concept == sbom.ReachableSymbol
+    select p
 }
 `
 const scaPlain = `
