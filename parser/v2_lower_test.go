@@ -1234,19 +1234,45 @@ binding routerUse {
 	}
 }
 
-func TestV2FactEmitRejectsUnsupportedLocations(t *testing.T) {
-	_, err := ParseV2Definitions(`
+func TestV2FactEmitLowersArgumentLocation(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
 module bindings.javascript.facts;
+concept RoutePath : fact {}
 binding routeArg {
   query pattern callExpr where callee.method == "get"
-  emit fact code.Route at args[0]
+  emit fact RoutePath at args[0]
 }
 `)
-	if err == nil {
-		t.Fatal("ParseV2Definitions succeeded, want unsupported fact location diagnostic")
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
 	}
-	if !strings.Contains(err.Error(), "emit fact currently lowers at call/node only") {
-		t.Fatalf("error = %v, want fact location diagnostic", err)
+	adapter := decls[1].(*BindingSet)
+	if len(adapter.Mappings) != 1 {
+		t.Fatalf("mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "fact_method_arg" || got.Pattern != "get" || got.Concept != "bindings.javascript.facts.RoutePath" || got.ArgIndex != 0 {
+		t.Fatalf("argument fact lowering wrong: %+v", got)
+	}
+}
+
+func TestV2FactEmitLowersArgsAnyLocation(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.facts;
+concept RoutePart : fact {}
+binding routeArgs {
+  query pattern callExpr where callee.path ~= "router.route"
+  emit fact RoutePart at args.any
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[1].(*BindingSet)
+	if len(adapter.Mappings) != 1 {
+		t.Fatalf("mappings = %d, want 1: %+v", len(adapter.Mappings), adapter)
+	}
+	if got := adapter.Mappings[0]; got.Kind != "fact_arg" || got.Pattern != "router.route" || got.Concept != "bindings.javascript.facts.RoutePart" || got.ArgIndex != -1 {
+		t.Fatalf("args.any fact lowering wrong: %+v", got)
 	}
 }
 

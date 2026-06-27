@@ -65,22 +65,27 @@ type sinkSpec struct {
 }
 
 type controlSpec struct {
-	Concept     string
-	NodeType    string
-	Pattern     string
-	ByMethod    bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
-	Receiver    bool     // label the call receiver node instead of the call result
-	Exact       bool     // exact path match instead of segment-prefix path matching
-	ValMatches  []string // `val "substr"` (AND — marks AND controls)
-	ValAbsents  []string // `nval "substr"` (AND — marks AND controls)
-	ArgCountSet bool
-	ArgCountMin int
-	ArgCountMax int
-	Packages    []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
-	Detail      map[string]string
-	Requirement *parser.BindingRequirement
-	Fidelity    string
-	Confidence  string
+	Concept         string
+	NodeType        string
+	Pattern         string
+	ByMethod        bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
+	Receiver        bool     // label the call receiver node instead of the call result
+	Exact           bool     // exact path match instead of segment-prefix path matching
+	ArgTarget       bool     // label call arguments instead of the matched call node
+	ArgIndex        int      // which argument position is targeted when ArgTarget is true; -1 means args.any
+	Collection      bool     // also label a Seq/collection-literal arg
+	CollectionFirst bool     // label a specific element of a Seq/collection arg when present
+	CollectionIndex int      // selected collection element index
+	ValMatches      []string // `val "substr"` (AND — marks AND controls)
+	ValAbsents      []string // `nval "substr"` (AND — marks AND controls)
+	ArgCountSet     bool
+	ArgCountMin     int
+	ArgCountMax     int
+	Packages        []string // derived from v2 dependency requirements; require matching import/SBOM package evidence
+	Detail          map[string]string
+	Requirement     *parser.BindingRequirement
+	Fidelity        string
+	Confidence      string
 }
 
 type flagPredicate struct {
@@ -1192,6 +1197,18 @@ func specFromBindingSet(d *parser.BindingSet) adapterSpec {
 		case "fact_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
 				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+		case "fact_arg":
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
+				ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
+				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
+				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+		case "fact_method_arg":
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
+				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: adapterMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "mark_method":
@@ -3398,6 +3415,7 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 			if crossLang {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
 			}
+			var collectionIdx collectionFlowIndex
 			for _, nodeType := range nodeTypes {
 				ids, _ := s.NodesOfType(nodeType)
 				for _, id := range ids {
@@ -3407,16 +3425,13 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 					}
 					path := n.Prop("callee_path")
 					method := n.Prop("method")
-					seenConcept := map[string]bool{}
+					seenMapping := map[string]bool{}
 					for _, mi := range markIdx.candidates(method, path) {
 						m := spec.Marks[mi]
 						if !nodeTypeAllowed(m.NodeType, n.Type) {
 							continue
 						}
 						if !effects[mi].Allowed {
-							continue
-						}
-						if seenConcept[m.Concept] {
 							continue
 						}
 						hit := m.ByMethod && method == m.Pattern ||
@@ -3438,14 +3453,68 @@ func (spec adapterSpec) markAdapter() adapters.Adapter {
 						if len(m.Packages) > 0 {
 							spec = 3 // package-specific mark supersedes native/general
 						}
-						out = append(out, adapters.Mapping{NodeID: id, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
-						seenConcept[m.Concept] = true
+						for _, target := range markTargets(s, &collectionIdx, n, m) {
+							key := m.Concept + "\x00" + target
+							if seenMapping[key] {
+								continue
+							}
+							out = append(out, adapters.Mapping{NodeID: target, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+							seenMapping[key] = true
+						}
 					}
 				}
 			}
 			return out
 		},
 	}
+}
+
+func markTargets(s usg.Store, idx *collectionFlowIndex, n usg.Node, m controlSpec) []string {
+	if !m.ArgTarget {
+		return []string{n.ID}
+	}
+	if n.Type != "code.Call" {
+		return nil
+	}
+	var out []string
+	addArgTarget := func(arg string) {
+		if arg == "" {
+			return
+		}
+		target := arg
+		foundCollectionTarget := false
+		if m.CollectionFirst {
+			if first := collectionElement(s, idx, arg, m.CollectionIndex); first != "" {
+				target = first
+				foundCollectionTarget = true
+			}
+		}
+		if a, ok, _ := s.GetNode(arg); ok {
+			vkind := a.Prop("vkind")
+			if m.Collection && !foundCollectionTarget && vkind != "Seq" &&
+				(!collectionArgKindAllowsFlow(vkind) || !collectionArgument(s, idx, arg)) {
+				return
+			}
+			if !m.Collection && !m.CollectionFirst && a.Prop("vkind") == "Seq" {
+				return
+			}
+		} else if m.Collection {
+			return
+		}
+		out = append(out, target)
+	}
+	if m.ArgIndex < 0 {
+		for ai := 0; ; ai++ {
+			arg := n.Prop("arg" + strconv.Itoa(ai))
+			if arg == "" {
+				break
+			}
+			addArgTarget(arg)
+		}
+		return out
+	}
+	addArgTarget(n.Prop("arg" + strconv.Itoa(m.ArgIndex)))
+	return out
 }
 
 func mergeMappingDetail(base, extra map[string]string) map[string]string {

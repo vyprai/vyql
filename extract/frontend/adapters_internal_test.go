@@ -2345,6 +2345,77 @@ binding expressRoute {
 	}
 }
 
+func TestV2FactEmitLabelsArgumentLocation(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.facts;
+concept RoutePath : fact {}
+binding expressRoute {
+  query pattern callExpr where callee.method == "get"
+  emit fact RoutePath at args[0]
+  fidelity: resolved
+  confidence: high
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "path", Type: "code.Literal", Props: map[string]string{
+		"loc": "app.js:7", "str_args": "/users", "tech": "javascript",
+	}})
+	store.AddNode(usg.Node{ID: "route", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "app.get", "method": "get", "arg0": "path", "tech": "javascript",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "path" || got[0].Concept != "bindings.javascript.facts.RoutePath" {
+		t.Fatalf("argument fact emit labeled wrong nodes: %+v", got)
+	}
+}
+
+func TestV2FactEmitLabelsAllArgumentLocations(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.facts;
+concept RoutePart : fact {}
+binding expressRoute {
+  query pattern callExpr where callee.method == "route"
+  emit fact RoutePart at args.any
+}
+`)
+	if err != nil {
+		t.Fatalf("parse v2 definitions: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, decls))
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "path", Type: "code.Literal", Props: map[string]string{
+		"loc": "app.js:7", "str_args": "/users", "tech": "javascript",
+	}})
+	store.AddNode(usg.Node{ID: "handler", Type: "code.Function", Props: map[string]string{
+		"loc": "app.js:7", "tech": "javascript",
+	}})
+	store.AddNode(usg.Node{ID: "route", Type: "code.Call", Props: map[string]string{
+		"loc": "app.js:7", "callee_path": "router.route", "method": "route", "arg0": "path", "arg1": "handler", "tech": "javascript",
+	}})
+
+	got := spec.markAdapter().Apply(store)
+	if len(got) != 2 {
+		t.Fatalf("argument fact emit labels = %+v, want two args", got)
+	}
+	seen := map[string]bool{}
+	for _, m := range got {
+		if m.Concept != "bindings.javascript.facts.RoutePart" {
+			t.Fatalf("unexpected concept in mapping: %+v", m)
+		}
+		seen[m.NodeID] = true
+	}
+	if !seen["path"] || !seen["handler"] {
+		t.Fatalf("argument fact emit targets = %+v, want path and handler", got)
+	}
+}
+
 func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",

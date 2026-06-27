@@ -872,10 +872,31 @@ func lowerV2FactEmit(binding string, shape v2CallShape, action V2BindingOutput, 
 	if action.About != "" {
 		return BindingAction{}, fmt.Errorf("binding %s: emit fact about metadata is only supported for call.result receiver-type facts", binding)
 	}
-	if action.Location != "call" && action.Location != "node" {
-		return BindingAction{}, fmt.Errorf("binding %s: emit fact currently lowers at call/node only", binding)
+	if action.Location == "call" || action.Location == "node" {
+		return shape.mapping(BindingAction{Kind: shape.factKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}), nil
 	}
-	return shape.mapping(BindingAction{Kind: shape.factKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req}), nil
+	loc, err := v2SinkLocationParts(action.Location)
+	if err != nil {
+		return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
+	}
+	kind := "fact_arg"
+	if shape.Field == "callee.method" {
+		kind = "fact_method_arg"
+	}
+	return shape.mapping(BindingAction{
+		Kind:            kind,
+		Pattern:         shape.Pattern,
+		Exact:           shape.Exact,
+		Concept:         action.Concept,
+		ArgIndex:        loc.ArgIndex,
+		ValMatches:      shape.ValMatches,
+		ValAbsents:      shape.ValAbsents,
+		Collection:      loc.Collection,
+		CollectionFirst: loc.CollectionFirst,
+		CollectionIndex: loc.CollectionIndex,
+		Packages:        pkgs,
+		Requirement:     req,
+	}), nil
 }
 
 func appendV2BindingAction(out []BindingAction, m BindingAction, attrs map[string]string) []BindingAction {
