@@ -6,6 +6,5 @@ concept ExternalEntryInput : source {
   sourceCondition: "a caller forwards attacker-controlled data into the public-API parameter {param}"
   sourceConditionCategory: "caller-controlled-input"
   sourceConfidence: medium
-  sourcePolicy: caller_conditional
   taint: [taint.UntrustedData]
 }

@@ -33,7 +33,6 @@ func ConceptFromDecl(d *parser.ConceptDecl) Concept {
 		ReviewEvidence:          str(d.Fields, "review_evidence"),
 		ReviewAssumption:        str(d.Fields, "review_assumption"),
 		ReviewConfidence:        str(d.Fields, "review_confidence"),
-		SourcePolicy:            str(d.Fields, "source_policy"),
 		SourceConditionCategory: str(d.Fields, "source_condition_category"),
 		SourceCondition:         str(d.Fields, "source_condition"),
 		SourceAssumption:        str(d.Fields, "source_assumption"),

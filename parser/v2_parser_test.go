@@ -1611,31 +1611,21 @@ concept PublicRouteObservation : observation {}
 	}
 }
 
-func TestValidateV2RejectsInvalidSourcePolicyMetadata(t *testing.T) {
+func TestValidateV2RejectsInvalidSourceReviewMetadata(t *testing.T) {
 	tests := []struct {
 		name string
 		src  string
 		want string
 	}{
 		{
-			name: "unknown source policy",
+			name: "authored source policy",
 			src: `
 module code;
 concept ExternalInput : source {
-  sourcePolicy: maybe
-}
-`,
-			want: `unknown sourcePolicy "maybe"`,
-		},
-		{
-			name: "source policy on non source",
-			src: `
-module code;
-concept ExternalSink : sink {
   sourcePolicy: caller_conditional
 }
 `,
-			want: `sourcePolicy is only valid on source concepts`,
+			want: `sourcePolicy is a Go-owned source review mechanic`,
 		},
 		{
 			name: "unknown source confidence",

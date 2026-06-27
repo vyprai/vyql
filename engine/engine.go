@@ -688,7 +688,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
 		review := e.reviewConditions(fl.SinkID, snkC)
-		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
+		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
 			param := ""
 			if n.ID != "" {

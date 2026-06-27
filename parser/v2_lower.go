@@ -565,8 +565,6 @@ func lowerV2FieldName(name string) string {
 		return "enabled_by"
 	case "confidenceFloor":
 		return "confidence_floor"
-	case "sourcePolicy":
-		return "source_policy"
 	case "sourceConditionCategory":
 		return "source_condition_category"
 	case "sourceCondition":

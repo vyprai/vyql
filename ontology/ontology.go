@@ -36,7 +36,6 @@ type Concept struct {
 	ReviewEvidence          string   `json:"review_evidence,omitempty"`
 	ReviewAssumption        string   `json:"review_assumption,omitempty"`
 	ReviewConfidence        string   `json:"review_confidence,omitempty"`
-	SourcePolicy            string   `json:"source_policy,omitempty"` // source review policy: direct|caller_conditional
 	SourceConditionCategory string   `json:"source_condition_category,omitempty"`
 	SourceCondition         string   `json:"source_condition,omitempty"`
 	SourceAssumption        string   `json:"source_assumption,omitempty"`

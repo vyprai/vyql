@@ -46,7 +46,6 @@ var (
 	v2FidelityLevels           = map[string]bool{"syntactic": true, "resolved": true, "semantic": true}
 	v2ConfidenceLevels         = map[string]bool{"low": true, "medium": true, "high": true}
 	v2ReviewConfidenceLevels   = map[string]bool{"low": true, "medium": true, "high": true, "possibility": true}
-	v2SourcePolicies           = map[string]bool{"direct": true, "caller_conditional": true}
 	v2CoverageSolversByMode    = map[string][]string{
 		"path":          {"solver.pathCovered"},
 		"endpoint":      {"solver.sameEndpoint"},
@@ -832,6 +831,9 @@ func validateV2Concept(c *V2ConceptDecl) []error {
 	if _, ok := c.Fields["analysisRole"]; ok {
 		errs = append(errs, fmt.Errorf("concept %s: analysisRole is a Go-owned language mechanic and must not be authored in VyQL", c.Name))
 	}
+	if _, ok := c.Fields["sourcePolicy"]; ok {
+		errs = append(errs, fmt.Errorf("concept %s: sourcePolicy is a Go-owned source review mechanic and must not be authored in VyQL", c.Name))
+	}
 	if raw, ok := c.Fields["internalRoles"]; ok {
 		values, ok := raw.([]string)
 		if !ok {
@@ -842,17 +844,6 @@ func validateV2Concept(c *V2ConceptDecl) []error {
 					errs = append(errs, fmt.Errorf("concept %s: unknown internal role %q", c.Name, role))
 				}
 			}
-		}
-	}
-	if raw, ok := c.Fields["sourcePolicy"]; ok {
-		value, ok := raw.(string)
-		if !ok {
-			errs = append(errs, fmt.Errorf("concept %s: sourcePolicy must be a string", c.Name))
-		} else if !v2SourcePolicies[value] {
-			errs = append(errs, fmt.Errorf("concept %s: unknown sourcePolicy %q", c.Name, value))
-		}
-		if c.Kind != "source" {
-			errs = append(errs, fmt.Errorf("concept %s: sourcePolicy is only valid on source concepts", c.Name))
 		}
 	}
 	if raw, ok := c.Fields["sourceConfidence"]; ok {
