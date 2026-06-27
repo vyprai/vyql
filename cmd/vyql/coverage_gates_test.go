@@ -588,37 +588,8 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 }
 
 func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
-	authoredMechanicDecl := regexp.MustCompile(`^\s*mechanic\s+\S+\s+\S+\b`)
 	authoredAssumeCall := regexp.MustCompile(`(^|[^A-Za-z0-9_.])assume\s*\(`)
 	var hits []string
-	root := filepath.Join(datadir.Root(), "mechanics")
-	if _, err := os.Stat(root); err != nil {
-		if !os.IsNotExist(err) {
-			t.Fatalf("stat mechanics dir: %v", err)
-		}
-		root = ""
-	}
-	if root != "" {
-		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".vyql") {
-				return err
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			src := string(data)
-			if !strings.Contains(src, "mechanic ") {
-				return nil
-			}
-			rel, _ := filepath.Rel(datadir.Root(), path)
-			hits = append(hits, filepath.ToSlash(rel))
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("walk mechanics dir: %v", err)
-		}
-	}
 	files, err := vyqlFilesUnder(datadir.Root())
 	if err != nil {
 		t.Fatalf("collect shipped definition files: %v", err)
@@ -629,12 +600,18 @@ func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		src := string(data)
+		prog, err := parser.ParseV2(src)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		for _, decl := range prog.Decls {
+			if mechanic, ok := decl.(*parser.V2MechanicDecl); ok {
+				rel, _ := filepath.Rel(datadir.Root(), path)
+				hits = append(hits, filepath.ToSlash(rel)+": mechanic "+mechanic.Kind+" "+mechanic.Name)
+			}
+		}
 		for _, line := range strings.Split(src, "\n") {
 			trimmed := strings.TrimSpace(line)
-			if authoredMechanicDecl.MatchString(line) {
-				rel, _ := filepath.Rel(datadir.Root(), path)
-				hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
-			}
 			if strings.HasPrefix(trimmed, "assume ") ||
 				strings.HasPrefix(trimmed, "analysisRole:") ||
 				authoredAssumeCall.MatchString(trimmed) {
