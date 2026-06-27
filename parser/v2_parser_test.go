@@ -894,6 +894,40 @@ mechanic coverage sameScope {
 	}
 }
 
+func TestParseV2RejectsEveryAuthoredBuiltInLanguageMechanic(t *testing.T) {
+	for verb := range v2BuiltInRuleVerbs {
+		src := fmt.Sprintf(`module mechanics.bad;
+mechanic ruleVerb %s {
+  solver: dataflow.taint
+  fromKinds: [source]
+  toKinds: [sink]
+  allowedClauses: [where]
+}`, verb)
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2 authored built-in ruleVerb %s succeeded, want rejection", verb)
+		}
+		if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+			t.Fatalf("ruleVerb %s error = %v, want Go-owned built-in mechanic diagnostic", verb, err)
+		}
+	}
+	for mode := range v2CoverageModes {
+		src := fmt.Sprintf(`module mechanics.bad;
+mechanic coverage %s {
+  capability: coverage.%s
+  targetParts: [%s]
+  requiresAnchor: true
+}`, mode, mode, mode)
+		_, err := ParseV2(src)
+		if err == nil {
+			t.Fatalf("ParseV2 authored built-in coverage %s succeeded, want rejection", mode)
+		}
+		if !strings.Contains(err.Error(), "built-in language mechanics are implemented in Go") {
+			t.Fatalf("coverage %s error = %v, want Go-owned built-in mechanic diagnostic", mode, err)
+		}
+	}
+}
+
 func TestParseV2RejectsAuthoredCoverageMechanicForms(t *testing.T) {
 	cases := []string{
 		`module mechanics.sast; mechanic coverage path { capability: coverage.path coversWhen: project.has("custom") }`,

@@ -589,6 +589,7 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 
 func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
 	authoredMechanicDecl := regexp.MustCompile(`^\s*mechanic\s+\S+\s+\S+\b`)
+	authoredAssumeCall := regexp.MustCompile(`(^|[^A-Za-z0-9_.])assume\s*\(`)
 	var hits []string
 	root := filepath.Join(datadir.Root(), "mechanics")
 	if _, err := os.Stat(root); err != nil {
@@ -636,10 +637,7 @@ func TestShippedDefinitionsDoNotAuthorLanguageMechanics(t *testing.T) {
 			}
 			if strings.HasPrefix(trimmed, "assume ") ||
 				strings.HasPrefix(trimmed, "analysisRole:") ||
-				strings.HasPrefix(trimmed, "where assume(") ||
-				strings.Contains(trimmed, " assume(") ||
-				strings.Contains(trimmed, " and assume(") ||
-				strings.Contains(trimmed, " or assume(") {
+				authoredAssumeCall.MatchString(trimmed) {
 				rel, _ := filepath.Rel(datadir.Root(), path)
 				hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
 			}
