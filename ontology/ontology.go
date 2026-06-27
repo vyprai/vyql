@@ -40,8 +40,8 @@ type Concept struct {
 	SourceCondition         string   `json:"source_condition,omitempty"`
 	SourceAssumption        string   `json:"source_assumption,omitempty"`
 	SourceConfidence        string   `json:"source_confidence,omitempty"`
-	AssumeMinLevel          string   `json:"assume_min_level,omitempty"`
-	AnalysisRole            string   `json:"analysis_role,omitempty"`
+	GrantMinLevel           string   `json:"grantMinLevel,omitempty"`
+	AnalysisRole            string   `json:"analysisRole,omitempty"`
 	ContextReachSource      string   `json:"context_reach_source,omitempty"`
 	ContextReachLabel       string   `json:"context_reach_label,omitempty"`
 	ContextReachTargetProp  string   `json:"context_reach_target_prop,omitempty"`

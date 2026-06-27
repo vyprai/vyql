@@ -81,3 +81,34 @@ concept SqlParameterization : check {
 		t.Fatalf("neutralizing check applies should default to path, got %q", c.Applies)
 	}
 }
+
+func TestConceptDeclUsesV2MechanicMetadataNames(t *testing.T) {
+	sources := []string{`
+module identity;
+concept AdminPrivilege : privilege {
+  grantMinLevel: ADMIN
+}
+`, `
+module core;
+concept CharFilter : check {
+  analysisRole: char_filter
+}
+`}
+	var got []Concept
+	for _, src := range sources {
+		loaded, err := LoadConceptText(src)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		got = append(got, loaded...)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 concepts, got %d", len(got))
+	}
+	if got[0].GrantMinLevel != "ADMIN" {
+		t.Fatalf("grantMinLevel = %q, want ADMIN", got[0].GrantMinLevel)
+	}
+	if got[1].AnalysisRole != AnalysisRoleCharFilter {
+		t.Fatalf("analysisRole = %q, want %q", got[1].AnalysisRole, AnalysisRoleCharFilter)
+	}
+}

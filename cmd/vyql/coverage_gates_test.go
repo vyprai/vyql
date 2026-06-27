@@ -805,6 +805,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"guarded_by",
 		"closed_by",
 	}
+	legacyMetadataNames := []string{
+		"assume_min_level",
+		"analysis_role",
+		"AssumeMinLevel",
+		"assumeMinLevel",
+	}
 	securityConceptNames := []string{
 		"ResourceRelease",
 		"LockRelease",
@@ -826,6 +832,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
 		usesLegacy := false
 		for _, snippet := range legacyCoverageClauses {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
+		for _, snippet := range legacyMetadataNames {
 			if strings.Contains(src, snippet) {
 				usesLegacy = true
 				break

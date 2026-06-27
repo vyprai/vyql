@@ -238,7 +238,7 @@ func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (
 	case "grant":
 		bConcept := call.Args[1].Ref.String()
 		bIDs := e.resolveArg(call.Args[1], env)
-		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.assumeMinLevel(bConcept))
+		paths, _ := solvers.FindAssume(e.Store, aIDs, bIDs, e.grantMinLevel(bConcept))
 		if len(paths) > 0 {
 			var w []string
 			for _, s := range paths[0].Steps {

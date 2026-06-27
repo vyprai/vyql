@@ -154,7 +154,7 @@ func (e *Engine) evalPrivilegeClosure(cr *CompiledRule, witnessKind string) ([]*
 	body := cr.Rule.Body.(*parser.FlowStmt)
 	sources := e.nodesWithConcept(body.Src.Concept)
 	targets := e.nodesWithConcept(body.Dst.Concept)
-	paths, err := solvers.FindAssume(e.Store, sources, targets, e.assumeMinLevel(body.Dst.Concept))
+	paths, err := solvers.FindAssume(e.Store, sources, targets, e.grantMinLevel(body.Dst.Concept))
 	if err != nil {
 		return nil, err
 	}
@@ -404,9 +404,9 @@ func intersect(a, b map[string]bool) bool {
 	return false
 }
 
-func (e *Engine) assumeMinLevel(concept string) string {
+func (e *Engine) grantMinLevel(concept string) string {
 	if c, err := e.Onto.Get(concept); err == nil {
-		return c.AssumeMinLevel
+		return c.GrantMinLevel
 	}
 	return ""
 }

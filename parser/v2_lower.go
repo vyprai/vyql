@@ -490,10 +490,6 @@ func lowerV2FieldName(name string) string {
 		return "source_assumption"
 	case "sourceConfidence":
 		return "source_confidence"
-	case "grantMinLevel":
-		return "assume_min_level"
-	case "analysisRole":
-		return "analysis_role"
 	case "contextReachSource":
 		return "context_reach_source"
 	case "contextReachLabel":
