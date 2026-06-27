@@ -2127,7 +2127,7 @@ func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 			out.Args = append(out.Args, lowered)
 		}
 		return out, nil
-	case "not", "soft":
+	case "not":
 		if len(req.Args) != 1 {
 			return BindingRequirement{}, fmt.Errorf("%s requirement needs exactly one child", req.Name)
 		}
@@ -2140,6 +2140,8 @@ func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 			return BindingRequirement{}, err
 		}
 		return BindingRequirement{Op: req.Name, Args: []BindingRequirement{lowered}}, nil
+	case "soft":
+		return BindingRequirement{}, fmt.Errorf("soft requirement needs native v2 confidence policy evaluation")
 	case "dependency", "import", "language", "file", "framework", "schema", "project.has":
 		return lowerV2PrimitiveRequirement(req)
 	default:

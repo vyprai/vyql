@@ -1875,7 +1875,7 @@ func (g *requirementGate) eval(req parser.BindingRequirement) bool {
 	case "not":
 		return len(req.Args) == 1 && !g.eval(req.Args[0])
 	case "soft":
-		return true
+		return false
 	default:
 		return false
 	}

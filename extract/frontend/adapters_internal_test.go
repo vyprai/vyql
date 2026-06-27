@@ -359,9 +359,9 @@ func TestV2RequirementGateEvaluatesStructuredEvidence(t *testing.T) {
 		{name: "not negates child", req: parser.BindingRequirement{Op: "not", Args: []parser.BindingRequirement{
 			{Op: "dependency", Value: "missing"},
 		}}, want: true},
-		{name: "soft never blocks", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
+		{name: "soft is not evaluated by the requirement gate", req: parser.BindingRequirement{Op: "soft", Args: []parser.BindingRequirement{
 			{Op: "dependency", Value: "missing"},
-		}}, want: true},
+		}}, want: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

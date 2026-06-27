@@ -620,12 +620,6 @@ func TestV2RequirementLowersToPackageHintsAndRequirementTree(t *testing.T) {
 			wantOp:   "import",
 		},
 		{
-			name:     "soft nested any",
-			req:      `soft(any(dependency("express"), import("koa")))`,
-			wantPkgs: []string{"express", "koa"},
-			wantOp:   "soft",
-		},
-		{
 			name:     "multiple top-level requirements",
 			req:      `dependency("express")` + "\n    " + `language("javascript")`,
 			wantPkgs: []string{"express"},
@@ -677,6 +671,11 @@ func TestV2RequirementLoweringRejectsMalformedCombinators(t *testing.T) {
 			name: "empty all",
 			req:  `all()`,
 			want: "at least one child",
+		},
+		{
+			name: "soft needs native confidence policy",
+			req:  `soft(any(dependency("express"), import("koa")))`,
+			want: "soft requirement needs native v2 confidence policy evaluation",
 		},
 	}
 	for _, tc := range cases {
