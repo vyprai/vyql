@@ -653,18 +653,7 @@ func TestShippedDefinitionsDoNotUseLegacyV1Syntax(t *testing.T) {
 	if err != nil {
 		t.Fatalf("collect shipped definition files: %v", err)
 	}
-	legacyLinePatterns := []*regexp.Regexp{
-		regexp.MustCompile(`^\s*adapter\s+[A-Za-z0-9_.-]+\s*\{`),
-		regexp.MustCompile(`^\s*source\s+"`),
-		regexp.MustCompile(`^\s*sink\s+(?:"|method\s+"|path\s+")`),
-		regexp.MustCompile(`^\s*control\s+"`),
-		regexp.MustCompile(`^\s*flag\s+[A-Za-z0-9_.]+\s+(?:on|in)\b`),
-		regexp.MustCompile(`^\s*mark\s+`),
-		regexp.MustCompile(`^\s*match\s+[A-Za-z0-9_.]+\s+as\b`),
-		regexp.MustCompile(`^\s*package\s+"`),
-		regexp.MustCompile(`\bunless\s+(?:sanitized_by|guarded_by|closed_by)\b`),
-		regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`),
-	}
+	legacyLinePatterns := legacyV1DefinitionLinePatterns()
 	var hits []string
 	for _, path := range files {
 		data, err := os.ReadFile(path)
@@ -684,6 +673,50 @@ func TestShippedDefinitionsDoNotUseLegacyV1Syntax(t *testing.T) {
 	if len(hits) > 0 {
 		sort.Strings(hits)
 		t.Fatalf("shipped non-test definitions must not use legacy v1 syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestVyqlTestSpecsDoNotUseLegacyV1DefinitionSyntax(t *testing.T) {
+	files := readDataFiles(t, "tests", ".test.vyql")
+	legacyLinePatterns := legacyV1DefinitionLinePatterns()
+	var hits []string
+	for path, src := range files {
+		inFence := false
+		for i, line := range strings.Split(src, "\n") {
+			if strings.TrimSpace(line) == "```" {
+				inFence = !inFence
+				continue
+			}
+			if inFence {
+				continue
+			}
+			for _, pattern := range legacyLinePatterns {
+				if pattern.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+					break
+				}
+			}
+		}
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("test specs must use the declarative v2 spec format, not legacy v1 definition syntax:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
+	return []*regexp.Regexp{
+		regexp.MustCompile(`^\s*adapter\s+[A-Za-z0-9_.-]+\s*\{`),
+		regexp.MustCompile(`^\s*source\s+"`),
+		regexp.MustCompile(`^\s*sink\s+(?:"|method\s+"|path\s+")`),
+		regexp.MustCompile(`^\s*control\s+"`),
+		regexp.MustCompile(`^\s*flag\s+[A-Za-z0-9_.]+\s+(?:on|in)\b`),
+		regexp.MustCompile(`^\s*mark\s+`),
+		regexp.MustCompile(`^\s*match\s+[A-Za-z0-9_.]+\s+as\b`),
+		regexp.MustCompile(`^\s*package\s+"`),
+		regexp.MustCompile(`\bunless\s+(?:sanitized_by|guarded_by|closed_by)\b`),
+		regexp.MustCompile(`\b(?:has|lacks)\s+"(?:call_path|literal|selector|identifier|function_name|class_name|class_base|class_bases|attr_path|decorator_path|decorator_method|param_name|param_type|param_index|var_name|return):`),
 	}
 }
 
