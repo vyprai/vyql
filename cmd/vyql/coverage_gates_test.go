@@ -588,6 +588,10 @@ func TestShippedDefinitionCorpusIsV2Only(t *testing.T) {
 }
 
 func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
+	builtInMechanicDecls := []*regexp.Regexp{
+		regexp.MustCompile(`^\s*mechanic\s+ruleVerb\s+(?:taint|reach|grant|issue|fact|query|assume)\b`),
+		regexp.MustCompile(`^\s*mechanic\s+coverage\s+(?:path|endpoint|sameReceiver|sameScope|dominates|postDominates|global|assume)\b`),
+	}
 	var hits []string
 	root := filepath.Join(datadir.Root(), "mechanics")
 	if _, err := os.Stat(root); err != nil {
@@ -627,14 +631,16 @@ func TestShippedDefinitionsDoNotAuthorGoOwnedMechanics(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		src := string(data)
-		if !strings.Contains(src, "assume") {
-			continue
-		}
 		for _, line := range strings.Split(src, "\n") {
 			trimmed := strings.TrimSpace(line)
+			for _, re := range builtInMechanicDecls {
+				if re.MatchString(line) {
+					rel, _ := filepath.Rel(datadir.Root(), path)
+					hits = append(hits, filepath.ToSlash(rel)+": "+trimmed)
+					break
+				}
+			}
 			if strings.HasPrefix(trimmed, "assume ") ||
-				strings.HasPrefix(trimmed, "mechanic ruleVerb assume") ||
-				strings.HasPrefix(trimmed, "mechanic coverage assume") ||
 				strings.HasPrefix(trimmed, "where assume(") ||
 				strings.Contains(trimmed, " assume(") ||
 				strings.Contains(trimmed, " and assume(") ||
