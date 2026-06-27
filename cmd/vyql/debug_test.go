@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/datadir"
+	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/usg"
@@ -65,6 +67,38 @@ func TestAdapterDisplayKindUsesV2AdvisoryVocabulary(t *testing.T) {
 		if got := adapterDisplayKind(in); got != want {
 			t.Fatalf("adapterDisplayKind(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestFindingsJSONUsesV2AdvisoryVocabulary(t *testing.T) {
+	got := findingsJSON([]*findings.Finding{{
+		RuleID:     "VYQL-TEST-001",
+		Severity:   "medium",
+		Confidence: "medium",
+		Bindings: []findings.Binding{{
+			Name: "sink",
+			Loc:  "app.js:1",
+		}},
+		NegationEvidence: []findings.NegationEvidence{{
+			Clause:    "path advisory",
+			Satisfied: false,
+			Detail:    "candidate advisory evidence",
+		}},
+		ReviewConditions: []findings.ReviewCondition{{
+			Condition:  "review this",
+			Assumption: "requires a deployment condition",
+		}},
+	}})
+	raw, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, `"advisory_noted":true`) || !strings.Contains(text, `"advisory":"requires a deployment condition"`) {
+		t.Fatalf("findings JSON should use v2 advisory fields, got %s", text)
+	}
+	if strings.Contains(text, "assumption_noted") || strings.Contains(text, `"Assumption"`) || strings.Contains(text, `"assumption"`) {
+		t.Fatalf("findings JSON leaked legacy assumption vocabulary: %s", text)
 	}
 }
 

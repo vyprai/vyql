@@ -107,7 +107,7 @@ func shortestToSink(onto *ontology.Ontology, g usg.Store, src, to string) ([]str
 }
 
 // frontier returns the nodes where taint stopped: reachable Call nodes whose taint goes no
-// further toward a labelled node, plus any control (sanitizer/guard/assumption) that was hit.
+// further toward a labelled node, plus any control or advisory evidence that was hit.
 // These are the candidate "broken edges" — most often an unresolved or cross-package call.
 func frontier(onto *ontology.Ontology, g usg.Store, src string) []string {
 	seen := map[string]bool{src: true}
@@ -216,7 +216,7 @@ func ontologyConceptKind(onto *ontology.Ontology, c string) string {
 // ── vyql explain ────────────────────────────────────────────────────────────────────
 // Run the rules and print each finding's FULL proof: source/sink bindings (with the adapter
 // that labelled them), the witness path, and every negation-evidence clause (sanitizer/guard/
-// assumption notes) — the "why did this fire, and what almost stopped it" view.
+// advisory notes) — the "why did this fire, and what almost stopped it" view.
 
 func cmdExplain(args []string) error {
 	fs := flag.NewFlagSet("explain", flag.ExitOnError)
@@ -265,7 +265,7 @@ func cmdExplain(args []string) error {
 				fmt.Printf(" — evidence: %s", ec.Evidence)
 			}
 			if ec.Assumption != "" {
-				fmt.Printf(" — assumes: %s", ec.Assumption)
+				fmt.Printf(" — advisory: %s", ec.Assumption)
 			}
 			if ec.Confidence != "" {
 				fmt.Printf(" — conf=%s", ec.Confidence)
@@ -599,7 +599,7 @@ type jsonFinding struct {
 	Source           string                     `json:"source"`
 	Sink             string                     `json:"sink"`
 	Path             []string                   `json:"path,omitempty"`
-	Noted            bool                       `json:"assumption_noted"`
+	Noted            bool                       `json:"advisory_noted"`
 	ReviewConditions []findings.ReviewCondition `json:"review_conditions,omitempty"`
 }
 
@@ -619,7 +619,7 @@ func findingsJSON(all []*findings.Finding) []jsonFinding {
 			jf.Sink = f.Bindings[0].Loc
 		}
 		for _, ne := range f.NegationEvidence {
-			if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+			if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 				jf.Noted = true
 			}
 		}

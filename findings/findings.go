@@ -31,11 +31,11 @@ type NegationEvidence struct {
 // ReviewCondition records what a reviewer should verify for a non-perfectly
 // proven condition, and what evidence VyQL observed for it.
 type ReviewCondition struct {
-	Category   string
-	Condition  string
-	Evidence   string
-	Assumption string
-	Confidence string
+	Category   string `json:"category,omitempty"`
+	Condition  string `json:"condition,omitempty"`
+	Evidence   string `json:"evidence,omitempty"`
+	Assumption string `json:"advisory,omitempty"`
+	Confidence string `json:"confidence,omitempty"`
 }
 
 // Finding is a rule match with its full derivation.
@@ -116,7 +116,7 @@ func (f *Finding) render(fp string) string {
 			fmt.Fprintf(&b, " — evidence: %s", ec.Evidence)
 		}
 		if ec.Assumption != "" {
-			fmt.Fprintf(&b, " — assumes: %s", ec.Assumption)
+			fmt.Fprintf(&b, " — advisory: %s", ec.Assumption)
 		}
 		if ec.Confidence != "" {
 			fmt.Fprintf(&b, " — conf=%s", ec.Confidence)

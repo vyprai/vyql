@@ -363,17 +363,14 @@ binding outputs {
   emit fact State at call
   emit fact Observation at call
   propagate value from args[0] to args[1]
-  propagate taint from args[0] to args[1]
-  propagate identity from args[0] to args[1]
-  propagate receiver from args[0] to args[1]
 }
 `)
 	if err != nil {
 		t.Fatalf("ParseV2: %v", err)
 	}
 	binding := prog.Decls[len(prog.Decls)-1].(*V2BindingDecl)
-	if got := len(binding.Outputs); got != 15 {
-		t.Fatalf("binding outputs = %d, want 15", got)
+	if got := len(binding.Outputs); got != 12 {
+		t.Fatalf("binding outputs = %d, want 12", got)
 	}
 }
 
@@ -392,6 +389,21 @@ func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
 			name: "propagate",
 			body: `propagate alias from args[0] to args[1]`,
 			want: `unknown propagate kind "alias"`,
+		},
+		{
+			name: "propagate taint not implemented",
+			body: `propagate taint from args[0] to args[1]`,
+			want: `propagate kind "taint" is not implemented in production v2`,
+		},
+		{
+			name: "propagate identity not implemented",
+			body: `propagate identity from args[0] to args[1]`,
+			want: `propagate kind "identity" is not implemented in production v2`,
+		},
+		{
+			name: "propagate receiver not implemented",
+			body: `propagate receiver from args[0] to args[1]`,
+			want: `propagate kind "receiver" is not implemented in production v2`,
 		},
 	}
 	for _, tc := range cases {

@@ -42,7 +42,7 @@ func findingToNexus(f *findings.Finding) map[string]any {
 	for _, ec := range f.ReviewConditions {
 		review = append(review, map[string]any{
 			"category": ec.Category, "condition": ec.Condition, "evidence": ec.Evidence,
-			"assumption": ec.Assumption, "confidence": ec.Confidence,
+			"advisory": ec.Assumption, "confidence": ec.Confidence,
 		})
 	}
 	return map[string]any{

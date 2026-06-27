@@ -417,10 +417,10 @@ func (e *Engine) grantMinLevel(concept string) string {
 	return ""
 }
 
-// charFilterAssumption returns an assumption note if a character-filter (replace) lies on a
+// charFilterAdvisoryNote returns an advisory note if a character-filter (replace) lies on a
 // live taint path — meaning vyql could NOT prove it excludes this sink's required
 // character set (a sound allowlist filter would have killed the flow already).
-func (e *Engine) charFilterAssumption(path []string, excluded string) string {
+func (e *Engine) charFilterAdvisoryNote(path []string, excluded string) string {
 	charFilters := e.conceptsWithAnalysisRole(ontology.AnalysisRoleCharFilter)
 	onPath := make(map[string]bool, len(path))
 	for _, id := range path {
@@ -435,7 +435,7 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 			// A replace FILTERS its subject but emits its REPLACEMENT verbatim (arg1, in both
 			// `s.replace(pat,repl)` and `re.sub(pat,repl,s)`). If the taint entered through the
 			// replacement, the filter never touched it: this is a direct insertion,
-			// so this is a confident finding, not an assumption.
+			// so this is a confident finding, not advisory-gated.
 			if n, ok, _ := e.Store.GetNode(id); ok {
 				if a1 := n.Prop("arg1"); a1 != "" && onPath[a1] {
 					continue
@@ -451,15 +451,15 @@ func (e *Engine) charFilterAssumption(path []string, excluded string) string {
 	return ""
 }
 
-// neutralizerAssumptions surfaces UNSOUND neutralizers that bear on a finding:
+// neutralizerAdvisoryEvidence surfaces UNSOUND neutralizers that bear on a finding:
 // a guard that DOMINATES the sink, or a sanitizer ON the taint path, whose declared `about`
-// concept matches this sink's threat. Each yields an assumption note — the flow is NEVER
+// concept matches this sink's threat. Each yields an advisory note — the flow is NEVER
 // suppressed (vyql cannot prove the neutralizer sound), but is flagged as a false positive
-// IF it works. This generalizes the regex-CharFilter mechanism (charFilterAssumption) to arbitrary
-// neutralizers: the confident bucket (findings with no assumption note) is near-zero-FP, and
+// IF it works. This generalizes the regex-CharFilter mechanism (charFilterAdvisoryNote) to arbitrary
+// neutralizers: the confident bucket (findings with no advisory note) is near-zero-FP, and
 // the noted bucket is the human review queue. Which calls are unsound neutralizers comes from
 // v2 advisory check bindings; the mechanic itself is Go-owned and threat-agnostic.
-func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
+func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkConcepts map[string]bool) []findings.NegationEvidence {
 	var out []findings.NegationEvidence
 	seen := map[string]bool{}
 	add := func(mode, pat string) {
@@ -472,9 +472,9 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 		if mode == "guard" {
 			detail = "an unsound guard " + pat + " dominates the sink but is not provably complete for this target; false positive if it blocks the relevant condition"
 		}
-		out = append(out, findings.NegationEvidence{Clause: mode + " (assumption)", Satisfied: false, Detail: detail})
+		out = append(out, findings.NegationEvidence{Clause: mode + " advisory", Satisfied: false, Detail: detail})
 	}
-	// sanitizer-style: an internal assumption label lying ON the taint path.
+	// sanitizer-style: an internal advisory label lying ON the taint path.
 	for _, id := range path {
 		for _, l := range e.labels(id) {
 			if l.Concept == ontology.InternalNeutralizerAssumptionConcept && l.Detail["mode"] == "sanitizer" && sinkConcepts[l.Detail["about"]] {
@@ -482,7 +482,7 @@ func (e *Engine) neutralizerAssumptions(path []string, sinkID string, sinkConcep
 			}
 		}
 	}
-	// guard-style: an assumption-role guard that DOMINATES the sink. A guard inspecting THIS
+	// guard-style: an advisory guard that DOMINATES the sink. A guard inspecting THIS
 	// tainted value is, by construction, a direct FLOWS out-neighbour of a node on the path
 	// (the tainted operand flows into it), so we scan those neighbours LOCALLY rather than the
 	// whole store — O(path · out-degree), not O(store · findings). Found nothing globally is
@@ -589,13 +589,13 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		// A character-filter on a still-LIVE path is, by definition, not provably sound
 		// for this sink (a sound one would have killed the flow). Surface it as an
-		// assumption: the finding is a false positive IF that filter actually neutralizes.
-		if wf := e.charFilterAssumption(fl.Path, excluded); wf != "" {
-			ne = append(ne, findings.NegationEvidence{Clause: "char-filter (assumption)", Satisfied: false, Detail: wf})
+		// advisory note: the finding is a false positive IF that filter actually neutralizes.
+		if wf := e.charFilterAdvisoryNote(fl.Path, excluded); wf != "" {
+			ne = append(ne, findings.NegationEvidence{Clause: "char-filter advisory", Satisfied: false, Detail: wf})
 		}
 		// Unsound guards/sanitizers are Go-owned mechanics. They never kill the flow;
-		// they annotate it as assumption-gated.
-		ne = append(ne, e.neutralizerAssumptions(fl.Path, fl.SinkID, sinkConcepts)...)
+		// they annotate it as advisory-gated.
+		ne = append(ne, e.neutralizerAdvisoryEvidence(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
 			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g)

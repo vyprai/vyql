@@ -731,7 +731,7 @@ type filterSpec struct {
 
 // advisoryNeutralizerSpec is an UNSOUND neutralizer: a guard (dominance) or sanitizer (on-path) that
 // might apply but cannot be proven to. It never kills a flow; the engine
-// attaches an assumption note instead.
+// attaches an advisory note instead.
 type advisoryNeutralizerSpec struct {
 	Pattern     string
 	ByMethod    bool
@@ -920,7 +920,7 @@ func (spec adapterSpec) advisoryNeutralizerAdapter() adapters.Adapter {
 // ontology role concept, recording the proven OUTPUT alphabet (or that it is unbounded)
 // in the label Detail. The solver then treats it as a SOUND sanitizer for any sink whose
 // excluded chars the alphabet excludes, and the engine surfaces an unproven filter
-// as an assumption note. The regex math is general (charfilter.go); WHICH methods
+// as an advisory note. The regex math is general (charfilter.go); WHICH methods
 // filter is data (the `filter` directive).
 func (spec adapterSpec) filterAdapter() adapters.Adapter {
 	concept := singleOntologyRoleConcept(ontology.AnalysisRoleCharFilter)

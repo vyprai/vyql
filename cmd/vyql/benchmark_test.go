@@ -61,20 +61,20 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 
 	// detected[testname][category] = VyQL reported that category in that test file.
-	// With BENCH_CONFIDENT=1 only findings WITHOUT an assumption note count (the confident
-	// bucket) — this measures "zero FP without assumption": every FP an unsound neutralizer
+	// With BENCH_CONFIDENT=1 only findings WITHOUT an advisory note count (the confident
+	// bucket) — this measures "zero FP without advisory": every FP an unsound neutralizer
 	// explains drops out, leaving the near-zero-FP confident scorecard.
 	confidentOnly := os.Getenv("BENCH_CONFIDENT") != ""
-	noteCat := os.Getenv("BENCH_NOTE_CAT") // print the assumption note of each noted finding in this category
+	noteCat := os.Getenv("BENCH_NOTE_CAT") // print the advisory note of each noted finding in this category
 	detected := map[string]map[string]bool{}
 	for _, f := range fs {
 		cat := ruleCategory[f.RuleID]
 		if cat == "" {
 			continue
 		}
-		if noteCat != "" && cat == noteCat && hasAssumptionNote(f) {
+		if noteCat != "" && cat == noteCat && hasAdvisoryNote(f) {
 			for _, ne := range f.NegationEvidence {
-				if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+				if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 					tn := ""
 					if len(f.Bindings) > 0 {
 						tn = testNameOf(f.Bindings[len(f.Bindings)-1].Loc)
@@ -83,7 +83,7 @@ func TestOWASPBenchmark(t *testing.T) {
 				}
 			}
 		}
-		if confidentOnly && hasAssumptionNote(f) {
+		if confidentOnly && hasAdvisoryNote(f) {
 			continue
 		}
 		for _, b := range f.Bindings {
@@ -102,11 +102,11 @@ func TestOWASPBenchmark(t *testing.T) {
 	}
 }
 
-// hasAssumptionNote reports whether a finding is assumption-gated — an unsound neutralizer
+// hasAdvisoryNote reports whether a finding is advisory-gated — an unsound neutralizer
 // (regex char-filter, prefix guard, unverifiable transform) lies on or dominates its flow.
-func hasAssumptionNote(f *findings.Finding) bool {
+func hasAdvisoryNote(f *findings.Finding) bool {
 	for _, ne := range f.NegationEvidence {
-		if !ne.Satisfied && strings.Contains(ne.Clause, "assumption") {
+		if !ne.Satisfied && strings.Contains(ne.Clause, "advisory") {
 			return true
 		}
 	}

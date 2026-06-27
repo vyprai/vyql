@@ -440,9 +440,6 @@ func parseEvidenceSpec(t *testing.T, src string, line int, rest string) evidence
 }
 
 func normalizeEvidenceExpectation(text string) string {
-	if text == "advisory" {
-		return "assumption"
-	}
 	return text
 }
 
