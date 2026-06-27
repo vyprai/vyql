@@ -3,9 +3,8 @@ module bindings.java.migration.m420f6b67;
 binding authorizationCheck212 {
   query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "call:canPerformSystemActions" and args.any.literal contains "call:ThriftSecurityException"
   emit check core.AuthorizationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

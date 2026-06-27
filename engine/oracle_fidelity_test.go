@@ -23,7 +23,7 @@ rule GuardedFlow {
 		}
 		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
-		s.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 		s.AddEdge(usg.Edge{Type: "PROTECTS", Src: "guard", Dst: "target"})
 	}
@@ -64,7 +64,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 3, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:1"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 	})
 	if len(errs) != 0 {
@@ -80,7 +80,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Scope: "sample.py/fn2@3", Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:10"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
 	})
 	if counts[0] != 1 {
@@ -94,7 +94,7 @@ rule GuardedFlow {
 		s.AddNode(usg.Node{ID: "target", Type: "code.Arg", Scope: "sample.py/fn1/try8@3", Region: "sample.py/fn1/try8", Props: map[string]string{"loc": "sample.py:25"}})
 		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
 		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 4, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:6"}})
-		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddLabel("summary", coverageLabel("custom.Transform", "endpoint"))
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "param"})
 		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "param", Dst: "target"})
 	})

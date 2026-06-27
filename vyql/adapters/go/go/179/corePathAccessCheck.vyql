@@ -3,9 +3,8 @@ module bindings.go.migration.m48a985c1;
 binding pathAccessCheck179 {
   query pattern callExpr where callee.path ~= "pathrs.Reopen"
   emit check core.PathAccessCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

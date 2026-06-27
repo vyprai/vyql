@@ -3,9 +3,8 @@ module bindings.javascript.migration.mfb63017a;
 binding prototypePollutionGuard568 {
   query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "lang=javascript" and args.any.literal contains "name=getPaths" and args.any.literal contains "segment !== '__proto__'" and args.any.literal contains "segment !== 'constructor'" and args.any.literal contains "segment !== 'prototype'"
   emit check core.PrototypePollutionGuard at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

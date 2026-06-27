@@ -6,9 +6,8 @@ binding redirectAllowlist14 {
   }
   query pattern callExpr where callee.path ~= "stringByAddingPercentEncodingWithAllowedCharacters"
   emit check core.RedirectAllowlist at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

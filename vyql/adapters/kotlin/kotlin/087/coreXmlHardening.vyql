@@ -3,9 +3,8 @@ module bindings.kotlin.migration.m304d1620;
 binding xmlHardening87 {
   query pattern callExpr where callee.path ~= "setExpandEntityReferences" and args.any.literal contains "false"
   emit check core.XmlHardening at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

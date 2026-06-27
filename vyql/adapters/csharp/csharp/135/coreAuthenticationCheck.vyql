@@ -3,9 +3,8 @@ module bindings.csharp.migration.m1caa8bf2;
 binding authenticationCheck135 {
   query pattern callExpr where callee.method == "IsAuthenticated"
   emit check core.AuthenticationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

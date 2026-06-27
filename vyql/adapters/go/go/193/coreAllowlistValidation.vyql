@@ -3,9 +3,8 @@ module bindings.go.migration.m48a985c1;
 binding allowlistValidation193 {
   query pattern callExpr where callee.path ~= "IsValidIssuer"
   emit check core.AllowlistValidation at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

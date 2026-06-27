@@ -3,9 +3,8 @@ module bindings.javascript.migration.mfb63017a;
 binding pathAccessCheck528 {
   query pattern callExpr where callee.path ~= "isWithin"
   emit check core.PathAccessCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

@@ -3,9 +3,8 @@ module bindings.go.migration.m48a985c1;
 binding authenticationCheck185 {
   query pattern callExpr where callee.method == "RequireAuth"
   emit check core.AuthenticationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

@@ -3,9 +3,8 @@ module bindings.python.migration.m21017d75;
 binding allowlistValidation175 {
   query pattern callExpr where callee.path ~= "is_allowed_url"
   emit check core.AllowlistValidation at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

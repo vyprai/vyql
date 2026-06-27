@@ -3,9 +3,8 @@ module bindings.python.migration.m21017d75;
 binding xmlHardening197 {
   query pattern callExpr where callee.path ~= "lxml.objectify.makeparser" and args.any.literal contains "resolve_entities=False"
   emit check core.XmlHardening at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

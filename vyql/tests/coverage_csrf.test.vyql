@@ -61,7 +61,7 @@ test "graph: a CSRF-protected state-changing op is clean (RF-003)"
   node src code.HttpInput
   node op code.StateChangingOp
   label op code.StateChangingOpSink
-  node guard core.CsrfProtection
+  node guard core.CsrfProtection {coverage=endpoint}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```

@@ -3,7 +3,7 @@ module bindings.swift.migration.m388f23d0;
 binding resourceRelease71 {
   query pattern callExpr where callee.method == "closeFile"
   emit check core.ResourceRelease at call {
-    covers path {
+    covers dominates {
       from: call
       to: call
     }

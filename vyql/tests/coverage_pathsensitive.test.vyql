@@ -11,7 +11,7 @@ test "path-sensitive: a CSRF guard that DOMINATES the sink suppresses (clean)"
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
   label op code.StateChangingOpSink
-  node guard core.CsrfProtection {region=/fn1, order=2}
+  node guard core.CsrfProtection {region=/fn1, order=2, coverage=endpoint}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```
@@ -23,7 +23,7 @@ test "path-sensitive: a CSRF guard in a SIBLING branch does NOT cover the sink (
   node src code.HttpInput {region=/fn1, order=1}
   node op code.StateChangingOp {region=/fn1/if2.t, order=5}
   label op code.StateChangingOpSink
-  node guard core.CsrfProtection {region=/fn1/if2.e, order=4}
+  node guard core.CsrfProtection {region=/fn1/if2.e, order=4, coverage=endpoint}
   edge FLOWS src -> op
   edge PROTECTS guard -> op
   ```
@@ -59,7 +59,7 @@ test "path-sensitive: a preflight validation loop covers a later bulk sink"
   graph
   ```
   node src core.UserControlledData {region=/fn1, order=1}
-  node guard core.PathAccessCheck {region=/fn1/loop2, order=3}
+  node guard core.PathAccessCheck {region=/fn1/loop2, order=3, coverage=endpoint}
   node sink code.ArchiveEntryWrite {region=/fn1, order=5}
   edge FLOWS src -> sink
   ```

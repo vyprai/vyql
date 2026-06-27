@@ -3,9 +3,8 @@ module bindings.php.migration.mfbe84119;
 binding csrfProtection424 {
   query pattern callExpr where callee.path ~= "check_csrf_token"
   emit check core.CsrfProtection at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

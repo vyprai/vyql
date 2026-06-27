@@ -3,7 +3,7 @@ module bindings.php.migration.mfbe84119;
 binding resourceRelease438 {
   query pattern callExpr where callee.path ~= "fclose"
   emit check core.ResourceRelease at call {
-    covers path {
+    covers dominates {
       from: call
       to: call
     }

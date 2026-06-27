@@ -6,9 +6,8 @@ binding authorizationCheck6 {
   }
   query pattern callExpr where callee.method == "patch_object_access_control"
   emit check core.AuthorizationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

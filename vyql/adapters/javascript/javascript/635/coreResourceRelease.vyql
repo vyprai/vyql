@@ -3,7 +3,7 @@ module bindings.javascript.migration.mfb63017a;
 binding resourceRelease635 {
   query pattern callExpr where callee.path ~= "fs.closeSync"
   emit check core.ResourceRelease at call {
-    covers path {
+    covers dominates {
       from: call
       to: call
     }

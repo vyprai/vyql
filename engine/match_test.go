@@ -54,6 +54,10 @@ func compileEvalV2(t *testing.T, src string, s usg.Store) []int {
 	return counts
 }
 
+func coverageLabel(concept, coverage string) usg.Label {
+	return usg.Label{Concept: concept, Detail: map[string]string{"coverage": coverage}}
+}
+
 func TestMatchComposesReachAndAssume(t *testing.T) {
 	src := `
 module test;
@@ -141,7 +145,7 @@ rule UnguardedAction {
 	g2.AddNode(usg.Node{ID: "action1", Type: "custom.Action", Props: map[string]string{"actor": "custom.ActorKind", "resource": "custom.ResourceKind"}})
 	g2.AddLabel("action1", usg.Label{Concept: "custom.Action"})
 	g2.AddNode(usg.Node{ID: "guard", Type: "custom.Control"})
-	g2.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g2.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 	g2.AddEdge(usg.Edge{Type: "CHECKS", Src: "guard", Dst: "action1"})
 	if c := compileEval(t, actionRule, g2); c[0] != 0 {
 		t.Fatalf("guarded action: expected 0 findings, got %d", c[0])
@@ -175,7 +179,7 @@ rule GuardedAction {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "endpoint"))
 	g.AddNode(usg.Node{ID: "action", Type: "code.Arg", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 
@@ -194,7 +198,7 @@ rule SameScopeAction {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "sameScope"))
 	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Scope: "sample.go/fn1/if1"})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 
@@ -213,7 +217,7 @@ rule SameScopeAction {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.Call", Loc: "sample.go:10", Scope: "sample.go/fn1"})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "sameScope"))
 	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:20", Scope: "sample.go/fn2"})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 
@@ -270,7 +274,7 @@ rule DominatedAction {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "dominates"))
 	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t/if2.t", Order: 11, HasOrder: true})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 
@@ -291,7 +295,7 @@ rule DominatedAction {
 	g.AddNode(usg.Node{ID: "action", Type: "code.Call", Loc: "sample.go:10", Region: "sample.go/fn1/if1.t", Order: 10, HasOrder: true})
 	g.AddLabel("action", usg.Label{Concept: "custom.Action"})
 	g.AddNode(usg.Node{ID: "release", Type: "code.Call", Loc: "sample.go:20", Region: "sample.go/fn1", Order: 20, HasOrder: true})
-	g.AddLabel("release", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("release", coverageLabel("custom.Transform", "dominates"))
 
 	if c := compileEvalV2(t, rule, g); c[0] != 1 {
 		t.Fatalf("post-dominating release must not satisfy dominates coverage, got %d", c[0])
@@ -329,7 +333,7 @@ rule DominatedFlow {
 	g.AddNode(usg.Node{ID: "input", Type: "code.Call", Loc: "sample.go:5"})
 	g.AddLabel("input", usg.Label{Concept: "custom.Input"})
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "sample.go:10", Region: "sample.go/fn1", Order: 10, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "custom.Transform"})
+	g.AddLabel("guard", coverageLabel("custom.Transform", "dominates"))
 	g.AddNode(usg.Node{ID: "sink", Type: "code.Call", Loc: "sample.go:11", Region: "sample.go/fn1/if1.t", Order: 11, HasOrder: true})
 	g.AddLabel("sink", usg.Label{Concept: "custom.Target"})
 	g.AddEdge(usg.Edge{Type: "FLOWS", Src: "input", Dst: "sink"})
@@ -350,7 +354,7 @@ rule CountDerivedElementAccess {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "guard", Type: "code.BinOp", Loc: "bucket.go:666", Region: "bucket.go/fn143/if144.e/if149.t", Order: 2032, HasOrder: true})
-	g.AddLabel("guard", usg.Label{Concept: "core.MemoryBoundsCheck"})
+	g.AddLabel("guard", coverageLabel("core.MemoryBoundsCheck", "endpoint"))
 	g.AddNode(usg.Node{ID: "idx", Type: "code.Arg", Loc: "bucket.go:667", Region: "bucket.go/fn143/if144.e/if149.t/if150.t", Order: 2038, HasOrder: true})
 	g.AddLabel("idx", usg.Label{Concept: "code.CountDerivedElementAccess"})
 
@@ -377,12 +381,12 @@ module vypr.deserialization;
 rule XxeUnhardened {
   meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
   issue code.XmlParserCreate as p
-  unless p.endpoint coveredBy core.XmlHardening
+  unless p.sameReceiver coveredBy core.XmlHardening
 }
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10", Region: "Parser.java/static", Props: map[string]string{"callee_path": "FACTORY.setFeature"}})
-	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddLabel("hardening", coverageLabel("core.XmlHardening", "sameReceiver"))
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
@@ -409,12 +413,12 @@ module vypr.deserialization;
 rule XxeUnhardened {
   meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
   issue code.XmlParserCreate as p
-  unless p.endpoint coveredBy core.XmlHardening
+  unless p.sameReceiver coveredBy core.XmlHardening
 }
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
-	g.AddLabel("factory", usg.Label{Concept: "core.XmlHardening"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 
@@ -446,7 +450,7 @@ rule XxeUnhardened {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10"})
-	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddLabel("hardening", coverageLabel("core.XmlHardening", "endpoint"))
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20"})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 	g.AddEdge(usg.Edge{Type: "PROTECTS", Src: "hardening", Dst: "parser"})
@@ -468,6 +472,38 @@ rule XxeUnhardened {
 	}
 }
 
+func TestV2EndpointCoveredByIgnoresSameReceiverEvidence(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.endpoint coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parser.ParseRuntime(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("sameReceiver evidence should not satisfy endpoint coverage, got %d findings", len(fs))
+	}
+}
+
 func TestV2SameReceiverCoveredByReceiverNodeLabel(t *testing.T) {
 	rule := `
 module vypr.deserialization;
@@ -479,7 +515,7 @@ rule XxeUnhardened {
 `
 	g := usg.NewInMemStore()
 	g.AddNode(usg.Node{ID: "factory", Type: "code.Name", Loc: "Parser.java:10"})
-	g.AddLabel("factory", usg.Label{Concept: "core.XmlHardening"})
+	g.AddLabel("factory", coverageLabel("core.XmlHardening", "sameReceiver"))
 	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Props: map[string]string{"recv": "factory"}})
 	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
 

@@ -2,5 +2,9 @@ module bindings.go.migration.m48a985c1;
 
 binding memoryBoundsCheck286 {
   query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.ne" and node.token contains "Count" and node.token contains "0"
-  emit check core.MemoryBoundsCheck at node
+  emit check core.MemoryBoundsCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
 }

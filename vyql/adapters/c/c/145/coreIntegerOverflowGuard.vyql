@@ -3,9 +3,8 @@ module bindings.c.migration.mce54b166;
 binding integerOverflowGuard145 {
   query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "(int)size<0" and args.any.literal contains "save+size<save"
   emit check core.IntegerOverflowGuard at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

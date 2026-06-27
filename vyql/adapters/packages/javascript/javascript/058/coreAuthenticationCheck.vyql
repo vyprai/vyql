@@ -6,9 +6,8 @@ binding authenticationCheck58 {
   }
   query pattern callExpr where callee.path ~= "passport.authenticate"
   emit check core.AuthenticationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

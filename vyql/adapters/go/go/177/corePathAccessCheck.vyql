@@ -3,9 +3,8 @@ module bindings.go.migration.m48a985c1;
 binding pathAccessCheck177 {
   query pattern callExpr where callee.path ~= "analysis.function.context" and args.any.literal contains "call_path:strings.Contains" and args.any.literal contains "literal:bad path" and args.any.literal contains "call_path:isSymbolLink" and args.any.literal contains "call_path:ioutil.ReadFile"
   emit check core.PathAccessCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

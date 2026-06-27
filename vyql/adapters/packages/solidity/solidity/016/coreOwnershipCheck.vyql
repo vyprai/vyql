@@ -6,9 +6,8 @@ binding ownershipCheck16 {
   }
   query pattern callExpr where callee.path ~= "onlyOwner"
   emit check core.OwnershipCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

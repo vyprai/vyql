@@ -4,9 +4,8 @@ binding xmlHardening93 {
   query pattern callExpr where callee.path ~= "setXIncludeAware" and args.any.literal contains "false"
   emit check core.XmlHardening at call {
     advisory: true
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

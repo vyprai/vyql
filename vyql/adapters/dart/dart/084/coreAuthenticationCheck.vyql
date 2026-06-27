@@ -3,9 +3,8 @@ module bindings.dart.migration.m1c398214;
 binding authenticationCheck84 {
   query pattern callExpr where callee.path ~= "requireAuth"
   emit check core.AuthenticationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

@@ -3,7 +3,7 @@ module core;
 concept XmlHardening : check {
   analysis_role: same_receiver_guard
   applies: path
-  covers: [endpoint, path]
+  covers: [endpoint, sameReceiver, path]
   cwe: [CWE_611]
   neutralizes: [deserialization.Xxe]
 }

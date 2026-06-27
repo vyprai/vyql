@@ -3,7 +3,7 @@ module bindings.cpp.migration.m4e783366;
 binding resourceRelease71 {
   query pattern callExpr where callee.path ~= "ucsdet_close"
   emit check core.ResourceRelease at call {
-    covers path {
+    covers dominates {
       from: call
       to: call
     }

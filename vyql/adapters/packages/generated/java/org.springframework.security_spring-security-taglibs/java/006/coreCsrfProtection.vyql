@@ -6,9 +6,8 @@ binding csrfProtection6 {
   }
   query pattern callExpr where callee.method == "doEndTag"
   emit check core.CsrfProtection at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

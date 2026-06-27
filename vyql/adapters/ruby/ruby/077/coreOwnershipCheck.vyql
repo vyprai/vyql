@@ -3,9 +3,8 @@ module bindings.ruby.migration.m5a48bf47;
 binding ownershipCheck77 {
   query pattern callExpr where callee.path ~= "owns_resource?"
   emit check core.OwnershipCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

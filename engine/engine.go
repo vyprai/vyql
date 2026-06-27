@@ -933,7 +933,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		edges, _ := e.Store.InEdges(sinkID, et)
 		for _, ed := range edges {
 			for _, l := range e.labels(ed.Src) {
-				if l.Concept != control || labelIsAdvisory(l) {
+				if !labelHasConcreteCoverage(l, control, "endpoint") {
 					continue
 				}
 				if sinkCFG && e.hasCFG(ed.Src) {
@@ -954,7 +954,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	// graphs — those rely on the explicit edge above.
 	guards := e.nodesWithConcept(control)
 	for _, gid := range guards {
-		if e.nodeHasAdvisoryConceptOnly(gid, control) {
+		if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
 			continue
 		}
 		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) {
@@ -963,7 +963,7 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	}
 	if sinkCFG {
 		for _, gid := range guards {
-			if e.nodeHasAdvisoryConceptOnly(gid, control) {
+			if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
 				continue
 			}
 			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
@@ -971,16 +971,13 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 			}
 		}
 		for _, gid := range guards {
-			if e.nodeHasAdvisoryConceptOnly(gid, control) {
+			if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
 				continue
 			}
 			if gid != sinkID && e.preflightLoopGuarded(gid, sinkID) {
 				return true
 			}
 		}
-	}
-	if e.sameReceiverGuarded(sinkID, control) {
-		return true
 	}
 	return false
 }
@@ -1028,7 +1025,7 @@ func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
 		return false
 	}
 	sinkRecv := receiverPrefix(sink.Prop("callee_path"))
-	if recvID := sink.Prop("recv"); recvID != "" && nodeHasConcreteConcept(e.labels(recvID), control) {
+	if recvID := sink.Prop("recv"); recvID != "" && nodeHasConcreteCoverage(e.labels(recvID), control, "sameReceiver") {
 		return true
 	}
 	if sinkRecv == "" {
@@ -1055,7 +1052,7 @@ func (e *Engine) dominanceGuardCandidates(control string) []string {
 	}
 	var out []string
 	for _, gid := range e.nodesWithConcept(control) {
-		if !e.hasCFG(gid) || !nodeHasConcreteConcept(e.labels(gid), control) {
+		if !e.hasCFG(gid) || !nodeHasConcreteCoverage(e.labels(gid), control, "dominates") {
 			continue
 		}
 		out = append(out, gid)
@@ -1070,7 +1067,7 @@ func (e *Engine) sameReceiverGuardReceivers(control string) map[string]bool {
 	}
 	receivers := map[string]bool{}
 	for _, gid := range e.nodesWithConcept(control) {
-		if e.nodeHasAdvisoryConceptOnly(gid, control) {
+		if !nodeHasConcreteCoverage(e.labels(gid), control, "sameReceiver") {
 			continue
 		}
 		guard, ok, _ := e.Store.GetNode(gid)
@@ -1108,7 +1105,7 @@ func (e *Engine) sameScopeGuardScopes(control string) map[string]bool {
 	}
 	scopes := map[string]bool{}
 	for _, gid := range e.nodesWithConcept(control) {
-		if e.nodeHasAdvisoryConceptOnly(gid, control) {
+		if !nodeHasConcreteCoverage(e.labels(gid), control, "sameScope") {
 			continue
 		}
 		guard, ok, _ := e.Store.GetNode(gid)
@@ -1185,6 +1182,19 @@ func nodeHasConcreteConcept(labels []usg.Label, concept string) bool {
 	return false
 }
 
+func labelHasConcreteCoverage(l usg.Label, concept, coverage string) bool {
+	return l.Concept == concept && !labelIsAdvisory(l) && l.Detail != nil && l.Detail["coverage"] == coverage
+}
+
+func nodeHasConcreteCoverage(labels []usg.Label, concept, coverage string) bool {
+	for _, l := range labels {
+		if labelHasConcreteCoverage(l, concept, coverage) {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *Engine) nodeHasAdvisoryConceptOnly(nodeID, concept string) bool {
 	seen := false
 	for _, l := range e.labels(nodeID) {
@@ -1231,7 +1241,7 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 		return false
 	}
 	for i, pid := range path {
-		if i < len(path)-1 && nodeHasConcreteConcept(e.labels(pid), control) {
+		if i < len(path)-1 && nodeHasConcreteCoverage(e.labels(pid), control, "endpoint") {
 			return true
 		}
 		for _, gid := range e.flowGuardCandidates(pid, control) {
@@ -1256,7 +1266,7 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(id string) {
-		if id == "" || seen[id] || !nodeHasConcreteConcept(e.labels(id), control) {
+		if id == "" || seen[id] || !nodeHasConcreteCoverage(e.labels(id), control, "endpoint") {
 			return
 		}
 		seen[id] = true
@@ -1318,7 +1328,7 @@ func (e *Engine) endpointClosed(allocID, control string) bool {
 	allocCFG := e.hasCFG(allocID)
 	releases := e.nodesWithConcept(control)
 	for _, rid := range releases {
-		if e.nodeHasAdvisoryConceptOnly(rid, control) {
+		if !nodeHasConcreteCoverage(e.labels(rid), control, "dominates") {
 			continue
 		}
 		if rid == allocID {

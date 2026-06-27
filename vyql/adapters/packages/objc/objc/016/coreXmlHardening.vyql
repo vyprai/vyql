@@ -6,9 +6,8 @@ binding xmlHardening16 {
   }
   query pattern callExpr where callee.path ~= "NSXMLDocument" and args.any.literal contains "NSXMLNodeLoadExternalEntitiesNever"
   emit check core.XmlHardening at call {
-    covers path {
-      from: call
-      to: call
+    covers sameReceiver {
+      anchor: callee.receiver
     }
   }
 }

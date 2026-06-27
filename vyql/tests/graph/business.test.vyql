@@ -12,7 +12,7 @@ test "a refund action guarded by an authorization check is clean (BIZ-001)"
   graph
   ```
   node refund business.Refund
-  node authz core.AuthorizationCheck
+  node authz core.AuthorizationCheck {coverage=endpoint}
   edge CHECKS authz -> refund
   ```
 
@@ -31,7 +31,7 @@ test "path-sensitive authz: a check dominating the refund suppresses (BIZ-001)"
   reject VYQL-BIZ-001
   graph
   ```
-  node authz core.AuthorizationCheck {region=/fn1, order=1}
+  node authz core.AuthorizationCheck {region=/fn1, order=1, coverage=endpoint}
   node refund business.Refund {region=/fn1, order=5}
   ```
 
@@ -39,6 +39,6 @@ test "path-sensitive authz: a check in a sibling branch does NOT cover the refun
   expect VYQL-BIZ-001
   graph
   ```
-  node authz core.AuthorizationCheck {region=/fn1/if2.e, order=2}
+  node authz core.AuthorizationCheck {region=/fn1/if2.e, order=2, coverage=endpoint}
   node refund business.Refund {region=/fn1/if2.t, order=5}
   ```

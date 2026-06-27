@@ -6,9 +6,8 @@ binding xmlHardening23 {
   }
   query pattern callExpr where callee.path ~= "SweetXml.parse" and args.any.literal contains "dtd=false"
   emit check core.XmlHardening at call {
-    covers path {
-      from: call
-      to: call
+    covers sameReceiver {
+      anchor: callee.receiver
     }
   }
 }

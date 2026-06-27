@@ -3,7 +3,7 @@ module bindings.go.migration.m48a985c1;
 binding lockRelease340 {
   query pattern callExpr where callee.method == "RUnlock"
   emit check core.LockRelease at call {
-    covers path {
+    covers dominates {
       from: call
       to: call
     }

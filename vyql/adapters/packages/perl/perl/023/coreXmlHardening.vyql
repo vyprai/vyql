@@ -6,9 +6,8 @@ binding xmlHardening23 {
   }
   query pattern callExpr where callee.path ~= "XML.LibXML.load_xml" and args.any.literal contains "no_network=true"
   emit check core.XmlHardening at call {
-    covers path {
-      from: call
-      to: call
+    covers sameReceiver {
+      anchor: callee.receiver
     }
   }
 }

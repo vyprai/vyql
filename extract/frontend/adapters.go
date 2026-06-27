@@ -3230,7 +3230,7 @@ func jsPathRegexGuardAdapter() adapters.Adapter {
 				if !safeJSPathComponentRegex(n.Prop("lit0")) {
 					continue
 				}
-				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
+				out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
 			}
 			return out
 		},
@@ -3337,7 +3337,7 @@ func jsSafePathResolverAdapter() adapters.Adapter {
 				method := n.Prop("method")
 				for name := range safe {
 					if path == name || method == name || strings.HasSuffix(path, "."+name) {
-						out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2})
+						out = append(out, adapters.Mapping{NodeID: id, Concept: concept, Specificity: 2, Detail: map[string]string{"coverage": "endpoint"}})
 						break
 					}
 				}

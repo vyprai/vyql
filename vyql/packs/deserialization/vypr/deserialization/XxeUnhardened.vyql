@@ -9,5 +9,6 @@ rule XxeUnhardened {
   }
   issue code.XmlParserCreate as p
   unless p.endpoint coveredBy core.XmlHardening
+  unless p.sameReceiver coveredBy core.XmlHardening
   unless p.path coveredBy core.XmlHardening
 }

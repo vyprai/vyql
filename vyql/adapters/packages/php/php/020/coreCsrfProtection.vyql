@@ -6,9 +6,8 @@ binding csrfProtection20 {
   }
   query pattern callExpr where callee.path ~= "csrf_field"
   emit check core.CsrfProtection at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

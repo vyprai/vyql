@@ -3,9 +3,8 @@ module bindings.javascript.migration.mfb63017a;
 binding authorizationCheck176 {
   query pattern callExpr where callee.path ~= "hasPermission"
   emit check core.AuthorizationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }

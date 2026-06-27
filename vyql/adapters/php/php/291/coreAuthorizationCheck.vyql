@@ -3,9 +3,8 @@ module bindings.php.migration.mfbe84119;
 binding authorizationCheck291 {
   query pattern callExpr where callee.path ~= "current_user_can_for_blog"
   emit check core.AuthorizationCheck at call {
-    covers path {
-      from: call
-      to: call
+    covers endpoint {
+      anchor: call
     }
   }
 }
