@@ -79,7 +79,7 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		for _, rel := range closers {
 			ok := e.endpointClosed(node, rel)
-			ne = append(ne, findings.NegationEvidence{Clause: "closed_by " + rel, Satisfied: ok})
+			ne = append(ne, findings.NegationEvidence{Clause: "dominates_covered_by " + rel, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
 		if suppressed {

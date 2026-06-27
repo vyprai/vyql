@@ -21,7 +21,7 @@ func sampleFinding() *findings.Finding {
 			{Name: "sink", NodeID: "q", Concept: "code.SqlExecution", Loc: "orders.js:14"},
 		},
 		NegationEvidence: []findings.NegationEvidence{
-			{Clause: "sanitized_by core.SqlParameterization", Satisfied: false, Detail: "none found anywhere on flows"},
+			{Clause: "path_covered_by core.SqlParameterization", Satisfied: false, Detail: "none found anywhere on flows"},
 		},
 	}
 }

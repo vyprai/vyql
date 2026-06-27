@@ -51,8 +51,8 @@ rule LegacyPresence {
   match code.DynamicCodeLoad as d
 }
 `
-	if _, err := compiledRulesFor(rules); err == nil || !strings.Contains(err.Error(), "v1 syntax") {
-		t.Fatalf("legacy compile = %v, want v2 syntax rejection", err)
+	if _, err := compiledRulesFor(rules); err == nil {
+		t.Fatalf("legacy compile succeeded, want v2 grammar rejection")
 	}
 }
 

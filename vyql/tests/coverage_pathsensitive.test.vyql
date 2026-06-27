@@ -1,5 +1,5 @@
-# B1.4 — path-sensitive guards. `unless guarded_by` suppresses only when the guard
-# DOMINATES the sink (lies on every CFG path to it). These graph specs carry CFG metadata
+# B1.4 — path-sensitive guards. `unless target.dominates coveredBy ...` suppresses only
+# when the guard DOMINATES the sink (lies on every CFG path to it). These graph specs carry CFG metadata
 # (region/order, as the lowering stamps) on the SAME topology as the presence-model reject
 # in coverage_csrf.test.vyql — proving the difference is dominance, not graph shape.
 # Without CFG metadata the engine falls back to presence semantics (that reject still holds).
@@ -29,7 +29,7 @@ test "path-sensitive: a CSRF guard in a SIBLING branch does NOT cover the sink (
   ```
 
 # Real-code guards (B1 enabler): a guard-control-labelled call (validate_csrf_token)
-# now suppresses the sinks it DOMINATES — `guarded_by` works on code, not just graphs.
+# now suppresses the sinks it DOMINATES through v2 coveredBy semantics.
 
 test "path-sensitive: a CSRF check dominating the state change suppresses (real code)"
   lang python

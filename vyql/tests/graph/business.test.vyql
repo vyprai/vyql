@@ -25,7 +25,7 @@ test "an invalid transition into Refunded (BIZ-002)"
 
 # Path-sensitive authorization (B1): a permission check suppresses only the actions it
 # DOMINATES. These carry CFG metadata (region/order) and NO explicit CHECKS edge — the
-# same dominance-label mechanism that now makes guarded_by work on real code.
+# same dominance-label mechanism used by v2 coveredBy rules on real code.
 
 test "path-sensitive authz: a check dominating the refund suppresses (BIZ-001)"
   reject VYQL-BIZ-001

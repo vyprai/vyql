@@ -571,8 +571,8 @@ func TestParseV2DefinitionsRejectsV1FallbackAndAllowsV2Modules(t *testing.T) {
 adapter javascript {
   source "req.body" -> code.HttpInput
 }
-`); err == nil || !strings.Contains(err.Error(), "v1 syntax") {
-		t.Fatalf("ParseV2Definitions v1 error = %v, want v1 syntax rejection", err)
+`); err == nil {
+		t.Fatalf("ParseV2Definitions accepted legacy adapter syntax")
 	}
 
 	decls, err := parseV2DefinitionsForTest(`
@@ -1742,7 +1742,7 @@ rule LockNotReleased {
 			}
 		case "LockNotReleased":
 			if _, ok := rule.Clauses[0].Unless.(ClosedBy); !ok {
-				t.Fatalf("release-style dominates coveredBy did not preserve closed_by semantics: %+v", rule.Clauses[0])
+				t.Fatalf("release-style dominates coveredBy did not preserve post-dominance semantics: %+v", rule.Clauses[0])
 			}
 		default:
 			t.Fatalf("unexpected rule %s", rule.Name)

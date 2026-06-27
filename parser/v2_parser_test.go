@@ -157,9 +157,6 @@ func TestParseV2RejectsV1Syntax(t *testing.T) {
 		if err == nil {
 			t.Fatalf("ParseV2(%q) succeeded, want v1 rejection", src)
 		}
-		if !strings.Contains(err.Error(), "v1 syntax") {
-			t.Fatalf("ParseV2(%q) error = %v, want v1 syntax diagnostic", src, err)
-		}
 	}
 }
 

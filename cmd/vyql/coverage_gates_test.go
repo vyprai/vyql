@@ -629,6 +629,11 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"type AdapterMapping",
 		"type AdapterFlag",
 	}
+	legacyCoverageClauses := []string{
+		"sanitized_by",
+		"guarded_by",
+		"closed_by",
+	}
 	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -645,6 +650,12 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		src := string(data)
 		importsVyqlParser := strings.Contains(src, `"github.com/vyprai/vyql/parser"`)
 		usesLegacy := false
+		for _, snippet := range legacyCoverageClauses {
+			if strings.Contains(src, snippet) {
+				usesLegacy = true
+				break
+			}
+		}
 		if importsVyqlParser {
 			for _, snippet := range legacyParserCalls {
 				if strings.Contains(src, snippet) {

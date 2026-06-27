@@ -11,8 +11,7 @@ type v2Parser struct {
 	module string
 }
 
-// ParseV2 parses the VyQL v2 language contract. It intentionally rejects v1
-// production forms such as adapter/source/sink/flag/mark/package declarations.
+// ParseV2 parses the VyQL v2 language contract.
 func ParseV2(src string) (prog *V2Program, err error) {
 	toks, lerr := lex(src)
 	if lerr != nil {
@@ -75,10 +74,8 @@ func (p *v2Parser) parseV2Program() *V2Program {
 			if p.at(tSemi) {
 				p.next()
 			}
-		case p.atWord("import"):
-			p.fail("v1 syntax %q is not supported in VyQL v2; use uses", p.peek().val)
 		default:
-			if !moduleSeen && !p.atWord("adapter") && !p.atWord("source") && !p.atWord("sink") && !p.atWord("flag") && !p.atWord("mark") && !p.atWord("filter") && !p.atWord("package") {
+			if !moduleSeen {
 				p.fail("VyQL v2 files require a module declaration before declarations")
 			}
 			declSeen = true
@@ -91,10 +88,6 @@ func (p *v2Parser) parseV2Program() *V2Program {
 
 func (p *v2Parser) parseV2Decl() V2Decl {
 	switch {
-	case p.atWord("adapter"), p.atWord("source"), p.atWord("sink"), p.atWord("flag"), p.atWord("mark"), p.atWord("filter"):
-		p.fail("v1 syntax %q is not supported in VyQL v2", p.peek().val)
-	case p.atWord("package"):
-		p.fail("v1 syntax %q is not supported in VyQL v2; use module or requires dependency(...)", p.peek().val)
 	case p.atWord("concept"):
 		return p.parseV2Concept()
 	case p.atWord("threat"):
@@ -378,9 +371,6 @@ func (p *v2Parser) parseV2Rule() *V2RuleDecl {
 }
 
 func (p *v2Parser) parseV2RuleBody() V2RuleBody {
-	if p.atWord("match") {
-		p.fail("v1 syntax %q is not supported in VyQL v2; use issue or fact", p.peek().val)
-	}
 	if p.atWord("query") {
 		p.next()
 		q := p.parseV2QueryExpr(v2StopAtSelect)
@@ -417,9 +407,6 @@ func (p *v2Parser) parseV2RuleClause() V2RuleClause {
 		return V2RuleClause{Kind: "where", Expr: p.parseV2ExprUntil(v2StopAtRuleClause)}
 	case p.atWord("unless"):
 		p.next()
-		if p.atWord("sanitized_by") || p.atWord("guarded_by") || p.atWord("closed_by") {
-			p.fail("v1 syntax %q is not supported in VyQL v2; use coveredBy", p.peek().val)
-		}
 		target := p.parseV2Location()
 		p.expectWord("coveredBy")
 		return V2RuleClause{Kind: "unless", Target: target, Coverage: lastSeg(target), Concept: p.parseQName()}
