@@ -600,22 +600,42 @@ binding requestBody {
 }
 
 func TestV2DependencyRequirementLowersToLegacyPackageGate(t *testing.T) {
-	decls, err := ParseV2Runtime(`
+	cases := []struct {
+		name string
+		req  string
+		want []string
+	}{
+		{
+			name: "dependency",
+			req:  `dependency("express")`,
+			want: []string{"express"},
+		},
+		{
+			name: "any dependency",
+			req:  `any(dependency("express"), dependency("koa"), dependency("express"))`,
+			want: []string{"express", "koa"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			decls, err := ParseV2Runtime(`
 module bindings.javascript.express;
 binding requestBody {
   requires {
-    dependency("express")
+    ` + tc.req + `
   }
   query pattern callExpr where callee.path ~= "request.body"
   emit source code.HttpInput at call.result
 }
 `)
-	if err != nil {
-		t.Fatalf("ParseV2Runtime: %v", err)
-	}
-	adapter := decls[0].(*AdapterDecl)
-	if got := adapter.Mappings[0].Packages; len(got) != 1 || got[0] != "express" {
-		t.Fatalf("packages = %#v, want express", got)
+			if err != nil {
+				t.Fatalf("ParseV2Runtime: %v", err)
+			}
+			adapter := decls[0].(*AdapterDecl)
+			if got := adapter.Mappings[0].Packages; !stringSlicesEqual(got, tc.want) {
+				t.Fatalf("packages = %#v, want %#v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -641,9 +661,34 @@ func TestV2RequirementLoweringRejectsUnsupportedSemantics(t *testing.T) {
 			want: "native v2 requirement evaluation",
 		},
 		{
-			name: "any dependency",
-			req:  `any(dependency("express"), dependency("koa"))`,
+			name: "all dependency",
+			req:  `all(dependency("express"), dependency("koa"))`,
 			want: "native v2 requirement evaluation",
+		},
+		{
+			name: "top-level import",
+			req:  `import("express")`,
+			want: "native v2 requirement evaluation",
+		},
+		{
+			name: "empty any",
+			req:  `any()`,
+			want: "at least one child",
+		},
+		{
+			name: "nested any",
+			req:  `any(any(dependency("express"), dependency("koa")))`,
+			want: "native v2 requirement evaluation",
+		},
+		{
+			name: "any non-dependency",
+			req:  `any(dependency("express"), import("koa"))`,
+			want: "native v2 requirement evaluation",
+		},
+		{
+			name: "any dependency with range",
+			req:  `any(dependency("express", range: ">=4 <6"), dependency("koa"))`,
+			want: "version ranges",
 		},
 		{
 			name: "multiple top-level requirements",
@@ -1714,4 +1759,16 @@ func parseV2RuntimeFiles(t *testing.T, srcs ...string) []Decl {
 		out = append(out, decls...)
 	}
 	return out
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

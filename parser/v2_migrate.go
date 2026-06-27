@@ -1076,9 +1076,19 @@ func writeV2PackageRequires(b *strings.Builder, pkgs []string) {
 		return
 	}
 	fmt.Fprintf(b, "  requires {\n")
-	for _, pkg := range pkgs {
-		fmt.Fprintf(b, "    dependency(%q)\n", pkg)
+	if len(pkgs) == 1 {
+		fmt.Fprintf(b, "    dependency(%q)\n", pkgs[0])
+		fmt.Fprintf(b, "  }\n")
+		return
 	}
+	fmt.Fprintf(b, "    any(")
+	for i, pkg := range pkgs {
+		if i > 0 {
+			fmt.Fprintf(b, ", ")
+		}
+		fmt.Fprintf(b, "dependency(%q)", pkg)
+	}
+	fmt.Fprintf(b, ")\n")
 	fmt.Fprintf(b, "  }\n")
 }
 

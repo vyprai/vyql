@@ -70,6 +70,51 @@ rule SqlInjection {
 	}
 }
 
+func TestWriteV2PackageRequiresPreservesLegacyOrPackageGate(t *testing.T) {
+	var req strings.Builder
+	writeV2PackageRequires(&req, []string{"express", "koa", "express"})
+	if got := req.String(); !strings.Contains(got, `any(dependency("express"), dependency("koa"), dependency("express"))`) {
+		t.Fatalf("multi-package gate did not use v2 any requirement:\n%s", got)
+	}
+	decls, err := ParseV2Runtime(`
+module bindings.javascript.web;
+binding requestBody {
+` + req.String() + `
+  query pattern callExpr where callee.path ~= "request.body"
+  emit source code.HttpInput at call.result
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime: %v", err)
+	}
+	adapter := decls[0].(*AdapterDecl)
+	if got, want := adapter.Mappings[0].Packages, []string{"express", "koa"}; !stringSlicesEqual(got, want) {
+		t.Fatalf("packages = %#v, want %#v", got, want)
+	}
+
+	migrator := v2Migrator{file: "legacy.vyql", kindPlan: V2MigrationKindPlan{}}
+	src, ok := migrator.convertAdapterMapping("bindings.javascript.web", "javascript", 0, AdapterMapping{
+		Kind:     "source",
+		Pattern:  "request.body",
+		Concept:  "code.HttpInput",
+		Packages: []string{"express", "koa"},
+	})
+	if !ok {
+		t.Fatalf("convertAdapterMapping returned unresolved; ledger=%+v", migrator.ledger)
+	}
+	if !strings.Contains(src, `any(dependency("express"), dependency("koa"))`) {
+		t.Fatalf("converted mapping did not preserve multi-package OR gate:\n%s", src)
+	}
+	decls, err = ParseV2Runtime(src)
+	if err != nil {
+		t.Fatalf("ParseV2Runtime converted mapping: %v\n%s", err, src)
+	}
+	adapter = decls[0].(*AdapterDecl)
+	if got, want := adapter.Mappings[0].Packages, []string{"express", "koa"}; !stringSlicesEqual(got, want) {
+		t.Fatalf("converted packages = %#v, want %#v", got, want)
+	}
+}
+
 func TestConvertV1ToV2UnsupportedConstructsProduceBlockingStubs(t *testing.T) {
 	res, err := ConvertV1ToV2(`
 adapter javascript {

@@ -1626,11 +1626,41 @@ func lowerV2RequirementsToPackages(reqs []V2Requirement) ([]string, error) {
 	if len(reqs) != 1 {
 		return nil, fmt.Errorf("multiple requirements need native v2 requirement evaluation")
 	}
-	pkg, err := lowerV2DependencyRequirement(reqs[0])
-	if err != nil {
-		return nil, err
+	return lowerV2PackageRequirement(reqs[0])
+}
+
+func lowerV2PackageRequirement(req V2Requirement) ([]string, error) {
+	switch req.Name {
+	case "dependency":
+		pkg, err := lowerV2DependencyRequirement(req)
+		if err != nil {
+			return nil, err
+		}
+		return []string{pkg}, nil
+	case "any":
+		if len(req.Args) == 0 {
+			return nil, fmt.Errorf("any dependency requirement needs at least one child")
+		}
+		seen := map[string]bool{}
+		out := make([]string, 0, len(req.Args))
+		for _, raw := range req.Args {
+			child, ok := raw.(V2Requirement)
+			if !ok {
+				return nil, fmt.Errorf("any requirement needs child requirements for legacy package lowering")
+			}
+			pkg, err := lowerV2DependencyRequirement(child)
+			if err != nil {
+				return nil, err
+			}
+			if !seen[pkg] {
+				seen[pkg] = true
+				out = append(out, pkg)
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)
 	}
-	return []string{pkg}, nil
 }
 
 func lowerV2DependencyRequirement(req V2Requirement) (string, error) {
