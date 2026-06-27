@@ -249,7 +249,7 @@ func TestVyqlSpecs(t *testing.T) {
 					// graph spec: build the asset/identity graph and evaluate the packs.
 					store := buildGraphStore(t, s)
 					if s.bindingsTech != "" {
-						if _, _, err := adapterapply.Apply(store, frontend.AdaptersFor(s.bindingsTech), nil); err != nil {
+						if _, _, err := adapterapply.Apply(store, frontend.BindingsFor(s.bindingsTech), nil); err != nil {
 							t.Fatalf("apply %s bindings: %v", s.bindingsTech, err)
 						}
 					}

@@ -14,46 +14,46 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-// language ties a file extension set to its real source→NIR frontend and the
-// framework adapters that label its graph. Adding a language is a frontend +
-// adapter entry only — lowering, resolution, and rules are unchanged (docs/20).
+// language ties a file extension set to its real source->NIR frontend and the
+// v2 binding applicators that label its graph. Adding a language is a frontend +
+// binding entry only; lowering, resolution, and rules are unchanged (docs/20).
 type language struct {
 	name     string
 	exts     map[string]bool
 	extract  func(files []string, root string) (nir.Program, error)
-	adapters func() []adapters.Adapter
+	bindings func() []adapters.Adapter
 }
 
 var languages = []language{
-	{"go", map[string]bool{".go": true}, golang.Extract, frontend.GoAdapters},
-	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonAdapters},
+	{"go", map[string]bool{".go": true}, golang.Extract, frontend.GoBindings},
+	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonBindings},
 	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
-		treesitter.ExtractJavaScript, frontend.JsAdapters},
-	{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
-	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
-	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, frontend.PHPAdapters},
-	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, frontend.CSharpAdapters},
-	{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, frontend.CAdapters},
-	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, frontend.CPPAdapters},
-	{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, frontend.RustAdapters},
-	{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, frontend.BashAdapters},
-	{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, frontend.ScalaAdapters},
-	{"lua", map[string]bool{".lua": true}, treesitter.ExtractLua, frontend.LuaAdapters},
-	{"kotlin", map[string]bool{".kt": true, ".kts": true}, treesitter.ExtractKotlin, frontend.KotlinAdapters},
-	{"powershell", map[string]bool{".ps1": true, ".psm1": true}, treesitter.ExtractPowerShell, frontend.PowerShellAdapters},
-	{"swift", map[string]bool{".swift": true}, treesitter.ExtractSwift, frontend.SwiftAdapters},
-	{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, frontend.PerlAdapters},
-	{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, frontend.SolidityAdapters},
-	{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, frontend.ObjCAdapters},
-	{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, frontend.ElixirAdapters},
-	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, frontend.DartAdapters},
-	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, frontend.GroovyAdapters},
+		treesitter.ExtractJavaScript, frontend.JsBindings},
+	{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, frontend.RubyBindings},
+	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaBindings},
+	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, frontend.PHPBindings},
+	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, frontend.CSharpBindings},
+	{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, frontend.CBindings},
+	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, frontend.CPPBindings},
+	{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, frontend.RustBindings},
+	{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, frontend.BashBindings},
+	{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, frontend.ScalaBindings},
+	{"lua", map[string]bool{".lua": true}, treesitter.ExtractLua, frontend.LuaBindings},
+	{"kotlin", map[string]bool{".kt": true, ".kts": true}, treesitter.ExtractKotlin, frontend.KotlinBindings},
+	{"powershell", map[string]bool{".ps1": true, ".psm1": true}, treesitter.ExtractPowerShell, frontend.PowerShellBindings},
+	{"swift", map[string]bool{".swift": true}, treesitter.ExtractSwift, frontend.SwiftBindings},
+	{"perl", map[string]bool{".pl": true, ".pm": true, ".cgi": true}, treesitter.ExtractPerl, frontend.PerlBindings},
+	{"solidity", map[string]bool{".sol": true}, treesitter.ExtractSolidity, frontend.SolidityBindings},
+	{"objc", map[string]bool{".m": true}, treesitter.ExtractObjC, frontend.ObjCBindings},
+	{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, frontend.ElixirBindings},
+	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, frontend.DartBindings},
+	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, frontend.GroovyBindings},
 	// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML,
 	// Terraform, Python setup.cfg, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
-	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternAdapters},
+		".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigBindings},
+	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternBindings},
 }
 
 // scanStats reports per-language file counts for the run summary.
@@ -63,8 +63,8 @@ type scanStats struct {
 }
 
 // extractAll routes every path to the right frontend(s), merges into one NIR
-// Program, and returns the union of adapters + constructor→type tables for the
-// languages present.
+// Program, and returns the union of binding applicators + constructor→type
+// tables for the languages present.
 func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]string, scanStats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
@@ -100,11 +100,11 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		}
 	}
 
-	var ads []adapters.Adapter
+	var bindingApps []adapters.Adapter
 	ctorTypes := map[string]string{}
 	for _, lg := range languages {
 		if present[lg.name] {
-			ads = append(ads, lg.adapters()...)
+			bindingApps = append(bindingApps, lg.bindings()...)
 			for k, v := range frontend.CtorTypesFor(lg.name) {
 				ctorTypes[k] = v
 			}
@@ -112,14 +112,14 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		}
 	}
 	if len(prog.Modules) > 0 {
-		ads = append(ads, frontend.AutoAdapters()...)
+		bindingApps = append(bindingApps, frontend.AutoBindings()...)
 	}
 	// Bundled .properties config is resolved to a flat key->value map so frontends can
 	// preserve configuration constants through lowering.
 	if props := collectProperties(paths); len(props) > 0 {
 		prog.Properties = props
 	}
-	return prog, ads, ctorTypes, stats, nil
+	return prog, bindingApps, ctorTypes, stats, nil
 }
 
 func filterEntriesForLanguage(entries []treesitter.Entry, lg language) []string {

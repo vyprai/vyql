@@ -30,9 +30,9 @@ func (f fakeDelta) PutRaw(k string, v []byte)      { f[k] = append([]byte(nil), 
 // source MUST yield the same set.
 func scanFindingKeys(t *testing.T, paths []string, cache lowering.DeltaCache) []string {
 	t.Helper()
-	g, err := buildGraphWithSyntheticAdapters(paths, cache)
+	g, err := buildGraphWithSyntheticBindings(paths, cache)
 	if err != nil {
-		t.Fatalf("buildGraphWithSyntheticAdapters: %v", err)
+		t.Fatalf("buildGraphWithSyntheticBindings: %v", err)
 	}
 	if g == nil {
 		return nil
@@ -70,7 +70,7 @@ func findingKey(f *findings.Finding) string {
 	return f.RuleID + "@" + sink
 }
 
-func buildGraphWithSyntheticAdapters(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
+func buildGraphWithSyntheticBindings(paths []string, cache lowering.DeltaCache) (usg.Store, error) {
 	prog, _, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, err
@@ -89,12 +89,12 @@ func buildGraphWithSyntheticAdapters(paths []string, cache lowering.DeltaCache) 
 	if err != nil {
 		return nil, err
 	}
-	ads := syntheticIncrementalAdapters()
+	bindingApps := syntheticIncrementalBindings()
 	if cache != nil {
-		if _, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), nil, cache); err != nil {
+		if _, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), nil, cache); err != nil {
 			return nil, err
 		}
-	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+	} else if _, _, err := adapters.Apply(g, bindingApps, nil); err != nil {
 		return nil, err
 	}
 	return g, nil
@@ -131,7 +131,7 @@ func syntheticIncrementalOntology() *ontology.Ontology {
 	return onto
 }
 
-func syntheticIncrementalAdapters() []adapters.Adapter {
+func syntheticIncrementalBindings() []adapters.Adapter {
 	return []adapters.Adapter{
 		{
 			Name: "test.input", Technology: "test", Specificity: 10,
@@ -205,27 +205,27 @@ func eqKeys(a, b []string) bool {
 	return true
 }
 
-func adapterStatKey(root string) string {
+func bindingStatKey(root string) string {
 	h := sha256.New()
-	statStaticAdapterData(h, root)
+	statStaticBindingData(h, root)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func TestStaticAdapterFingerprintIncludesSplitLayout(t *testing.T) {
+func TestStaticBindingFingerprintIncludesSplitLayout(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "javascript.vyql"), "module bindings.javascript.flat;\n")
-	before := adapterStatKey(root)
+	before := bindingStatKey(root)
 
 	writeFile(t, filepath.Join(root, "javascript", "javascript", "001", "codeHttpInput.vyql"), "module bindings.javascript.split;\n")
-	afterSplit := adapterStatKey(root)
+	afterSplit := bindingStatKey(root)
 	if afterSplit == before {
-		t.Fatal("static adapter fingerprint did not include split adapter file")
+		t.Fatal("static binding fingerprint did not include split binding file")
 	}
 
 	writeFile(t, filepath.Join(root, "packages", "generated", "javascript", "express.vyql"), "module bindings.javascript.generated;\n")
-	afterGenerated := adapterStatKey(root)
+	afterGenerated := bindingStatKey(root)
 	if afterGenerated != afterSplit {
-		t.Fatal("static adapter fingerprint should not include generated package corpus")
+		t.Fatal("static binding fingerprint should not include generated package corpus")
 	}
 }
 

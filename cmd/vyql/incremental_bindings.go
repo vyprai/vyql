@@ -16,8 +16,8 @@ import (
 	"github.com/vyprai/vyql/usg"
 )
 
-// encodeLabels/decodeLabels are a compact length-prefixed codec for one module's adapter-label
-// output — far faster than gob (no reflection, fewer allocations), the dominant cost of replaying
+// encodeLabels/decodeLabels are a compact length-prefixed codec for one module's binding-label
+// output - far faster than gob (no reflection, fewer allocations), the dominant cost of replaying
 // thousands of modules' cached labels per warm scan. The bytes are a cache value (never hashed),
 // so encoding order is free; round-trip fidelity is gated by the findings-equivalence harness.
 func encodeLabels(recs []usg.LabelRec) []byte {
@@ -117,37 +117,37 @@ func (r *lblReader) smap() map[string]string {
 	return m
 }
 
-// applyAdaptersIncremental runs the adapter labeling phase reusing the cached concept labels of
-// modules whose content AND the global adapter inputs are unchanged, re-running adapters only on
-// the rest. This is the adapter analogue of incremental lowering.
+// applyBindingsIncremental runs the binding labeling phase reusing the cached concept labels of
+// modules whose content AND the global binding inputs are unchanged, re-running binding
+// applicators only on the rest. This is the binding analogue of incremental lowering.
 //
 // Soundness rests on adapters.Apply resolving precedence strictly per-(node, concept): a node's
 // final labels depend only on proposals targeting that exact node (its own properties plus the
 // global package/import evidence), never on other code nodes. Since each node belongs to exactly
-// one module, restricting the adapter pass to a subset of modules yields labels byte-identical
+// one module, restricting the binding pass to a subset of modules yields labels byte-identical
 // to a full pass for those modules. Import and SBOM nodes stay fully visible (RestrictStore),
 // so package-evidence gating is unaffected by which modules are in the relabel set.
 //
-// The per-module cache key folds in adapterFingerprint — the active source set (profile), the
-// package-evidence set, and a stat-hash of the loaded adapter data — so any change to a global
-// adapter input misses every module and re-labels the whole graph. modHash maps each module's
+// The per-module cache key folds in bindingFingerprint - the active source set (profile), the
+// package-evidence set, and a stat-hash of the loaded binding data - so any change to a global
+// binding input misses every module and re-labels the whole graph. modHash maps each module's
 // namespace (lowering.ModuleNS) to its content hash; a module absent from it (e.g. a native
 // frontend with no Hash) is always relabeled and never cached.
-func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
-	fp := adapterFingerprint(deps)
+func applyBindingsIncremental(g usg.Store, bindingApps []adapters.Adapter, modHash map[string]string, deps map[string]bool, cache lowering.DeltaCache) (map[string]bool, error) {
+	fp := bindingFingerprint(deps)
 
-	// decide which modules must be (re)labeled: those whose adapter-cache key misses. Read all
-	// module keys in one batched transaction — thousands of individual badger reads here was the
+	// decide which modules must be (re)labeled: those whose binding-cache key misses. Read all
+	// module keys in one batched transaction - thousands of individual badger reads here was the
 	// dominant cost of a large incremental scan (I/O-bound, invisible to a CPU profile).
 	keys := make([]string, 0, len(modHash))
 	for ns, h := range modHash {
-		keys = append(keys, adapterKey(fp, ns, h))
+		keys = append(keys, bindingKey(fp, ns, h))
 	}
 	raws := batchGet(cache, keys)
 	relabel := map[string]bool{}
 	cachedFor := map[string][]usg.LabelRec{}
 	for ns, h := range modHash {
-		if raw, ok := raws[adapterKey(fp, ns, h)]; ok {
+		if raw, ok := raws[bindingKey(fp, ns, h)]; ok {
 			if recs, ok := decodeLabels(raw); ok {
 				cachedFor[ns] = recs
 				continue
@@ -156,28 +156,29 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 		relabel[ns] = true
 	}
 
-	// run adapters over a view that exposes only relabel-set modules (plus nodes with no module
-	// and all Import/SBOM evidence), recording the labels each produces. The subset is computed
-	// once; each adapter then iterates O(subset) instead of re-filtering the whole graph.
+	// Run binding applicators over a view that exposes only relabel-set modules
+	// plus nodes with no module and all Import/SBOM evidence. The subset is
+	// computed once; each applicator then iterates O(subset) instead of
+	// re-filtering the whole graph.
 	rec := &usg.RecordingStore{Store: g}
 	view, err := usg.NewSubsetStore(rec, func(id, _ string) bool {
 		mod, ok := lowering.NodeModule(id)
 		if !ok {
-			return true // not module-scoped — always process, never cached
+			return true // not module-scoped - always process, never cached
 		}
 		if _, hashed := modHash[mod]; !hashed {
-			return true // hashless module (native frontend, no content hash) — always relabel
+			return true // hashless module (native frontend, no content hash) - always relabel
 		}
 		return relabel[mod]
 	})
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := adapters.Apply(view, ads, nil); err != nil {
+	if _, _, err := adapters.Apply(view, bindingApps, nil); err != nil {
 		return nil, err
 	}
 
-	// bucket recorded labels by module, then persist one entry per relabeled module — even an
+	// bucket recorded labels by module, then persist one entry per relabeled module - even an
 	// empty one, so a label-free module hits next time instead of re-running every scan.
 	buckets := map[string][]usg.LabelRec{}
 	for _, lr := range rec.Recs {
@@ -187,7 +188,7 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 	}
 	writes := make(map[string][]byte, len(relabel))
 	for ns := range relabel {
-		writes[adapterKey(fp, ns, modHash[ns])] = encodeLabels(buckets[ns])
+		writes[bindingKey(fp, ns, modHash[ns])] = encodeLabels(buckets[ns])
 	}
 	batchPut(cache, writes)
 
@@ -200,8 +201,8 @@ func applyAdaptersIncremental(g usg.Store, ads []adapters.Adapter, modHash map[s
 	return relabel, nil
 }
 
-func adapterKey(fp, moduleNS, moduleHash string) string {
-	return "adapt\x00" + fp + "\x00" + moduleNS + "\x00" + moduleHash
+func bindingKey(fp, moduleNS, moduleHash string) string {
+	return "bind\x00" + fp + "\x00" + moduleNS + "\x00" + moduleHash
 }
 
 // batchReader / batchWriter are the optional fast paths a real (badger-backed) DeltaCache
@@ -237,12 +238,12 @@ func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
 	}
 }
 
-// adapterFingerprint hashes every global input the adapter phase depends on besides a module's
+// bindingFingerprint hashes every global input the binding phase depends on besides a module's
 // own nodes: the binary salt (a rebuilt scanner re-labels everything), the active source set,
-// the package-evidence set (which package-scoped adapters fire), and a stat-hash of the loaded
-// adapter data (static per-language adapters + the generated per-package files for present
-// deps). If this is unchanged, a module's adapter labels are reproducible from its content.
-func adapterFingerprint(deps map[string]bool) string {
+// the package-evidence set (which package-scoped bindings fire), and a stat-hash of the loaded
+// binding data (static per-language bindings + the generated per-package files for present
+// deps). If this is unchanged, a module's binding labels are reproducible from its content.
+func bindingFingerprint(deps map[string]bool) string {
 	h := sha256.New()
 	if cache := parsecache.Shared(); cache != nil {
 		if salt := cache.Salt(); salt != nil {
@@ -263,19 +264,19 @@ func adapterFingerprint(deps map[string]bool) string {
 		io.WriteString(h, "\x00")
 	}
 
-	io.WriteString(h, "\x00adata\x00")
-	statAdapterData(h, deps)
+	io.WriteString(h, "\x00bdata\x00")
+	statBindingData(h, deps)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// statAdapterData folds the identity (path+size+mtime) of the adapter data that
-// actually loads into h: split v2 static adapters plus the generated per-package
+// statBindingData folds the identity (path+size+mtime) of the binding data that
+// actually loads into h: split v2 static bindings plus the generated per-package
 // files for packages in deps. It deliberately avoids stat-walking the full
-// generated corpus — only the matched generated files matter, and walking all of
+// generated corpus - only the matched generated files matter, and walking all of
 // them every scan would cost what this cache saves.
-func statAdapterData(h hash.Hash, deps map[string]bool) {
+func statBindingData(h hash.Hash, deps map[string]bool) {
 	root := filepath.Join(datadir.Root(), "bindings")
-	statStaticAdapterData(h, root)
+	statStaticBindingData(h, root)
 	if len(deps) == 0 {
 		return
 	}
@@ -289,18 +290,18 @@ func statAdapterData(h hash.Hash, deps map[string]bool) {
 	sort.Strings(langs)
 	for _, langDir := range langs {
 		for _, p := range pkgs {
-			statGeneratedPackageAdapter(h, langDir, p)
+			statGeneratedPackageBinding(h, langDir, p)
 		}
 	}
 }
 
-func statGeneratedPackageAdapter(h hash.Hash, langDir, pkg string) {
+func statGeneratedPackageBinding(h hash.Hash, langDir, pkg string) {
 	dir := filepath.Join(langDir, pkg)
 	statVYQLTreeExcept(h, dir, nil)
 	statFile(h, dir+".vyql")
 }
 
-func statStaticAdapterData(h hash.Hash, root string) {
+func statStaticBindingData(h hash.Hash, root string) {
 	statVYQLTreeExcept(h, root, map[string]bool{
 		"packages/generated": true,
 	})

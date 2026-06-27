@@ -759,9 +759,9 @@ func legacyV1DefinitionLinePatterns() []*regexp.Regexp {
 	}
 }
 
-// T0.5 — every adapter loads (parses v2 bindings and builds graph-labeling actions)
-// without panicking, for every adapter shipped under vyql/bindings/.
-func TestAllAdaptersLoadGate(t *testing.T) {
+// T0.5 — every binding set loads (parses v2 bindings and builds graph-labeling
+// applicators) without panicking, for every technology shipped under vyql/bindings/.
+func TestAllBindingsLoadGate(t *testing.T) {
 	root := filepath.Join(datadir.Root(), "bindings")
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -775,11 +775,11 @@ func TestAllAdaptersLoadGate(t *testing.T) {
 		t.Run(tech, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {
-					t.Fatalf("adapter %q failed to load: %v", tech, r)
+					t.Fatalf("binding set %q failed to load: %v", tech, r)
 				}
 			}()
-			if n := len(frontend.AdaptersFor(tech)); n == 0 {
-				t.Errorf("adapter %q produced no adapters", tech)
+			if n := len(frontend.BindingsFor(tech)); n == 0 {
+				t.Errorf("binding set %q produced no graph-labeling applicators", tech)
 			}
 		})
 	}
@@ -804,8 +804,8 @@ func TestEverySourceLanguageHasV2TaintEndpointCoverage(t *testing.T) {
 			if checkCount == 0 {
 				t.Fatalf("%q has no v2 check coverage definitions", lang)
 			}
-			if n := len(frontend.AdaptersFor(lang)); n == 0 {
-				t.Fatalf("%q frontend produced no runtime adapters", lang)
+			if n := len(frontend.BindingsFor(lang)); n == 0 {
+				t.Fatalf("%q frontend produced no binding applicators", lang)
 			}
 		})
 	}
@@ -932,7 +932,35 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 		"cmdAdapters",
 		"cmdValidateAdapter",
 		"OverlayAdapters",
+		"applyAdaptersIncremental",
+		"syntheticIncrementalAdapters",
+		"buildGraphWithSyntheticAdapters",
 		"GeneratedPackageAdaptersFor",
+		"AdaptersFor(",
+		"AutoAdapters(",
+		"ConfigAdapters(",
+		"TextPatternAdapters(",
+		"PythonAdapters(",
+		"JsAdapters(",
+		"RubyAdapters(",
+		"GoAdapters(",
+		"JavaAdapters(",
+		"PHPAdapters(",
+		"CSharpAdapters(",
+		"CAdapters(",
+		"CPPAdapters(",
+		"RustAdapters(",
+		"BashAdapters(",
+		"ScalaAdapters(",
+		"LuaAdapters(",
+		"KotlinAdapters(",
+		"PowerShellAdapters(",
+		"SwiftAdapters(",
+		"PerlAdapters(",
+		"SolidityAdapters(",
+		"ObjCAdapters(",
+		"adaptersFromSpec",
+		"loadAutoBindings",
 		"parseGeneratedPackageAdapterSource",
 		"adapter-overlay",
 		"overlay adapter",

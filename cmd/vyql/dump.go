@@ -38,7 +38,7 @@ func lowerCache() lowering.DeltaCache {
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
 	tk := newTimer()
-	prog, ads, ctorTypes, stats, err := extractAll(paths)
+	prog, bindingApps, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, stats, err
 	}
@@ -56,7 +56,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		if len(nodes) == 0 {
 			return nil, stats, nil
 		}
-		if _, _, err := adapters.Apply(g, frontend.AutoAdapters(), nil); err != nil {
+		if _, _, err := adapters.Apply(g, frontend.AutoBindings(), nil); err != nil {
 			return nil, stats, err
 		}
 		tk.mark("sca+bindings")
@@ -86,25 +86,25 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// framework bindings.
 	deps := frontend.DependencyEvidence(g)
 	for _, lang := range stats.languages {
-		ads = append(ads, frontend.GeneratedPackageBindingsFor(lang, deps)...)
+		bindingApps = append(bindingApps, frontend.GeneratedPackageBindingsFor(lang, deps)...)
 	}
 	if overlay := strings.TrimSpace(scanBindingOverlay); overlay != "" {
 		extra, err := frontend.OverlayBindings(overlay, stats.languages)
 		if err != nil {
 			return nil, stats, fmt.Errorf("binding overlay: %w", err)
 		}
-		ads = append(ads, extra...)
+		bindingApps = append(bindingApps, extra...)
 	}
 	tk.mark("sca+pkg")
 	// Binding labeling: incremental (reuse unchanged modules' cached labels) when caching is
 	// on, else a full pass. Both produce identical labels — binding precedence is per-node.
 	if incremental {
-		relabel, err := applyAdaptersIncremental(g, ads, moduleHashes(prog), deps, cache)
+		relabel, err := applyBindingsIncremental(g, bindingApps, moduleHashes(prog), deps, cache)
 		if err != nil {
 			return nil, stats, err
 		}
 		// Graph DB change-feed: collect the label rows of every label-dirty module. Label-dirty
-		// = the adapter relabel set ∪ the lowering fresh set (a fresh module's labels may also
+		// is the binding relabel set plus the lowering fresh set (a fresh module's labels may also
 		// have changed; re-emitting unchanged ones is an idempotent upsert). Nodes come from the
 		// same pass (fresh set); edges were collected creator-attributed during lowering.
 		if syncCollector != nil {
@@ -122,7 +122,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 				return nil, stats, err
 			}
 		}
-	} else if _, _, err := adapters.Apply(g, ads, nil); err != nil {
+	} else if _, _, err := adapters.Apply(g, bindingApps, nil); err != nil {
 		return nil, stats, err
 	}
 	tk.mark("bindings")
@@ -130,7 +130,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 }
 
 // moduleHashes maps each content-addressed module's namespace (lowering.ModuleNS) to its
-// content hash, the per-module identity the incremental adapter-label cache keys on. Modules
+// content hash, the per-module identity the incremental binding-label cache keys on. Modules
 // without a Hash (native frontends) are omitted, so they are always relabeled.
 func moduleHashes(prog nir.Program) map[string]string {
 	m := map[string]string{}

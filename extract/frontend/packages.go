@@ -89,7 +89,7 @@ func GeneratedPackageBindingsFor(tech string, deps map[string]bool) []adapters.A
 	if len(merged.Mappings) == 0 {
 		return nil
 	}
-	return adaptersFromSpec(specFromBindingSet(merged))
+	return bindingApplicatorsFromSpec(specFromBindingSet(merged))
 }
 
 func readGeneratedPackageBindingSources(tech, pkg string) ([]datadir.Source, error) {

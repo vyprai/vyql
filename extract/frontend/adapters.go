@@ -1,6 +1,6 @@
 // Package frontend turns extracted code.* graphs into concept labels using
-// framework adapters (docs/07). The adapter CONTENT — which framework calls
-// are inputs, sinks, controls, and which constructors yield which types — is
+// framework bindings (docs/07). The binding content - which framework calls
+// are inputs, sinks, controls, and which constructors yield which types - is
 // VyQL, authored in vyql/bindings/<tech>.vyql and loaded at runtime. Only the
 // matching engine and the language parsers are Go code.
 package frontend
@@ -136,8 +136,8 @@ type cachedAutoBindings struct {
 func SetActiveSources(s map[string]bool) { activeSources = s }
 
 // ActiveSourcesKey returns a deterministic fingerprint of the active source set for the
-// incremental adapter-label cache: changing the profile changes which
-// source labels adapters emit, so cached labels from one profile must not be reused under
+// incremental binding-label cache: changing the profile changes which
+// source labels bindings emit, so cached labels from one profile must not be reused under
 // another. "*" means no filter (every source active).
 func ActiveSourcesKey() string {
 	if activeSources == nil {
@@ -832,10 +832,10 @@ type adapterSpec struct {
 	ParamSources         []paramSourceSpec // `source param -> X`: concepts to label parameter nodes with
 }
 
-// AdaptersFor loads v2 bindings for a technology and builds the graph-labeling
-// adapters that apply those bindings to an extracted graph.
-func AdaptersFor(tech string) []adapters.Adapter {
-	out := adaptersFromSpec(loadSpec(tech))
+// BindingsFor loads v2 bindings for a technology and builds the graph-labeling
+// applicators that apply those bindings to an extracted graph.
+func BindingsFor(tech string) []adapters.Adapter {
+	out := bindingApplicatorsFromSpec(loadSpec(tech))
 	if tech == "javascript" {
 		out = append(out, jsDomValueInputAdapter())
 		out = append(out, jsPathRegexGuardAdapter())
@@ -897,16 +897,16 @@ func OverlayBindings(root string, techs []string) ([]adapters.Adapter, error) {
 			}
 			spec := specFromBindingSet(ad)
 			spec.Name = "overlay." + spec.Name
-			out = append(out, adaptersFromSpec(spec)...)
+			out = append(out, bindingApplicatorsFromSpec(spec)...)
 		}
 	}
 	return out, nil
 }
 
-// adaptersFromSpec turns a compiled binding spec into concrete graph-labeling
-// adapters, one per action family present. Shared by AdaptersFor and the
-// dynamic package loader.
-func adaptersFromSpec(spec adapterSpec) []adapters.Adapter {
+// bindingApplicatorsFromSpec turns a compiled binding spec into concrete
+// graph-labeling applicators, one per action family present. Shared by
+// BindingsFor and the dynamic package loader.
+func bindingApplicatorsFromSpec(spec adapterSpec) []adapters.Adapter {
 	var out []adapters.Adapter
 	if len(spec.Inputs) > 0 {
 		out = append(out, spec.inputAdapter())
@@ -4047,13 +4047,13 @@ func matchPath(path string, patterns []string, mode string) bool {
 	return false
 }
 
-// Per-language adapter sets (loaded from vyql/bindings/<tech>/).
-func ConfigAdapters() []adapters.Adapter      { return AdaptersFor("config") }
-func TextPatternAdapters() []adapters.Adapter { return AdaptersFor("textpattern") }
+// Per-language binding applicator sets (loaded from vyql/bindings/<tech>/).
+func ConfigBindings() []adapters.Adapter      { return BindingsFor("config") }
+func TextPatternBindings() []adapters.Adapter { return BindingsFor("textpattern") }
 
-// AutoAdapters returns v2 binding sets that opt into whole-graph application through
+// AutoBindings returns v2 binding sets that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
-func AutoAdapters() []adapters.Adapter {
+func AutoBindings() []adapters.Adapter {
 	const key = "v2"
 	if cached, ok := autoBindingsCache.Load(key); ok {
 		res := cached.(cachedAutoBindings)
@@ -4062,7 +4062,7 @@ func AutoAdapters() []adapters.Adapter {
 		}
 		return res.data
 	}
-	data, err := loadAutoBindings()
+	data, err := loadAutoBindingApplicators()
 	res := cachedAutoBindings{data: data, err: err}
 	actual, _ := autoBindingsCache.LoadOrStore(key, res)
 	actualRes := actual.(cachedAutoBindings)
@@ -4072,7 +4072,7 @@ func AutoAdapters() []adapters.Adapter {
 	return actualRes.data
 }
 
-func loadAutoBindings() ([]adapters.Adapter, error) {
+func loadAutoBindingApplicators() ([]adapters.Adapter, error) {
 	sources, err := autoBindingSources()
 	if err != nil {
 		return nil, fmt.Errorf("frontend: read auto bindings: %w", err)
@@ -4103,7 +4103,7 @@ func loadAutoBindings() ([]adapters.Adapter, error) {
 	for _, name := range order {
 		ad := byName[name]
 		if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
-			out = append(out, adaptersFromSpec(specFromBindingSet(ad))...)
+			out = append(out, bindingApplicatorsFromSpec(specFromBindingSet(ad))...)
 		}
 	}
 	return out, nil
@@ -4547,28 +4547,28 @@ func safeProcessArgVectorSeq(s usg.Store, idx *collectionFlowIndex, seqID string
 	}
 }
 
-func ElixirAdapters() []adapters.Adapter     { return AdaptersFor("elixir") }
-func DartAdapters() []adapters.Adapter       { return AdaptersFor("dart") }
-func GroovyAdapters() []adapters.Adapter     { return AdaptersFor("groovy") }
-func PythonAdapters() []adapters.Adapter     { return AdaptersFor("python") }
-func JsAdapters() []adapters.Adapter         { return AdaptersFor("javascript") }
-func RubyAdapters() []adapters.Adapter       { return AdaptersFor("ruby") }
-func GoAdapters() []adapters.Adapter         { return AdaptersFor("go") }
-func JavaAdapters() []adapters.Adapter       { return AdaptersFor("java") }
-func PHPAdapters() []adapters.Adapter        { return AdaptersFor("php") }
-func CSharpAdapters() []adapters.Adapter     { return AdaptersFor("csharp") }
-func CAdapters() []adapters.Adapter          { return AdaptersFor("c") }
-func CPPAdapters() []adapters.Adapter        { return AdaptersFor("cpp") }
-func RustAdapters() []adapters.Adapter       { return AdaptersFor("rust") }
-func BashAdapters() []adapters.Adapter       { return AdaptersFor("bash") }
-func ScalaAdapters() []adapters.Adapter      { return AdaptersFor("scala") }
-func LuaAdapters() []adapters.Adapter        { return AdaptersFor("lua") }
-func KotlinAdapters() []adapters.Adapter     { return AdaptersFor("kotlin") }
-func PowerShellAdapters() []adapters.Adapter { return AdaptersFor("powershell") }
-func SwiftAdapters() []adapters.Adapter      { return AdaptersFor("swift") }
-func PerlAdapters() []adapters.Adapter       { return AdaptersFor("perl") }
-func SolidityAdapters() []adapters.Adapter   { return AdaptersFor("solidity") }
-func ObjCAdapters() []adapters.Adapter       { return AdaptersFor("objc") }
+func ElixirBindings() []adapters.Adapter     { return BindingsFor("elixir") }
+func DartBindings() []adapters.Adapter       { return BindingsFor("dart") }
+func GroovyBindings() []adapters.Adapter     { return BindingsFor("groovy") }
+func PythonBindings() []adapters.Adapter     { return BindingsFor("python") }
+func JsBindings() []adapters.Adapter         { return BindingsFor("javascript") }
+func RubyBindings() []adapters.Adapter       { return BindingsFor("ruby") }
+func GoBindings() []adapters.Adapter         { return BindingsFor("go") }
+func JavaBindings() []adapters.Adapter       { return BindingsFor("java") }
+func PHPBindings() []adapters.Adapter        { return BindingsFor("php") }
+func CSharpBindings() []adapters.Adapter     { return BindingsFor("csharp") }
+func CBindings() []adapters.Adapter          { return BindingsFor("c") }
+func CPPBindings() []adapters.Adapter        { return BindingsFor("cpp") }
+func RustBindings() []adapters.Adapter       { return BindingsFor("rust") }
+func BashBindings() []adapters.Adapter       { return BindingsFor("bash") }
+func ScalaBindings() []adapters.Adapter      { return BindingsFor("scala") }
+func LuaBindings() []adapters.Adapter        { return BindingsFor("lua") }
+func KotlinBindings() []adapters.Adapter     { return BindingsFor("kotlin") }
+func PowerShellBindings() []adapters.Adapter { return BindingsFor("powershell") }
+func SwiftBindings() []adapters.Adapter      { return BindingsFor("swift") }
+func PerlBindings() []adapters.Adapter       { return BindingsFor("perl") }
+func SolidityBindings() []adapters.Adapter   { return BindingsFor("solidity") }
+func ObjCBindings() []adapters.Adapter       { return BindingsFor("objc") }
 
 // containsStr reports whether xs contains v.
 func containsStr(xs []string, v string) bool {
