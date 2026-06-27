@@ -964,12 +964,16 @@ binding aliasOutParam {
   query pattern callExpr where callee.method == "alias"
   propagate identity from args[0] to args[1].pointee
 }
+binding fluentBuilder {
+  query pattern callExpr where callee.method == "setOption"
+  propagate receiver from callee.receiver to call.result
+}
 `)
 	if err != nil {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	adapter := decls[0].(*BindingSet)
-	if adapter.Name != "c" || len(adapter.Mappings) != 4 {
+	if adapter.Name != "c" || len(adapter.Mappings) != 5 {
 		t.Fatalf("adapter lowering wrong: %+v", adapter)
 	}
 	if got := adapter.Mappings[0]; got.Kind != "flow_method" || got.Pattern != "decode" || got.FlowSourceArg != 0 || got.FlowSourceResult || got.FlowDestArg != 1 {
@@ -983,6 +987,9 @@ binding aliasOutParam {
 	}
 	if got := adapter.Mappings[3]; got.Kind != "flow_method" || got.Pattern != "alias" || got.FlowSourceArg != 0 || got.FlowSourceResult || got.FlowDestArg != 1 || !got.FlowIdentity {
 		t.Fatalf("identity propagation wrong: %+v", got)
+	}
+	if got := adapter.Mappings[4]; got.Kind != "flow_method" || got.Pattern != "setOption" || !got.FlowReceiver {
+		t.Fatalf("receiver propagation wrong: %+v", got)
 	}
 }
 

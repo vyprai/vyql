@@ -92,6 +92,7 @@ type BindingAction struct {
 	FlowSourceArg    int    // value-propagation source argument index; -1 when source is the call result
 	FlowSourceResult bool   // call result flows into destination out-param
 	FlowIdentity     bool   // destination aliases the source node instead of receiving a taint join
+	FlowReceiver     bool   // receiver propagates to call result for fluent APIs
 	Advisory         bool   // advisory check evidence; must not suppress findings
 	Coverage         string // v2 coverage mode for advisory check evidence
 	Flag             *BindingPresence

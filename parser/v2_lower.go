@@ -2024,12 +2024,24 @@ func lowerV2ReceiverConstraint(cmp V2BinaryExpr) (string, bool) {
 }
 
 func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, action V2BindingOutput, pkgs []string, req *BindingRequirement) (BindingAction, error) {
-	if action.Kind != "propagate value" && action.Kind != "propagate taint" && action.Kind != "propagate identity" {
+	if action.Kind != "propagate value" && action.Kind != "propagate taint" && action.Kind != "propagate identity" && action.Kind != "propagate receiver" {
 		return BindingAction{}, fmt.Errorf("binding %s: unsupported propagation kind %q", binding, action.Kind)
 	}
 	kind := "flow_path"
 	if shape.Field == "callee.method" {
 		kind = "flow_method"
+	}
+	if action.Kind == "propagate receiver" {
+		if err := v2PropagationReceiverLocations(v2NormalizeQueryLocation(action.From, queryAlias), v2NormalizeQueryLocation(action.To, queryAlias)); err != nil {
+			return BindingAction{}, fmt.Errorf("binding %s: %w", binding, err)
+		}
+		return shape.mapping(BindingAction{
+			Kind:         kind,
+			Pattern:      shape.Pattern,
+			FlowReceiver: true,
+			Packages:     pkgs,
+			Requirement:  req,
+		}), nil
 	}
 	dest, err := v2PropagationDestArg(v2NormalizeQueryLocation(action.To, queryAlias))
 	if err != nil {
@@ -2049,6 +2061,15 @@ func lowerV2Propagation(binding string, shape v2CallShape, queryAlias string, ac
 		Packages:         pkgs,
 		Requirement:      req,
 	}), nil
+}
+
+func v2PropagationReceiverLocations(from, to string) error {
+	from = strings.TrimPrefix(from, "call.")
+	to = strings.TrimPrefix(to, "call.")
+	if from != "callee.receiver" || to != "result" {
+		return fmt.Errorf("propagate receiver must be from callee.receiver to call.result")
+	}
+	return nil
 }
 
 func v2NormalizeQueryLocation(location, alias string) string {

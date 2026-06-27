@@ -2806,7 +2806,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(av, result)
 		}
 	}
-	l.applyCallEffects(call, argVals, result, sc)
+	l.applyCallEffects(call, argVals, result, recvNode, sc)
 	return result
 }
 
@@ -2893,8 +2893,12 @@ func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
 	}
 }
 
-func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result string, sc *scope) {
+func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recvNode string, sc *scope) {
 	for _, effect := range call.Effects {
+		if effect.Receiver {
+			l.flow(recvNode, result)
+			continue
+		}
 		if effect.DestArg < 0 || effect.DestArg >= len(call.Args) {
 			continue
 		}

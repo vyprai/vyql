@@ -390,11 +390,6 @@ func TestParseV2RejectsUnknownBindingOutputKinds(t *testing.T) {
 			body: `propagate alias from args[0] to args[1]`,
 			want: `unknown propagate kind "alias"`,
 		},
-		{
-			name: "propagate receiver not implemented",
-			body: `propagate receiver from args[0] to args[1]`,
-			want: `propagate kind "receiver" is not implemented in production v2`,
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

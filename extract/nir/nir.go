@@ -90,6 +90,7 @@ type CallEffect struct {
 	SourceArg    int
 	SourceResult bool
 	Identity     bool
+	Receiver     bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).

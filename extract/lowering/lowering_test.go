@@ -576,6 +576,55 @@ func TestCallEffectIdentityAliasesOutParam(t *testing.T) {
 	}
 }
 
+func TestCallEffectReceiverFlowsToResult(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:   "handler",
+				Params: []string{"builder"},
+				Loc:    "app.py:1",
+				Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"next"}, Value: nir.Call{
+						Callee: nir.Attr{
+							Base: nir.Name{ID: "builder", Loc: "app.py:2"},
+							Attr: "setOption",
+							Path: "builder.setOption",
+							Loc:  "app.py:2",
+						},
+						Path:    "builder.setOption",
+						Method:  "setOption",
+						Loc:     "app.py:2",
+						Effects: []nir.CallEffect{{Receiver: true}},
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "app.py:3"},
+						Path:   "sink",
+						Method: "sink",
+						Loc:    "app.py:3",
+						Args:   []nir.Expr{nir.Name{ID: "next", Loc: "app.py:3"}},
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	builder := findNodeID(t, g, "code.Param", "name", "builder")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:3")
+	reachable, err := usg.BFS(g, builder, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("receiver call effect did not route receiver to fluent result")
+	}
+}
+
 func TestLowerMaterializesImportNodes(t *testing.T) {
 	g, err := Lower(nir.Program{Modules: []nir.Module{{
 		Key:  "app",
