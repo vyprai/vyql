@@ -3078,7 +3078,7 @@ func lowerV2RuleWhereBinary(x V2BinaryExpr, names v2NameResolver) (Expr, error) 
 			parts = append(parts, right)
 		}
 		return Or{Parts: parts}, nil
-	case "==", "!=":
+	case "==", "!=", ">=", "<=", ">", "<":
 		ref, ok := v2RuleWhereRef(x.Left)
 		if !ok {
 			return nil, fmt.Errorf("%s left side must be a field reference", x.Op)
@@ -3175,7 +3175,7 @@ func v2RuleWhereValue(expr V2Expr) (any, bool) {
 	switch x := expr.(type) {
 	case V2LiteralExpr:
 		switch x.Value.(type) {
-		case string, []string:
+		case string, []string, int:
 			return x.Value, true
 		default:
 			return nil, false

@@ -156,6 +156,30 @@ rule EitherKind {
 	}
 }
 
+func TestMatchSupportsWhereNumericComparisons(t *testing.T) {
+	src := `
+module test;
+rule HighScore {
+  issue custom.WorkItem as w
+  where w.score >= 7
+}
+`
+	s := usg.NewInMemStore()
+	s.AddNode(usg.Node{ID: "high", Type: "custom.WorkItem", Props: map[string]string{"score": "9"}})
+	s.AddLabel("high", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "exact", Type: "custom.WorkItem", Props: map[string]string{"score": "7"}})
+	s.AddLabel("exact", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "low", Type: "custom.WorkItem", Props: map[string]string{"score": "6"}})
+	s.AddLabel("low", usg.Label{Concept: "custom.WorkItem"})
+	s.AddNode(usg.Node{ID: "text", Type: "custom.WorkItem", Props: map[string]string{"score": "high"}})
+	s.AddLabel("text", usg.Label{Concept: "custom.WorkItem"})
+
+	counts := compileEvalV2(t, src, s)
+	if counts[0] != 2 {
+		t.Fatalf("numeric where comparison should match high and exact candidates, got %d", counts[0])
+	}
+}
+
 func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
 	rule := `
 module test;

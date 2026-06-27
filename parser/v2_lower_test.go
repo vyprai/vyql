@@ -1963,9 +1963,13 @@ rule ReviewOrSecret {
   issue code.Review as r
   where r.category == review or r.category == secret
 }
+rule NumericScore {
+  issue code.Review as r
+  where r.score >= 7
+}
 `)
-	if len(decls) != 6 {
-		t.Fatalf("decls = %d, want 6", len(decls))
+	if len(decls) != 7 {
+		t.Fatalf("decls = %d, want 7", len(decls))
 	}
 	toxic := decls[0].(*Rule)
 	and, ok := toxic.Clauses[0].Where.(And)
@@ -1995,6 +1999,10 @@ rule ReviewOrSecret {
 	or, ok := disj.Clauses[0].Where.(Or)
 	if !ok || len(or.Parts) != 2 {
 		t.Fatalf("or where = %#v, want two-part Or", disj.Clauses[0].Where)
+	}
+	numeric := decls[6].(*Rule)
+	if got, ok := numeric.Clauses[0].Where.(Cmp); !ok || got.Ref.String() != "r.score" || got.Op != ">=" || got.Value != 7 {
+		t.Fatalf("numeric where = %#v, want integer comparison", numeric.Clauses[0].Where)
 	}
 }
 

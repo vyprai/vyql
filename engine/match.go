@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"strconv"
+
 	"github.com/vyprai/vyql/findings"
 	"github.com/vyprai/vyql/parser"
 	"github.com/vyprai/vyql/solvers"
@@ -221,16 +223,49 @@ func (e *Engine) evalAtom(atom parser.Expr, env map[string]string) (bool, []stri
 		}
 		return in, nil
 	case parser.Cmp:
-		val := e.resolveScalar(a.Ref, env)
-		want, _ := a.Value.(string)
-		if a.Op == "!=" {
-			return val != want, nil
-		}
-		return val == want, nil
+		return e.evalCmp(a, env), nil
 	case parser.Ref:
 		return e.resolveRef(a, env) != "", nil
 	}
 	return false, nil
+}
+
+func (e *Engine) evalCmp(cmp parser.Cmp, env map[string]string) bool {
+	val := e.resolveScalar(cmp.Ref, env)
+	switch want := cmp.Value.(type) {
+	case int:
+		got, err := strconv.Atoi(val)
+		if err != nil {
+			return false
+		}
+		switch cmp.Op {
+		case "==":
+			return got == want
+		case "!=":
+			return got != want
+		case ">=":
+			return got >= want
+		case "<=":
+			return got <= want
+		case ">":
+			return got > want
+		case "<":
+			return got < want
+		default:
+			return false
+		}
+	case string:
+		switch cmp.Op {
+		case "==":
+			return val == want
+		case "!=":
+			return val != want
+		default:
+			return false
+		}
+	default:
+		return false
+	}
 }
 
 func (e *Engine) evalSolverCall(call parser.SolverCall, env map[string]string) (bool, []string) {

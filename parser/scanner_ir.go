@@ -302,8 +302,8 @@ type Is struct {
 
 type Cmp struct {
 	Ref   Ref
-	Op    string // "==" | "!="
-	Value any    // string or []string
+	Op    string // "==" | "!=" | ">=" | "<=" | ">" | "<"
+	Value any    // string, int, or []string
 }
 
 // NotIn is `<ref> not in [<set>]` — set non-membership of a scalar property
