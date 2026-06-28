@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding clamavWwpackStructsPointerOobWrite113 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "wwunpack" and node.token contains "structs=&exe[(0xffff&cli_readint32(&exe[pe+0x14]))+pe+0x18]" and node.token contains "cli_writeint32(structs+8,sects[i].vsz)" and node.token contains "cli_writeint32(structs+20,sects[i].rva)" and node.token contains "structs+=0x28" and node.token contains "memset(structs,0,0x28)" and not (node.token contains "CLI_ISCONTAINED(exe,exesz,structs,0x28)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "wwunpack" and node.token contains "cli_writeint32" and node.token contains "cli_readint32" and not (node.token contains "CLI_ISCONTAINED")
   emit issue code.ClamavWwpackStructsPointerOobWrite at node
 }
