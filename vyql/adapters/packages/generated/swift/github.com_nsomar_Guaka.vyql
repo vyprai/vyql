@@ -1,5 +1,7 @@
 adapter swift {
   package "github.com/nsomar/Guaka" {
-    mark method "hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "hash"
+    }
   }
 }

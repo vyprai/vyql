@@ -3,9 +3,13 @@ import core.{UserControlledData}
 
 adapter kotlin {
   package "oro:oro" {
-    mark method "compile" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "compile"
+    }
     source method "match" -> core.UserControlledData
     source method "contains" -> core.UserControlledData
-    mark method "substitute" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "substitute"
+    }
   }
 }

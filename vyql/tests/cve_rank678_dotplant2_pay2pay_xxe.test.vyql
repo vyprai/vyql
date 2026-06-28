@@ -1,0 +1,53 @@
+# Rank 678 / CVE-2020-25750: dotplant2 Pay2Pay parsed posted payment XML
+# before disabling libxml external entity loading.
+
+test "rank678: Pay2Pay parses posted XML without libxml entity hardening"
+  lang php
+  file Pay2PayPayment.php
+  expect VYQL-DESER-015
+  code
+  ```
+  <?php
+  class Pay2PayPayment {
+      public function checkResult($hash = '') {
+          if (isset($_POST['xml'], $_POST['sign'])) {
+              $xml = base64_decode(str_replace(' ', '+', $_POST['xml']));
+              $sign = base64_decode(str_replace(' ', '+', $_POST['sign']));
+              $data = simplexml_load_string($xml);
+              if ($data->order_id) {
+                  $generatedSign = md5($this->hiddenKey . $xml . $this->hiddenKey);
+                  if ($generatedSign == $sign) {
+                      return $data->status;
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank678: Pay2Pay disables libxml entity loading before posted XML parse"
+  lang php
+  file Pay2PayPayment.php
+  reject VYQL-DESER-015
+  code
+  ```
+  <?php
+  class Pay2PayPayment {
+      public function checkResult($hash = '') {
+          if (function_exists("libxml_disable_entity_loader")) {
+              libxml_disable_entity_loader(true);
+          }
+          if (isset($_POST['xml'], $_POST['sign'])) {
+              $xml = base64_decode(str_replace(' ', '+', $_POST['xml']));
+              $sign = base64_decode(str_replace(' ', '+', $_POST['sign']));
+              $data = simplexml_load_string($xml);
+              if ($data->order_id) {
+                  $generatedSign = md5($this->hiddenKey . $xml . $this->hiddenKey);
+                  if ($generatedSign == $sign) {
+                      return $data->status;
+                  }
+              }
+          }
+      }
+  }
+  ```

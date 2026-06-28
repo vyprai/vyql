@@ -10,7 +10,11 @@ adapter ruby {
     sink method "write" -> code.NetworkSend
     sink method "write_nonblock" -> code.NetworkSend
     sink method "syswrite" -> code.NetworkSend
-    mark method "fcntl" -> code.PrivilegedOp
-    mark method "ioctl" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "fcntl"
+    }
+    flag code.PrivilegedOp on any {
+      method "ioctl"
+    }
   }
 }

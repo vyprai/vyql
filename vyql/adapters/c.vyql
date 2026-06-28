@@ -10,6 +10,9 @@ adapter c {
   source "fread" -> code.HttpInput
   source "recv" -> code.HttpInput
   source "recvfrom" -> code.HttpInput
+  source "http_request_param_get" -> code.HttpInput
+  source "http_request_get_query_string" -> code.HttpInput
+  source "http_request_get_path_info" -> code.HttpInput
 
   // command execution (the program/command string is arg0)
   sink path "system" -> code.CommandExecution
@@ -25,7 +28,11 @@ adapter c {
   sink path "g_spawn_command_line_sync" -> code.CommandExecution
   sink path "g_spawn_command_line_async" -> code.CommandExecution
   sink path "g_app_info_create_from_commandline" -> code.CommandExecution
-  mark exact "analysis.function.context" val "g_app_info_create_from_commandline(cmdline" val "g_string_append_printf(cmd,\"--find=%s\",search_string)" nval "g_shell_quote" -> code.CommandLineAssemblyReview
+  flag code.CommandLineAssemblyReview in function {
+    has "g_app_info_create_from_commandline(cmdline"
+    has "g_string_append_printf(cmd,\"--find=%s\",search_string)"
+    lacks "g_shell_quote"
+  }
 
   // SQL (procedural — the query is arg1)
   sink path "mysql_query" arg 1 -> code.SqlExecution
@@ -42,6 +49,72 @@ adapter c {
   sink path "unlink" -> code.FilePathAccess
   sink path "remove" -> code.FilePathAccess
   sink path "opendir" -> code.FilePathAccess
+  sink path "access" arg 0 -> code.FilePathAccess
+  sink path "file_read" arg 0 -> code.FilePathAccess
+  sink path "file_write" arg 0 -> code.FilePathAccess
+  flag code.CWebRequestFilePathTraversal in function {
+    lang "c"
+    has "http_request_param_get"
+    has "http_request_get_query_string"
+    has "file_read"
+    has "file_write"
+    has "unlink"
+    lacks "page_name_is_good(page)"
+    lacks "strstr(page,\"..\")"
+    lacks "strchr(page,'/')"
+  }
+  flag code.SharedOtaHandlerMissingAuthentication on any {
+    path exact "analysis.module.context"
+    has "classWebServerBase"
+    has "voidadd_handler(AsyncWebHandler*handler)"
+    has "handlers_.push_back(handler)"
+    has "classOTARequestHandler"
+    has "voidhandleUpload(AsyncWebServerRequest*request"
+    lacks "AuthMiddlewareHandler"
+    lacks "request->authenticate"
+    lacks "check_auth"
+  }
+  flag code.RemoteListingDownloadPath in module {
+    lang "c"
+    has "sink(intargc,char**argv)"
+    has "atomicio(read,remin,cp,1)"
+    has "strchr(cp,'/')!=NULL"
+    has "strcmp(cp,\"..\")==0"
+    has "snprintf(namebuf,need,\"%s%s%s\",targ"
+    has "open(np,O_WRONLY|O_CREAT,mode)"
+    lacks "strcmp(cp,\".\")==0"
+    lacks "*cp=='\\0'"
+  }
+  flag code.PathBasedSandboxExposeBindRace in module {
+    lang "c"
+    call path "g_variant_lookup"
+    literal "sandbox-expose"
+    call path "filesystem_sandbox_arg"
+    call path "get_path_for_fd"
+    call path "filesystem_arg"
+    call path "g_ptr_array_add"
+    not call path "fd_map_remap_fd"
+    not call path "validate_opath_fd"
+    not call path "glnx_chaseat"
+    not literal "--bind-fd=%d"
+    not literal "--ro-bind-fd=%d"
+  }
+  flag code.DnsInterfaceNewlineValidationMissing in function {
+    lang "c"
+    name "initConfig"
+    literal "dns.interface"
+    attr path "conf.dns.interface.c"
+    attr path "conf.dns.interface.t"
+    assign contains "conf.dns.interface.c=validate_stub"
+    not assign contains_any ["conf.dns.interface.c=validate_str_no_newline"]
+  }
+  flag code.CredentialProtocolNewlineInjection in function {
+    lang "c"
+    name "credential_write_item"
+    call path "fprintf"
+    literal contains "%s=%s"
+    not call path "strchr"
+  }
 
   // dynamic loading (untrusted path -> code load)
   sink path "dlopen" -> code.DynamicCodeLoad
@@ -59,13 +132,31 @@ adapter c {
   sink path "xmlXPathEval" -> code.XpathQuery
 
   // insecure temp file (CWE-377) — predictable-name / race-prone temp APIs
-  mark "mktemp" -> code.InsecureTempFile
-  mark "tmpnam" -> code.InsecureTempFile
-  mark "tempnam" -> code.InsecureTempFile
-  mark "chmod" val "0777" -> code.InsecurePermission
-  mark "chmod" val "0666" -> code.InsecurePermission
-  mark "open" val "0777" -> code.InsecurePermission
-  mark "open" val "0666" -> code.InsecurePermission
+  flag code.InsecureTempFile on any {
+    path "mktemp"
+  }
+  flag code.InsecureTempFile on any {
+    path "tmpnam"
+  }
+  flag code.InsecureTempFile on any {
+    path "tempnam"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0666"
+  }
+  flag code.InsecurePermission on any {
+    path "open"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "open"
+    has "0666"
+  }
 
   // memory safety (exploitability-aware). Taint rules fire when attacker input reaches
   // the dangerous operand; smell rules keep an explicit exploit assumption.
@@ -73,10 +164,18 @@ adapter c {
   sink path "strcat" arg 1 -> code.UnboundedCopy
   sink path "sprintf" arg all -> code.UnboundedCopy
   sink path "vsprintf" arg all -> code.UnboundedCopy
-  mark "strcpy" -> code.UnboundedCopySmell
-  mark "strcat" -> code.UnboundedCopySmell
-  mark "sprintf" -> code.UnboundedCopySmell
-  mark "vsprintf" -> code.UnboundedCopySmell
+  flag code.UnboundedCopySmell on any {
+    path "strcpy"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "strcat"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "sprintf"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "vsprintf"
+  }
   sink path "memcpy" arg 2 -> code.RawMemoryCopySize
   sink path "memmove" arg 2 -> code.RawMemoryCopySize
   sink path "strncpy" arg 2 -> code.RawMemoryCopySize
@@ -85,56 +184,561 @@ adapter c {
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
   sink path "reallocarray" arg 1 -> code.SizeComputation
-  mark "realloc" -> code.ZeroSizeReallocation
-  mark "reallocarray" -> code.ZeroSizeReallocation
-  mark "alloca" -> code.StackAllocationSmell
-  mark "__subscript" -> code.IndexAccess
-  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
-  mark "analysis.lifetime.release_then_return" val "release=delete" val "return=false" val "storage=nonlocal" -> code.FailurePathOwnedBufferFree
-  mark exact "analysis.function.context" val "lang=c" val "name=bt_att_cancel" val "queue_remove_if(att->req_queue" val "queue_remove_if(att->ind_queue" val "queue_remove_if(att->write_queue" val "destroy_att_send_op(op)" nval "att->in_disc" nval "bt_att_disc_cancel" -> code.ReentrantQueueCleanupReview
-  mark exact "analysis.function.context" val "lang=c" val "unescapeChar(*readPtr++);}*writePtr++=c;" -> code.EscapedTerminatorWrite
-  mark exact "analysis.function.context" val "lang=c" val "start+len+1>end" val "start+=len" nval "buff_size" nval "end-start-1" -> code.PointerOffsetBoundsCheck
-  mark exact "analysis.function.context" val "lang=c" val "name=match" val "cur->peercallno==callno" val "dcallno==cur->callno" nval "full_frame?dcallno==cur->callno" -> code.ProtocolFrameBindingReview
-  mark exact "analysis.function.context" val "lang=c" val "name=__of_unflatten_dtb" val "FDT_BEGIN_NODE" val "FDT_PROP" val "is_reserved_name(pathp)" val "is_reserved_name(name)" val "of_new_node(node,pathp)" val "of_new_property" nval "is_allowed_input_name" nval "strchr(name,'/')" -> code.ProtocolStateReview
-  mark exact "analysis.function.context" val "lang=c" val "name=dispatch_cmd" val "OP_PUT" val "body_size=strtoul" val "body_size>job_data_size_limit" val "reply_msg(c,MSG_JOB_TOO_BIG)" nval "skip(c,body_size+2,MSG_JOB_TOO_BIG)" -> code.ProtocolCommandInjection
-  mark exact "analysis.function.context" val "name=perform_http_xact" val "CREATION_NOTIFICATION" val "run_post_create" nval "client_uid!=0" -> code.PrivilegedEntryPointReview
-  mark exact "analysis.function.context" val "lang=c" val "AVAHI_FLAGS_VALID" val "AVAHI_PUBLISH_USE_WIDE_AREA" val "AVAHI_PUBLISH_USE_MULTICAST" val "transport_flags_from_domain" nval "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)" -> code.ReachableAssertionReview
-  mark exact "analysis.function.context" val "lang=c" val "px->ft=imcb_file_send_start" val "px->ft->data=px" nval "if(!px->ft)" -> code.UncheckedNullableResultDeref
-  mark "analysis.field.clear_null" -> code.OwnerFieldClear
-  mark "xmlFreeDoc" -> code.OwnerFree
-  mark "__deref" -> code.PointerUse
-  mark "__deref" -> code.NullableDeref
-  mark "free" -> code.PointerFree
+  flag code.ZeroSizeReallocation on any {
+    path "realloc"
+  }
+  flag code.ZeroSizeReallocation on any {
+    path "reallocarray"
+  }
+  flag code.ReallocFailurePathInputFree on any {
+    path "analysis.lifetime.realloc_failure_input_free"
+    fact allocator "realloc"
+    fact release "free"
+    fact return "null"
+  }
+  flag code.StackAllocationSmell on any {
+    path "alloca"
+  }
+  flag code.IndexAccess on any {
+    path "__subscript"
+  }
+  flag code.FieldDerivedIndexAccess on any {
+    path "analysis.index.access"
+    fact index_kind "field_derived"
+    fact guard "missing_upper_bound"
+  }
+  flag code.ZeroCountLastElementAccess on any {
+    path "analysis.zero_count.last_index"
+    fact index_kind "field_minus_one"
+    fact guard "missing_nonzero"
+  }
+  flag code.FailurePathOwnedBufferFree on any {
+    path "analysis.lifetime.release_then_return"
+    fact release "delete"
+    fact return "false"
+    fact storage "nonlocal"
+  }
+  flag code.ConditionalFallbackListDoubleFree in function {
+    lang "c"
+    call path "CommandLineParseCommaSeparatedValuesEx"
+    call path "open_port"
+    call path "free"
+    has "free(list)"
+    has "server->ipcSocket==NULL"
+    has "open_port(server,NULL)"
+    has "return-1"
+    lacks "if(!open_port(server,NULL)){free(list);return-1;}"
+  }
+  flag code.MissingPostCopyBoundsCheck in function {
+    lang "c"
+    name "patch"
+    has "newpos+=x"
+    has "memcpy(newData+newpos,extraPtr,y)"
+    lacks "newpos+y>newDataLength"
+  }
+  flag code.Fat12SuccessorEntryBoundsBypass in function {
+    lang "c"
+    name "set_fat"
+    has "fs->fat_bits"
+    has "cluster*3/2"
+    has "get_fat(&subseqEntry,fs->fat,cluster+1,fs)"
+    has "cluster!=fs->clusters-1"
+    lacks "cluster!=fs->clusters+1"
+  }
+  flag code.ShiftedClusterSizeAllocationMissingBounds in function {
+    lang "c"
+    name "exfat_mount"
+    has "malloc(CLUSTER_SIZE(*ef->sb))"
+    has "verify_vbr_checksum(ef->dev,ef->zero_cluster,SECTOR_SIZE(*ef->sb))"
+    has "ef->sb->sector_bits"
+    has "ef->sb->spc_bits"
+    lacks "ef->sb->sector_bits<9"
+  }
+  flag code.PhpZvalArrayMergeMissingDestTypeCheck in function {
+    lang "c"
+    call path "Z_ARRVAL_PP"
+    call path "zend_hash_find"
+    call path "zend_hash_index_find"
+    binary "Z_TYPE_PP(test_ptr)==IS_ARRAY"
+    not binary "Z_TYPE_PP(test_ptr)==IS_ARRAY&&Z_TYPE_PP(ptr)==IS_ARRAY"
+  }
+  flag code.NumericParserMissingProgressCheck in function {
+    lang "c"
+    has "fio_atol((char**)&tmp)"
+    has "fio_atof((char**)&tmp)"
+    has "JSON_NUMERAL[*tmp]"
+    has "tmp=pos"
+    lacks "tmp==pos"
+  }
+  flag code.PairwiseConstraintIntersectionDos in function {
+    lang "c"
+    call path contains_any ["intersect_nodes", "name_constraints_intersect_nodes"]
+    call path contains_any ["node_list_add", "name_constraints_node_list_add"]
+    selector contains_any ["permitted.size", "permitted2.size", "removed.size"]
+    binary contains_any ["i<permitted2->size", "j<removed.size", "j<permitted2->size"]
+    not call path contains_any ["ensure_sorted", "compare_name_constraint_nodes"]
+    not selector "sorted_view"
+  }
+  flag code.EcPointIdentityElementMissing in function {
+    lang "c"
+    param type "PointZZ_p"
+    name contains_any ["pointZZ_pDouble", "pointZZ_pAdd"]
+    call path "mpz_invert"
+    not call contains_any [
+      "IsIdentityElement", "SetToIdentityElement",
+      "is_at_infinity", "set_at_infinity",
+      "isInfinity", "setInfinity"
+    ]
+  }
+  flag code.EcPointIdentityElementMissing in function {
+    lang "c"
+    param type "PointZZ_p"
+    name contains_any ["pointZZ_pMul"]
+    call path "pointZZ_pDouble"
+    call path "pointZZ_pAdd"
+    not call contains_any [
+      "IsIdentityElement", "SetToIdentityElement",
+      "is_at_infinity", "set_at_infinity",
+      "isInfinity", "setInfinity"
+    ]
+  }
+  flag code.UnderallocatedFormattedAddressList in function {
+    lang "c"
+    name "option_to_env"
+    has "D6_OPT_DNS_SERVERS"
+    has "xmalloc(4+addrs*40-1)"
+    has "sprint_nip6(dlist,option+4+option_offset)"
+    has "dlist+=39"
+    lacks "xmalloc(4+addrs*40+1)"
+  }
+  flag code.XmlLeadByteNameValidationMissing in module {
+    lang "c"
+    token macro_name "CHECK_NAME_CASE"
+    token macro_name "CHECK_NMSTRT_CASE"
+    token macro_body contains "CHECK_NAME_CASE:"
+    token macro_body contains "if(!IS_NAME_CHAR(enc,ptr,n))"
+    token macro_body contains "CHECK_NMSTRT_CASE:"
+    token macro_body contains "if(!IS_NMSTRT_CHAR(enc,ptr,n))"
+    not token macro_body contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NAME_CHAR(enc,ptr,n)"
+    not token macro_body contains "IS_INVALID_CHAR(enc,ptr,n)||!IS_NMSTRT_CHAR(enc,ptr,n)"
+  }
+  flag code.IcmpEchoPayloadLengthUnderflow in function {
+    lang "c"
+    name "prvProcessICMPMessage_IPv6"
+    token switch_case "ipICMP_PING_REPLY_IPv6"
+    selector contains "usPayloadLength"
+    assign contains "uxDataLength=uxDataLength-sizeof"
+    selector "pxICMPEchoHeader.usIdentifier"
+    call path "FreeRTOS_ntohs"
+    call path "vApplicationPingReplyHook"
+    binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
+    not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
+  }
+  flag code.IsolateLevelIncrementWithoutCap in function {
+    lang "c"
+    name "fribidi_get_par_embedding_levels_ex"
+    call path "FRIBIDI_IS_ISOLATE"
+    assign "RL_ISOLATE_LEVEL=isolate_level++"
+    assign "base_level_per_iso_level[]=new_level"
+    index "run_per_isolate_level[]"
+    not binary contains "isolate_level<FRIBIDI_BIDI_MAX_EXPLICIT_LEVEL-1"
+  }
+  flag code.FlowSpecOperatorLoopBoundOffByOne in function {
+    lang "c"
+    call path "hex2bin"
+    call path "hexstr2num"
+    selector "mval.value"
+    binary "loop>BGP_PBR_MATCH_VAL_MAX"
+    not binary "loop>=BGP_PBR_MATCH_VAL_MAX"
+  }
+  flag code.FlacDecoderBufferReuseWithoutBlocksizeCheck in function {
+    lang "c"
+    name "flac_buffer_copy"
+    call path "memcpy"
+    selector "frame.header.blocksize"
+    attr path "pflac.wbuffer"
+    attr path "pflac.rbuffer"
+    binary contains "frame->header.blocksize>FLAC__MAX_BLOCK_SIZE"
+    not attr path "pflac.wbuffer_size"
+    not binary contains "frame->header.blocksize>pflac->wbuffer_size"
+  }
+  flag code.ContikiSicslowpanFragmentOffsetOobWrite in function {
+    lang "c"
+    name "copy_frags2uip"
+    has "memcpy((uint8_t*)UIP_IP_BUF+(uint16_t)(frag_buf[i].offset<<3),(uint8_t*)frag_buf[i].data,frag_buf[i].len)"
+    lacks "(frag_buf[i].offset<<3)+frag_buf[i].len>sizeof(uip_buf)"
+    lacks "frag_info[context].len>sizeof(uip_buf)"
+  }
+  flag code.BinarySearchTableIndexGuardBypass in function {
+    lang "c"
+    name "X86_insn_reg_intel"
+    has "insn_regs_intel_sorted[mid].insn<id"
+    has "first=mid+1"
+    has "last=mid-1"
+    has "mid=(first+last)/2"
+    lacks "insn_regs_intel_sorted[0].insn>id"
+    lacks "insn_regs_intel_sorted[last].insn<id"
+  }
+  flag code.CompressedBlockSizeCapacityMismatch in function {
+    lang "c"
+    name "blosc_c"
+    has "_sw32(dest-4,-value)"
+    has "ntbytes+maxout>maxbytes"
+    has "maxout=(int64_t)maxbytes-(int64_t)ntbytes"
+    has "(ntbytes+neblock)>maxbytes"
+    lacks "destsize"
+    lacks "ntbytes>destsize"
+  }
+  flag code.LengthDerivedAllocation in function {
+    lang "c"
+    has "read_and_decode_block_header"
+    has "blockSize"
+    has "malloc_from_callbacks(blockSize"
+    has "onRead(pUserData,pRawData,blockSize)"
+    lacks "hasKnownFileSize"
+    lacks "fileSize-runningFilePos"
+  }
+  flag code.FixedChunkCapacityGrowthIndex in function {
+    lang "c"
+    binary contains_any [
+      "level>=ms->c.len",
+      "level>=ctx->c.len",
+      "level>=state->c.len",
+      "idx>=capacity",
+      "index>=capacity",
+      "level>=capacity"
+    ]
+    assign contains_any [
+      ".len=20",
+      "capacity=16",
+      "capacity=32",
+      "capacity=64"
+    ]
+    call path "realloc"
+    token index_key contains_any ["level", "idx", "index"]
+    not assign contains_any [
+      ".len=20+level",
+      ".len=level+20",
+      "capacity=idx+1",
+      "capacity=index+1",
+      "capacity=level+1"
+    ]
+  }
+  flag code.UncheckedPythonCapiHashError in function {
+    lang "c"
+    name "CBORTag_hash"
+    has "PyObject_Hash(tmp)"
+    has "PySet_Discard(running_hashes,self_id)"
+    has "PySequence_Length(running_hashes)"
+    lacks "ret==-1"
+  }
+  flag code.RubyCgiEscapeHtmlLengthOverflow in function {
+    lang "c"
+    name "optimized_escape_html"
+    has "HTML_ESCAPE_MAX_LEN"
+    has "RSTRING_LEN(str)"
+    has "ALLOCV_N(char,vbuf,RSTRING_LEN(str)*HTML_ESCAPE_MAX_LEN)"
+    lacks "ALLOCV_N(escape_buf,vbuf,RSTRING_LEN(str))"
+    lacks "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]"
+  }
+  flag code.PythonUnicodeEscapeWideUnderallocation in function {
+    lang "c"
+    name "unicodeescape_string"
+    has "PyString_FromStringAndSize(NULL,2+6*size+1)"
+    has "ch>=0x10000"
+    has "*p++='U'"
+    lacks "10*size"
+  }
+  flag code.SignedMessageLengthUnderflowCopy in function {
+    lang "c"
+    name "crypto_sign_open"
+    has "*mlen=smlen-(unsignedlonglong)sizeof(CROSS_sig_t)"
+    has "memcpy((unsignedchar*)m,(constunsignedchar*)sm,(size_t)*mlen)"
+    lacks "smlen<(size_t)sizeof(CROSS_sig_t)"
+  }
+  flag code.CgifAddframeSignedFrameCountOverflow in function {
+    lang "c"
+    name "cgif_addframe"
+    has "for(i=0;i<pGIF->config.width*pGIF->config.height;i++)"
+    has "cmpPixel(pGIF,pConfig,&pGIF->aFrames[pGIF->iHEAD]->config,pConfig->pImageData[i],pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])"
+    lacks "for(i=0;i<MULU16(pGIF->config.width,pGIF->config.height);i++)"
+  }
+  flag code.ReentrantQueueCleanupReview in function {
+    lang "c"
+    name "bt_att_cancel"
+    has "queue_remove_if(att->req_queue"
+    has "queue_remove_if(att->ind_queue"
+    has "queue_remove_if(att->write_queue"
+    has "destroy_att_send_op(op)"
+    lacks "att->in_disc"
+    lacks "bt_att_disc_cancel"
+  }
+  flag code.CjsonTrailingBackslashStringOverread in function {
+    lang "c"
+    name "parse_string"
+    has "while(*end_ptr!='\\\"'&&*end_ptr&&++len)"
+    has "if(*end_ptr++=='\\\\')end_ptr++"
+    has "cJSON_malloc(len+1)"
+    lacks "if(*end_ptr=='\\0')"
+  }
+  flag code.UnboundedFileReadIntoFixedBuffer in function {
+    lang "c"
+    has "chartemp["
+    has "for(;;)"
+    has "temp[i]=fgetc("
+    lacks "i>="
+    lacks "realloc("
+  }
+  flag code.DhcpOptionLengthUncheckedRead in function {
+    lang "c"
+    name "parse_options"
+    has "u8_t*end=optptr+len;"
+    has "while(optptr<end)"
+    has "type=*(optptr+2);"
+    has "memcmp((char*)&client.addr,(char*)optptr+2,4)==0"
+    has "optptr+=optptr[1]+2;"
+    lacks "optptr+1>=end"
+    lacks "optptr+2+opt_len>end"
+    lacks "opt_len>=4"
+  }
+  flag code.LengthMultiplierFormattedExpansionUnderallocation in function {
+    lang "c"
+    has "newSV(strlen("
+    has ")*3)"
+    has "sprintf("
+    has "%d"
+    lacks "*6+16"
+    lacks "snprintf("
+  }
+  flag code.GzipDeflateFixedExpansionUnderallocation in function {
+    lang "c"
+    call path "deflateInit2"
+    call path "deflate"
+    call path contains_any ["malloc", "flb_malloc"]
+    assign contains_any [
+      "out_size=in_len+",
+      "out_size=input_len+",
+      "out_size=source_len+",
+      "out_size=src_len+"
+    ]
+    not assign contains_any [
+      "max_input_expansion",
+      "compressBound",
+      "deflateBound"
+    ]
+    not call path contains_any ["compressBound", "deflateBound"]
+  }
+  flag code.ClamavWwpackStructsPointerOobWrite in function {
+    lang "c"
+    name "wwunpack"
+    has "structs=&exe[(0xffff&cli_readint32(&exe[pe+0x14]))+pe+0x18]"
+    has "cli_writeint32(structs+8,sects[i].vsz)"
+    has "cli_writeint32(structs+20,sects[i].rva)"
+    has "structs+=0x28"
+    has "memset(structs,0,0x28)"
+    lacks "CLI_ISCONTAINED(exe,exesz,structs,0x28)"
+  }
+  flag code.EscapedTerminatorWrite in function {
+    lang "c"
+    has "unescapeChar(*readPtr++);}*writePtr++=c;"
+  }
+  flag code.PointerOffsetBoundsCheck in function {
+    lang "c"
+    has "start+len+1>end"
+    has "start+=len"
+    lacks "buff_size"
+    lacks "end-start-1"
+  }
+  flag code.ProtocolFrameBindingReview in function {
+    lang "c"
+    name "match"
+    has "cur->peercallno==callno"
+    has "dcallno==cur->callno"
+    lacks "full_frame?dcallno==cur->callno"
+  }
+  flag code.ProtocolStateReview in function {
+    lang "c"
+    name "__of_unflatten_dtb"
+    has "FDT_BEGIN_NODE"
+    has "FDT_PROP"
+    has "is_reserved_name(pathp)"
+    has "is_reserved_name(name)"
+    has "of_new_node(node,pathp)"
+    has "of_new_property"
+    lacks "is_allowed_input_name"
+    lacks "strchr(name,'/')"
+  }
+  flag code.FilesystemImageDirentTraversal in function {
+    lang "c"
+    name "do_directory"
+    has "memcpy(newpath+pathlen,romfs_read(offset),newlen)"
+    has "newpath[pathlen+newlen]=0"
+    has "expand_fs(newpath,child)"
+    lacks "strchr(name,'/')"
+    lacks "strcmp(name,\"..\")"
+  }
+  flag code.ProtocolCommandInjection in function {
+    lang "c"
+    name "dispatch_cmd"
+    has "OP_PUT"
+    has "body_size=strtoul"
+    has "body_size>job_data_size_limit"
+    has "reply_msg(c,MSG_JOB_TOO_BIG)"
+    lacks "skip(c,body_size+2,MSG_JOB_TOO_BIG)"
+  }
+  flag code.PrivilegedEntryPointReview in function {
+    name "perform_http_xact"
+    has "CREATION_NOTIFICATION"
+    has "run_post_create"
+    lacks "client_uid!=0"
+  }
+  flag code.ParsedUserIdDefaultRootPrivilegeEscalation in function {
+    lang "c"
+    has "strtoll(userspec,&endptr,10)"
+    has "if(*endptr=='\\0')returnu"
+    has "u->gid=(int)l"
+    lacks "u->uid=(int)l;if(*endptr=='\\0')returnu"
+  }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    lang "c"
+    name "cupsdCheckGroup"
+    has "_cups_strcasecmp(username,group->gr_mem[i])"
+    lacks "strcmp(user->pw_name,group->gr_mem[i])"
+  }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    lang "c"
+    name "cupsdIsAuthorized"
+    has "_cups_strcasecmp(username,name)"
+    lacks "strcmp(pw->pw_name,name)"
+  }
+  flag code.CaseInsensitiveLocalIdentityAuthorizationBypass in function {
+    lang "c"
+    name "cupsdIsAuthorized"
+    has "_cups_strcasecmp(username,ownername)"
+    lacks "strcmp(pw->pw_name,ownername)"
+  }
+  sink path "ucsdet_open" -> code.ResourceHandle
+  control "ucsdet_close" -> core.ResourceRelease
+  control "m_freem" -> core.ResourceRelease
+  flag code.RateLimitedMbufResponseLeak in function {
+    lang "c"
+    param type "mbuf"
+    call path "tcp_challenge_ack_check"
+    call path "tcp_respond"
+    not call path "m_freem"
+  }
+  flag code.ReachableAssertionReview in function {
+    lang "c"
+    has "AVAHI_FLAGS_VALID"
+    has "AVAHI_PUBLISH_USE_WIDE_AREA"
+    has "AVAHI_PUBLISH_USE_MULTICAST"
+    has "transport_flags_from_domain"
+    lacks "!(flags&AVAHI_PUBLISH_USE_WIDE_AREA)||!(flags&AVAHI_PUBLISH_USE_MULTICAST)"
+  }
+  flag code.ZeroLengthRadiusAttributeValueParse in function {
+    lang "c"
+    name contains_any ["rad_decode", "decode_radius", "radius_decode"]
+    call path contains_any ["debug_pair", "pairfree"]
+    not prop "str_args" contains_any ["attrlen==0", "0==attrlen"]
+  }
+  flag code.UncheckedNullableResultDeref in function {
+    lang "c"
+    has "px->ft=imcb_file_send_start"
+    has "px->ft->data=px"
+    lacks "if(!px->ft)"
+  }
+  flag code.OwnerFieldClear on any {
+    path "analysis.field.clear_null"
+  }
+  flag code.OwnerFree on any {
+    path "xmlFreeDoc"
+  }
+  flag code.PointerUse on any {
+    path "__deref"
+  }
+  flag code.NullableDeref on any {
+    path "__deref"
+  }
+  flag code.PointerFree on any {
+    path "free"
+  }
   sink path "__binop.div" arg 1 -> code.DivisionDenominator
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
-  mark "__binop.add" -> code.IntegerSizeArithmetic
-  mark "__binop.sub" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.add"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.sub"
+  }
   source "__binop.mul" -> code.ComputedSizeValue
-  mark "__binop.mul" -> code.IntegerSizeArithmetic
-  mark "__binop.shl" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.mul"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.shl"
+  }
+  flag code.JpegSubsamplingRatioValidationMissing in function {
+    lang "c"
+    name "stbi__process_frame_header"
+    has "if(z->img_comp[i].h>h_max)h_max=z->img_comp[i].h;"
+    has "if(z->img_comp[i].v>v_max)v_max=z->img_comp[i].v;"
+    has "z->img_comp[i].x=(s->img_x*z->img_comp[i].h+h_max-1)/h_max;"
+    has "z->img_comp[i].y=(s->img_y*z->img_comp[i].v+v_max-1)/v_max;"
+    has "stbi__malloc_mad2(z->img_comp[i].w2,z->img_comp[i].h2,15)"
+    lacks "h_max%z->img_comp[i].h"
+    lacks "v_max%z->img_comp[i].v"
+  }
   control "analysis.function.context" val "(int)size<0" val "save+size<save" -> core.IntegerOverflowGuard
   control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367): check before use on the same CFG path. The rule is
   // assumption-gated because same-path ordering is not yet same-object proof.
-  mark "access" -> code.FileCheck
-  mark "stat" -> code.FileCheck
-  mark "lstat" -> code.FileCheck
-  mark "fopen" -> code.FileUse
-  mark "open" -> code.FileUse
-  mark "open64" -> code.FileUse
-  mark "unlink" -> code.FileUse
-  mark "remove" -> code.FileUse
-  mark "rename" -> code.FileUse
-  mark "chmod" -> code.FileUse
-  mark "chown" -> code.FileUse
+  flag code.FileCheck on any {
+    path "access"
+  }
+  flag code.FileCheck on any {
+    path "stat"
+  }
+  flag code.FileCheck on any {
+    path "lstat"
+  }
+  flag code.FileUse on any {
+    path "fopen"
+  }
+  flag code.FileUse on any {
+    path "open"
+  }
+  flag code.FileUse on any {
+    path "open64"
+  }
+  flag code.FileUse on any {
+    path "unlink"
+  }
+  flag code.FileUse on any {
+    path "remove"
+  }
+  flag code.FileUse on any {
+    path "rename"
+  }
+  flag code.FileUse on any {
+    path "chmod"
+  }
+  flag code.FileUse on any {
+    path "chown"
+  }
 
   // lifecycle / concurrency
-  mark "pthread_mutex_lock" -> code.LockAcquire
-  mark "mtx_lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    path "pthread_mutex_lock"
+  }
+  flag code.LockAcquire on any {
+    path "mtx_lock"
+  }
   control "pthread_mutex_unlock" -> core.LockRelease
   control "mtx_unlock" -> core.LockRelease
-  mark "pthread_create" -> code.LocklessSharedMutation
+  flag code.LocklessSharedMutation on any {
+    path "pthread_create"
+  }
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "printf" arg 0 -> code.FormatString
@@ -156,31 +760,91 @@ adapter c {
   sink path "xmlParseMemory" -> code.XmlParse
 
   // weak hash (CWE-328) — OpenSSL MD4/MD5/SHA1 (presence); SHA-256 is safe
-  mark "MD5_Init" -> code.WeakHash
-  mark "MD5" -> code.WeakHash
-  mark "MD4" -> code.WeakHash
-  mark "SHA1_Init" -> code.WeakHash
-  mark "SHA1" -> code.WeakHash
-  mark "EVP_md5" -> code.WeakHash
-  mark "EVP_sha1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "MD5_Init"
+  }
+  flag code.WeakHash on any {
+    path "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MD4"
+  }
+  flag code.WeakHash on any {
+    path "SHA1_Init"
+  }
+  flag code.WeakHash on any {
+    path "SHA1"
+  }
+  flag code.WeakHash on any {
+    path "EVP_md5"
+  }
+  flag code.WeakHash on any {
+    path "EVP_sha1"
+  }
 
   // weak cipher (CWE-327) — OpenSSL DES (presence); AES is safe
-  mark "DES_ecb_encrypt" -> code.WeakCipher
-  mark "DES_ncbc_encrypt" -> code.WeakCipher
-  mark "DES_set_key" -> code.WeakCipher
-  mark "RC4" -> code.WeakCipher
-  mark "BF_set_key" -> code.WeakCipher
-  mark "EVP_EncryptInit_ex" val "0000000000000000" -> code.StaticIv
-  mark "EVP_DecryptInit_ex" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "DES_ecb_encrypt"
+  }
+  flag code.WeakCipher on any {
+    path "DES_ncbc_encrypt"
+  }
+  flag code.WeakCipher on any {
+    path "DES_set_key"
+  }
+  flag code.WeakCipher on any {
+    path "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "BF_set_key"
+  }
+  flag code.StaticIv on any {
+    path "EVP_EncryptInit_ex"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "EVP_DecryptInit_ex"
+    has "0000000000000000"
+  }
+  // Encrypted transport config must not allow an enabled cipher with HMAC/hash
+  // disabled. Corosync CVE-2013-0250 is this shape: crypto_cipher can be aes*
+  // while crypto_hash is none unless the config reader rejects the combination.
+  flag code.CipherWithoutIntegrityHash in function {
+    lang "c"
+    has "crypto_cipher"
+    has "crypto_hash"
+    has "tmp_cipher"
+    has "tmp_hash"
+    has "strcmp(str,\"none\")==0"
+    lacks "strcmp(tmp_cipher,\"none\")!=0"
+    lacks "strcmp(tmp_hash,\"none\")==0"
+  }
+  flag code.RepeatedKeyfileSubstitutionTables in function {
+    lang "c"
+    has "keyFile!=NULL"
+    has "fread(extractedString,1,BUFFER_SIZE,keyFile)"
+    has "scrambleAsciiTables[j][i%256]=scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]"
+    has "scrambleAsciiTables[j][(unsignedchar)(extractedString[i])]=temp"
+    lacks "generateNumber()^extractedString[i]"
+    lacks "scramblingTablesOrder"
+    lacks "usingKeyFile"
+  }
 
   // insecure randomness (CWE-330) — rand()/random() (presence); getrandom()/RAND_bytes safe
-  mark "rand" -> code.WeakRandomValue
-  mark "random" -> code.WeakRandomValue
-  mark "rand_r" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "rand"
+  }
+  flag code.WeakRandomValue on any {
+    path "random"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand_r"
+  }
 
   // controls (sanitizers) — realpath canonicalizes a path; preamble defines the rest
   control "realpath" -> core.PathCanonicalization
   control "safe_path" -> core.PathCanonicalization
+  control "page_name_is_good" -> core.PathAccessCheck
   control "escape_shell" -> core.ShellEscape
   control "escape_html" -> core.HtmlEscape
   control "encode_for_ldap" -> core.LdapEscape

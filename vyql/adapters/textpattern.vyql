@@ -16,5 +16,7 @@ adapter textpattern {
     text_pattern_excluded_substrings: ["env", "process."],
     text_pattern_min_value_classes: "2"
   }
-  mark "analysis.text_pattern.credential_literal" -> code.HardcodedSecret
+  flag code.HardcodedSecret on any {
+    path "analysis.text_pattern.credential_literal"
+  }
 }

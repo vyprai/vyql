@@ -46,6 +46,10 @@ func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) stri
 	}
 	io.WriteString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
+	if overlay := scanAdapterOverlay; overlay != "" {
+		io.WriteString(h, "\x00adapter-overlay\x00")
+		statWalk(h, overlay)
+	}
 	for _, p := range paths {
 		io.WriteString(h, "\x00src\x00")
 		statWalk(h, p)

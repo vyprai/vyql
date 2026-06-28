@@ -69,11 +69,12 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.bodyStmts(field(n, "body"))
 		c.currentFunc = prev
 		return []nir.Stmt{nir.FuncDef{
-			Name:       name,
-			Params:     params,
-			ParamTypes: c.paramTypes(field(n, "parameters")),
-			Body:       body,
-			Loc:        L,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    c.paramTypes(field(n, "parameters")),
+			Body:          body,
+			Loc:           L,
+			ContextTokens: c.scFunctionContext(name, field(n, "body")),
 		}}
 	case "val_definition", "var_definition", "val_declaration", "var_declaration":
 		name := c.patName(field(n, "pattern"))
@@ -247,6 +248,92 @@ func (c *scConvScala) paramTypes(params *tree_sitter.Node) map[string]string {
 		}
 	}
 	return out
+}
+
+func (c *scConvScala) scFunctionContext(name string, body *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	add("lang=scala")
+	if name != "" {
+		add("function_name:" + name)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "val_definition", "var_definition":
+			left := c.patName(field(n, "pattern"))
+			if right := scContextValue(c.text(field(n, "value"))); left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "assignment_expression":
+			left := scContextPath(c, field(n, "left"))
+			right := scContextValue(c.text(field(n, "right")))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "call_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+				for _, arg := range namedChildren(field(n, "arguments")) {
+					if a := scContextPath(c, arg); a != "" {
+						add("call_arg:" + path + ":" + a)
+					}
+				}
+			}
+		case "field_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "infix_expression":
+			if expr := scContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "string", "interpolated_string_expression", "integer_literal", "floating_point_literal", "boolean_literal", "null_literal":
+			if lit := scContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func scContextPath(c *scConvScala, n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return scContextCompact(c.text(n))
+}
+
+func scContextValue(raw string) string {
+	return scContextCompact(raw)
+}
+
+func scContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(raw), "")
+	if len(s) > 160 {
+		s = s[:160]
+	}
+	return s
 }
 
 func (c *scConvScala) patName(p *tree_sitter.Node) string {

@@ -1,0 +1,78 @@
+test "rank835: FFmpeg APE frame table writes first and last elements without non-empty guard"
+  lang c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef struct APEFrame {
+      int pos;
+      int nblocks;
+      int size;
+  } APEFrame;
+
+  typedef struct APEContext {
+      unsigned int totalframes;
+      unsigned int firstframe;
+      unsigned int blocksperframe;
+      unsigned int finalframeblocks;
+      APEFrame *frames;
+  } APEContext;
+
+  void *av_malloc(unsigned int size);
+
+  int ape_read_header(APEContext *ape) {
+      if (ape->totalframes > 0xffffffffu / sizeof(APEFrame))
+          return -1;
+
+      ape->frames = av_malloc(ape->totalframes * sizeof(APEFrame));
+      if (!ape->frames)
+          return -1;
+
+      ape->frames[0].pos = ape->firstframe;
+      ape->frames[0].nblocks = ape->blocksperframe;
+      ape->frames[ape->totalframes - 1].size = ape->finalframeblocks * 4;
+      ape->frames[ape->totalframes - 1].nblocks = ape->finalframeblocks;
+      return 0;
+  }
+  ```
+
+test "rank835: FFmpeg APE frame table rejects empty files before frame access"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef struct APEFrame {
+      int pos;
+      int nblocks;
+      int size;
+  } APEFrame;
+
+  typedef struct APEContext {
+      unsigned int totalframes;
+      unsigned int firstframe;
+      unsigned int blocksperframe;
+      unsigned int finalframeblocks;
+      APEFrame *frames;
+  } APEContext;
+
+  void *av_malloc(unsigned int size);
+
+  int ape_read_header(APEContext *ape) {
+      if (!ape->totalframes)
+          return -1;
+
+      if (ape->totalframes > 0xffffffffu / sizeof(APEFrame))
+          return -1;
+
+      ape->frames = av_malloc(ape->totalframes * sizeof(APEFrame));
+      if (!ape->frames)
+          return -1;
+
+      ape->frames[0].pos = ape->firstframe;
+      ape->frames[0].nblocks = ape->blocksperframe;
+      ape->frames[ape->totalframes - 1].size = ape->finalframeblocks * 4;
+      ape->frames[ape->totalframes - 1].nblocks = ape->finalframeblocks;
+      return 0;
+  }
+  ```

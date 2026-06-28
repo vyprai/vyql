@@ -1,5 +1,7 @@
 adapter csharp {
   package "xam.plugin.externalmaps" {
-    mark method "NavigateTo" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "NavigateTo"
+    }
   }
 }

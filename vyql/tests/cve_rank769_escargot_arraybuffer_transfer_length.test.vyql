@@ -1,0 +1,62 @@
+# Rank 769 / CVE-2026-8915: Escargot ArrayBuffer.prototype.transfer
+# allocated a caller-selected new length without enforcing maxByteLength.
+
+test "rank769: ArrayBuffer transfer skips maxByteLength check before allocation"
+  lang cpp
+  file BuiltinArrayBuffer.cpp
+  expect VYQL-MEM-036
+  expect_review code.ArrayBufferTransferMaxLengthBypass
+  code
+  ```
+  static Value builtinArrayBufferTransfer(ExecutionState& state, Value thisValue, size_t argc, Value* argv, Optional<Object*> newTarget)
+  {
+      RESOLVE_THIS_BINDING_TO_ARRAYBUFFER(obj, ArrayBuffer, transfer);
+      obj->throwTypeErrorIfDetached(state);
+
+      uint64_t newByteLength = obj->byteLength();
+      if (argc > 0 && !argv[0].isUndefined()) {
+          newByteLength = argv[0].toIndex(state);
+      }
+
+      Optional<uint64_t> maxLength;
+      if (obj->isResizableArrayBuffer()) {
+          maxLength = obj->maxByteLength();
+      }
+      ArrayBuffer* newValue = ArrayBufferObject::allocateArrayBuffer(state, state.context()->globalObject()->arrayBuffer(), newByteLength, maxLength);
+      newValue->fillData(obj->data(), std::min(newByteLength, static_cast<uint64_t>(obj->byteLength())));
+      obj->asArrayBufferObject()->detachArrayBuffer();
+      return newValue;
+  }
+  ```
+
+test "rank769: ArrayBuffer transfer rejects lengths above maxByteLength"
+  lang cpp
+  file BuiltinArrayBuffer.cpp
+  reject VYQL-MEM-036
+  reject_review code.ArrayBufferTransferMaxLengthBypass
+  code
+  ```
+  static Value builtinArrayBufferTransfer(ExecutionState& state, Value thisValue, size_t argc, Value* argv, Optional<Object*> newTarget)
+  {
+      RESOLVE_THIS_BINDING_TO_ARRAYBUFFER(obj, ArrayBuffer, transfer);
+      obj->throwTypeErrorIfDetached(state);
+
+      uint64_t newByteLength = obj->byteLength();
+      if (argc > 0 && !argv[0].isUndefined()) {
+          newByteLength = argv[0].toIndex(state);
+      }
+
+      obj->throwTypeErrorIfDetached(state);
+      Optional<uint64_t> maxLength;
+      if (obj->isResizableArrayBuffer()) {
+          maxLength = obj->maxByteLength();
+          if (newByteLength > maxLength.value()) {
+              ErrorObject::throwBuiltinError(state, ErrorCode::RangeError, state.context()->staticStrings().ArrayBuffer.string(), true, state.context()->staticStrings().transfer.string(), ErrorObject::Messages::GlobalObject_FirstArgumentInvalidLength);
+          }
+      }
+      ArrayBuffer* newValue = ArrayBufferObject::allocateArrayBuffer(state, state.context()->globalObject()->arrayBuffer(), newByteLength, maxLength);
+      newValue->fillData(obj->data(), std::min(newByteLength, static_cast<uint64_t>(obj->byteLength())));
+      obj->asArrayBufferObject()->detachArrayBuffer();
+      return newValue;
+  }
+  ```

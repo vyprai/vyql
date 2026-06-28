@@ -1,19 +1,47 @@
 import code.{PrivilegedOp}
 adapter dart {
   package "bitsdojo_window_linux" {
-    mark method "startWindowDrag" -> code.PrivilegedOp
-    mark method "startDragging" -> code.PrivilegedOp
-    mark method "start_window_drag_at_position" -> code.PrivilegedOp
-    mark method "setPosition" -> code.PrivilegedOp
-    mark method "setSize" -> code.PrivilegedOp
-    mark method "setRect" -> code.PrivilegedOp
-    mark method "setMinSize" -> code.PrivilegedOp
-    mark method "setMaxSize" -> code.PrivilegedOp
-    mark method "showWindow" -> code.PrivilegedOp
-    mark method "hideWindow" -> code.PrivilegedOp
-    mark method "minimizeWindow" -> code.PrivilegedOp
-    mark method "maximizeWindow" -> code.PrivilegedOp
-    mark method "unmaximizeWindow" -> code.PrivilegedOp
-    mark method "setWindowTitle" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "startWindowDrag"
+    }
+    flag code.PrivilegedOp on any {
+      method "startDragging"
+    }
+    flag code.PrivilegedOp on any {
+      method "start_window_drag_at_position"
+    }
+    flag code.PrivilegedOp on any {
+      method "setPosition"
+    }
+    flag code.PrivilegedOp on any {
+      method "setSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "setRect"
+    }
+    flag code.PrivilegedOp on any {
+      method "setMinSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "setMaxSize"
+    }
+    flag code.PrivilegedOp on any {
+      method "showWindow"
+    }
+    flag code.PrivilegedOp on any {
+      method "hideWindow"
+    }
+    flag code.PrivilegedOp on any {
+      method "minimizeWindow"
+    }
+    flag code.PrivilegedOp on any {
+      method "maximizeWindow"
+    }
+    flag code.PrivilegedOp on any {
+      method "unmaximizeWindow"
+    }
+    flag code.PrivilegedOp on any {
+      method "setWindowTitle"
+    }
   }
 }

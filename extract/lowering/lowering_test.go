@@ -145,6 +145,7 @@ func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
 				},
 				Loc: "app.py:2",
 			}},
+			nir.Assign{Targets: []string{"guard"}, Value: nir.Const{Loc: "app.py:3", Value: "\"__proto__\""}},
 		},
 	}}}
 	g, err := Lower(prog, true)
@@ -169,6 +170,118 @@ func TestLoweringCarriesLiteralTokensOnFormatAndSubscript(t *testing.T) {
 	}
 	if !sawSubscript || !sawFormat {
 		t.Fatalf("literal tokens missing: subscript=%v format=%v", sawSubscript, sawFormat)
+	}
+	var sawConst bool
+	ids, _ = g.NodesOfType("code.Const")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if strings.Contains(n.Prop("str_args"), "__proto__") {
+			sawConst = true
+		}
+	}
+	if !sawConst {
+		t.Fatalf("const literal token missing")
+	}
+}
+
+func TestLoweringMapsJSArgumentsToSyntheticExportParam(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "pkg",
+		File: "index.js",
+		Body: []nir.Stmt{
+			nir.FuncDef{
+				Name:     "__default_export__",
+				Params:   []string{nir.JSArgumentsParam},
+				Loc:      "index.js:1",
+				Exported: true,
+				Body: []nir.Stmt{
+					nir.Return{Value: nir.Index{
+						Base: nir.Name{ID: "arguments", Loc: "index.js:2"},
+						Key:  nir.Const{Value: "0", Loc: "index.js:2"},
+						Path: "arguments.__subscript",
+						Loc:  "index.js:2",
+					}},
+				},
+			},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+
+	src := findNodeID(t, g, "code.Param", "name", nir.JSArgumentsParam)
+	subscriptIDs, err := g.NodesOfType("code.Subscript")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subscriptIDs) != 1 {
+		t.Fatalf("expected one arguments subscript, got %v", subscriptIDs)
+	}
+	dst := subscriptIDs[0]
+	reachable, err := usg.BFS(g, src, "FLOWS", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[dst] {
+		t.Fatalf("synthetic JS arguments param did not flow to arguments subscript")
+	}
+}
+
+func TestDynamicReadOfCleanTrackedContainerDoesNotInheritSelectorTaint(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app.php",
+		File: "app.php",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "view", Loc: "app.php:1", Params: []string{"key", "payload"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "$files", Loc: "app.php:2"}, Attr: "__setitem__", Loc: "app.php:2"},
+					Args: []nir.Expr{
+						nir.Const{Value: "\"/etc/radiusd.conf\"", Loc: "app.php:2"},
+						nir.Const{Value: "\"radiusd\"", Loc: "app.php:2"},
+					},
+					Path: "$files.__setitem__", Method: "__setitem__", Loc: "app.php:2",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "$files", Loc: "app.php:3"}, Attr: "__setitem__", Loc: "app.php:3"},
+					Args: []nir.Expr{
+						nir.Name{ID: "payload", Loc: "app.php:3"},
+						nir.Const{Value: "\"dynamic\"", Loc: "app.php:3"},
+					},
+					Path: "$files.__setitem__", Method: "__setitem__", Loc: "app.php:3",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "app.php:4"},
+					Args: []nir.Expr{nir.Index{
+						Base: nir.Name{ID: "$files", Loc: "app.php:4"},
+						Key:  nir.Name{ID: "key", Loc: "app.php:4"},
+						Path: "$files", Loc: "app.php:4",
+					}},
+					Path: "sink", Method: "sink", Loc: "app.php:4",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyParam := findNodeID(t, g, "code.Param", "name", "key")
+	payloadParam := findNodeID(t, g, "code.Param", "name", "payload")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.php:4")
+	keyReachable, err := usg.BFS(g, keyParam, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyReachable[sinkArg] {
+		t.Fatalf("dynamic selector taint should not become the selected value of a clean tracked container")
+	}
+	payloadReachable, err := usg.BFS(g, payloadParam, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !payloadReachable[sinkArg] {
+		t.Fatalf("dynamic read of a clean tracked container should still include tainted known slots")
 	}
 }
 

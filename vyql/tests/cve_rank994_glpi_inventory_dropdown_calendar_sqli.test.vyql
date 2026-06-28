@@ -1,0 +1,57 @@
+# Rank 994 / CVE-2026-26001: GLPI Inventory reports assembled a date predicate
+# from dropdown_calendar and dropdown_sup_inf request fields, then concatenated
+# that fragment into a SQL query before $DB->doQuery.
+
+test "rank994 php: report date filter concatenates request date into sql"
+  lang php
+  file report/ports_date_connections.php
+  expect VYQL-INJ-196
+  expect_review code.ReportDateFilterSqlFragmentInjection
+  code
+  ```
+  <?php
+  global $DB;
+
+  if (isset($_POST["dropdown_calendar"]) && isset($_POST["dropdown_sup_inf"])) {
+      $date_search = '';
+      if ($_POST['dropdown_sup_inf'] == 'sup') {
+          $date_search .= "> '" . $_POST['dropdown_calendar'] . "'";
+      } elseif ($_POST['dropdown_sup_inf'] == 'inf') {
+          $date_search .= "< '" . $_POST['dropdown_calendar'] . "'";
+      } elseif ($_POST['dropdown_sup_inf'] == 'equal') {
+          $date_search .= " LIKE '" . $_POST['dropdown_calendar'] . "%'";
+      }
+
+      $query = "SELECT glpi_networkports.id FROM glpi_networkports"
+             . " WHERE a.id IS NOT NULL"
+             . " AND a.date_mod" . $date_search
+             . " ORDER BY glpi_networkports.items_id";
+      $result = $DB->doQuery($query);
+  }
+  ```
+
+test "rank994 php: report date filter validates and parameterizes date"
+  lang php
+  file report/ports_date_connections.php
+  reject VYQL-INJ-196
+  reject_review code.ReportDateFilterSqlFragmentInjection
+  code
+  ```
+  <?php
+  global $DB;
+
+  if (isset($_POST["dropdown_calendar"]) && isset($_POST["dropdown_sup_inf"])) {
+      $calendar = DateTime::createFromFormat('Y-m-d H:i:s', $_POST['dropdown_calendar']);
+      if ($calendar === false || !in_array($_POST['dropdown_sup_inf'], ['sup', 'inf', 'equal'], true)) {
+          throw new InvalidArgumentException('invalid date filter');
+      }
+
+      $operator = $_POST['dropdown_sup_inf'] === 'sup' ? '>' : ($_POST['dropdown_sup_inf'] === 'inf' ? '<' : 'LIKE');
+      $iterator = $DB->request([
+          'SELECT' => ['glpi_networkports' => ['id']],
+          'FROM' => 'glpi_networkports',
+          'WHERE' => ['date_mod' => [$operator, new QueryParam($calendar->format('Y-m-d H:i:s'))]],
+          'ORDER' => ['glpi_networkports.items_id'],
+      ]);
+  }
+  ```

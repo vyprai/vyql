@@ -58,8 +58,15 @@ adapter cpp {
   }
   package "libcurl" {
     sink path "curl_easy_setopt" arg 2 -> UrlFetch
-    mark "curl_easy_setopt" val "http://" nval "127.0" -> CleartextChannel
-    mark "curl_easy_setopt" val "CURLOPT_SSL_VERIFYPEER=0" -> CertValidationDisabled
+    flag CleartextChannel on any {
+      path "curl_easy_setopt"
+      has "http://"
+      lacks "127.0"
+    }
+    flag CertValidationDisabled on any {
+      path "curl_easy_setopt"
+      has "CURLOPT_SSL_VERIFYPEER=0"
+    }
   }
   package "libxml2" {
     sink path "xmlReadMemory" -> XmlParse
@@ -75,9 +82,15 @@ adapter cpp {
     control "inja.escape" -> HtmlEscape
   }
   package "openssl" {
-    mark "EVP_md5" -> WeakHash
-    mark "EVP_sha1" -> WeakHash
-    mark "EVP_des_ede3_cbc" -> WeakCipher
+    flag WeakHash on any {
+      path "EVP_md5"
+    }
+    flag WeakHash on any {
+      path "EVP_sha1"
+    }
+    flag WeakCipher on any {
+      path "EVP_des_ede3_cbc"
+    }
   }
   package "jwt-cpp" {
     control "jwt.verify" -> AuthenticationCheck

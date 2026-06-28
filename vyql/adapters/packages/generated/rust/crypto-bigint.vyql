@@ -1,7 +1,11 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "crypto-bigint" {
-    mark method "random" -> code.WeakRandomValue
-    mark method "try_random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "random"
+    }
+    flag code.WeakRandomValue on any {
+      method "try_random"
+    }
   }
 }

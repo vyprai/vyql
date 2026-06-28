@@ -3,7 +3,11 @@ adapter kotlin {
     sink method "hash" -> code.SqlExecution
     control method "prepareValidatedExecutableTypes" -> core.SqlParameterization
     control method "normalize" -> core.InputValidation
-    mark method "hash" -> code.WeakHash
-    mark method "regexp" -> code.RegexCompile
+    flag code.WeakHash on any {
+      method "hash"
+    }
+    flag code.RegexCompile on any {
+      method "regexp"
+    }
   }
 }

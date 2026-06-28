@@ -1,0 +1,127 @@
+# Rank 359 / CVE-2025-53632: Chall-Manager decoded scenario ZIP files by
+# joining archive member names into the destination directory before writing.
+
+test "rank359: chall-manager writes zip member names without containment check"
+  lang go
+  expect VYQL-PATH-014
+  expect_review code.ManualZipEntryFileWrite
+  code
+  ```
+  package scenario
+
+  import (
+    "archive/zip"
+    "bytes"
+    "context"
+    "encoding/base64"
+    "io"
+    "os"
+    "path/filepath"
+  )
+
+  func Decode(ctx context.Context, challDir, scenario string) (string, error) {
+    cd := filepath.Join(challDir, "scenario")
+    b, err := base64.StdEncoding.DecodeString(scenario)
+    if err != nil {
+      return cd, err
+    }
+    r, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+    if err != nil {
+      return cd, err
+    }
+    for _, f := range r.File {
+      filePath := filepath.Join(cd, f.Name)
+      if f.FileInfo().IsDir() {
+        continue
+      }
+      if err := copy(filePath, f); err != nil {
+        return cd, err
+      }
+    }
+    return cd, nil
+  }
+
+  func copy(filePath string, f *zip.File) error {
+    outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0777)
+    if err != nil {
+      return err
+    }
+    defer outFile.Close()
+    rc, err := f.Open()
+    if err != nil {
+      return err
+    }
+    defer rc.Close()
+    _, err = io.Copy(outFile, rc)
+    return err
+  }
+  ```
+
+test "rank359: chall-manager checks zip member path before writing"
+  lang go
+  reject VYQL-PATH-014
+  reject_review code.ManualZipEntryFileWrite
+  code
+  ```
+  package scenario
+
+  import (
+    "archive/zip"
+    "bytes"
+    "context"
+    "encoding/base64"
+    "fmt"
+    "io"
+    "os"
+    "path/filepath"
+    "strings"
+  )
+
+  func Decode(ctx context.Context, challDir, scenario string) (string, error) {
+    cd := filepath.Join(challDir, "scenario")
+    b, err := base64.StdEncoding.DecodeString(scenario)
+    if err != nil {
+      return cd, err
+    }
+    r, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+    if err != nil {
+      return cd, err
+    }
+    for _, f := range r.File {
+      if f.FileInfo().IsDir() {
+        continue
+      }
+      filePath, err := sanitizeArchivePath(cd, f.Name)
+      if err != nil {
+        return cd, err
+      }
+      if err := copyTo(f, filePath); err != nil {
+        return cd, err
+      }
+    }
+    return cd, nil
+  }
+
+  func sanitizeArchivePath(d, t string) (v string, err error) {
+    v = filepath.Join(d, t)
+    if strings.HasPrefix(v, filepath.Clean(d)) {
+      return v, nil
+    }
+    return "", fmt.Errorf("filepath is tainted: %s", t)
+  }
+
+  func copyTo(f *zip.File, filePath string) error {
+    outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0777)
+    if err != nil {
+      return err
+    }
+    defer outFile.Close()
+    rc, err := f.Open()
+    if err != nil {
+      return err
+    }
+    defer rc.Close()
+    _, err = io.Copy(outFile, rc)
+    return err
+  }
+  ```

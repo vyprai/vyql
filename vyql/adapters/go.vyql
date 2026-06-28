@@ -24,6 +24,7 @@ adapter go {
   source path "analysis.parameter.entry" val "param_type:http.Request" -> code.HttpInput
   source "os.Args" -> code.CliArgument
   source "os.Getenv" -> code.EnvVariable
+  source path "analysis.function.context" val "function_name:NewClient" val "call_path:log.Infof" val "literal:Loaded client config: %#v" val "selector:cfg.Spec" -> code.SecretValue
   source "flag.Arg" -> code.CliArgument
   source "flag.Args" -> code.CliArgument
   source ".URL.Query" -> code.HttpInput
@@ -64,6 +65,62 @@ adapter go {
   source "apiauth.ExtractIssuer" -> code.HttpInput
   source "ExtractIssuer" -> code.HttpInput
 
+  flag code.OverbroadRolePermissionGrant in module {
+    var "PermissionsByRole"
+    has "RoleNetworkManager"
+    has "PermBackup"
+    has "PermRestore"
+    lacks "RoleAdmin:{PermBackup,PermRestore"
+  }
+  flag code.TpmDiskKeyWeakPcrSealing in module {
+    var "DiskKeySealingPCRs"
+    has "tpm2.PCRSelection"
+    has "Hash:tpm2.AlgSHA1"
+    has "PCRs:[]int{0,1,2,3,4,6,7,8,9,13}"
+    lacks "AlgSHA256"
+  }
+  flag code.ShareInfoDirectDownloadTokenExposure in function {
+    lang "go"
+    function "shareInfoHandler"
+    call path "store.Share.GetByHash"
+    selector "commonShare.DownloadURL"
+    selector "shareLink.Token"
+    call arg "getShareURL:true"
+    call arg "getShareURL:shareLink.Token"
+    call path "renderJSON"
+  }
+  flag code.VerboseHttpErrorObjectDisclosure in function {
+    lang "go"
+    call path "fmt.Errorf"
+    literal contains "%+v"
+    selector contains ".Request"
+    selector contains ".Body"
+    selector contains ".TLS"
+  }
+  flag code.BulkEmailRecipientDisclosure in function {
+    call path contains_any ["SendIssueCommentMail", "SendIssueMentionMail", "SendMail", "SendEmail", "SendNotification", "SendNotificationMail", "SendNotificationEmail"]
+    call path "append"
+    selector contains ".Email"
+    call arg contains_any [
+      "SendIssueCommentMail:tos",
+      "SendIssueMentionMail:getUserEmailsByNames",
+      "SendMail:tos",
+      "SendMail:recipients",
+      "SendEmail:recipients",
+      "SendEmail:emails",
+      "SendNotification:recipients",
+      "SendNotificationMail:recipients",
+      "SendNotificationEmail:recipients"
+    ]
+    not call arg contains "__object_literal"
+    not call path contains_any ["Bcc", "BlindCopy"]
+  }
+  flag code.UnescapedMysqlDsnDatabaseName in function {
+    lang "go"
+    call path "sql.NewParserFromAlterStatement"
+    selector "migrationContext.DatabaseName"
+    not call path "url.QueryEscape"
+  }
   sink method "Query" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryRow" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
   sink method "QueryContext" on [sql.DB, sqlx.DB, gorm.DB] -> code.SqlExecution
@@ -145,6 +202,20 @@ adapter go {
   sink path "analysis.function.return" val "<html" -> code.HtmlRender
   sink path "analysis.function.return" val "<body" -> code.HtmlRender
   sink path "analysis.function.return" val "<a " -> code.HtmlRender
+  flag code.GouniverseCmsAliasXss in function {
+    function "PageRenderHtmlByAlias"
+    param type "http.Request"
+    call path "cms.PageFindByAlias"
+    literal "Page with alias '"
+    not call "ToHTML"
+  }
+  flag code.DocumizeMarkdownRenderWithoutSanitizer in function {
+    function "Render"
+    call path "blackfriday.Run"
+    call "string"
+    not call path "bluemonday.UGCPolicy"
+    not call "SanitizeBytes"
+  }
   // Gin/http response writer bodies. These are the last-hop render boundary for
   // raw strings/bytes assembled by handlers.
   sink path "Writer.WriteString" -> code.HtmlRender
@@ -157,16 +228,63 @@ adapter go {
   sink method "GetUser" -> code.ObjectLookupByUserInput
   sink method "GetAccount" -> code.ObjectLookupByUserInput
   sink method "GetOrder" -> code.ObjectLookupByUserInput
-  mark "ChangePassword" -> code.AuthenticationRequiredOp
-  mark "UpdatePassword" -> code.AuthenticationRequiredOp
-  mark "ResetPassword" -> code.AuthenticationRequiredOp
-  mark "ChangeEmail" -> code.AuthenticationRequiredOp
-  mark "TransferFunds" -> code.AuthenticationRequiredOp
-  mark "DeleteAccount" -> code.AuthenticationRequiredOp
-  mark "GrantRole" -> code.AuthenticationRequiredOp
-  mark "MakeAdmin" -> code.AuthenticationRequiredOp
-  mark exact "analysis.function.context" val "function_name:SolveChallenge" val "selector:challenge.tries" val "selector:s.challenges" -> code.AuthAttemptLimitReview
-  mark exact "analysis.function.context" val "function_name:Verify" val "call:Get" val "binary:v==answer" nval "binary:v!=\"\"" -> code.EmptyVerifierAcceptance
+  flag code.AuthenticationRequiredOp on any {
+    path "ChangePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "UpdatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "ResetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "ChangeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "TransferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "DeleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "GrantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "MakeAdmin"
+  }
+  flag code.PathMatcherNormalizationOrderBypass in function {
+    function "Match"
+    call path "url.PathUnescape"
+    selector "r.URL.Path"
+    call order "strings.TrimRight>path.Clean"
+    call "HasSuffix"
+  }
+  flag code.UnicodeNormalizationAfterFilterBypass in function {
+    function contains_any ["Preprocess", "preprocess", "Normalize", "normalize", "Canonical", "canonical", "Lookup", "lookup"]
+    call path "regexp.MustCompile.ReplaceAllString"
+    call path "norm.NFKD.String"
+    call order "norm.NFKD.String>regexp.MustCompile.ReplaceAllString"
+    not call order "regexp.MustCompile.ReplaceAllString>norm.NFKD.String"
+    literal contains_any ["-_ .", "[-_ .]", "-_."]
+  }
+  flag code.LeadingDotSegmentOnlyRouteFilter on any {
+    path exact "analysis.function.context"
+    call path "strings.HasPrefix"
+    literal "/."
+    selector "ctx.R.URL.Path"
+    lacks call path "strings.Contains"
+  }
+  flag code.AuthAttemptLimitReview in function {
+    function "SolveChallenge"
+    selector "challenge.tries"
+    selector "s.challenges"
+  }
+  flag code.EmptyVerifierAcceptance in function {
+    function "Verify"
+    call "Get"
+    binary "v==answer"
+    not binary "v!=\"\""
+  }
   // HTTP response splitting / header injection (CWE-113).
   sink path "Header.Set" arg 1 -> code.ResponseHeaderWrite
   sink path "Header.Add" arg 1 -> code.ResponseHeaderWrite
@@ -174,9 +292,75 @@ adapter go {
   sink path "log.Print" arg all -> code.LogOutput
   sink path "log.Printf" arg all -> code.LogOutput
   sink path "log.Println" arg all -> code.LogOutput
-  mark "log.Print" -> code.LogWrite
-  mark "log.Printf" -> code.LogWrite
-  mark "log.Println" -> code.LogWrite
+  flag code.LogWrite in function {
+    function "NewClient"
+    call path "log.Infof"
+    literal "Loaded client config: %#v"
+    selector "cfg.Spec"
+  }
+  flag code.CoderAgentManifestInfoLog on any {
+    path exact "a.logger.Info"
+    has "fetched manifest"
+    has "slog.F"
+    has "manifest"
+  }
+  flag code.KubernetesCurlAuthorizationHeaderLogLeak in function {
+    function "toCurl"
+    selector "r.RequestHeaders"
+    call path "fmt.Sprintf"
+    literal "%s: %s"
+    not call "maskValue"
+  }
+  flag code.RequestPathPercentSLogInjection in function {
+    call path "fmt.Sprintf"
+    selector contains ".Path"
+    selector contains ".ErrorMessage"
+    literal contains "%s %s\n%s"
+    not literal contains "%#v"
+  }
+  flag code.RequestPluginNamePathTraversal in function {
+    call path "ShouldBindJSON"
+    selector contains ".PlugName"
+    selector contains ".Snake"
+    call path contains_any ["CreatePlug", "GeneratePlug", "CreatePlugin", "GeneratePlugin", "CreateModule", "GenerateModule"]
+    not call path contains_any ["filepath.Base", "path.Base", "regexp.MatchString"]
+    not call arg contains_any ["strings.Contains:filepath.Separator", "strings.Contains:os.PathSeparator", "strings.Contains:/", "strings.Contains:\\"]
+  }
+  flag code.TextAccessLogDefaultFormatInjection on call {
+    path "cfgcore.DataSource_InlineString"
+    operand {
+      identifier contains "EnvoyTextLogFormat"
+    }
+  }
+  flag code.KubernetesNamespaceNotInEgressPolicy in function {
+    lang "go"
+    call path "netwv1.NewNetworkPolicy"
+    call path "netwv1.NetworkPolicyEgressRuleArgs"
+    call path "netwv1.NetworkPolicyPeerArgs"
+    call path "metav1.LabelSelectorRequirementArgs"
+    literal "Egress"
+    literal "kubernetes.io/metadata.name"
+    literal "NotIn"
+    call path contains_any ["Metadata.Name.Elem", "Namespace.Name.Elem"]
+  }
+  flag code.UnescapedContentDispositionFilename in function {
+    function "Attachment"
+    call path "filepath.Base"
+    call path "ctx.Set"
+    call arg "ctx.Set:HeaderContentDisposition"
+    literal "attachment; filename="
+    not call path "url.QueryEscape"
+    not call path "url.PathEscape"
+  }
+  flag code.LogWrite on any {
+    path "log.Print"
+  }
+  flag code.LogWrite on any {
+    path "log.Printf"
+  }
+  flag code.LogWrite on any {
+    path "log.Println"
+  }
   // CSV/formula injection (CWE-1236).
   sink path "writer.Write" arg all collection -> code.CsvCell
   sink path "csvWriter.Write" arg all collection -> code.CsvCell
@@ -195,6 +379,8 @@ adapter go {
   // A path denylist that rejects parent-directory and Windows separator tokens is
   // a real traversal guard; weaker substring checks remain ordinary calls.
   control "strings.Contains" val ".." val "\\" -> core.PathAccessCheck
+  control "analysis.function.context" val "call_path:strings.Contains" val "literal:bad path" val "call_path:isSymbolLink" val "call_path:ioutil.ReadFile" -> core.PathAccessCheck
+  control "regexp.MatchString" val "^/var/lib/casaos/\\d" -> core.PathAccessCheck
   control "pathrs.Reopen" -> core.PathAccessCheck
   control "procfs.OpenProcRoot" -> core.PathAccessCheck
   control method "OpenThreadSelf" -> core.PathAccessCheck
@@ -218,120 +404,851 @@ adapter go {
   sink path "regexp.MatchString" -> code.RegexCompile
 
   // weak crypto (CWE-327) — presence marker on the call node
-  mark "md5.New" -> code.WeakHash
-  mark "sha1.New" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "md5.New"
+  }
+  flag code.WeakHash on any {
+    path "sha1.New"
+  }
   // one-shot digests: md5.Sum(b) / sha1.Sum(b) are the common Go idiom alongside .New().
-  mark "md5.Sum" -> code.WeakHash
-  mark "sha1.Sum" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "md5.Sum"
+  }
+  flag code.WeakHash on any {
+    path "sha1.Sum"
+  }
 
   // insecure randomness (CWE-330) — math/rand. The math/rand-only methods (Intn/Int31/
   // Int63/Float64/Perm/Shuffle) disambiguate from crypto/rand (which has Read/Int/Prime).
-  mark "rand.Intn" -> code.WeakRandomValue
-  mark "rand.Int31" -> code.WeakRandomValue
-  mark "rand.Int31n" -> code.WeakRandomValue
-  mark "rand.Int63" -> code.WeakRandomValue
-  mark "rand.Int63n" -> code.WeakRandomValue
-  mark "rand.Float64" -> code.WeakRandomValue
-  mark "rand.Float32" -> code.WeakRandomValue
-  mark "rand.Perm" -> code.WeakRandomValue
-  mark "rand.Shuffle" -> code.WeakRandomValue
-  mark "rand.NewSource" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "rand.Intn"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Int31"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Int31n"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Int63"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Int63n"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Float64"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Float32"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Perm"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.Shuffle"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand.NewSource"
+  }
+  // Cloudreve's util.RandStringRunes wraps math/rand and was replaced with the
+  // crypto/rand variant for persisted/session secrets in CVE-2026-25726.
+  flag code.CloudreveWeakSecretPrng on any {
+    path exact "util.RandStringRunes"
+    has "32"
+  }
+  flag code.CloudreveWeakSecretPrng on any {
+    path exact "util.RandStringRunes"
+    has "64"
+  }
+  flag code.CloudreveWeakSecretPrng on any {
+    path exact "util.RandStringRunes"
+    has "128"
+  }
+  flag code.CloudreveWeakSecretPrng on any {
+    path exact "util.RandStringRunes"
+    has "256"
+  }
+  flag code.ConstellationLuks2AttachedHeaderActivation in function {
+    function "initByDevicePath"
+    call path "cryptsetup.Init"
+    not call path "detachHeader"
+    not call path "cryptsetup.InitDataDevice"
+  }
+  flag code.ConstellationLuks2AttachedHeaderActivation in function {
+    function "initByName"
+    call path "cryptsetup.InitByName"
+    not call path "detachHeader"
+    not call path "cryptsetup.InitByNameAndHeader"
+  }
 
   // weak cipher (CWE-327) — named broken ciphers
-  mark "des.NewCipher" -> code.WeakCipher
-  mark "des.NewTripleDESCipher" -> code.WeakCipher
-  mark "rc4.NewCipher" -> code.WeakCipher
-  mark "cipher.NewCBCEncrypter" val "0000000000000000" -> code.StaticIv
-  mark "cipher.NewCBCDecrypter" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "des.NewCipher"
+  }
+  flag code.WeakCipher on any {
+    path "des.NewTripleDESCipher"
+  }
+  flag code.WeakCipher on any {
+    path "rc4.NewCipher"
+  }
+  flag code.StaticIv on any {
+    path "cipher.NewCBCEncrypter"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "cipher.NewCBCDecrypter"
+    has "0000000000000000"
+  }
 
   // insecure file permission (CWE-732) — world-writable mode on chmod/WriteFile/MkdirAll.
   // octal literal text is carried by the frontend; restrictive modes are not matched.
-  mark "os.Chmod" val "0777" -> code.InsecurePermission
-  mark "os.Chmod" val "0666" -> code.InsecurePermission
-  mark "os.MkdirAll" val "0777" -> code.InsecurePermission
-  mark "os.WriteFile" val "0777" -> code.InsecurePermission
+  flag code.InsecurePermission on any {
+    path "os.Chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "os.Chmod"
+    has "0666"
+  }
+  flag code.InsecurePermission on any {
+    path "os.MkdirAll"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "os.WriteFile"
+    has "0777"
+  }
   // Review-only: project-specific config serializers often need an explicit
   // "redact/scrub secrets" option before returning configs through diagnostics/API.
-  mark "MarshalConfig" val "false" -> code.ConfigExposureReview
-  mark "instance.MarshalConfig" val "false" -> code.ConfigExposureReview
-  mark exact "analysis.type.context" val "field:Repositories" val "field:Keyring" nval "method:MarshalYAML" -> code.ConfigExposureReview
-  mark "settingspkg.Settings" val "PasswordPattern" -> code.SensitiveSettingsExposureReview
+  flag code.ConfigExposureReview on any {
+    path "MarshalConfig"
+    has "false"
+  }
+  flag code.ConfigExposureReview on any {
+    path "instance.MarshalConfig"
+    has "false"
+  }
+  flag code.ConfigExposureReview on any {
+    path exact "analysis.type.context"
+    field "Repositories"
+    field "Keyring"
+    not method name "MarshalYAML"
+  }
+  flag code.InheritedProcessEnvironmentLeak in function {
+    call path "unshare.Command"
+    selector "cmd.Env"
+    call path "os.Environ"
+    literal "LOGLEVEL=%d"
+  }
+  flag code.ContainerdCriImageEnvAliasLeak in function {
+    assign "env=imageConfig.Env"
+    call path "config.GetEnvs"
+    call path "oci.WithEnv"
+    not token append_copy "imageConfig.Env"
+  }
+  flag code.ContainerPrimaryGidMissingSupplementalGroup in function {
+    function "setupContainerUser"
+    call path "specgen.SetProcessGID"
+    selector "sc.RunAsGroup"
+    call path "specgen.AddProcessAdditionalGid"
+    not call arg "specgen.AddProcessAdditionalGid:gid"
+  }
+  flag code.MountStubCleanupPathEscape in function {
+    call path "os.Lstat"
+    call path "filepath.Dir"
+    call path "os.Remove"
+    call path "os.Chtimes"
+    not call path "fs.RootPath"
+  }
+  flag code.ContainersCommonFipsModeMountSymlink on any {
+    path "analysis.function.context"
+    function "addFIPSModeSubscription"
+    call path "filepath.Join"
+    call path "fileutils.Exists"
+    not call path "securejoin.SecureJoin"
+  }
+  // Docker CLI for Windows removed the legacy ProgramData system plugin search
+  // directory because standard users can create it and plant plugin binaries.
+  flag code.DockerCliProgramDataPluginSearchPath on any {
+    path exact "filepath.Join"
+    has "ProgramData"
+    has "Docker"
+    has "cli-plugins"
+    lacks "ProgramFiles"
+  }
+  flag code.SensitiveSettingsExposureReview on any {
+    path "settingspkg.Settings"
+    has "PasswordPattern"
+  }
+  flag code.MessageBusSecretConfigExposure in function {
+    call path "bootstrapMessaging.SetOptionsAuthData"
+    call path "messaging.NewMessageClient"
+    field "Optional"
+    selector "messageBusInfo.Optional"
+    not selector "bootstrapMessaging.OptionsPasswordKey"
+  }
+  flag code.KubernetesTemplateSecretLookupExposure in function {
+    call path "ctrlcfg.GetConfig"
+    call path "kubernetes.NewForConfig"
+    call path "clientset.CoreV1.Secrets.Get"
+    call arg "clientset.CoreV1.Secrets:namespace"
+    index "secret.Data"
+    index "secret.Data:keyName"
+    not call contains_any ["SelfSubjectAccessReview", "SubjectAccessReview", "CheckAccess", "Authorize"]
+  }
   // Review-only: protocol/state handlers that stop a registration timer without
   // first checking the corresponding state can accept out-of-sequence messages.
-  mark exact "analysis.function.context" val "call:StopT3550" nval "selector:ue.T3550" -> code.ProtocolStateReview
+  flag code.ProtocolStateReview in function {
+    call "StopT3550"
+    not selector "ue.T3550"
+  }
   // Review-only: protocol handlers that compare an incoming previous-state pointer
   // against the last stored state need manual review for stale or forked-chain cases.
-  mark exact "analysis.function.context" val "PrevATXID" val "call:GetLastIDByNodeID" -> code.ProtocolStateReview
+  flag code.ProtocolStateReview in function {
+    has "PrevATXID"
+    call "GetLastIDByNodeID"
+  }
+  // Review-only: protocol response loops that abort on malformed frame parse
+  // errors before checking request/response identifiers can let spoofed packets
+  // block the valid upstream response. A fixed implementation distinguishes
+  // UDP parse errors from network errors and continues waiting.
+  flag code.ProtocolStateReview in function {
+    call path "pc.c.WriteMsg"
+    call path "pc.c.ReadMsg"
+    call path "pc.c.Close"
+    selector "state.Req.Id"
+    selector "ret.Id"
+    not selector "net.Error"
+    not binary "proto==\"udp\""
+  }
   // Review-only: request handlers that derive request metadata, load resource metadata,
   // then dispatch a resource handler need a visible request/resource scope consistency
   // check before dispatch.
-  mark exact "analysis.function.context" val "function_name:ServeHTTP" val "call:RequestInfoFrom" val "call:Get" val "call:serveResource" nval "selector:apiextensions.NamespaceScoped" -> code.RequestScopePolicyReview
+  flag code.RequestScopePolicyReview in function {
+    function "ServeHTTP"
+    call "RequestInfoFrom"
+    call "Get"
+    call "serveResource"
+    not selector "apiextensions.NamespaceScoped"
+  }
+  flag code.ExternalResourceNamespaceControl in function {
+    function "newBuildPod"
+    call path "build.BuilderPodNamespace"
+  }
+  flag code.ExternalResourceNamespaceControl in function {
+    function "deleteBuilderPod"
+    call path "build.BuilderPodNamespace"
+  }
+  flag code.ExternalResourceNamespaceControl in function {
+    function "getBuilderPod"
+    call path "build.BuilderPodNamespace"
+  }
+  flag code.TenantServiceAccountAdmissionBypass in function {
+    function "IsCapsuleUser"
+    call "NewUserGroupList"
+    literal "system:serviceaccounts:kube-system"
+    call "Find"
+    not call "MatchingFieldsSelector"
+    not literal ".status.namespaces"
+  }
+  flag code.NamespacedSubjectKeyCollision in function {
+    function "OwnerRoleBindingsIndexFunc"
+    selector "rb.Subjects"
+    selector "subject.Kind"
+    selector "subject.Name"
+    call path "fmt.Sprintf"
+    not selector "subject.Namespace"
+    not call path "strings.Join"
+  }
+  flag code.HopByHopHeaderAuthBypass in function {
+    function "impersonateHandler"
+    call path "hr.GetUserAndGroups"
+    call path "request.Header.Set"
+    call path "request.Header.Add"
+    literal "Authorization"
+    literal "Impersonate-User"
+    literal "Impersonate-Group"
+    not call path "n.removingHopByHopHeaders"
+    not call path "httpguts.HeaderValuesContainsToken"
+  }
+  flag code.BasicAuthStreamAuthBypass on any {
+    path exact "Options"
+    has "BasicAuthEnabled"
+    has "Creds"
+    lacks "AuthRequired"
+  }
+  flag code.ProxyClientIpSpoofingBypass in function {
+    call path "g.management.GetProxy"
+    call path "proxy.ServeHTTP"
+    not call path "rewriteRequestSourceIP"
+  }
+  flag code.UnvalidatedRouteConfigKeyStoredXss in function {
+    call path "mux.Vars"
+    call path "meta.AddConnectionConfKey"
+    call path "json.Unmarshal"
+    not call path "validate.ValidateID"
+    not call path "ValidateID"
+  }
+  flag code.UploadFilePathTraversalWrite in function {
+    function "UploadFileSafe"
+    call path "uploadFile"
+    not call path "strings.Contains"
+  }
+  flag code.AttestationPredicateVerificationBypass in function {
+    call path "policy.AttestationToPayloadJSON"
+    selector "c.PredicateType"
+    binary "len(payload)==0"
+    call path "PrintVerification"
+    call arg "PrintVerification:verified"
+    not call arg "PrintVerification:checked"
+    not binary "len(checked)==0"
+  }
   // Review-only: admission ignore helpers that skip every non-empty subresource
   // need manual review for alternate API paths that bypass the primary policy.
-  mark exact "analysis.function.context" val "function_name:shouldIgnore" val "call:GetSubresource" nval "ignoredSubresources" -> code.AdmissionSubresourcePolicyReview
-  mark exact "analysis.function.context" val "call:LoadOrStore" val "literal:overflow" -> code.UnboundedStateGrowthReview
-  mark exact "analysis.function.context" val "function_name:MessageReceived" val "call:Wantlist" val "call:splitWantsCancels" val "call:Wants" val "call:PushTasksTruncated" nval "call:ByteLen" nval "mh.IDENTITY" -> code.UnboundedProtocolStateByIdentifier
-  mark exact "analysis.function.context" val "function_name:readBytes" val "call:ReadLong" val "call:int" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxSliceAllocSize" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "call:ReadBlockHeader" val "call:int" val "call:getMaxMapAllocSize" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "call:SkipNBytes" val "call:int" nval "call:SkipNBytesInt64" nval "function_name:SkipNBytesInt64" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:readBlock" val "call:ReadLong" val "call:make" nval "selector:math.MaxInt" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:readNBytes" val "call:make" val "call:ReadByte" nval "selector:reader.data" nval "selector:reader.pos" -> code.LengthDerivedAllocation
-  mark exact "analysis.function.context" val "call:ReadString" val "call:BytesNtohs" val "binary:len(buf)<=off" nval "binary:len(buf)<off+2" -> code.FieldDerivedIndexAccess
-  mark exact "analysis.function.context" val "call_path:fmt.Sprintf" val "literal:%08b" val "index:capabilities:8" nval "literal:%016b" -> code.UnderwidthFormattedIndex
+  flag code.AdmissionSubresourcePolicyReview in function {
+    function "shouldIgnore"
+    call "GetSubresource"
+    lacks "ignoredSubresources"
+  }
+  flag code.UnboundedStateGrowthReview in function {
+    call "LoadOrStore"
+    literal "overflow"
+  }
+  flag code.UnboundedProtocolStateByIdentifier in function {
+    function "MessageReceived"
+    call "Wantlist"
+    call "splitWantsCancels"
+    call "Wants"
+    call "PushTasksTruncated"
+    not call "ByteLen"
+    lacks "mh.IDENTITY"
+  }
+  flag code.BlockingReadInAcceptLoop in function {
+    call "Accept"
+    call "ReadTCP"
+    call "serve"
+  }
+  flag code.UnderboundedProtocolCountLimit in function {
+    function "BtcDecode"
+    call "ReadVarInt"
+    selector "txin.Witness"
+    token const "maxWitnessItemsPerInput=500000"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    function "readBytes"
+    call "ReadLong"
+    call "int"
+    call "make"
+    not selector "math.MaxInt"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    call "ReadBlockHeader"
+    call "int"
+    call "getMaxSliceAllocSize"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    call "ReadBlockHeader"
+    call "int"
+    call "getMaxMapAllocSize"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    call "SkipNBytes"
+    call "int"
+    not call "SkipNBytesInt64"
+    not function "SkipNBytesInt64"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    function "readBlock"
+    call "ReadLong"
+    call "make"
+    not selector "math.MaxInt"
+  }
+  flag code.ChGoCompressedSizeUint32Overflow in function {
+    function "Compress"
+    call path "binary.LittleEndian.PutUint32"
+    call "uint32"
+    not selector "math.MaxUint32"
+    not literal "compressed size overflows uint32"
+  }
+  flag code.OffsetLengthBoundsOverflow in function {
+    call "int"
+    call "len"
+    call arg "int:header.StringOff+header.StringLen"
+    call arg "len:btf"
+    slice "btf:header.StringOff:"
+    slice "btf::header.StringOff+header.StringLen"
+    not call "uint64"
+    not call arg "uint64:header.StringOff"
+  }
+  flag code.OffsetLengthBoundsOverflow in function {
+    call "int"
+    call "len"
+    call arg "int:header.TypeOff+header.TypeLen"
+    call arg "len:btf"
+    slice "btf:header.TypeOff:"
+    slice "btf::header.TypeOff+header.TypeLen"
+    not call "uint64"
+    not call arg "uint64:header.TypeOff"
+  }
+  flag code.LengthDerivedAllocation in function {
+    function "readNBytes"
+    call "make"
+    call "ReadByte"
+    not selector "reader.data"
+    not selector "reader.pos"
+  }
+  flag code.LengthDerivedAllocation in function {
+    selector "r.ContentLength"
+    call "make"
+    call path "io.ReadFull"
+    not call path "io.LimitReader"
+    not call path "http.MaxBytesReader"
+  }
+  flag code.FieldDerivedIndexAccess in function {
+    call "ReadString"
+    call "BytesNtohs"
+    binary "len(buf)<=off"
+    not binary "len(buf)<off+2"
+  }
+  flag code.FieldDerivedIndexAccess in function {
+    function "readObject"
+    index "ber:offset"
+    binary "contentEnd>len(ber)"
+    literal "ber2der: BER tag length is more than available data"
+    not binary "len(ber)<=offset"
+  }
+  flag code.Free5gcChfRechargeInfoSplitPanic in function {
+    function "RechargePut"
+    call path "strings.Split"
+    literal "rechargingInfo"
+    index "ueIdRatingGroup:1"
+    not call "len"
+    not call path "c.Query"
+  }
+  flag code.UnboundedDelimiterSplitCount in function {
+    lang "go"
+    call path "strings.Split"
+    literal "."
+    call path "len"
+    index "parts:1"
+    call path "base64.RawURLEncoding.DecodeString"
+    not call path "strings.Count"
+    not call path "strings.SplitN"
+  }
+  flag code.NilMapMergeWritePanic in function {
+    lang "go"
+    selector "options.Helm.Values"
+    selector "options.Helm.ValuesFrom"
+    assign "values=options.Helm.Values.Data"
+    call path "mergeValues"
+    not binary "values==nil"
+    not assign "values=map[string]interface{}{}"
+    not call path "make"
+  }
+  flag code.ManualZipEntryFileWrite in function {
+    function "Decode"
+    call path "zip.NewReader"
+    call path "filepath.Join"
+    selector "f.Name"
+    call path "copy"
+    not call path "sanitizeArchivePath"
+    not call path "strings.HasPrefix"
+  }
+  flag code.ManualZipEntryFileWrite in function {
+    function "UnzipDirectory"
+    call path "zip.OpenReader"
+    call path "filepath.Join"
+    selector "f.Name"
+    call path "os.OpenFile"
+    call arg "os.OpenFile:filePath"
+    selector "os.O_TRUNC"
+    not call path "os.Stat"
+    not call path "GetInput"
+  }
+  flag code.HardlinkedFileOverwriteWithoutClobber in function {
+    call path "filepath.Abs"
+    call path "os.Stat"
+    call path "os.Create"
+    token identifier contains_any ["filename", "filePath", "filepath", "path"]
+    not call path "os.Lstat"
+    not call path "os.Remove"
+    not call path "os.OpenFile"
+    not selector "os.O_EXCL"
+  }
+  flag code.CiliumBroadTcFilterCleanup in function {
+    function "getTCFilters"
+    selector "bpfFilter.Name"
+    call path "strings.Contains"
+    literal "cilium"
+    not literal "cil_"
+  }
+  flag code.CiliumCliEtcdInitMountMismatch in function {
+    function "generateDeployment"
+    literal "etcd-init"
+    field "MountPath=etcd-data-dir"
+    field "Args"
+  }
+  flag code.CharmRouteFileStorePathAccess in function {
+    function "handlePostFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Put"
+    not call path "filepath.Clean"
+  }
+  flag code.CharmRouteFileStorePathAccess in function {
+    function "handleGetFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Get"
+    not call path "filepath.Clean"
+  }
+  flag code.CharmRouteFileStorePathAccess in function {
+    function "handleDeleteFile"
+    call path "pattern.Path"
+    call path "s.cfg.FileStore.Delete"
+    not call path "filepath.Clean"
+  }
+  flag code.BoundRequestPathDeleteTraversal in function {
+    function "Delete"
+    call path "self.Validate"
+    selector "params.Path"
+    call path "GetSaveRealPath"
+    call path "os.Remove"
+    not call path "filepath.IsLocal"
+    not call path "filepath.Clean"
+  }
+  flag code.UnderwidthFormattedIndex in function {
+    call path "fmt.Sprintf"
+    literal "%08b"
+    index "capabilities:8"
+    not literal "%016b"
+  }
+  flag code.UnsafeBuildClientCommandAssembly in function {
+    function "BuildClient"
+    literal "GO_ENABLED=1 GOOS=%s GOARCH=amd64 go build"
+    selector "input.Filename"
+    call "handleFilename"
+    call path "fmt.Sprintf"
+    call path "exec.Command"
+    not call path "utils.NormalizeString"
+    not call path "utils.StringIsNumber"
+    not call path "utils.IsValidIPAddress"
+  }
+  flag code.UnsignedIndexConversionGuardBypass in function {
+    function "checkTopicRegister"
+    selector "data.Idx"
+    selector "data.Topics"
+    call "int"
+    call "len"
+    binary "data.Idx<0"
+  }
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
-  mark "__binop.ne" val "Count" val "0" -> core.MemoryBoundsCheck
-  mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_status'::regproc" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
-  mark exact "analysis.function.context" val "literal:SELECT 'aurora_global_db_instance_status'::regproc" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
-  mark exact "analysis.function.context" val "literal:SELECT count(1) FROM aurora_global_db_status()" nval "pg_catalog.aurora_global_db_status" -> code.UnqualifiedDatabaseRoutineReview
-  mark exact "analysis.function.context" val "literal:FROM aurora_global_db_instance_status()" nval "pg_catalog.aurora_global_db_instance_status" -> code.UnqualifiedDatabaseRoutineReview
-  mark exact "analysis.function.context" val "function_name:NodePublishVolume" val "call:GetVolumeContext" val "call:append" val "call:Mount" nval "call:ParseIP" -> code.CommandOptionInjection
+  flag core.MemoryBoundsCheck on any {
+    path "__binop.ne"
+    has "Count"
+    has "0"
+  }
+  flag code.UnqualifiedDatabaseRoutineReview in function {
+    literal "SELECT 'aurora_global_db_status'::regproc"
+    lacks "pg_catalog.aurora_global_db_status"
+  }
+  flag code.UnqualifiedDatabaseRoutineReview in function {
+    literal "SELECT 'aurora_global_db_instance_status'::regproc"
+    lacks "pg_catalog.aurora_global_db_instance_status"
+  }
+  flag code.UnqualifiedDatabaseRoutineReview in function {
+    literal "SELECT count(1) FROM aurora_global_db_status()"
+    lacks "pg_catalog.aurora_global_db_status"
+  }
+  flag code.UnqualifiedDatabaseRoutineReview in function {
+    literal "FROM aurora_global_db_instance_status()"
+    lacks "pg_catalog.aurora_global_db_instance_status"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "goqu.L"
+    has "project"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "goqu.L"
+    has "group"
+  }
+  flag code.UnparameterizedSqlQueryParser in function {
+    call path "impl.dbConnection.Query"
+    literal "SELECT "
+    literal " and "
+    has "='"
+    lacks "queryParams"
+  }
+  flag code.CommandOptionInjection in function {
+    function "NodePublishVolume"
+    call "GetVolumeContext"
+    call "append"
+    call "Mount"
+    not call "ParseIP"
+  }
+  flag code.CommandAllowlistBeforeParsing in function {
+    lang "go"
+    call path "strings.Split"
+    call path "d.user.CanExecute"
+    call path "runner.ParseCommand"
+    call path "exec.Command"
+    token call_before "d.user.CanExecute>runner.ParseCommand"
+  }
+  flag code.ApiScanFoundActionCommandExecution in function {
+    function "postScanHandler"
+    call path "c.Bind"
+    selector "rq.Options"
+    call path "ScanFromAPI"
+    not call path "sanitizeAPIScanOptions"
+  }
   // Review-only: writing security state through ordinary path opening of procfs control
   // files needs a verified procfs/open boundary to avoid link or mount redirection.
-  mark exact "analysis.function.context" val "call_path:os.OpenFile" val "literal:/proc/self/attr/exec" nval "call:OpenProcRoot" nval "call:OpenThreadSelf" nval "call_path:pathrs.Reopen" -> code.SpecialFileAccessReview
+  flag code.SpecialFileAccessReview in function {
+    call path "os.OpenFile"
+    literal "/proc/self/attr/exec"
+    not call "OpenProcRoot"
+    not call "OpenThreadSelf"
+    not call path "pathrs.Reopen"
+  }
   // Review-only: request/header secrets compared after ordinary string conversion need
   // constant-time comparison when attacker-controlled candidates can be repeated.
-  mark exact "analysis.function.context" val "function_name:ParseAndValidate" val "selector:r.Header.Get" val "call:string" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
-  mark exact "analysis.function.context" val "call:BasicAuth" val "binary:username==wrapper.username" val "binary:password==wrapper.password" nval "call:ConstantTimeCompare" -> code.SecretComparisonReview
-  mark "os.WriteFile" val "0666" -> code.InsecurePermission
-  mark "ioutil.WriteFile" val "0777" -> code.InsecurePermission
-  mark "ioutil.WriteFile" val "0666" -> code.InsecurePermission
-  mark "os.Create" val "/tmp/" -> code.InsecureTempFile
+  flag code.SecretComparisonReview in function {
+    function "ParseAndValidate"
+    selector "r.Header.Get"
+    call "string"
+    not call "ConstantTimeCompare"
+  }
+  flag code.SecretComparisonReview in function {
+    call "BasicAuth"
+    binary "username==wrapper.username"
+    binary "password==wrapper.password"
+    not call "ConstantTimeCompare"
+  }
+  flag code.SecretComparisonReview in function {
+    call path "scrypt.Key"
+    call path "bytes.Equal"
+    call arg "bytes.Equal:source_master_key"
+    call arg "bytes.Equal:target_master_key"
+    not call "ConstantTimeCompare"
+    not call path "hmac.Equal"
+    not call path "subtle.ConstantTimeCompare"
+  }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "!="]
+    operand {
+      key contains_any [".Password", ".password", ".Secret", ".secret", ".Token", ".token", ".APIKey", ".apiKey", ".AccessKey", ".accessKey"]
+    }
+    operand {
+      key contains_any [".Password", ".password", ".Secret", ".secret", ".Token", ".token", ".APIKey", ".apiKey", ".AccessKey", ".accessKey"]
+    }
+    lacks call contains_any ["ConstantTimeCompare", "hmac.Equal", "subtle.ConstantTimeCompare", "CompareHashAndPassword"]
+  }
+  flag code.FastPasswordHash in function {
+    function "GenerateUsers"
+    has "user.Password"
+    has "sha256sum"
+    lacks "GenerateFromPassword"
+    lacks "bcrypt"
+    lacks "argon2"
+    lacks "scrypt"
+  }
+  flag code.FastPasswordHash in function {
+    function "FindByPassword"
+    has "user.Password"
+    has "sha256sum"
+    lacks "CompareHashAndPassword"
+    lacks "bcrypt"
+    lacks "argon2"
+    lacks "scrypt"
+  }
+  flag code.InsecurePermission on any {
+    path "os.WriteFile"
+    has "0666"
+  }
+  flag code.InsecurePermission on any {
+    path "ioutil.WriteFile"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "ioutil.WriteFile"
+    has "0666"
+  }
+  flag code.InsecureTempFile on any {
+    path "os.Create"
+    has "/tmp/"
+  }
 
   // TLS cert validation disabled (CWE-295) — tls.Config{InsecureSkipVerify: true}
-  mark "tls.Config" val "InsecureSkipVerify=true" -> code.CertValidationDisabled
-  mark "ParseUnverified" -> code.JwtUnverified
+  flag code.CertValidationDisabled on any {
+    path "tls.Config"
+    has "InsecureSkipVerify=true"
+  }
+  flag code.JwtUnverified on any {
+    path "ParseUnverified"
+  }
+  flag code.CsrfDisabled in function {
+    function "CheckOrigin"
+    param type "http.Request"
+    token return "true"
+    not call path "r.Header.Get"
+    not selector "r.Host"
+  }
+  flag code.DtlsEpochZeroApplicationData in function {
+    function "handleIncomingPacket"
+    call path "h.Unmarshal"
+    selector "h.epoch"
+    call path "c.state.cipherSuite.decrypt"
+    call path "r.Unmarshal"
+    selector "c.decrypted"
+    not binary "h.epoch==0"
+    not binary "0==h.epoch"
+  }
+  flag code.GrpcGatewayCommonNameAuthenticationBypass in function {
+    call path "peer.FromContext"
+    selector "tlsInfo.State.VerifiedChains"
+    selector "chains.Subject.CommonName"
+    lacks literal "grpcgateway-accept"
+  }
+  flag code.UnverifiedFederationMissingEvents in function {
+    call path "missingResp.Events.UntrustedEvents"
+    call path "t.cacheAndReturn"
+    not call path "ev.VerifyEventSignatures"
+  }
+  flag code.SamlXmlRoundtripValidationBypass in function {
+    function "HandlePOST"
+    call path "base64.StdEncoding.DecodeString"
+    call path "verifyResponseSig"
+    call path "xml.Unmarshal"
+    call path "p.validateSubject"
+    not call path "xrv.Validate"
+  }
+  flag code.SamlAssertionWrappingBypass in function {
+    lang "go"
+    call path "etreeutils.NSDetatch"
+    call path "v.context.Validate"
+    call path "elt.RemoveChild"
+    call path "elt.AddChild"
+    not call path "elt.ChildElements"
+    not call path "child.NamespaceURI"
+    not var "errMultipleAssertions"
+  }
 
   // resource lifecycle (CWE-772) — raw handles that must be closed.
-  mark "net.Dial" -> code.ResourceHandle
-  mark "net.DialTimeout" -> code.ResourceHandle
-  mark "os.Open" -> code.ResourceHandle
-  mark "os.OpenFile" -> code.ResourceHandle
-  mark "os.Create" -> code.ResourceHandle
+  flag code.ResourceHandle on any {
+    path "net.Dial"
+  }
+  flag code.ResourceHandle on any {
+    path "net.DialTimeout"
+  }
+  flag code.ResourceHandle on any {
+    path "os.Open"
+  }
+  flag code.ResourceHandle on any {
+    path "os.OpenFile"
+  }
+  flag code.ResourceHandle on any {
+    path "os.Create"
+  }
   control method "Close" -> core.ResourceRelease
 
   // permissive CORS (CWE-942) — w.Header().Set("Access-Control-Allow-Origin", "*")
-  mark "Header.Set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "Header.Add" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  flag code.PermissiveCors on any {
+    path "Header.Set"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "Header.Add"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  // CORS wildcard origin parsers must keep the whole prefix before a trailing *.
+  // Slicing to i-1 before prefix matching weakens origin validation by one byte.
+  flag code.CorsWildcardPrefixTruncation in function {
+    function "parseWildcardRules"
+    selector "c.AllowOrigins"
+    selector "c.AllowWildcard"
+    call path "strings.Index"
+    call path "append"
+    slice "o::i-1"
+  }
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
-  mark "Header.Set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "Header.Add" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  flag code.MissingFrameProtection on any {
+    path "Header.Set"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "Header.Add"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
 
   // insecure cookie (CWE-614) — http.Cookie{HttpOnly: false} / {Secure: false} explicit
-  mark "http.Cookie" val "HttpOnly=false" -> code.InsecureCookie
-  mark "http.Cookie" val "Secure=false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "http.Cookie"
+    has "HttpOnly=false"
+  }
+  flag code.InsecureCookie on any {
+    path "http.Cookie"
+    has "Secure=false"
+  }
+  flag code.InsecureCookie in function {
+    has "ctx.SetCookie"
+    has "GenerateToken"
+    has "opt.CookieHttpOnly"
+    has "false"
+    lacks "opt.Secure"
+  }
 
   // cleartext channel (CWE-319) — http:// URL to net/http (loopback excluded; low sev)
-  mark "http.Get" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.Post" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.NewRequest" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "http.Get"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.Post"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.NewRequest"
+    has "http://"
+    lacks "127.0"
+  }
 
   // lifecycle / locking (CWE-667)
-  mark "Lock" -> code.LockAcquire
-  mark "RLock" -> code.LockAcquire
-  mark exact "analysis.global.mutation" val "field:ctx" -> code.LocklessSharedMutation
-  mark exact "analysis.global.mutation" val "field:roundTripper" -> code.LocklessSharedMutation
+  flag code.LockAcquire on any {
+    path "Lock"
+  }
+  flag code.LockAcquire on any {
+    path "RLock"
+  }
+  flag code.RecursiveJsonMarshalUnderLock in function {
+    function "MarshalJSON"
+    call path "ps.mtx.Lock"
+    call path "cmtjson.Marshal"
+    selector "ps"
+    lacks "jsonPeerState"
+    not call path "ps.Count"
+    not call path "ps.Total"
+  }
+  flag code.LocklessSharedMutation on any {
+    path exact "analysis.global.mutation"
+    field "ctx"
+  }
+  flag code.LocklessSharedMutation on any {
+    path exact "analysis.global.mutation"
+    field "roundTripper"
+  }
+  flag code.LocklessSharedMutation in function {
+    function "ReplaceIndividualSubcription"
+    call "GetSubscription"
+    index "bsfContext.BsfSelf.Subscriptions:subId"
+    call "Status"
+    selector "http.StatusNoContent"
+    not selector "http.StatusNotFound"
+  }
   control method "Unlock" -> core.LockRelease
   control method "RUnlock" -> core.LockRelease
 

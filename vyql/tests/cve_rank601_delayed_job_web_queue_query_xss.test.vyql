@@ -1,0 +1,29 @@
+test "rank601: delayed_job_web queue query string is unescaped"
+  lang ruby
+  expect VYQL-INJ-131
+  expect_review code.UnescapedQueueQueryStringXss
+  code
+  ```
+  class DelayedJobWeb
+    def url_path(*path_parts)
+      url = [ path_prefix, path_parts ].join("/").squeeze('/')
+      url += "?queues=#{@queues.join(",")}" unless @queues.empty?
+      url
+    end
+  end
+  ```
+
+test "rank601: delayed_job_web queue query string is CGI escaped"
+  lang ruby
+  reject VYQL-INJ-131
+  reject_review code.UnescapedQueueQueryStringXss
+  code
+  ```
+  class DelayedJobWeb
+    def url_path(*path_parts)
+      url = [ path_prefix, path_parts ].join("/").squeeze('/')
+      url += "?queues=#{CGI.escape(@queues.join(","))}" unless @queues.empty?
+      url
+    end
+  end
+  ```

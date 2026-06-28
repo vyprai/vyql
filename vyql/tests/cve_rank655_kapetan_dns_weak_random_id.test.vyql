@@ -1,0 +1,45 @@
+test "rank655: DNS request ID generated with System.Random is weak"
+  lang csharp
+  expect VYQL-CRY-003
+  code
+  ```
+  using System;
+
+  public class Request
+  {
+      private static readonly Random RANDOM = new Random();
+      private Header header;
+
+      public Request()
+      {
+          this.header.Id = RANDOM.Next(UInt16.MaxValue);
+      }
+  }
+  ```
+
+test "rank655: DNS request ID generated with RandomNumberGenerator is strong"
+  lang csharp
+  reject VYQL-CRY-003
+  code
+  ```
+  using System;
+  using System.Security.Cryptography;
+
+  public class Request
+  {
+      private static readonly RandomNumberGenerator RANDOM = new RNGCryptoServiceProvider();
+      private Header header;
+
+      public Request()
+      {
+          this.header.Id = NextRandomId();
+      }
+
+      private ushort NextRandomId()
+      {
+          byte[] buffer = new byte[sizeof(ushort)];
+          RANDOM.GetBytes(buffer);
+          return BitConverter.ToUInt16(buffer, 0);
+      }
+  }
+  ```

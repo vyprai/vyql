@@ -4,8 +4,12 @@ import core.{UserControlledData}
 adapter dart {
   package "firebase_dynamic_links" {
     source method "getDynamicLink" -> core.UserControlledData
-    mark method "buildLink" -> code.RedirectTarget
-    mark method "buildShortLink" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "buildLink"
+    }
+    flag code.RedirectTarget on any {
+      method "buildShortLink"
+    }
     source method "onNewIntent" -> core.UserControlledData
     source method "onMethodCall" -> core.UserControlledData
   }

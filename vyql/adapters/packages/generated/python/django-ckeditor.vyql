@@ -4,7 +4,9 @@ import core.{InputValidation}
 adapter python {
   package "django-ckeditor" {
     source method "ckeditor_uploader.views.post" -> code.HttpInput
-    mark method "ckeditor_uploader.views.post" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "ckeditor_uploader.views.post"
+    }
     sink method "ckeditor_uploader.views.post" -> code.FileUse
     sink method "ckeditor_uploader.views.browse" -> code.FilePathAccess
     control method "ckeditor_uploader.utils.slugify_filename" -> core.InputValidation

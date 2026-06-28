@@ -6,7 +6,11 @@ import "strings"
 // manifests, imports, and call roots. It intentionally keeps ecosystem-specific
 // spelling such as npm scopes, while removing quote noise and case drift.
 func NormalizePackageName(s string) string {
-	return strings.ToLower(strings.TrimSpace(strings.Trim(s, `"'`)))
+	s = strings.ToLower(strings.TrimSpace(strings.Trim(s, `"'`)))
+	if i := strings.IndexByte(s, '['); i >= 0 {
+		s = s[:i]
+	}
+	return s
 }
 
 // importAlias maps a language IMPORT name to the distribution/package name(s) it actually
@@ -80,7 +84,21 @@ func PackageMatches(observed, want string) bool {
 		strings.HasPrefix(observed, want+".") ||
 		strings.HasPrefix(want, observed+".") ||
 		strings.HasPrefix(observed, want+"/") ||
-		strings.HasPrefix(want, observed+"/")
+		strings.HasPrefix(want, observed+"/") ||
+		packagePathContains(observed, want) ||
+		packagePathContains(want, observed)
+}
+
+func packagePathContains(path, want string) bool {
+	if !strings.Contains(path, "/") || want == "" || strings.ContainsAny(want, "/.") {
+		return false
+	}
+	for _, seg := range strings.Split(path, "/") {
+		if seg == want {
+			return true
+		}
+	}
+	return false
 }
 
 // CallRoot extracts the package-shaped root from a resolved callee path.

@@ -3,6 +3,8 @@ import core.{AuthenticationCheck}
 
 adapter objc {
   package "GoogleSignIn" {
-    mark method "handleURL:" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "handleURL:"
+    }
   }
 }

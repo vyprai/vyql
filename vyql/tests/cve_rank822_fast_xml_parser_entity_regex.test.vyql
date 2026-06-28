@@ -1,0 +1,54 @@
+# Rank 822 / CVE-2026-25896: fast-xml-parser compiled caller-provided XML
+# entity names into RegExp without escaping regex metacharacters that entity-name
+# validation still allowed.
+
+test "rank822: external entity name reaches RegExp without regex escaping"
+  lang javascript
+  profile library
+  file OrderedObjParser.js
+  expect VYQL-DOS-001
+  code
+  ```
+  export default class OrderedObjParser {
+    constructor() {
+      this.addExternalEntities = addExternalEntities;
+    }
+  }
+
+  function addExternalEntities(externalEntities) {
+    const entKeys = Object.keys(externalEntities);
+    for (let i = 0; i < entKeys.length; i++) {
+      const ent = entKeys[i];
+      this.lastEntities[ent] = {
+         regex: new RegExp("&" + ent + ";", "g"),
+         val : externalEntities[ent]
+      }
+    }
+  }
+  ```
+
+test "rank822: external entity name is regex-escaped before RegExp"
+  lang javascript
+  profile library
+  file OrderedObjParser.js
+  reject VYQL-DOS-001
+  code
+  ```
+  export default class OrderedObjParser {
+    constructor() {
+      this.addExternalEntities = addExternalEntities;
+    }
+  }
+
+  function addExternalEntities(externalEntities) {
+    const entKeys = Object.keys(externalEntities);
+    for (let i = 0; i < entKeys.length; i++) {
+      const ent = entKeys[i];
+      const escaped = ent.replace(/[.\-+*:]/g, '\\.');
+      this.lastEntities[ent] = {
+         regex: new RegExp("&" + escaped + ";", "g"),
+         val : externalEntities[ent]
+      }
+    }
+  }
+  ```

@@ -1,0 +1,60 @@
+test "rank341: cbor2 CBORTag_hash misses PyObject_Hash error return"
+  lang c
+  expect VYQL-DOS-013
+  expect_review code.UncheckedPythonCapiHashError
+  code
+  ```
+  static Py_hash_t CBORTag_hash(CBORTagObject *self) {
+    Py_hash_t ret = -1;
+    PyObject *running_hashes = PySet_New(NULL);
+    PyObject *self_id = PyLong_FromVoidPtr(self);
+    PyObject *tmp = Py_BuildValue("(KO)", self->tag, self->value);
+    if (!tmp) {
+      goto exit;
+    }
+    ret = PyObject_Hash(tmp);
+    if (PySet_Discard(running_hashes, self_id) == -1) {
+      ret = -1;
+      goto exit;
+    }
+    Py_ssize_t length = PySequence_Length(running_hashes);
+    if (length == -1) {
+      ret = -1;
+      goto exit;
+    }
+  exit:
+    return ret;
+  }
+  ```
+
+test "rank341: cbor2 CBORTag_hash exits on PyObject_Hash error"
+  lang c
+  reject VYQL-DOS-013
+  reject_review code.UncheckedPythonCapiHashError
+  code
+  ```
+  static Py_hash_t CBORTag_hash(CBORTagObject *self) {
+    Py_hash_t ret = -1;
+    PyObject *running_hashes = PySet_New(NULL);
+    PyObject *self_id = PyLong_FromVoidPtr(self);
+    PyObject *tmp = Py_BuildValue("(KO)", self->tag, self->value);
+    if (!tmp) {
+      goto exit;
+    }
+    ret = PyObject_Hash(tmp);
+    if (ret == -1) {
+      goto exit;
+    }
+    if (PySet_Discard(running_hashes, self_id) == -1) {
+      ret = -1;
+      goto exit;
+    }
+    Py_ssize_t length = PySequence_Length(running_hashes);
+    if (length == -1) {
+      ret = -1;
+      goto exit;
+    }
+  exit:
+    return ret;
+  }
+  ```

@@ -53,11 +53,21 @@ adapter lua {
   sink path "core.log.warning" arg all -> code.LogOutput
   sink path "core.log.error" arg all -> code.LogOutput
   sink path "core.log.debug" arg all -> code.LogOutput
-  mark "core.log.info" -> code.LogWrite
-  mark "core.log.warn" -> code.LogWrite
-  mark "core.log.warning" -> code.LogWrite
-  mark "core.log.error" -> code.LogWrite
-  mark "core.log.debug" -> code.LogWrite
+  flag code.LogWrite on any {
+    path "core.log.info"
+  }
+  flag code.LogWrite on any {
+    path "core.log.warn"
+  }
+  flag code.LogWrite on any {
+    path "core.log.warning"
+  }
+  flag code.LogWrite on any {
+    path "core.log.error"
+  }
+  flag code.LogWrite on any {
+    path "core.log.debug"
+  }
 
   // SSRF — luasocket http.request / resty.http request_uri
   sink path "http.request" -> code.UrlFetch
@@ -65,8 +75,16 @@ adapter lua {
   sink path "ngx.re.match" arg 1 -> code.RegexCompile
   sink path "ngx.re.find" arg 1 -> code.RegexCompile
   sink path "ngx.re.gsub" arg 1 -> code.RegexCompile
-  mark "http.request" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "request_uri" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "http.request"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "request_uri"
+    has "http://"
+    lacks "127.0"
+  }
 
   // LDAP (CWE-90) — lualdap ld:search (filter is arg1)
   sink method "search" arg 1 -> code.LdapQuery
@@ -79,38 +97,94 @@ adapter lua {
   sink method "find_by_id" -> code.ObjectLookupByUserInput
   sink method "get_user" -> code.ObjectLookupByUserInput
   sink method "get_account" -> code.ObjectLookupByUserInput
-  mark "change_password" -> code.AuthenticationRequiredOp
-  mark "update_password" -> code.AuthenticationRequiredOp
-  mark "reset_password" -> code.AuthenticationRequiredOp
-  mark "change_email" -> code.AuthenticationRequiredOp
-  mark "transfer_funds" -> code.AuthenticationRequiredOp
-  mark "delete_account" -> code.AuthenticationRequiredOp
-  mark "grant_role" -> code.AuthenticationRequiredOp
-  mark "make_admin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "change_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "update_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "reset_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "change_email"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transfer_funds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "delete_account"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grant_role"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "make_admin"
+  }
 
   // weak hash (CWE-328) — md5/sha1 digests (sha256 is safe; distinct path = no collision)
-  mark "md5.sum" -> code.WeakHash
-  mark "sha1.sum" -> code.WeakHash
-  mark "ngx.md5" -> code.WeakHash
-  mark "ngx.sha1_bin" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "md5.sum"
+  }
+  flag code.WeakHash on any {
+    path "sha1.sum"
+  }
+  flag code.WeakHash on any {
+    path "ngx.md5"
+  }
+  flag code.WeakHash on any {
+    path "ngx.sha1_bin"
+  }
 
   // weak cipher (CWE-327) — val-matched on the algorithm string (AES is safe)
-  mark "crypto.cipher" val "DES" -> code.WeakCipher
-  mark "crypto.cipher" val "RC4" -> code.WeakCipher
-  mark "crypto.cipher" val "Blowfish" -> code.WeakCipher
-  mark "crypto.cipher" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "crypto.cipher"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "crypto.cipher"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "crypto.cipher"
+    has "Blowfish"
+  }
+  flag code.StaticIv on any {
+    path "crypto.cipher"
+    has "0000000000000000"
+  }
 
   // insecure randomness (CWE-330) — math.random (resty.random.bytes is safe)
-  mark "math.random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "math.random"
+  }
 
   // insecure cookie (CWE-614) — cookie flags set to false
-  mark "set_secure" val "false" -> code.InsecureCookie
-  mark "set_httponly" val "false" -> code.InsecureCookie
-  mark "lfs.chmod" val "777" -> code.InsecurePermission
-  mark "lfs.chmod" val "666" -> code.InsecurePermission
-  mark "os.tmpname" -> code.InsecureTempFile
-  mark "io.open" -> code.ResourceHandle
-  mark "socket.tcp" -> code.ResourceHandle
+  flag code.InsecureCookie on any {
+    path "set_secure"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "set_httponly"
+    has "false"
+  }
+  flag code.InsecurePermission on any {
+    path "lfs.chmod"
+    has "777"
+  }
+  flag code.InsecurePermission on any {
+    path "lfs.chmod"
+    has "666"
+  }
+  flag code.InsecureTempFile on any {
+    path "os.tmpname"
+  }
+  flag code.ResourceHandle on any {
+    path "io.open"
+  }
+  flag code.ResourceHandle on any {
+    path "socket.tcp"
+  }
   control method "close" -> core.ResourceRelease
 
   // controls — sanitizers/validators defined in each generated case's preamble

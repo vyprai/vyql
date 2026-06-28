@@ -2,11 +2,21 @@ import code.{CodeEval, RawMemoryCopySize, PointerFree, PointerUse}
 
 adapter scala {
   package "net.java.dev.jna:jna" {
-    mark method "read" -> code.RawMemoryCopySize
-    mark method "write" -> code.RawMemoryCopySize
-    mark method "free" -> code.PointerFree
-    mark method "malloc" -> code.PointerUse
-    mark method "getByteBuffer" -> code.PointerUse
+    flag code.RawMemoryCopySize on any {
+      method "read"
+    }
+    flag code.RawMemoryCopySize on any {
+      method "write"
+    }
+    flag code.PointerFree on any {
+      method "free"
+    }
+    flag code.PointerUse on any {
+      method "malloc"
+    }
+    flag code.PointerUse on any {
+      method "getByteBuffer"
+    }
     sink method "load" -> code.CodeEval
     sink method "loadLibrary" -> code.CodeEval
   }

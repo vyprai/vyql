@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -66,8 +67,10 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
-			body := c.decls(tree.RootNode())
+			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
+			body = append(body, c.decls(tree.RootNode())...)
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
+			body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -84,9 +87,35 @@ func (c *ccConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
+func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
+	loc := c.file + ":1"
+	if root != nil {
+		loc = c.loc(root)
+	}
+	path := "analysis.module.context"
+	tokens := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=" + c.lang},
+		nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
+	}
+	for _, tok := range c.ccStructuredContextTokens(root) {
+		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range c.ccMacroContextTokens() {
+		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+	}
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   tokens,
+		Path:   path,
+		Method: "context",
+		Loc:    loc,
+	}}
+}
+
 var (
 	ccNewAssignRe = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
 	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
+	ccReallocRe   = regexp.MustCompile(`\brealloc\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,`)
 )
 
 func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []nir.Stmt {
@@ -144,6 +173,60 @@ func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []n
 	return out
 }
 
+func (c *ccConv) ccReallocFailureInputFreeObservations(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" {
+			text := c.text(n)
+			for _, m := range ccReallocRe.FindAllStringSubmatchIndex(text, -1) {
+				if len(m) < 4 {
+					continue
+				}
+				ptr := text[m[2]:m[3]]
+				tail := text[m[1]:]
+				freeRe := regexp.MustCompile(`\bfree\s*\(\s*` + regexp.QuoteMeta(ptr) + `\s*\)\s*;`)
+				freeLoc := freeRe.FindStringIndex(tail)
+				if freeLoc == nil {
+					continue
+				}
+				afterFree := tail[freeLoc[1]:]
+				if !strings.Contains(afterFree, "return nullptr") &&
+					!strings.Contains(afterFree, "return NULL") &&
+					!strings.Contains(afterFree, "return 0") {
+					continue
+				}
+				loc := c.locAt(n, text, m[1]+freeLoc[0])
+				if seen[loc] {
+					continue
+				}
+				seen[loc] = true
+				path := "analysis.lifetime.realloc_failure_input_free"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "allocator=realloc"},
+						nir.Const{Loc: loc, Value: "release=free"},
+						nir.Const{Loc: loc, Value: "return=null"},
+					},
+					Path:   path,
+					Method: "realloc_failure_input_free",
+					Loc:    loc,
+				}})
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
 func ccFunctionDeclaresLocal(fnText, name string) bool {
 	for _, line := range strings.Split(fnText, "\n") {
 		line = strings.TrimSpace(line)
@@ -170,6 +253,22 @@ func minInt(a, b int) int {
 	return b
 }
 
+func sortedMapValues(m map[string]string) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, m[k])
+	}
+	return out
+}
+
 func ccLang(ext string) string {
 	switch ext {
 	case ".cpp":
@@ -181,11 +280,212 @@ func ccLang(ext string) string {
 	}
 }
 
-func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node) []string {
+func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTypes map[string]string) []string {
 	if body == nil {
 		return nil
 	}
-	return []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	tokens := []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	for _, typ := range sortedMapValues(paramTypes) {
+		if typ != "" {
+			tokens = append(tokens, "param_type:"+typ)
+		}
+	}
+	tokens = append(tokens, c.ccStructuredContextTokens(body)...)
+	return tokens
+}
+
+func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
+	const maxCContextTokens = 8192
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= maxCContextTokens {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	atom := func(n *tree_sitter.Node) string {
+		if n == nil {
+			return ""
+		}
+		if p := c.dotted(n); p != "" && p != "?" {
+			return p
+		}
+		return compactCExprText(c.text(n))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= maxCContextTokens {
+			return
+		}
+		switch n.Kind() {
+		case "preproc_def", "preproc_function_def":
+			if name, body := cMacroNameAndBody(c.text(n)); name != "" {
+				add("macro_name:" + name)
+				if body != "" {
+					add("macro_body:" + name + ":" + body)
+				}
+			}
+		case "case_statement":
+			if lv := field(n, "value"); lv != nil {
+				if label := atom(lv); label != "" {
+					add("switch_case:" + label)
+				}
+			} else {
+				add("switch_default")
+				for _, call := range c.ccCallPaths(n) {
+					add("switch_default_call:" + call)
+				}
+			}
+		case "call_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				add("call:" + lastSeg(path))
+				for _, arg := range namedChildren(field(n, "arguments")) {
+					if a := atom(arg); a != "" {
+						add("call_arg:" + path + ":" + a)
+					}
+				}
+			}
+		case "field_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "subscript_expression":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := atom(field(n, "argument")); base != "" {
+				add("index_base:" + base)
+			}
+			if key := atom(field(n, "index")); key != "" {
+				add("index_key:" + key)
+			}
+		case "assignment_expression":
+			left := atom(field(n, "left"))
+			right := atom(field(n, "right"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "init_declarator":
+			left := c.declName(field(n, "declarator"))
+			right := atom(field(n, "value"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "binary_expression":
+			if expr := compactCExprText(c.text(n)); expr != "" {
+				add("binary:" + expr)
+			}
+		case "string_literal", "concatenated_string", "raw_string_literal":
+			if lit := strings.Trim(cStringText(c.text(n)), "\""); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *ccConv) ccMacroContextTokens() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	lines := strings.Split(string(c.src), "\n")
+	for i := 0; i < len(lines); i++ {
+		raw := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(raw, "#") {
+			continue
+		}
+		for strings.HasSuffix(strings.TrimSpace(raw), "\\") && i+1 < len(lines) {
+			raw = strings.TrimSuffix(strings.TrimSpace(raw), "\\") + " " + strings.TrimSpace(lines[i+1])
+			i++
+		}
+		name, body := cMacroNameAndBody(raw)
+		if name == "" {
+			continue
+		}
+		add("macro_name:" + name)
+		if body != "" {
+			add("macro_body:" + name + ":" + body)
+		}
+	}
+	return out
+}
+
+func cMacroNameAndBody(raw string) (string, string) {
+	s := strings.TrimSpace(raw)
+	s = strings.TrimPrefix(s, "#")
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "define") {
+		return "", ""
+	}
+	s = strings.TrimSpace(strings.TrimPrefix(s, "define"))
+	if s == "" {
+		return "", ""
+	}
+	i := 0
+	for i < len(s) {
+		ch := s[i]
+		if !(ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || i > 0 && ch >= '0' && ch <= '9') {
+			break
+		}
+		i++
+	}
+	if i == 0 {
+		return "", ""
+	}
+	name := s[:i]
+	rest := strings.TrimSpace(s[i:])
+	if strings.HasPrefix(rest, "(") {
+		depth := 0
+		for j, ch := range rest {
+			switch ch {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth == 0 {
+					rest = strings.TrimSpace(rest[j+1:])
+					return name, compactCExprText(rest)
+				}
+			}
+		}
+		return name, ""
+	}
+	return name, compactCExprText(rest)
+}
+
+func (c *ccConv) ccCallPaths(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "call_expression" {
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" && !seen[path] {
+				seen[path] = true
+				out = append(out, path)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
 }
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
@@ -283,9 +583,14 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			ParamTypes:    paramTypes,
 			Body:          append(c.block(field(n, "body")), c.ccIndexAccessObservations(n)...),
 			Loc:           L,
-			ContextTokens: c.ccFunctionContext(name, field(n, "body")),
+			ContextTokens: c.ccFunctionContext(name, field(n, "body"), paramTypes),
 		}}
-	case "struct_specifier", "union_specifier", "enum_specifier":
+	case "struct_specifier":
+		if c.lang == "cpp" {
+			return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
+		}
+		return nil
+	case "union_specifier", "enum_specifier":
 		return nil
 	case "class_implementation", "class_interface", "category_implementation", // ObjC
 		"category_interface", "protocol_declaration", "implementation_definition",
@@ -297,7 +602,8 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return out
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.objcParamTypes(n, params), Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body)}}
+		paramTypes := c.objcParamTypes(n, params)
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body, paramTypes)}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := field(n, "body"); b != nil {
 			return c.decls(b)
@@ -572,10 +878,7 @@ func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
 	var deflt []nir.Stmt
 	var pending []nir.Expr
 	if b := field(n, "body"); b != nil {
-		for _, cs := range namedChildren(b) {
-			if cs.Kind() != "case_statement" {
-				continue
-			}
+		for _, cs := range c.cSwitchCases(b) {
 			lv := field(cs, "value")
 			var stmts []nir.Stmt
 			for _, ch := range namedChildren(cs) {
@@ -597,6 +900,26 @@ func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	return nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}
+}
+
+func (c *ccConv) cSwitchCases(body *tree_sitter.Node) []*tree_sitter.Node {
+	var out []*tree_sitter.Node
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			switch {
+			case ch.Kind() == "case_statement":
+				out = append(out, ch)
+			case strings.HasPrefix(ch.Kind(), "preproc_") || ch.IsError():
+				walk(ch)
+			}
+		}
+	}
+	walk(body)
+	return out
 }
 
 func (c *ccConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
@@ -905,6 +1228,27 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 					}})
 				}
 			}
+			if count, ok := ccLastElementCountExpr(compactIdx); ok {
+				loc := c.loc(n)
+				prefixText := compactCExprText(c.textBefore(body, n))
+				guard := "guard=missing_nonzero"
+				if ccHasNonZeroGuard(prefixText, count) {
+					guard = "guard=nonzero"
+				}
+				path := "analysis.zero_count.last_index"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "index_kind=field_minus_one"},
+						nir.Const{Loc: loc, Value: guard},
+						nir.Const{Loc: loc, Value: "index=" + compactIdx},
+						nir.Const{Loc: loc, Value: "count=" + count},
+					},
+					Path:   path,
+					Method: "last_index",
+					Loc:    loc,
+				}})
+			}
 		}
 		for _, ch := range namedChildren(n) {
 			walk(ch)
@@ -923,6 +1267,39 @@ func ccHasUpperBoundGuard(bodyText, idx string) bool {
 		strings.Contains(bodyText, idx+"<=") ||
 		strings.Contains(bodyText, ">"+idx) ||
 		strings.Contains(bodyText, ">="+idx)
+}
+
+func ccLastElementCountExpr(compactIdx string) (string, bool) {
+	count := strings.TrimSuffix(compactIdx, "-1")
+	if count == compactIdx || count == "" || !ccStructuredIndex(count) {
+		return "", false
+	}
+	return count, true
+}
+
+func ccHasNonZeroGuard(bodyText, expr string) bool {
+	for _, v := range []string{expr, strings.ReplaceAll(expr, "->", ".")} {
+		if v == "" {
+			continue
+		}
+		if strings.Contains(bodyText, "!"+v) ||
+			strings.Contains(bodyText, v+"==0") ||
+			strings.Contains(bodyText, "0=="+v) ||
+			strings.Contains(bodyText, v+"<=0") ||
+			strings.Contains(bodyText, "0>="+v) ||
+			strings.Contains(bodyText, v+"<1") ||
+			strings.Contains(bodyText, "1>"+v) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *ccConv) textBefore(scope, n *tree_sitter.Node) string {
+	if scope == nil || n == nil || n.StartByte() < scope.StartByte() {
+		return ""
+	}
+	return string(c.src[scope.StartByte():n.StartByte()])
 }
 
 func compactCExprText(s string) string {

@@ -16,7 +16,7 @@ import (
 
 func TestParseRequirements(t *testing.T) {
 	got := ParseRequirements("Flask==2.0.1\n# a comment\nrequests\n-r dev.txt\n\n  django == 4.2  \npyyaml>=6.0\n")
-	want := []Dep{{"flask", "2.0.1"}, {"requests", "*"}, {"django", "4.2"}, {"pyyaml", "6.0"}}
+	want := []Dep{{"flask", "==2.0.1"}, {"requests", "*"}, {"django", "==4.2"}, {"pyyaml", ">=6.0"}}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
 	}
@@ -38,13 +38,142 @@ setup(
     ],
 )
 `)
-	want := []Dep{{"awscrt", "0.11.20"}, {"requests", "2.31.0"}}
+	want := []Dep{{"awscrt", "==0.11.20"}, {"requests", ">=2.31.0"}}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
 	}
 	for i := range want {
 		if got[i] != want[i] {
 			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseSetupCfgInstallRequires(t *testing.T) {
+	got := ParseSetupCfg(`[metadata]
+name = httpie
+
+[options]
+packages = find:
+install_requires =
+    requests[socks] >=2.22.0, <=2.31.0
+    Pygments>=2.5.2
+
+[options.extras_require]
+dev =
+    pytest
+`)
+	want := []Dep{{"requests", ">=2.22.0, <=2.31.0"}, {"pygments", ">=2.5.2"}}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseGoModRequires(t *testing.T) {
+	got := ParseGoMod(`module example.com/app
+
+go 1.21
+
+require github.com/One/Direct v1.2.3
+
+require (
+    github.com/ElrondNetwork/elrond-vm-common v1.3.6
+    github.com/pkg/errors v0.9.1 // indirect
+)
+
+replace github.com/ElrondNetwork/elrond-vm-common v1.3.6 => github.com/example/fork v1.3.7
+`)
+	want := []Dep{
+		{"github.com/one/direct", "v1.2.3"},
+		{"github.com/elrondnetwork/elrond-vm-common", "v1.3.6"},
+		{"github.com/pkg/errors", "v0.9.1"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
+	got := ParseVendoredJS("tinymce/static/tinymce/plugins/image/plugin.min.js", `/**
+ * Version: 5.5.0 (2020-09-29)
+ */
+!function(){}();
+`)
+	want := []Dep{{"tinymce", "5.5.0"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseVendoredJS() = %+v, want %+v", got, want)
+	}
+	if got := ParseVendoredJS("static/app.js", `/* Version: 5.5.0 */`); len(got) != 0 {
+		t.Fatalf("unrecognized vendored JS path should not emit deps, got %+v", got)
+	}
+}
+
+func TestMinSafeAdvisoryMatch(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"npm": {
+		"tinymce": {{Version: "*", ID: "CVE-2024-21910", MinSafe: "5.10.0"}},
+	}}}
+	if adv, ok := matchAdvisory(d, "npm", "tinymce", "5.5.0", "5.5.0"); !ok || adv.ID != "CVE-2024-21910" {
+		t.Fatalf("tinymce 5.5.0 should match min_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "npm", "tinymce", "5.10.1", "5.10.1"); ok {
+		t.Fatal("tinymce 5.10.1 should be clean for min_safe 5.10.0")
+	}
+}
+
+func TestMaxSafeAdvisoryMatchPreservesOpenRanges(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"pypi": {
+		"requests": {{Version: "*", ID: "CVE-2023-48052", MaxSafe: "2.31.0"}},
+	}}}
+	if adv, ok := matchAdvisory(d, "pypi", "requests", "2.22.0", ">=2.22.0"); !ok || adv.ID != "CVE-2023-48052" {
+		t.Fatalf("open requests range should match max_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "pypi", "requests", "2.31.0", "==2.31.0"); ok {
+		t.Fatal("pinned requests 2.31.0 should be clean for max_safe 2.31.0")
+	}
+}
+
+func TestExactAdvisoryMatchesSpecifierRanges(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"pypi": {
+		"exotel": {{Version: "0.1.6", ID: "CVE-2022-38792", CWE: []string{"CWE-506"}}},
+	}}}
+	if adv, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", ">=0.1.5"); !ok || adv.ID != "CVE-2022-38792" {
+		t.Fatalf("exotel>=0.1.5 should allow known-bad 0.1.6, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", "==0.1.5"); ok {
+		t.Fatal("exotel==0.1.5 should not match an advisory for 0.1.6")
+	}
+	if _, ok := matchAdvisory(d, "pypi", "exotel", "0.1.5", ">=0.1.5,<=0.1.5"); ok {
+		t.Fatal("exotel range capped at 0.1.5 should not allow known-bad 0.1.6")
+	}
+	if adv, ok := matchAdvisory(d, "pypi", "exotel", "*", "*"); !ok || adv.ID != "CVE-2022-38792" {
+		t.Fatalf("unpinned exotel should allow known-bad 0.1.6, got ok=%v adv=%+v", ok, adv)
+	}
+}
+
+func TestPackageMatchesRepositorySlugInImportPath(t *testing.T) {
+	cases := []struct {
+		observed string
+		want     string
+		match    bool
+	}{
+		{"github.com/cloudreve/Cloudreve/v4/pkg/util", "cloudreve", true},
+		{"github.com/capnproto/capnproto/c++/src", "capnproto", true},
+		{"github.com/cloudreve/Cloudreve/v4/pkg/util", "reve", false},
+		{"github.com/example/not-cloudreve/pkg", "cloudreve", false},
+	}
+	for _, tc := range cases {
+		if got := PackageMatches(tc.observed, tc.want); got != tc.match {
+			t.Errorf("PackageMatches(%q, %q)=%v want %v", tc.observed, tc.want, got, tc.match)
 		}
 	}
 }
@@ -155,6 +284,22 @@ func TestBuildSBOMPatchedIsClean(t *testing.T) {
 	}
 	if v := packageIDsWithToken(t, g, "status=vulnerable"); len(v) != 0 {
 		t.Errorf("patched lodash@4.17.21 should be clean, got %d advisory tokens", len(v))
+	}
+}
+
+func TestGoPseudoVersionMinSafeAdvisoryMatch(t *testing.T) {
+	d := &scaData{advisories: map[string]map[string][]advisoryEntry{
+		"go": {
+			"github.com/consensys/gnark-crypto": {
+				{Version: "*", ID: "CVE-2025-58157", MinSafe: "v0.17.1-0.20250502112255-56600883e0e9"},
+			},
+		},
+	}}
+	if adv, ok := matchAdvisory(d, "go", "github.com/consensys/gnark-crypto", "v0.17.1-0.20250415081852-c838dcdfa844", "v0.17.1-0.20250415081852-c838dcdfa844"); !ok || adv.ID != "CVE-2025-58157" {
+		t.Fatalf("old gnark-crypto pseudo-version should match min_safe advisory, got ok=%v adv=%+v", ok, adv)
+	}
+	if _, ok := matchAdvisory(d, "go", "github.com/consensys/gnark-crypto", "v0.17.1-0.20250502112255-56600883e0e9", "v0.17.1-0.20250502112255-56600883e0e9"); ok {
+		t.Fatal("fixed gnark-crypto pseudo-version should be clean for min_safe advisory")
 	}
 }
 

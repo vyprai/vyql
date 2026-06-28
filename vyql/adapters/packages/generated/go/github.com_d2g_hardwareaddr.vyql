@@ -2,6 +2,8 @@ import code.{WeakRandomValue}
 
 adapter go {
   package "github.com/d2g/hardwareaddr" {
-    mark method "GenerateEUI48" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "GenerateEUI48"
+    }
   }
 }

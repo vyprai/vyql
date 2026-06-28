@@ -1,0 +1,60 @@
+test "rank308: Camel XStream wrapper creates unrestricted XStream"
+  lang java
+  expect VYQL-DESER-007
+  code
+  ```
+  import com.thoughtworks.xstream.XStream;
+  import com.thoughtworks.xstream.converters.Converter;
+
+  public class AbstractXStreamWrapper {
+    private XStream xstream;
+    private java.util.List<String> converters;
+
+    protected XStream createXStream(ClassResolver resolver, ClassLoader classLoader) throws Exception {
+      xstream = new XStream();
+
+      if (this.converters != null) {
+        for (String name : this.converters) {
+          Class<Converter> converterClass = resolver.resolveMandatoryClass(name, Converter.class);
+          Converter converter = converterClass.newInstance();
+          xstream.registerConverter(converter);
+        }
+      }
+
+      return xstream;
+    }
+  }
+  ```
+
+test "rank308: Camel XStream wrapper registers default permissions"
+  lang java
+  reject VYQL-DESER-007
+  code
+  ```
+  import com.thoughtworks.xstream.XStream;
+  import com.thoughtworks.xstream.converters.Converter;
+
+  public class AbstractXStreamWrapper {
+    private XStream xstream;
+    private java.util.List<String> converters;
+
+    protected XStream createXStream(ClassResolver resolver, ClassLoader classLoader) throws Exception {
+      xstream = new XStream();
+
+      if (this.converters != null) {
+        for (String name : this.converters) {
+          Class<Converter> converterClass = resolver.resolveMandatoryClass(name, Converter.class);
+          Converter converter = converterClass.newInstance();
+          xstream.registerConverter(converter);
+        }
+      }
+
+      addDefaultPermissions(xstream);
+      return xstream;
+    }
+
+    private static void addDefaultPermissions(XStream xstream) {
+      xstream.denyPermission(AnyTypePermission.ANY);
+    }
+  }
+  ```

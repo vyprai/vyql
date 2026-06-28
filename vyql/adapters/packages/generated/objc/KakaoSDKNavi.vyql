@@ -2,8 +2,14 @@ import code.{RedirectTarget}
 
 adapter objc {
   package "KakaoSDKNavi" {
-    mark method "shareUrl" -> code.RedirectTarget
-    mark method "navigateUrl" -> code.RedirectTarget
-    mark method "makeNaviUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "shareUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "navigateUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "makeNaviUrl"
+    }
   }
 }

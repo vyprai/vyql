@@ -1,0 +1,54 @@
+# Rank 793 / CVE-2015-8026: exfat allocated CLUSTER_SIZE(*sb) before validating
+# the sector and sectors-per-cluster shift fields from the filesystem header.
+
+test "rank793: exfat cluster allocation before sector-bit lower bound"
+  lang c
+  file mount.c
+  expect VYQL-MEM-039
+  expect_review code.ShiftedClusterSizeAllocationMissingBounds
+  code
+  ```
+  int exfat_mount(struct exfat* ef) {
+    ef->zero_cluster = malloc(CLUSTER_SIZE(*ef->sb));
+    if (ef->zero_cluster == NULL) {
+      return -ENOMEM;
+    }
+    if (!verify_vbr_checksum(ef->dev, ef->zero_cluster, SECTOR_SIZE(*ef->sb))) {
+      free(ef->zero_cluster);
+      return -EIO;
+    }
+    if ((int) ef->sb->sector_bits + (int) ef->sb->spc_bits > 25) {
+      free(ef->zero_cluster);
+      return -EIO;
+    }
+    return 0;
+  }
+  ```
+
+test "rank793: exfat validates sector-bit lower bound before cluster allocation"
+  lang c
+  file mount.c
+  reject VYQL-MEM-039
+  reject_review code.ShiftedClusterSizeAllocationMissingBounds
+  code
+  ```
+  int exfat_mount(struct exfat* ef) {
+    if (ef->sb->sector_bits < 9) {
+      free(ef->sb);
+      return -EIO;
+    }
+    if ((int) ef->sb->sector_bits + (int) ef->sb->spc_bits > 25) {
+      free(ef->sb);
+      return -EIO;
+    }
+    ef->zero_cluster = malloc(CLUSTER_SIZE(*ef->sb));
+    if (ef->zero_cluster == NULL) {
+      return -ENOMEM;
+    }
+    if (!verify_vbr_checksum(ef->dev, ef->zero_cluster, SECTOR_SIZE(*ef->sb))) {
+      free(ef->zero_cluster);
+      return -EIO;
+    }
+    return 0;
+  }
+  ```

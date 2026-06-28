@@ -1,0 +1,60 @@
+test "rank388: Jenkins plugin uses local DirectoryBrowserSupport fork for HTML reports"
+  lang java
+  expect VYQL-INJ-065
+  expect_review code.JenkinsPluginForkedDirectoryBrowserWithoutCsp
+  code
+  ```
+  package ci.with.toad.edge;
+
+  import hudson.FilePath;
+
+  public class ReportPublisherAction {
+      private Object build;
+      private java.io.File compareReportsDir;
+
+      public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws Exception {
+          if (this.build != null) {
+              DirectoryBrowserSupport dbs = new DirectoryBrowserSupport(
+                  this,
+                  new FilePath(this.compareReportsDir),
+                  "Compare Html Report",
+                  "graph.gif",
+                  false
+              );
+              dbs.setIndexFileName("index.html");
+              dbs.generateResponse(req, rsp, this);
+          }
+      }
+  }
+  ```
+
+test "rank388: Jenkins plugin uses Jenkins core DirectoryBrowserSupport"
+  lang java
+  reject VYQL-INJ-065
+  reject_review code.JenkinsPluginForkedDirectoryBrowserWithoutCsp
+  code
+  ```
+  package ci.with.toad.edge;
+
+  import hudson.FilePath;
+  import hudson.model.DirectoryBrowserSupport;
+
+  public class ReportPublisherAction {
+      private Object build;
+      private java.io.File compareReportsDir;
+
+      public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws Exception {
+          if (this.build != null) {
+              DirectoryBrowserSupport dbs = new DirectoryBrowserSupport(
+                  this,
+                  new FilePath(this.compareReportsDir),
+                  "Compare Html Report",
+                  "graph.gif",
+                  false
+              );
+              dbs.setIndexFileName("index.html");
+              dbs.generateResponse(req, rsp, this);
+          }
+      }
+  }
+  ```

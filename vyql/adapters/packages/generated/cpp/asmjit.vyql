@@ -1,6 +1,8 @@
 adapter cpp {
   package "asmjit" {
     sink method "Compiler" -> code.DynamicCodeLoad
-    mark method "Random" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "Random"
+    }
   }
 }

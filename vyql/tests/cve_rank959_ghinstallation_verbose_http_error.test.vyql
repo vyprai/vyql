@@ -1,0 +1,48 @@
+# Rank 959 / CVE-2022-39304: ghinstallation exposed verbose HTTP
+# request/response/TLS internals in token-refresh error messages.
+
+test "rank959: verbose HTTP error formats response internals"
+  lang go
+  profile api
+  file transport.go
+  expect VYQL-SEC-034
+  expect_review code.VerboseHttpErrorObjectDisclosure
+  code
+  ```
+  package ghinstallation
+
+  import (
+    "fmt"
+    "net/http"
+  )
+
+  func refreshToken(resp *http.Response) error {
+    if resp.StatusCode/100 != 2 {
+      return fmt.Errorf("request %+v received non 2xx response status %q with body %+v and TLS %+v", resp.Request, resp.Body, resp.Request, resp.TLS)
+    }
+    return nil
+  }
+  ```
+
+test "rank959: HTTP error reports status and URL only"
+  lang go
+  profile api
+  file transport.go
+  reject VYQL-SEC-034
+  reject_review code.VerboseHttpErrorObjectDisclosure
+  code
+  ```
+  package ghinstallation
+
+  import (
+    "fmt"
+    "net/http"
+  )
+
+  func refreshToken(req *http.Request, resp *http.Response) error {
+    if resp.StatusCode/100 != 2 {
+      return fmt.Errorf("received non 2xx response status %q when fetching %v", resp.Status, req.URL)
+    }
+    return nil
+  }
+  ```

@@ -1,0 +1,81 @@
+# Rank 963 / CVE-2020-36567: Gin default logger wrote request paths with %s,
+# allowing control characters in paths to forge log lines. The fix switched the
+# path slot to %#v so Go quotes and escapes the path.
+
+test "rank963: Gin default logger formats request path with raw string verb"
+  lang go
+  profile api
+  file logger.go
+  expect VYQL-INJ-174
+  expect_review code.RequestPathPercentSLogInjection
+  code
+  ```
+  package gin
+
+  import (
+    "fmt"
+    "time"
+  )
+
+  type LogFormatterParams struct {
+    TimeStamp time.Time
+    StatusCode int
+    Latency time.Duration
+    ClientIP string
+    Method string
+    Path string
+    ErrorMessage string
+  }
+
+  var defaultLogFormatter = func(param LogFormatterParams) string {
+    var statusColor, methodColor, resetColor string
+    return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %s\n%s",
+      param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+      statusColor, param.StatusCode, resetColor,
+      param.Latency,
+      param.ClientIP,
+      methodColor, param.Method, resetColor,
+      param.Path,
+      param.ErrorMessage,
+    )
+  }
+  ```
+
+test "rank963: Gin default logger quotes request path"
+  lang go
+  profile api
+  file logger.go
+  reject VYQL-INJ-174
+  reject_review code.RequestPathPercentSLogInjection
+  code
+  ```
+  package gin
+
+  import (
+    "fmt"
+    "time"
+  )
+
+  type LogFormatterParams struct {
+    TimeStamp time.Time
+    StatusCode int
+    Latency time.Duration
+    ClientIP string
+    Method string
+    Path string
+    ErrorMessage string
+  }
+
+  var defaultLogFormatter = func(param LogFormatterParams) string {
+    var statusColor, methodColor, resetColor string
+    return fmt.Sprintf("[GIN] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+      param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+      statusColor, param.StatusCode, resetColor,
+      param.Latency,
+      param.ClientIP,
+      methodColor, param.Method, resetColor,
+      param.Path,
+      param.ErrorMessage,
+    )
+  }
+  ```

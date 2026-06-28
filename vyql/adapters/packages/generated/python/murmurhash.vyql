@@ -1,14 +1,32 @@
 import code.{WeakHash}
 adapter python {
   package "murmurhash" {
-    mark method "MurmurHash2" -> code.WeakHash
-    mark method "MurmurHash2A" -> code.WeakHash
-    mark method "MurmurHash64A" -> code.WeakHash
-    mark method "MurmurHash64B" -> code.WeakHash
-    mark method "MurmurHashNeutral2" -> code.WeakHash
-    mark method "MurmurHashAligned2" -> code.WeakHash
-    mark method "MurmurHash3_x86_32" -> code.WeakHash
-    mark method "MurmurHash3_x86_128" -> code.WeakHash
-    mark method "MurmurHash3_x64_128" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "MurmurHash2"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash2A"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash64A"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash64B"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHashNeutral2"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHashAligned2"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash3_x86_32"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash3_x86_128"
+    }
+    flag code.WeakHash on any {
+      method "MurmurHash3_x64_128"
+    }
   }
 }

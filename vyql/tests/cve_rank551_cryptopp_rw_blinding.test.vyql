@@ -1,0 +1,124 @@
+# Rank 551 / CVE-2015-2141: Crypto++ Rabin-Williams signatures used a
+# randomized blinding factor directly for inversion before satisfying the
+# Jacobi/square requirement, exposing private-key material through timing.
+
+test "rank551: Rabin-Williams blinding factor inverted before Jacobi hardening"
+  lang cpp
+  file rw.cpp
+  expect VYQL-CRY-011
+  expect_review code.CryptoImproperBlinding
+  code
+  ```
+  namespace CryptoPP {
+  class Integer {
+  public:
+      static Integer One();
+      bool IsZero() const;
+      bool IsOdd() const;
+      void Randomize(RandomNumberGenerator &, const Integer &, const Integer &);
+  };
+  class RandomNumberGenerator {};
+  class ModularArithmetic {
+  public:
+      ModularArithmetic(const Integer &);
+      Integer MultiplicativeInverse(const Integer &);
+      Integer Square(const Integer &);
+      Integer Multiply(const Integer &, const Integer &);
+  };
+  int Jacobi(const Integer &, const Integer &);
+  Integer ModularSquareRoot(const Integer &, const Integer &);
+  Integer CRT(const Integer &, const Integer &, const Integer &, const Integer &, const Integer &);
+
+  class InvertibleRWFunction {
+      Integer m_n, m_p, m_q, m_u;
+      void DoQuickSanityCheck() const;
+      Integer ApplyFunction(const Integer &) const;
+  public:
+      Integer CalculateInverse(RandomNumberGenerator &rng, const Integer &x) const {
+          DoQuickSanityCheck();
+          ModularArithmetic modn(m_n);
+          Integer r, rInv;
+          do {
+              r.Randomize(rng, Integer::One(), m_n - Integer::One());
+              rInv = modn.MultiplicativeInverse(r);
+          } while (rInv.IsZero());
+          Integer re = modn.Square(r);
+          re = modn.Multiply(re, x);
+
+          Integer cp=re%m_p, cq=re%m_q;
+          if (Jacobi(cp, m_p) * Jacobi(cq, m_q) != 1) {
+              cp = cp.IsOdd() ? (cp+m_p) >> 1 : cp >> 1;
+              cq = cq.IsOdd() ? (cq+m_q) >> 1 : cq >> 1;
+          }
+          cp = ModularSquareRoot(cp, m_p);
+          cq = ModularSquareRoot(cq, m_q);
+
+          Integer y = CRT(cq, m_q, cp, m_p, m_u);
+          y = modn.Multiply(y, rInv);
+          if (ApplyFunction(y) != x) {}
+          return y;
+      }
+  };
+  }
+  ```
+
+test "rank551: Rabin-Williams blinding factor squared before inversion is clean"
+  lang cpp
+  file rw.cpp
+  reject VYQL-CRY-011
+  reject_review code.CryptoImproperBlinding
+  code
+  ```
+  namespace CryptoPP {
+  class Integer {
+  public:
+      static Integer One();
+      bool IsZero() const;
+      bool IsOdd() const;
+      void Randomize(RandomNumberGenerator &, const Integer &, const Integer &);
+  };
+  class RandomNumberGenerator {};
+  class ModularArithmetic {
+  public:
+      ModularArithmetic(const Integer &);
+      Integer MultiplicativeInverse(const Integer &);
+      Integer Square(const Integer &);
+      Integer Multiply(const Integer &, const Integer &);
+  };
+  int Jacobi(const Integer &, const Integer &);
+  Integer ModularSquareRoot(const Integer &, const Integer &);
+  Integer CRT(const Integer &, const Integer &, const Integer &, const Integer &, const Integer &);
+
+  class InvertibleRWFunction {
+      Integer m_n, m_p, m_q, m_u;
+      void DoQuickSanityCheck() const;
+      Integer ApplyFunction(const Integer &) const;
+  public:
+      Integer CalculateInverse(RandomNumberGenerator &rng, const Integer &x) const {
+          DoQuickSanityCheck();
+          ModularArithmetic modn(m_n);
+          Integer r, rInv;
+          do {
+              r.Randomize(rng, Integer::One(), m_n - Integer::One());
+              r = modn.Square(r);
+              rInv = modn.MultiplicativeInverse(r);
+          } while (rInv.IsZero());
+          Integer re = modn.Square(r);
+          re = modn.Multiply(re, x);
+
+          Integer cp=re%m_p, cq=re%m_q;
+          if (Jacobi(cp, m_p) * Jacobi(cq, m_q) != 1) {
+              cp = cp.IsOdd() ? (cp+m_p) >> 1 : cp >> 1;
+              cq = cq.IsOdd() ? (cq+m_q) >> 1 : cq >> 1;
+          }
+          cp = ModularSquareRoot(cp, m_p);
+          cq = ModularSquareRoot(cq, m_q);
+
+          Integer y = CRT(cq, m_q, cp, m_p, m_u);
+          y = modn.Multiply(y, rInv);
+          if (ApplyFunction(y) != x) {}
+          return y;
+      }
+  };
+  }
+  ```

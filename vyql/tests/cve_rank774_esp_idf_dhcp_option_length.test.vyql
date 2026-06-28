@@ -1,0 +1,142 @@
+# Rank 774 / CVE-2026-45160: ESP-IDF DHCP server option parsing read
+# option payload bytes and advanced by optptr[1] without checking that the
+# option header and payload fit before use.
+
+test "rank774: DHCP option parser reads payload before length guards"
+  lang c
+  file dhcpserver.c
+  expect VYQL-MEM-037
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+  #include <stdbool.h>
+
+  typedef uint8_t u8_t;
+  typedef int16_t s16_t;
+  typedef uint16_t u16_t;
+  typedef struct { uint32_t addr; } ip4_addr_t;
+  typedef struct { ip4_addr_t client_address; bool renew; } dhcps_t;
+  struct dhcps_state { int state; };
+
+  #define DHCP_OPTION_MSG_TYPE 53
+  #define DHCP_OPTION_REQ_IPADDR 50
+  #define DHCP_OPTION_END 255
+  #define DHCPS_STATE_IDLE 5
+  #define DHCPS_STATE_ACK 3
+  #define DHCPS_STATE_NAK 4
+
+  static u8_t parse_options(dhcps_t *dhcps, u8_t *optptr, s16_t len)
+  {
+      ip4_addr_t client;
+      bool is_dhcp_parse_end = false;
+      struct dhcps_state s;
+
+      client.addr = *((uint32_t *) &dhcps->client_address);
+      u8_t *end = optptr + len;
+      u16_t type = 0;
+      s.state = DHCPS_STATE_IDLE;
+
+      while (optptr < end) {
+          switch ((s16_t) *optptr) {
+              case DHCP_OPTION_MSG_TYPE:
+                  type = *(optptr + 2);
+                  break;
+              case DHCP_OPTION_REQ_IPADDR:
+                  if (memcmp((char *) &client.addr, (char *) optptr + 2, 4) == 0) {
+                      s.state = DHCPS_STATE_ACK;
+                  } else {
+                      s.state = DHCPS_STATE_NAK;
+                  }
+                  break;
+              case DHCP_OPTION_END: {
+                  is_dhcp_parse_end = true;
+              }
+              break;
+          }
+
+          if (is_dhcp_parse_end) {
+              break;
+          }
+
+          optptr += optptr[1] + 2;
+      }
+
+      return s.state;
+  }
+  ```
+
+test "rank774: DHCP option parser validates header and payload lengths"
+  lang c
+  file dhcpserver.c
+  reject VYQL-MEM-037
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+  #include <stdbool.h>
+
+  typedef uint8_t u8_t;
+  typedef int16_t s16_t;
+  typedef uint16_t u16_t;
+  typedef struct { uint32_t addr; } ip4_addr_t;
+  typedef struct { ip4_addr_t client_address; bool renew; } dhcps_t;
+  struct dhcps_state { int state; };
+
+  #define DHCP_OPTION_PAD 0
+  #define DHCP_OPTION_MSG_TYPE 53
+  #define DHCP_OPTION_REQ_IPADDR 50
+  #define DHCP_OPTION_END 255
+  #define DHCPS_STATE_IDLE 5
+  #define DHCPS_STATE_ACK 3
+  #define DHCPS_STATE_NAK 4
+
+  static u8_t parse_options(dhcps_t *dhcps, u8_t *optptr, s16_t len)
+  {
+      ip4_addr_t client;
+      struct dhcps_state s;
+
+      client.addr = *((uint32_t *) &dhcps->client_address);
+      u8_t *end = optptr + len;
+      u16_t type = 0;
+      s.state = DHCPS_STATE_IDLE;
+
+      while (optptr < end) {
+          if (*optptr == DHCP_OPTION_PAD) {
+              optptr++;
+              continue;
+          }
+          if (*optptr == DHCP_OPTION_END) {
+              break;
+          }
+          if (optptr + 1 >= end) {
+              break;
+          }
+          u8_t opt_len = optptr[1];
+          if (optptr + 2 + opt_len > end) {
+              break;
+          }
+
+          switch ((s16_t) *optptr) {
+              case DHCP_OPTION_MSG_TYPE:
+                  if (opt_len >= 1) {
+                      type = optptr[2];
+                  }
+                  break;
+              case DHCP_OPTION_REQ_IPADDR:
+                  if (opt_len >= 4) {
+                      if (memcmp((char *) &client.addr, (char *) optptr + 2, 4) == 0) {
+                          s.state = DHCPS_STATE_ACK;
+                      } else {
+                          s.state = DHCPS_STATE_NAK;
+                      }
+                  }
+                  break;
+          }
+
+          optptr += opt_len + 2;
+      }
+
+      return s.state;
+  }
+  ```

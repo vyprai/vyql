@@ -1,0 +1,70 @@
+test "rank633: Discourse post edit report lacks private visibility filters"
+  lang ruby
+  expect VYQL-AUTH-040
+  code
+  ```
+  module Reports::PostEdits
+    def self.report_post_edits(report)
+      builder = DB.build <<~SQL
+      SELECT
+        pr.user_id AS editor_id,
+        p.user_id AS author_id,
+        LEFT(p.raw, 40) AS post_raw,
+        p.topic_id
+      FROM post_revisions pr
+      JOIN posts p
+        ON p.id = pr.post_id
+      /*join*/
+      /*where*/
+      SQL
+
+      if category_id
+        builder.join "topics t ON t.id = p.topic_id"
+        builder.where("t.category_id = ?", category_id)
+      end
+
+      result = builder.query
+      result.each do |r|
+        revision = { post_raw: r.post_raw, topic_id: r.topic_id }
+        report.data << revision
+      end
+    end
+  end
+  ```
+
+test "rank633: Discourse post edit report filters PMs and secure categories"
+  lang ruby
+  reject VYQL-AUTH-040
+  code
+  ```
+  module Reports::PostEdits
+    def self.report_post_edits(report)
+      builder = DB.build <<~SQL
+      SELECT
+        pr.user_id AS editor_id,
+        p.user_id AS author_id,
+        LEFT(p.raw, 40) AS post_raw,
+        p.topic_id
+      FROM post_revisions pr
+      JOIN posts p
+        ON p.id = pr.post_id
+      /*join*/
+      /*where*/
+      SQL
+
+      builder.join "topics t ON t.id = p.topic_id"
+
+      unless report.current_user&.admin?
+        builder.where("t.archetype != ?", Archetype.private_message)
+        builder.join "categories c ON c.id = t.category_id"
+        builder.secure_category(Guardian.new(report.current_user).secure_category_ids)
+      end
+
+      result = builder.query
+      result.each do |r|
+        revision = { post_raw: r.post_raw, topic_id: r.topic_id }
+        report.data << revision
+      end
+    end
+  end
+  ```

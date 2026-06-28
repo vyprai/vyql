@@ -2,6 +2,8 @@ adapter php {
   package "ckeditor/ckeditor" {
     sink method "exec" -> code.CommandExecution
     sink method "onLoad" -> code.XmlParse
-    mark method "RegExp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "RegExp"
+    }
   }
 }

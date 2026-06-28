@@ -1,0 +1,52 @@
+# Rank 751 / CVE-2026-29780: eml_parser example extraction used attachment
+# filename metadata directly under the output directory before stripping path
+# components.
+
+test "rank751: email attachment filename joined without basename"
+  lang python
+  expect VYQL-PATH-038
+  expect_review code.EmailAttachmentFilenamePathTraversal
+  code
+  ```
+  import base64
+  import pathlib
+  import eml_parser
+
+  def main():
+      scan_path = pathlib.Path(options.path)
+      out_path = pathlib.Path(options.outpath)
+      ep = eml_parser.EmlParser(include_attachment_data=True)
+      for k in scan_path.iterdir():
+          m = ep.decode_email(k)
+          if 'attachment' in m:
+              for a in m['attachment']:
+                  out_filepath = out_path / a['filename']
+                  with out_filepath.open('wb') as a_out:
+                      a_out.write(base64.b64decode(a['raw']))
+  ```
+
+test "rank751: email attachment filename basename is clean"
+  lang python
+  reject VYQL-PATH-038
+  reject_review code.EmailAttachmentFilenamePathTraversal
+  code
+  ```
+  import base64
+  import pathlib
+  import eml_parser
+
+  def main():
+      scan_path = pathlib.Path(options.path).resolve()
+      out_path = pathlib.Path(options.outpath).resolve()
+      ep = eml_parser.EmlParser(include_attachment_data=True)
+      for k in scan_path.iterdir():
+          m = ep.decode_email(k)
+          if 'attachment' in m:
+              for a in m['attachment']:
+                  attachment_filename = pathlib.Path(a['filename']).name
+                  out_filepath = out_path / attachment_filename
+                  if out_filepath.is_dir():
+                      out_filepath = out_path / 'attachment_0'
+                  with out_filepath.open('wb') as a_out:
+                      a_out.write(base64.b64decode(a['raw']))
+  ```

@@ -4,6 +4,8 @@ adapter objc {
   package "FBSDKCoreKit" {
     sink method "startGraphRequestWithGraphPath:parameters:tokenString:HTTPMethod:completion:" -> code.UrlFetch
     source method "initWithTokenString:" -> code.SecretValue
-    mark method "handle:" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "handle:"
+    }
   }
 }

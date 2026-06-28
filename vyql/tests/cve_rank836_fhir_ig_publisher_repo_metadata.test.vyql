@@ -1,0 +1,83 @@
+test "rank836: Java repository source is exported to metadata after being added to data"
+  lang java
+  expect VYQL-SEC-028
+  expect_review code.RepositorySourceMetadataExposure
+  code
+  ```
+  class Publisher {
+    String repoSource;
+
+    String gh() { return repoSource; }
+    String getGitSource() { return "https://token@example.org/project.git"; }
+
+    void generateDataFile(JsonObject data, DBBuilder db) {
+      data.add("toolingVersion", "1");
+      if (repoSource != null) {
+        data.add("repoSource", gh());
+      } else {
+        String git = getGitSource();
+        if (git != null) {
+          data.add("repoSource", git);
+        }
+      }
+      if (db != null) {
+        for (JsonProperty p : data.getProperties()) {
+          db.metadata(p.getName(), p.getValue().asString());
+        }
+      }
+    }
+  }
+
+  class JsonObject {
+    void add(String key, String value) {}
+    Iterable<JsonProperty> getProperties() { return null; }
+  }
+  class JsonProperty {
+    String getName() { return ""; }
+    JsonValue getValue() { return null; }
+  }
+  class JsonValue { String asString() { return ""; } }
+  class DBBuilder { void metadata(String key, String value) {} }
+  ```
+
+test "rank836: Java metadata is written before repository source is added"
+  lang java
+  reject VYQL-SEC-028
+  reject_review code.RepositorySourceMetadataExposure
+  code
+  ```
+  class Publisher {
+    String repoSource;
+
+    String gh() { return repoSource; }
+    String getGitSource() { return "https://token@example.org/project.git"; }
+
+    void generateDataFile(JsonObject data, DBBuilder db) {
+      data.add("toolingVersion", "1");
+      if (db != null) {
+        for (JsonProperty p : data.getProperties()) {
+          db.metadata(p.getName(), p.getValue().asString());
+        }
+      }
+      if (repoSource != null) {
+        data.add("repoSource", gh());
+      } else {
+        String git = getGitSource();
+        if (git != null) {
+          data.add("repoSource", git);
+        }
+      }
+    }
+  }
+
+  class JsonObject {
+    void add(String key, String value) {}
+    Iterable<JsonProperty> getProperties() { return null; }
+  }
+  class JsonProperty {
+    String getName() { return ""; }
+    JsonValue getValue() { return null; }
+  }
+  class JsonValue { String asString() { return ""; } }
+  class DBBuilder { void metadata(String key, String value) {} }
+  ```

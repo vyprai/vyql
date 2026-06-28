@@ -4,6 +4,8 @@ adapter python {
   package "lazr.restfulclient" {
     sink method "get" -> code.NetworkConnect
     sink method "post" -> code.NetworkSend
-    mark method "ssl_certificate_validation_disabled" -> code.CertValidationDisabled
+    flag code.CertValidationDisabled on any {
+      method "ssl_certificate_validation_disabled"
+    }
   }
 }

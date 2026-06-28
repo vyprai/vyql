@@ -1,0 +1,48 @@
+test "rank340: c-blosc2 compressed block size uses maxbytes instead of destsize"
+  lang c
+  expect VYQL-MEM-023
+  expect_review code.CompressedBlockSizeCapacityMismatch
+  code
+  ```
+  static int blosc_c(char *dest, int32_t ntbytes, int32_t maxbytes,
+                     int32_t neblock, int32_t maxout) {
+    int32_t value = 7;
+    if (value != 0) {
+      _sw32(dest - 4, -value);
+    }
+    if (ntbytes + maxout > maxbytes) {
+      maxout = (int64_t)maxbytes - (int64_t)ntbytes;
+    }
+    if ((ntbytes + neblock) > maxbytes) {
+      return 0;
+    }
+    memcpy(dest + ntbytes, dest, maxout);
+    return ntbytes;
+  }
+  ```
+
+test "rank340: c-blosc2 compressed block size checks real destination size"
+  lang c
+  reject VYQL-MEM-023
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  code
+  ```
+  static int blosc_c(char *dest, int32_t ntbytes, int32_t destsize,
+                     int32_t neblock, int32_t maxout) {
+    int32_t value = 7;
+    if (value != 0) {
+      if (ntbytes > destsize) {
+        return -1;
+      }
+      _sw32(dest - 4, -value);
+    }
+    if (ntbytes + maxout > destsize) {
+      maxout = (int64_t)destsize - (int64_t)ntbytes;
+    }
+    if ((ntbytes + neblock) > destsize) {
+      return 0;
+    }
+    memcpy(dest + ntbytes, dest, maxout);
+    return ntbytes;
+  }
+  ```

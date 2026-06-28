@@ -2,7 +2,9 @@ import code.{RedirectTarget, SecretValue}
 
 adapter elixir {
   package "elixir_auth_google" {
-    mark method "generate_redirect_uri" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "generate_redirect_uri"
+    }
     source method "get_token" -> code.SecretValue
     source method "get_user_profile" -> code.SecretValue
   }

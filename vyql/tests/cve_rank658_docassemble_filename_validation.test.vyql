@@ -1,0 +1,33 @@
+test "rank658: filename validator blocks dotdot but permits absolute paths"
+  lang python
+  expect VYQL-PATH-031
+  code
+  ```
+  import re
+
+  def filename_invalid(filename):
+      if '../' in filename:
+          return True
+      if re.search(r'[^A-Za-z0-9\_\.\-\/ ]', filename):
+          return True
+      if len(filename) > 268:
+          return True
+      return False
+  ```
+
+test "rank658: filename validator rejects absolute paths"
+  lang python
+  reject VYQL-PATH-031
+  code
+  ```
+  import re
+
+  def filename_invalid(filename):
+      if '../' in filename or filename.startswith('/'):
+          return True
+      if re.search(r'[^A-Za-z0-9\_\.\-\/ ]', filename):
+          return True
+      if len(filename) > 268:
+          return True
+      return False
+  ```

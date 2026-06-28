@@ -1,0 +1,133 @@
+test "rank510: CoreDNS malformed UDP response aborts before ID-bound response"
+  lang go
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  package proxy
+
+  import "io"
+
+  type Msg struct {
+    Id int
+    Rcode int
+  }
+  type Conn struct{}
+  func (c *Conn) WriteMsg(*Msg) error { return nil }
+  func (c *Conn) ReadMsg() (*Msg, error) { return nil, nil }
+  func (c *Conn) Close() error { return nil }
+  type Request struct { Req *Msg }
+  type Transport struct{}
+  func (t *Transport) Yield(*persistConn) {}
+  type persistConn struct { c *Conn }
+  type Proxy struct { transport *Transport }
+  type Options struct { PreferUDP bool }
+  var ErrCachedClosed error
+
+  func (p *Proxy) Connect(state Request, opts Options, cached bool, pc *persistConn) (*Msg, error) {
+    proto := "tcp"
+    if opts.PreferUDP {
+      proto = "udp"
+    }
+    originId := state.Req.Id
+    state.Req.Id = 1234
+    if err := pc.c.WriteMsg(state.Req); err != nil {
+      pc.c.Close()
+      if err == io.EOF && cached {
+        return nil, ErrCachedClosed
+      }
+      return nil, err
+    }
+    var ret *Msg
+    var err error
+    for {
+      ret, err = pc.c.ReadMsg()
+      if err != nil {
+        pc.c.Close()
+        if err == io.EOF && cached {
+          return nil, ErrCachedClosed
+        }
+        if ret != nil {
+          ret.Id = originId
+        }
+        return ret, err
+      }
+      if state.Req.Id == ret.Id {
+        break
+      }
+    }
+    ret.Id = originId
+    p.transport.Yield(pc)
+    return ret, nil
+  }
+  ```
+
+test "rank510: CoreDNS continues waiting after malformed UDP parse errors"
+  lang go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package proxy
+
+  import (
+    "io"
+    "net"
+  )
+
+  type Msg struct {
+    Id int
+    Rcode int
+  }
+  type Conn struct{}
+  func (c *Conn) WriteMsg(*Msg) error { return nil }
+  func (c *Conn) ReadMsg() (*Msg, error) { return nil, nil }
+  func (c *Conn) Close() error { return nil }
+  type Request struct { Req *Msg }
+  type Transport struct{}
+  func (t *Transport) Yield(*persistConn) {}
+  type persistConn struct { c *Conn }
+  type Proxy struct { transport *Transport }
+  type Options struct { PreferUDP bool }
+  var ErrCachedClosed error
+
+  func (p *Proxy) Connect(state Request, opts Options, cached bool, pc *persistConn) (*Msg, error) {
+    proto := "tcp"
+    if opts.PreferUDP {
+      proto = "udp"
+    }
+    originId := state.Req.Id
+    state.Req.Id = 1234
+    if err := pc.c.WriteMsg(state.Req); err != nil {
+      pc.c.Close()
+      if err == io.EOF && cached {
+        return nil, ErrCachedClosed
+      }
+      return nil, err
+    }
+    var ret *Msg
+    var err error
+    for {
+      ret, err = pc.c.ReadMsg()
+      if err != nil {
+        if proto == "udp" {
+          if _, ok := err.(net.Error); !ok {
+            continue
+          }
+        }
+        pc.c.Close()
+        if err == io.EOF && cached {
+          return nil, ErrCachedClosed
+        }
+        if ret != nil {
+          ret.Id = originId
+        }
+        return ret, err
+      }
+      if state.Req.Id == ret.Id {
+        break
+      }
+    }
+    ret.Id = originId
+    p.transport.Yield(pc)
+    return ret, nil
+  }
+  ```

@@ -1,0 +1,61 @@
+# Rank 695 / CVE-2026-33850 pool row; the merge actually imports the
+# stb_image CVE-2021-28021 fix. JPEG component sampling factors must divide
+# h_max/v_max before component dimensions and buffers are derived from those ratios.
+
+test "rank695: JPEG frame header derives component buffers without sampling-ratio validation"
+  lang c
+  file stb_image.h
+  expect VYQL-MEM-035
+  code
+  ```
+  static int stbi__process_frame_header(stbi__jpeg *z, int scan) {
+      stbi__context *s = z->s;
+      int i, h_max = 1, v_max = 1;
+      if (scan != STBI__SCAN_load) return 1;
+      for (i = 0; i < s->img_n; ++i) {
+          if (z->img_comp[i].h > h_max) h_max = z->img_comp[i].h;
+          if (z->img_comp[i].v > v_max) v_max = z->img_comp[i].v;
+      }
+      z->img_mcu_x = (s->img_x + z->img_mcu_w - 1) / z->img_mcu_w;
+      z->img_mcu_y = (s->img_y + z->img_mcu_h - 1) / z->img_mcu_h;
+      for (i = 0; i < s->img_n; ++i) {
+          z->img_comp[i].x = (s->img_x * z->img_comp[i].h + h_max - 1) / h_max;
+          z->img_comp[i].y = (s->img_y * z->img_comp[i].v + v_max - 1) / v_max;
+          z->img_comp[i].w2 = z->img_mcu_x * z->img_comp[i].h * 8;
+          z->img_comp[i].h2 = z->img_mcu_y * z->img_comp[i].v * 8;
+          z->img_comp[i].raw_data = stbi__malloc_mad2(z->img_comp[i].w2, z->img_comp[i].h2, 15);
+      }
+      return 1;
+  }
+  ```
+
+test "rank695: JPEG frame header rejects non-integer sampling ratios"
+  lang c
+  file stb_image.h
+  reject VYQL-MEM-035
+  code
+  ```
+  static int stbi__process_frame_header(stbi__jpeg *z, int scan) {
+      stbi__context *s = z->s;
+      int i, h_max = 1, v_max = 1;
+      if (scan != STBI__SCAN_load) return 1;
+      for (i = 0; i < s->img_n; ++i) {
+          if (z->img_comp[i].h > h_max) h_max = z->img_comp[i].h;
+          if (z->img_comp[i].v > v_max) v_max = z->img_comp[i].v;
+      }
+      for (i = 0; i < s->img_n; ++i) {
+          if (h_max % z->img_comp[i].h != 0) return stbi__err("bad H", "Corrupt JPEG");
+          if (v_max % z->img_comp[i].v != 0) return stbi__err("bad V", "Corrupt JPEG");
+      }
+      z->img_mcu_x = (s->img_x + z->img_mcu_w - 1) / z->img_mcu_w;
+      z->img_mcu_y = (s->img_y + z->img_mcu_h - 1) / z->img_mcu_h;
+      for (i = 0; i < s->img_n; ++i) {
+          z->img_comp[i].x = (s->img_x * z->img_comp[i].h + h_max - 1) / h_max;
+          z->img_comp[i].y = (s->img_y * z->img_comp[i].v + v_max - 1) / v_max;
+          z->img_comp[i].w2 = z->img_mcu_x * z->img_comp[i].h * 8;
+          z->img_comp[i].h2 = z->img_mcu_y * z->img_comp[i].v * 8;
+          z->img_comp[i].raw_data = stbi__malloc_mad2(z->img_comp[i].w2, z->img_comp[i].h2, 15);
+      }
+      return 1;
+  }
+  ```

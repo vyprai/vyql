@@ -1,0 +1,49 @@
+# Rank 811 / CVE-2012-10012: the Facebook Button Plugin settings form
+# saved WordPress options from $_REQUEST without a nonce check.
+
+test "rank811: WordPress settings save uses request superglobal without nonce"
+  lang php
+  file facebook-button-plugin.php
+  expect VYQL-RF-028
+  expect_review code.WordPressOptionUpdateMissingCsrf
+  code
+  ```
+  <?php
+  function fcbk_bttn_plgn_settings_page()
+  {
+      global $fcbk_bttn_plgn_options_array;
+
+      if ( isset( $_REQUEST['fcbk_bttn_plgn_form_submit'] ) ) {
+          if ( isset ( $_REQUEST['fcbk_bttn_plgn_where'] ) && isset ( $_REQUEST['fcbk_bttn_plgn_link'] ) ) {
+              $fcbk_bttn_plgn_options_array [ 'fcbk_bttn_plgn_link' ] = $_REQUEST [ 'fcbk_bttn_plgn_link' ];
+              $fcbk_bttn_plgn_options_array [ 'fcbk_bttn_plgn_where' ] = $_REQUEST [ 'fcbk_bttn_plgn_where' ];
+              update_option ( 'fcbk_bttn_plgn_options_array', $fcbk_bttn_plgn_options_array );
+          }
+      }
+  }
+  ```
+
+test "rank811: WordPress settings save verifies admin nonce"
+  lang php
+  file facebook-button-plugin.php
+  reject VYQL-RF-028
+  reject_review code.WordPressOptionUpdateMissingCsrf
+  code
+  ```
+  <?php
+  function fcbk_bttn_plgn_settings_page()
+  {
+      global $fcbk_bttn_plgn_options_array;
+
+      if ( isset( $_REQUEST['fcbk_bttn_plgn_form_submit'] ) &&
+           check_admin_referer( plugin_basename(__FILE__), 'fcbk_bttn_plgn_nonce_name' ) ) {
+          if ( isset ( $_REQUEST['fcbk_bttn_plgn_where'] ) && isset ( $_REQUEST['fcbk_bttn_plgn_link'] ) ) {
+              $fcbk_bttn_plgn_options_array [ 'fcbk_bttn_plgn_link' ] = $_REQUEST [ 'fcbk_bttn_plgn_link' ];
+              $fcbk_bttn_plgn_options_array [ 'fcbk_bttn_plgn_where' ] = $_REQUEST [ 'fcbk_bttn_plgn_where' ];
+              update_option ( 'fcbk_bttn_plgn_options_array', $fcbk_bttn_plgn_options_array );
+          }
+      }
+
+      wp_nonce_field( plugin_basename(__FILE__), 'fcbk_bttn_plgn_nonce_name' );
+  }
+  ```

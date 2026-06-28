@@ -1,0 +1,38 @@
+# Rank 445 / CVE-2015-7541: colorscore interpolated image_path, colors,
+# and depth directly into an ImageMagick shell command.
+
+test "rank445: colorscore convert command interpolates caller values"
+  lang ruby
+  file histogram.rb
+  expect VYQL-INJ-090
+  expect_review code.ColorscoreImagemagickCommandInjection
+  code
+  ```
+  module Colorscore
+    class Histogram
+      def initialize(image_path, colors=16, depth=8)
+        output = `convert #{image_path} -resize 400x400 -format %c -dither None -quantize YIQ -colors #{colors} -depth #{depth} histogram:info:-`
+        @lines = output.lines.sort.reverse.map(&:strip).reject(&:empty?)
+      end
+    end
+  end
+  ```
+
+test "rank445: colorscore convert command escapes path and coerces numeric options"
+  lang ruby
+  file histogram.rb
+  reject VYQL-INJ-090
+  reject_review code.ColorscoreImagemagickCommandInjection
+  code
+  ```
+  require "shellwords"
+
+  module Colorscore
+    class Histogram
+      def initialize(image_path, colors=16, depth=8)
+        output = `convert #{image_path.shellescape} -resize 400x400 -format %c -dither None -quantize YIQ -colors #{colors.to_i} -depth #{depth.to_i} histogram:info:-`
+        @lines = output.lines.sort.reverse.map(&:strip).reject(&:empty?)
+      end
+    end
+  end
+  ```

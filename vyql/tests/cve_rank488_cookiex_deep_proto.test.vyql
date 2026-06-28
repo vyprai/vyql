@@ -1,0 +1,54 @@
+# Rank 488 / CVE-2021-23442: @cookiex/deep recursively assigned source object
+# keys into target objects without rejecting prototype-mutating key names.
+
+test "rank488: cookiex-deep writes prototype-sensitive keys"
+  lang javascript
+  file assigner.ts
+  expect VYQL-INJ-107
+  expect_review code.CookiexDeepPrototypePollution
+  code
+  ```
+  const untracker = [ undefined, null ]
+
+  const Assigner = function( delegate: ( a: any, b: any ) => any, useuntrack: boolean = true ): ( ...args: any[] ) => any {
+    const assigner = ( ...args: any[] ) => {
+      return args.reduce( ( a, b ) => {
+        if ( untracker.includes( a ) ) throw new TypeError( `can't convert ${a} to object` )
+        if ( useuntrack && untracker.includes( b ) ) return a
+        Object.keys( b ).forEach( key => {
+          if ( untracker.includes( a[key] ) ) a[key] = b[key]
+          else a[key] = delegate.call( this, a[key], b[key] )
+        } )
+        return a
+      } )
+    }
+    return assigner
+  }
+  ```
+
+test "rank488: cookiex-deep rejects prototype-sensitive keys"
+  lang javascript
+  file assigner.ts
+  reject VYQL-INJ-107
+  reject_review code.CookiexDeepPrototypePollution
+  code
+  ```
+  const untracker = [ undefined, null ]
+  const invalids = [ '__proto__', 'constructor', 'prototype' ]
+
+  const Assigner = function( delegate: ( a: any, b: any ) => any, useuntrack: boolean = true ): ( ...args: any[] ) => any {
+    const assigner = ( ...args: any[] ) => {
+      return args.reduce( ( a, b ) => {
+        if ( untracker.includes( a ) ) throw new TypeError( `can't convert ${a} to object` )
+        if ( useuntrack && untracker.includes( b ) ) return a
+        Object.keys( b ).forEach( key => {
+          if ( invalids.includes( key ) ) return void 0
+          if ( untracker.includes( a[key] ) ) a[key] = b[key]
+          else a[key] = delegate.call( this, a[key], b[key] )
+        } )
+        return a
+      } )
+    }
+    return assigner
+  }
+  ```

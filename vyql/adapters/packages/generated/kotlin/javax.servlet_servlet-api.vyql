@@ -25,7 +25,9 @@ adapter kotlin {
 
     sink method "getWriter" -> code.HtmlRender
     sink method "getOutputStream" -> code.HtmlRender
-    mark method "sendRedirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "sendRedirect"
+    }
     sink method "addHeader" -> code.ResponseHeaderWrite
     sink method "setHeader" -> code.ResponseHeaderWrite
     sink method "forward" -> code.FilePathAccess

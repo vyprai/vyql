@@ -1,0 +1,81 @@
+# Rank 930 / CVE-2026-32769: a Kubernetes NetworkPolicy egress rule used
+# namespace metadata.name NotIn the current namespace, allowing cross-namespace
+# egress instead of enforcing namespace isolation.
+
+test "rank930: namespace NotIn egress policy allows adjacent namespaces"
+  lang go
+  file namespace.go
+  expect VYQL-AUTH-068
+  expect_review code.KubernetesNamespaceNotInEgressPolicy
+  code
+  ```
+  package parts
+
+  func (ns *Namespace) provision(ctx Context, args Args, opts ...Option) error {
+      _, err := netwv1.NewNetworkPolicy(ctx, "inter-ns", &netwv1.NetworkPolicyArgs{
+          Metadata: metav1.ObjectMetaArgs{
+              Namespace: ns.ns.Metadata.Name(),
+              Labels:    args.AdditionalLabels,
+          },
+          Spec: netwv1.NetworkPolicySpecArgs{
+              PodSelector: metav1.LabelSelectorArgs{},
+              PolicyTypes: pulumi.ToStringArray([]string{"Egress"}),
+              Egress: netwv1.NetworkPolicyEgressRuleArray{
+                  netwv1.NetworkPolicyEgressRuleArgs{
+                      To: netwv1.NetworkPolicyPeerArray{
+                          netwv1.NetworkPolicyPeerArgs{
+                              NamespaceSelector: metav1.LabelSelectorArgs{
+                                  MatchExpressions: metav1.LabelSelectorRequirementArray{
+                                      metav1.LabelSelectorRequirementArgs{
+                                          Key:      pulumi.String("kubernetes.io/metadata.name"),
+                                          Operator: pulumi.String("NotIn"),
+                                          Values: pulumi.StringArray{
+                                              ns.ns.Metadata.Name().Elem(),
+                                          },
+                                      },
+                                  },
+                              },
+                          },
+                      },
+                  },
+              },
+          },
+      }, opts...)
+      return err
+  }
+  ```
+
+test "rank930: removing namespace NotIn egress policy is clean"
+  lang go
+  file namespace.go
+  reject VYQL-AUTH-068
+  reject_review code.KubernetesNamespaceNotInEgressPolicy
+  code
+  ```
+  package parts
+
+  func (ns *Namespace) provision(ctx Context, args Args, opts ...Option) error {
+      _, err := netwv1.NewNetworkPolicy(ctx, "internet", &netwv1.NetworkPolicyArgs{
+          Metadata: metav1.ObjectMetaArgs{
+              Namespace: ns.ns.Metadata.Name(),
+              Labels:    args.AdditionalLabels,
+          },
+          Spec: netwv1.NetworkPolicySpecArgs{
+              PodSelector: metav1.LabelSelectorArgs{},
+              PolicyTypes: pulumi.ToStringArray([]string{"Egress"}),
+              Egress: netwv1.NetworkPolicyEgressRuleArray{
+                  netwv1.NetworkPolicyEgressRuleArgs{
+                      To: netwv1.NetworkPolicyPeerArray{
+                          netwv1.NetworkPolicyPeerArgs{
+                              IPBlock: netwv1.IPBlockArgs{
+                                  Cidr: pulumi.String("0.0.0.0/0"),
+                              },
+                          },
+                      },
+                  },
+              },
+          },
+      }, opts...)
+      return err
+  }
+  ```

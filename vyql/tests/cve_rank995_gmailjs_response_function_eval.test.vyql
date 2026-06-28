@@ -1,0 +1,64 @@
+# Rank 995 / CVE-2016-1000228: gmail.js parsed Gmail post-response chunks by
+# compiling `"use strict"; return ` plus response data with new Function. The
+# fix replaced that dynamic evaluation with JSON.parse(data).
+
+test "rank995 javascript: response parser compiles response chunk with Function"
+  lang javascript
+  file src/gmail.js
+  expect VYQL-INJ-197
+  expect_review code.ResponseParserFunctionEval
+  code
+  ```
+  var api = { tools: {} };
+
+  api.tools.parse_response = function(response) {
+      var parsedResponse = [],
+          data, dataLength, endIndex, realData;
+
+      while (response.replace(/\s/g, "").length > 1) {
+          dataLength = response.substring(0, response.indexOf("[")).replace(/\s/g, "");
+          if (!dataLength) { dataLength = response.length; }
+          endIndex = (parseInt(dataLength, 10) - 2) + response.indexOf("[");
+          data = response.substring(response.indexOf("["), endIndex);
+
+          var get_data = new Function("\"use strict\"; return " + data);
+          realData = get_data();
+          parsedResponse.push(realData);
+
+          response = response.substring(response.indexOf("["), response.length);
+          response = response.substring(data.length, response.length);
+      }
+
+      return parsedResponse;
+  };
+  ```
+
+test "rank995 javascript: response parser uses JSON.parse"
+  lang javascript
+  file src/gmail.js
+  reject VYQL-INJ-197
+  reject_review code.ResponseParserFunctionEval
+  code
+  ```
+  var api = { tools: {} };
+
+  api.tools.parse_response = function(response) {
+      var parsedResponse = [],
+          data, dataLength, endIndex;
+
+      while (response.replace(/\s/g, "").length > 1) {
+          dataLength = response.substring(0, response.indexOf("[")).replace(/\s/g, "");
+          if (!dataLength) { dataLength = response.length; }
+          endIndex = (parseInt(dataLength, 10) - 2) + response.indexOf("[");
+          data = response.substring(response.indexOf("["), endIndex);
+
+          var json = JSON.parse(data);
+          parsedResponse.push(json);
+
+          response = response.substring(response.indexOf("["), response.length);
+          response = response.substring(data.length, response.length);
+      }
+
+      return parsedResponse;
+  };
+  ```

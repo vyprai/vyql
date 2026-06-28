@@ -2,13 +2,29 @@ import code.{WeakRandomValue}
 
 adapter go {
   package "github.com/aokoli/goutils" {
-    mark method "RandomNonAlphaNumeric" -> code.WeakRandomValue
-    mark method "RandomAscii" -> code.WeakRandomValue
-    mark method "RandomNumeric" -> code.WeakRandomValue
-    mark method "RandomAlphabetic" -> code.WeakRandomValue
-    mark method "RandomAlphaNumeric" -> code.WeakRandomValue
-    mark method "RandomAlphaNumericCustom" -> code.WeakRandomValue
-    mark method "Random" -> code.WeakRandomValue
-    mark method "RandomSeed" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "RandomNonAlphaNumeric"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomAscii"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomNumeric"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomAlphabetic"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomAlphaNumeric"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomAlphaNumericCustom"
+    }
+    flag code.WeakRandomValue on any {
+      method "Random"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomSeed"
+    }
   }
 }

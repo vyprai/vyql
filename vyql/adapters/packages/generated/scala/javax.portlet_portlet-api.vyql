@@ -2,8 +2,12 @@ import code.{HtmlRender, RedirectTarget}
 
 adapter scala {
   package "javax.portlet:portlet-api" {
-    mark method "sendRedirect" -> code.RedirectTarget
-    mark method "createRedirectURL" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "sendRedirect"
+    }
+    flag code.RedirectTarget on any {
+      method "createRedirectURL"
+    }
     sink method "getWriter" -> code.HtmlRender
   }
 }

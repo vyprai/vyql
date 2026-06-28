@@ -27,7 +27,8 @@ func ExtractSwift(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &swConv{src: src, file: rel, key: moduleKey(root, abs, ".swift")}
-			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
+			body := append(c.swModuleContext(tree.RootNode()), c.decls(tree.RootNode())...)
+			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
@@ -41,6 +42,99 @@ func (c *swConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
+}
+
+func (c *swConv) swModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=swift"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.swStructuredContextTokens(root) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *swConv) swStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 2048 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 2048 {
+			return
+		}
+		switch n.Kind() {
+		case "function_declaration", "init_declaration":
+			if name := c.text(field(n, "name")); name != "" {
+				add("function_name:" + name)
+			}
+			for _, p := range c.paramPairs(n) {
+				if p[0] != "" && p[0] != "_" {
+					add("param_label:" + p[0])
+				}
+				if p[1] != "" && p[1] != "_" {
+					add("param_name:" + p[1])
+				}
+			}
+			for _, typ := range c.paramTypes(n) {
+				if typ != "" {
+					add("param_type:" + typ)
+				}
+			}
+		case "call_expression", "navigation_expression":
+			if path := c.dotted(n); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+				add("selector:" + path)
+			}
+		case "simple_identifier":
+			if ident := swContextValue(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
+		case "line_string_literal", "multi_line_string_literal", "raw_string_literal", "integer_literal", "real_literal", "boolean_literal", "nil_literal":
+			if lit := swContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func swContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		s = s[1 : len(s)-1]
+	}
+	s = strings.Join(strings.Fields(s), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *swConv) decls(n *tree_sitter.Node) []nir.Stmt {

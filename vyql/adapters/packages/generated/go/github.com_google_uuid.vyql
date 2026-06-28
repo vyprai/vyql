@@ -5,7 +5,11 @@ adapter go {
     sink method "Parse" -> code.Deserialization
     sink method "ParseBytes" -> code.Deserialization
     sink method "MustParse" -> code.Deserialization
-    mark method "NewMD5" -> code.WeakHash
-    mark method "NewSHA1" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "NewMD5"
+    }
+    flag code.WeakHash on any {
+      method "NewSHA1"
+    }
   }
 }

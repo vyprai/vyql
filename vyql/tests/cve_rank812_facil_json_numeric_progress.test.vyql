@@ -1,0 +1,80 @@
+# Rank 812 / CVE-2026-41146: facil.io's JSON parser could retry numeric
+# parsing without checking whether fio_atol/fio_atof advanced the cursor.
+
+test "rank812: JSON numeric parser retries without cursor progress guard"
+  lang c
+  file fio_json_parser.h
+  expect VYQL-DOS-029
+  expect_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  #include <stdint.h>
+  #define JSON_NUMERAL ((uint8_t *)"")
+
+  long long fio_atol(char **p);
+  double fio_atof(char **p);
+  void fio_json_on_float(void *parser, double f);
+  void fio_json_on_number(void *parser, long long i);
+
+  static size_t fio_json_parse(void *parser, const char *buffer, size_t length) {
+      uint8_t *pos = (uint8_t *)buffer;
+      uint8_t *limit = pos + length;
+      uint8_t *tmp = pos;
+      long long i = fio_atol((char **)&tmp);
+      if (tmp > limit)
+          return 0;
+      if (!tmp || JSON_NUMERAL[*tmp]) {
+          tmp = pos;
+          double f = fio_atof((char **)&tmp);
+          if (tmp > limit)
+              return 0;
+          if (!tmp || JSON_NUMERAL[*tmp])
+              return 0;
+          fio_json_on_float(parser, f);
+          pos = tmp;
+      } else {
+          fio_json_on_number(parser, i);
+          pos = tmp;
+      }
+      return (size_t)(pos - (uint8_t *)buffer);
+  }
+  ```
+
+test "rank812: JSON numeric parser rejects non-advancing cursor"
+  lang c
+  file fio_json_parser.h
+  reject VYQL-DOS-029
+  reject_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  #include <stdint.h>
+  #define JSON_NUMERAL ((uint8_t *)"")
+
+  long long fio_atol(char **p);
+  double fio_atof(char **p);
+  void fio_json_on_float(void *parser, double f);
+  void fio_json_on_number(void *parser, long long i);
+
+  static size_t fio_json_parse(void *parser, const char *buffer, size_t length) {
+      uint8_t *pos = (uint8_t *)buffer;
+      uint8_t *limit = pos + length;
+      uint8_t *tmp = pos;
+      long long i = fio_atol((char **)&tmp);
+      if (tmp > limit)
+          return 0;
+      if (!tmp || tmp == pos || JSON_NUMERAL[*tmp]) {
+          tmp = pos;
+          double f = fio_atof((char **)&tmp);
+          if (tmp > limit)
+              return 0;
+          if (!tmp || tmp == pos || JSON_NUMERAL[*tmp])
+              return 0;
+          fio_json_on_float(parser, f);
+          pos = tmp;
+      } else {
+          fio_json_on_number(parser, i);
+          pos = tmp;
+      }
+      return (size_t)(pos - (uint8_t *)buffer);
+  }
+  ```

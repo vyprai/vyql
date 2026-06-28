@@ -7,6 +7,8 @@ adapter kotlin {
     source method "getRequestUri" -> code.HttpInput
     source method "decodeRequestString" -> code.HttpInput
     control method "normalize" -> core.PathCanonicalization
-    mark method "issueRedirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "issueRedirect"
+    }
   }
 }

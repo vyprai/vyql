@@ -19,7 +19,15 @@ adapter javascript {
   }
   package "next" {
     source "searchParams" -> HttpInput
-    mark exact "analysis.function.context" val "name=updateSession" val "request.headers" val "getSessionFromCookie" val "verifyAccessToken" val "newRequestHeaders.set(sessionHeaderName" val "NextResponse.next" nval "newRequestHeaders.delete(sessionHeaderName)" -> ProtocolStateReview
+    flag ProtocolStateReview in function {
+      name "updateSession"
+      has "request.headers"
+      has "getSessionFromCookie"
+      has "verifyAccessToken"
+      has "newRequestHeaders.set(sessionHeaderName"
+      has "NextResponse.next"
+      lacks "newRequestHeaders.delete(sessionHeaderName)"
+    }
   }
   package "@nestjs/common" {
     source "context.params" -> HttpInput

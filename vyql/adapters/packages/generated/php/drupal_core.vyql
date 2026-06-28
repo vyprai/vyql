@@ -5,6 +5,8 @@ adapter php {
     sink method "get" -> code.NosqlQuery
     sink method "settings" -> code.StoredDataWrite
     source method "token" -> code.SecretValue
-    mark method "RegExp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "RegExp"
+    }
   }
 }

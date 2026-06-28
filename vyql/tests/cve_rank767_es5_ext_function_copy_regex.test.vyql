@@ -1,0 +1,63 @@
+# Rank 767 / CVE-2024-27088: es5-ext parsed Function#toString output
+# with a problematic regex when copying functions.
+
+test "rank767: function copy parses Function#toString with problematic regex"
+  lang javascript
+  file copy.js
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  "use strict";
+
+  var mixin         = require("../../object/mixin")
+    , validFunction = require("../valid-function")
+    , re            = /^\s*function\s*([\0-')-\uffff]+)*\s*\(([\0-(*-\uffff]*)\)\s*\{/;
+
+  module.exports = function () {
+    var match = String(validFunction(this)).match(re), fn;
+
+    fn = new Function(
+      "fn",
+      "return function " +
+        match[1].trim() +
+        "(" +
+        match[2] +
+        ") { return fn.apply(this, arguments); };"
+    )(this);
+    try { mixin(fn, this); }
+    catch (ignore) {}
+    return fn;
+  };
+  ```
+
+test "rank767: function copy uses name and generated argument list"
+  lang javascript
+  file copy.js
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  "use strict";
+
+  var mixin         = require("../../object/mixin")
+    , validFunction = require("../valid-function");
+
+  module.exports = function () {
+    validFunction(this);
+
+    var args = [];
+    for (var i = 0; i < this.length; ++i) args.push("arg" + (i + 1));
+    var fn = new Function(
+      "fn",
+      "return function " +
+        (this.name || "") +
+        "(" +
+        args.join(", ") +
+        ") { return fn.apply(this, arguments); };"
+    )(this);
+    try { mixin(fn, this); }
+    catch (ignore) {}
+    return fn;
+  };
+  ```

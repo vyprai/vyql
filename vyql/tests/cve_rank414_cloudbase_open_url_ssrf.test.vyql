@@ -1,0 +1,60 @@
+# Rank 414 / CVE-2026-7221: CloudBase-MCP open-url endpoint accepted
+# req.body.url and opened it without scheme/private-address validation.
+
+test "rank414: CloudBase MCP open-url endpoint opens request body URL without SSRF validation"
+  lang javascript
+  file interactive-server.ts
+  expect VYQL-RF-016
+  expect_review code.CloudBaseOpenUrlSsrf
+  code
+  ```
+  export class InteractiveServer {
+    private setupExpress() {
+      this.app.post("/api/open-url", async (req, res) => {
+        const { url } = req.body;
+
+        if (!url) {
+          res.status(400).json({ success: false, error: "URL is required" });
+          return;
+        }
+
+        await openUrl(url, undefined, this._mcpServer);
+        res.json({ success: true });
+      });
+    }
+  }
+  ```
+
+test "rank414: CloudBase MCP validates open-url request body URL before opening"
+  lang javascript
+  file interactive-server.ts
+  reject VYQL-RF-016
+  reject_review code.CloudBaseOpenUrlSsrf
+  code
+  ```
+  export class InteractiveServer {
+    private setupExpress() {
+      this.app.post("/api/open-url", async (req, res) => {
+        const { url } = req.body;
+
+        if (!url) {
+          res.status(400).json({ success: false, error: "URL is required" });
+          return;
+        }
+        if (typeof url !== "string") {
+          res.status(400).json({ success: false, error: "URL must be a string" });
+          return;
+        }
+
+        const validation = isUrlSafeToOpen(url);
+        if (!validation.safe) {
+          res.status(403).json({ success: false, error: "URL not allowed" });
+          return;
+        }
+
+        await openUrl(url, undefined, this._mcpServer);
+        res.json({ success: true });
+      });
+    }
+  }
+  ```

@@ -2,6 +2,8 @@ import code.{WeakCipher}
 
 adapter cpp {
   package "openssl" {
-    mark method "sslv3_method" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "sslv3_method"
+    }
   }
 }

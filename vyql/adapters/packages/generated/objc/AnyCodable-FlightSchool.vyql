@@ -1,5 +1,7 @@
 adapter objc {
   package "AnyCodable-FlightSchool" {
-    mark path "anycodable.flightschool.hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      path "anycodable.flightschool.hash"
+    }
   }
 }

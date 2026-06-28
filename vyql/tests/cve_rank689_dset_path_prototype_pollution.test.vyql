@@ -1,0 +1,33 @@
+test "rank689 dset exported path setter writes caller-controlled keys without prototype guard"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  export default function (obj, keys, val) {
+    keys.split && (keys = keys.split('.'));
+    var i = 0, l = keys.length, t = obj, x;
+    for (; i < l; ++i) {
+      x = t[keys[i]];
+      t = t[keys[i]] = (i === l - 1 ? val : (x != null ? x : (!!~keys[i + 1].indexOf('.') || !(+keys[i + 1] > -1)) ? {} : []));
+    }
+  }
+  ```
+
+test "rank689 dset prototype key guard suppresses path setter pollution"
+  lang javascript
+  profile library
+  reject VYQL-INJ-013
+  code
+  ```
+  export default function (obj, keys, val) {
+    keys.split && (keys = keys.split('.'));
+    var i = 0, l = keys.length, t = obj, x, k;
+    for (; i < l; ++i) {
+      k = keys[i];
+      if (k == '__proto__' || k == 'constructor' || k == 'prototype') continue;
+      x = t[k];
+      t = t[k] = (i === l - 1 ? val : (x != null ? x : (!!~keys[i + 1].indexOf('.') || !(+keys[i + 1] > -1)) ? {} : []));
+    }
+  }
+  ```

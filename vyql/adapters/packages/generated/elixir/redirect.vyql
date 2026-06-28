@@ -1,6 +1,8 @@
 import code.{RedirectTarget}
 adapter elixir {
   package "redirect" {
-    mark method "call" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "call"
+    }
   }
 }

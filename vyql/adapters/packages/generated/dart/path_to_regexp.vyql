@@ -1,6 +1,8 @@
 adapter dart {
   package "path_to_regexp" {
     sink method "parse" -> code.Deserialization
-    mark method "parse" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "parse"
+    }
   }
 }

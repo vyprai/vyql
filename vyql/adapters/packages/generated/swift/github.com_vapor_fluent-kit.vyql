@@ -4,6 +4,8 @@ adapter swift {
     control method "prepare" -> core.SqlParameterization
     source path "database" -> code.HttpInput
     sink path "set" -> code.ResponseHeaderWrite
-    mark method "update" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "update"
+    }
   }
 }

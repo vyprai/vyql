@@ -1,0 +1,52 @@
+# Rank 932 / CVE-2016-1000249: Swagger Parser validation dereferenced
+# external $ref targets from user-supplied Swagger documents until external
+# reference resolution was disabled.
+
+test "rank932: Swagger Parser validates with external refs enabled"
+  lang javascript
+  file parser.js
+  expect VYQL-RF-040
+  expect_review code.SwaggerParserExternalRefDereference
+  code
+  ```
+  import SwaggerParser from 'swagger-parser';
+
+  export default class Parser {
+    parse(done) {
+      const swaggerParser = new SwaggerParser();
+      const loaded = yaml.safeLoad(this.source);
+
+      swaggerParser.validate(loaded, (err) => {
+        this.swagger = swaggerParser.api;
+        return done(err, this.result);
+      });
+    }
+  }
+  ```
+
+test "rank932: Swagger Parser disables external refs"
+  lang javascript
+  file parser.js
+  reject VYQL-RF-040
+  reject_review code.SwaggerParserExternalRefDereference
+  code
+  ```
+  import SwaggerParser from 'swagger-parser';
+
+  export default class Parser {
+    parse(done) {
+      const swaggerParser = new SwaggerParser();
+      const loaded = yaml.safeLoad(this.source);
+      const swaggerOptions = {
+        '$refs': {
+          external: false,
+        },
+      };
+
+      swaggerParser.validate(loaded, swaggerOptions, (err) => {
+        this.swagger = swaggerParser.api;
+        return done(err, this.result);
+      });
+    }
+  }
+  ```

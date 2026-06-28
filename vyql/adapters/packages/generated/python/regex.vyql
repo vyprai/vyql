@@ -3,7 +3,9 @@ import core.{InputValidation}
 
 adapter python {
   package "regex" {
-    mark method "compile" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "compile"
+    }
     control method "escape" -> core.InputValidation
   }
 }

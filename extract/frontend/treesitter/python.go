@@ -25,6 +25,7 @@ type pyConv struct {
 	key           string // current module key (source-root dotted)
 	moduleContext string
 	classContext  []string
+	decorators    []string
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -40,7 +41,8 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			root0 := tree.RootNode()
 			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			c.moduleContext = c.pyModuleLiteralContext(root0)
-			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: c.blockChildren(root0)}, true
+			body := append(c.pyModuleContext(root0), c.blockChildren(root0)...)
+			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
 }
@@ -284,9 +286,9 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(field(n, "parameters"))
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
-		body = append(body, c.pyFunctionContext(n)...)
+		body = append(body, c.pyFunctionContext(n, c.decorators)...)
 		var entries []nir.ParamEntry
-		if strings.HasPrefix(name, "resolve_") {
+		if strings.HasPrefix(name, "resolve_") || name == "mutate" {
 			entries = append(entries, c.pyParamEntries(name, params, nil)...)
 		}
 		// public API = no leading underscore, OR a dunder (__init__/__call__ are entry points).
@@ -305,7 +307,10 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		decorators := c.pyDecoratorTokens(n)
 		isRoute := def.Kind() == "function_definition" && c.hasRouteDecorator(n)
+		prevDecorators := c.decorators
+		c.decorators = decorators
 		out := c.stmt(def)
+		c.decorators = prevDecorators
 		for i, st := range out {
 			if fn, ok := st.(nir.FuncDef); ok {
 				fn.Decorators = decorators
@@ -508,7 +513,7 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	return els
 }
 
-func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
+func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
 		return nil
@@ -517,12 +522,19 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	bodyText := c.text(body)
 	loc := c.loc(fn)
 	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
 		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
 		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
 	for _, tok := range c.classContext {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range decorators {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	for _, tok := range c.pyStructuredContextTokens(fn, name) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	contextPath := "analysis.function.context"
@@ -553,6 +565,166 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 			Loc:    loc,
 		}},
 	}
+}
+
+func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=python"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.pyStructuredContextTokens(root, "module") {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	if name != "" {
+		add("function_name:" + name)
+	}
+	if params := field(fn, "parameters"); params != nil {
+		for i, p := range c.params(params) {
+			add("param_name:" + p)
+			add("param_index:" + itoa(i))
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.pyContextPath(left); lhs != "" {
+				if rhs := pyContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+				}
+				for _, item := range c.pyContextAssignmentItems(right) {
+					add("assign_item:" + lhs + ":" + item)
+				}
+				if right != nil && right.Kind() == "call" {
+					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
+						add("assign_call:" + lhs + ":" + path)
+					}
+				}
+			}
+		case "call":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+			}
+		case "attribute":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "identifier":
+			if ident := pyContextCompact(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
+		case "subscript":
+			if sub := pyContextCompact(c.text(n)); sub != "" {
+				add("subscript:" + sub)
+			}
+			if base := c.dotted(field(n, "value")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+			if key := c.pyContextPath(field(n, "subscript")); key != "" {
+				add("index_key:" + key)
+			}
+		case "comparison_operator", "boolean_operator":
+			if expr := pyContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "string", "concatenated_string", "integer", "float", "true", "false", "none":
+			if lit := pyContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	body := field(fn, "body")
+	if body == nil {
+		body = fn
+	}
+	walk(body)
+	return out
+}
+
+func (c *pyConv) pyContextAssignmentItems(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	switch n.Kind() {
+	case "list", "tuple", "set":
+	default:
+		return nil
+	}
+	var out []string
+	for _, ch := range namedChildren(n) {
+		item := c.pyContextPath(ch)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+		if len(out) >= 64 {
+			break
+		}
+	}
+	return out
+}
+
+func (c *pyConv) pyContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return pyContextValue(c.text(n))
+}
+
+func pyContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return pyContextCompact(s)
+}
+
+func pyContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
@@ -962,7 +1134,16 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 		}
 		return nir.Seq{Parts: parts, Loc: loc}
 	}
-	out := c.expr(body)
+	parts := []nir.Expr{c.expr(body)}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "if_clause" {
+			parts = append(parts, c.expr(ch))
+		}
+	}
+	var out nir.Expr = parts[0]
+	if len(parts) > 1 {
+		out = nir.Seq{Parts: parts, Loc: loc}
+	}
 	for _, ch := range namedChildren(n) {
 		if ch.Kind() != "for_in_clause" {
 			continue

@@ -5,7 +5,11 @@ adapter python {
     source method "fromPostArgs" -> code.HttpInput
     source method "fromOpenIDArgs" -> code.HttpInput
     sink method "toFormMarkup" -> code.HtmlRender
-    mark method "toURL" -> code.RedirectTarget
-    mark method "toURLEncoded" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "toURL"
+    }
+    flag code.RedirectTarget on any {
+      method "toURLEncoded"
+    }
   }
 }

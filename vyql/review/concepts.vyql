@@ -1,5 +1,6 @@
 import core.*
 import code.*
+import sbom.*
 
 review core.AuthenticationCheck {
   category: "auth"
@@ -25,6 +26,27 @@ review core.LockRelease {
   category: "concurrency"
   kind: "check"
 }
+review code.CiliumBroadTcFilterCleanup {
+  category: "lifecycle"
+  kind: "attention"
+  text: "review Cilium TC filter cleanup for broad name matching that can detach endpoint datapath programs during agent restart"
+}
+review code.StateMutationBeforeOperationPreconditions {
+  category: "lifecycle"
+  kind: "attention"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "review operation application ordering so durable state mutation happens only after all operation preconditions pass"
+}
+review code.StateCommitBeforeExternalWriteAccounting {
+  category: "lifecycle"
+  kind: "target"
+  text: "verify durable state is not committed before fallible external write accounting or metering succeeds"
+}
+review code.PersistentConnectionReuseAfterInterruptedResponse {
+  category: "lifecycle"
+  kind: "target"
+  text: "verify persistent connections are reset after interrupted or incomplete response reads before socket reuse"
+}
 review core.XmlHardening {
   category: "xml"
   kind: "check"
@@ -41,12 +63,91 @@ review core.EncryptionInTransit {
   category: "crypto"
   kind: "check"
 }
+review sbom.CertValidationDependency {
+  category: "dependency"
+  kind: "attention"
+  text: "review dependency constraints for certificate-validation regressions or missing TLS verification guarantees"
+}
+review sbom.SsrfDependency {
+  category: "dependency"
+  kind: "attention"
+  text: "review dependency constraints for SSRF-prone URL fetch or service registration behavior"
+}
 
 review code.AuthenticationRequiredOp {
   category: "auth"
   kind: "target"
   expected: [core.AuthenticationCheck]
   text: "verify an authenticated user is required before this operation"
+}
+review code.PasswordHashMissingUserBalance {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review login failure paths for a dummy password-hash verification that balances missing or inactive users against real password checks"
+}
+review code.SharedOtaHandlerMissingAuthentication {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify shared web-server handler registration wraps OTA upload handlers in the same authentication middleware as normal request handlers"
+}
+review code.GrpcGatewayCommonNameAuthenticationBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review gRPC TLS CommonName authentication for a gRPC-gateway metadata guard before accepting certificate CommonName as the request user"
+}
+review code.FlaskEntityDetailMissingAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "verify Flask entity-detail JSON routes require authentication and an authorization check before returning user or group metadata"
+}
+review code.UnsignedStorageDownloadRoute {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "verify wildcard storage download routes require signed URLs or authorization middleware before returning framework storage files"
+}
+review code.JmxRmiRegistryExposure {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review JMX/RMI server registration for local-only socket binding and enforced authentication"
+}
+review code.NodetoolArchiveCommandPrivilegeEscalation {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review nodetool/JMX archive-command options for explicit privileged opt-in before local shell execution"
+}
+review code.DhcpOptionLengthUncheckedRead {
+  category: "memory"
+  kind: "target"
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  text: "verify DHCP option parsing checks the option header and payload length before reading option data"
+}
+review code.EffectiveUidRootCheckBypass {
+  category: "auth"
+  kind: "attention"
+  text: "review root/superuser checks that use effective UID where real UID determines retained privilege"
+}
+review code.ParsedUserIdDefaultRootPrivilegeEscalation {
+  category: "auth"
+  kind: "attention"
+  text: "review UID/GID parsers that can return a zero-initialized privileged user before assigning the parsed UID"
+}
+review code.CaseInsensitiveLocalIdentityAuthorizationBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review local user/group authorization checks that compare supplied identity text case-insensitively instead of canonical OS identity names"
+}
+review code.ClearanceKitPolicyApplyBeforeAdapterStart {
+  category: "auth"
+  kind: "attention"
+  text: "review ClearanceKit startup ordering so full policy, allowlist, and jail rules are applied after the EndpointSecurity client starts"
 }
 review code.UnqualifiedDatabaseRoutineReview {
   category: "path"
@@ -59,11 +160,53 @@ review code.AuthFlowBypassReview {
   expected: [core.AuthenticationCheck]
   text: "review alternate UI or navigation exit paths in this authentication flow"
 }
+review code.CaptchaValidationTruthyReturnBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  text: "review captcha validators that return non-boolean falsey values for invalid input instead of explicit False"
+}
+review code.OAuthReauthenticationUserMismatch {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify OAuth reauthentication callbacks require the OAuth-resolved user to match the current authenticated user before refreshing session freshness"
+}
+review code.UnanchoredOAuthEmailRegexAuthBypass {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.InputValidation]
+  text: "verify OAuth email authorization uses exact or full-string matching instead of prefix regex matching"
+}
+review code.MissingGuestFallbackForWebAuth {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review web-server authentication flows that can exit or create users before applying the configured guest fallback"
+}
+review code.RequestControlledMfaSecretBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.MfaRequirement, core.AuthenticationCheck]
+  text: "review MFA verification flows for request-controlled TOTP secrets instead of session- or user-record-backed secrets"
+}
 review code.MissingSessionRotationAfterAuthentication {
   category: "auth"
   kind: "attention"
   expected: [core.AuthenticationCheck]
   text: "review successful authentication flows that reuse the pre-login HTTP session instead of rotating it"
+}
+review code.CockpitLimeRedirectStopContinuation {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review Cockpit Lime redirect/stop handling so expired or unauthenticated sessions cannot continue protected request execution"
+}
+review code.CodeCheckerGuidelineRulesMissingViewCheck {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review CodeChecker report-server guideline APIs for __require_view before rule and checker-label lookup"
 }
 review code.LocalRequestBypassReview {
   category: "auth"
@@ -89,10 +232,94 @@ review code.CredentialedEndpointReview {
   expected: [core.AuthorizationCheck]
   text: "review credentialed test endpoint for admin permission and request-method guards"
 }
+review code.JenkinsDescriptorConfigEnumerationMissingPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins descriptor fill endpoint for missing Item/Configure or Overall/Administer permission checks before listing configuration or credential identifiers"
+}
+review code.JenkinsCredentialEndpointMissingPostPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck, core.CsrfProtection]
+  text: "review Jenkins descriptor credential creation and remote-test endpoints for @POST plus Overall/Administer permission checks"
+}
+review code.JenkinsBuildScheduleMissingPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins Stapler build endpoints for Item/Build permission checks before queueing projects"
+}
+review code.JenkinsRemoteValidationMissingPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins remote form-validation endpoints for Overall/Administer permission checks before connecting to supplied services"
+}
+review code.ShareInfoDirectDownloadTokenExposure {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "verify public share-info responses do not include tokenized direct-download URLs before the share password or access challenge"
+}
+review code.CommandAllowlistBeforeParsing {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify command allowlists and execution permission checks run on the canonical parsed command that is later executed"
+}
+review code.SessionHashMissingAuthorizationState {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify session validity hashes include mutable authorization state such as role, permissions, and home directory"
+}
+review code.MemberStoreMissingCreateAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify member storage endpoints enforce create permissions on the POST store path, not only on the form-rendering route"
+}
+review code.FullSizeMediaFileMissingViewFullAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify full-size media/data file endpoints require the stronger full-view permission before streaming original files"
+}
+review code.PublicRestDataEndpointMissingAuthorization {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify public REST data endpoints enforce resource status, page privacy, ownership, or equivalent view permission inside the handler"
+}
+review code.ClusterDeployFunctionMissingPermission {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify cluster functions that deploy uploaded JARs declare privileged deploy/manage permissions before execution"
+}
+review code.ShareLinkDeletionMissingAuthGuard {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.CsrfProtection]
+  text: "verify share-link deletion endpoints require an authenticated authorized caller and CSRF protection before deleting token-selected links"
+}
+review code.ShopwareStoreApiManyToManyCriteriaBypass {
+  category: "access_control"
+  kind: "attention"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "review Shopware Store API Criteria association traversal for ManyToMany ApiAware protection"
+}
 review code.TimeBoundAccessTokenReview {
   category: "auth"
   kind: "attention"
   text: "review generated access tokens or signed URLs for configurable, appropriately bounded expiration"
+}
+review code.ExpiredCachedAuthTokenReuse {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review authentication token cache expiry comparisons so cached token material is not reused after expiration"
 }
 review code.AuthAttemptLimitReview {
   category: "auth"
@@ -100,11 +327,23 @@ review code.AuthAttemptLimitReview {
   expected: [core.RateLimit]
   text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
 }
+review code.PasswordRecoveryLinkHostControl {
+  category: "auth"
+  kind: "target"
+  expected: [core.AllowlistValidation]
+  text: "review password recovery links for configured base URLs instead of request-derived host or absolute-route generation"
+}
 review code.ProtocolFrameBindingReview {
   category: "auth"
   kind: "attention"
   expected: [core.AuthenticationCheck]
   text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
+}
+review code.CredentialProtocolNewlineInjection {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "reject embedded newlines before writing line-oriented credential protocol key/value records"
 }
 review code.AuthFailureResponseReview {
   category: "auth"
@@ -124,20 +363,121 @@ review code.ObjectLookupByUserInput {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "verify object access is constrained to the current principal"
 }
+review code.FrappeLinkExpansionMissingReadPermission {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Frappe link expansion helpers for read permission checks and field-level read filtering before returning linked documents"
+}
+review code.CustomerThreadEditMissingMailboxAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review customer-thread edit policies for mailbox or conversation access checks before allowing customer-originated thread edits"
+}
+review code.UnauthenticatedAdminerIncludeRoute {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review Adminer UI routes for an authenticated session gate before including the Adminer application"
+}
 review code.DeserializableInvocationHandler {
   category: "deserialization"
   kind: "attention"
   text: "review serializable dynamic-proxy invocation handlers that dispatch reflected or scripted methods without a deserialization rejection hook"
+}
+review code.CodeceptionRunProcessDeserializationGadget {
+  category: "deserialization"
+  kind: "attention"
+  expected: [core.SafeDeserialization]
+  text: "review Codeception RunProcess for __sleep/__wakeup rejection before process-control objects can be deserialized"
 }
 review code.RequestSelectedDeserializationFormat {
   category: "deserialization"
   kind: "attention"
   text: "review request-selected deserialization formats for unsafe codecs such as pickle"
 }
+review code.PickleUnsafeImportBlocklistGap {
+  category: "deserialization"
+  kind: "target"
+  expected: [core.SafeDeserialization]
+  text: "verify pickle safety analyzers blocklist dangerous import modules such as ctypes and pydoc before trusting analysis results"
+}
+review code.PickleLoadsJoblibModelLoader {
+  category: "deserialization"
+  kind: "target"
+  expected: [core.SafeDeserialization]
+  text: "verify model-loading helpers do not pass joblib-loaded artifacts into pickle.loads unless artifacts are strictly trusted or loaded with a restricted unpickler"
+}
+review code.ConfigurableCacheUnserializeWrapper {
+  category: "deserialization"
+  kind: "attention"
+  expected: [core.SafeDeserialization]
+  text: "review configurable cache unserialize wrappers for unsafe unserializers and vulnerable cache-data type handling"
+}
 review code.UncheckedPrototypeConfigKey {
   category: "prototype_pollution"
   kind: "attention"
   text: "review dynamic config-key copies for __proto__/constructor/prototype filtering before writing plain object properties"
+}
+review code.PrototypeKeyCachePoisoning {
+  category: "prototype_pollution"
+  kind: "attention"
+  text: "review dynamic cache keys written into plain objects; prefer null-prototype cache buckets"
+}
+review code.CspParserProtoDirectivePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review CSP parser directive storage for Map/null-prototype results or __proto__ rejection"
+}
+review code.ControlledMergeInheritedKeyPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review controlled-merge for own-property filtering before copying for-in keys into result objects"
+}
+review code.ChartkickRecursiveExtendPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review Chartkick recursive object extension for __proto__ filtering before assigning target keys"
+}
+review code.CollectionExtendPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review Collection.js extend for __proto__ filtering before recursive byLink/setVal object merges"
+}
+review code.CookiexDeepPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review cookiex-deep recursive assignment for __proto__/constructor/prototype filtering before writing target keys"
+}
+review code.CordysRequestParamXssFilterDisabled {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review CordysCRM request string deserialization for URL-scoped XSS escaping before stored content endpoints"
+}
+review code.FlarumTranslatorRawStringParameterXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Flarum translator parameter preprocessing for text-node wrapping before rich ICU rendering"
+}
+review code.DotcmsSqlUtilBlacklistBypass {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review dotCMS SQLUtil blacklist sanitization before using request-controlled sort, direction, or condition fragments in SQL"
+}
+review code.DotcmsFormsOrderBySqlInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review dotCMS Forms orderBy handling for SQLUtil.sanitizeSortBy or an equivalent column allowlist before structure lookups"
 }
 review code.MethodGatedRedirectValidationBypass {
   category: "request_forgery"
@@ -151,11 +491,172 @@ review code.ChecksumErrorLogoutRedirect {
   expected: [core.RedirectAllowlist]
   text: "review checksum-error redirect handling that can fall back to request-supplied logout URLs"
 }
+review code.SessionStoredRedirectTarget {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review session-stored login redirect targets for relative-URL or same-origin validation before redirecting"
+}
+review code.ProtocolRelativeSavedRequestRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  text: "review saved-request redirect reconstruction for protocol-relative URLs beginning with double slash"
+}
+review code.PhpMyAdminSetupRedirectorOpenRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review phpMyAdmin setup links that route external URLs through url.php without normal token protection"
+}
+review code.OwnCloudLoginRedirectUrlOpenRedirect {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review ownCloud login redirect_url handling for same-webroot validation before writing a Location header"
+}
+review code.LogoutReturnUrlRedirectWithoutAllowlist {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.RedirectAllowlist]
+  text: "verify logout return-url redirects use same-origin or configured-domain allowlist validation before constructing RedirectResponse"
+}
+review code.UnsignedOidcStateDestinationRedirect {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.RedirectAllowlist]
+  text: "verify OIDC state-carried post-login destinations are signed or allowlisted before redirecting after callback"
+}
+review code.WeakRedirectUrlValidation {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  text: "review redirect URL validators for scheme/netloc parity, slash normalization, control-character rejection, and exact external-host matching"
+}
+review code.DesktopProtocolRedirectWithoutAllowlist {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist, core.InputValidation]
+  text: "review desktop deep-link redirects for an explicit trusted protocol allowlist before assigning window.location"
+}
+review code.GitPackSignatureSearchParsingBypass {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Git push pack parsers for packet-line offset parsing and PACK signature validation instead of searching the request body for PACK bytes"
+}
+review code.WebViewServerRedirectUrlValidationBypass {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify WKWebView server redirects are validated through URL-fixup or allowlist logic before provisional navigation continues"
+}
+review code.RequestBackedFooterScriptXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review footer script storage so rendered scripts come only from server-owned state, not $_REQUEST/GET/POST/COOKIE data"
+}
+review code.PathMatcherNormalizationOrderBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review path matcher normalization order; canonical cleaning should happen before suffix trimming used for platform quirks"
+}
+review code.UnicodeNormalizationAfterFilterBypass {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Unicode normalization order; compatibility normalization should happen before character filtering used by lookups or allowlists"
+}
+review code.MultipleDropdownScalarFallbackMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review multiple-select dropdown value handling for scalar and malformed JSON fallback to an array"
+}
+review code.DeviceStatusStateMachineBypass {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation, core.MemoryBoundsCheck]
+  text: "review device status register writes for required state-machine transition validation before updating stored status bits"
+}
+review code.WindowsReservedDeviceNameBypass {
+  category: "path"
+  kind: "attention"
+  text: "review Windows reserved device-name denylist coverage for superscript digit variants"
+}
+review code.UnvalidatedLocaleFileInclude {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review locale-derived PHP include paths for locale validation before including language files"
+}
 review code.RequestHostUrlValidationBypass {
   category: "request_forgery"
   kind: "attention"
   expected: [core.AllowlistValidation]
   text: "review URL host validation that trusts request Host or server-name metadata instead of a configured allowlist"
+}
+review code.ChamiloUnsafeGuzzleUrlFetch {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review Chamilo social URL previews for scheme, DNS, and private/reserved IP checks before Guzzle fetches"
+}
+review code.CloudBaseOpenUrlSsrf {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review CloudBase MCP open-url requests for scheme, hostname, and private-address validation before opening URLs"
+}
+review code.WebhookUrlFetchMissingSsrfGuard {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.AllowlistValidation]
+  text: "review webhook or callback delivery for SSRF-safe dispatchers or URL validation before outbound fetches"
+}
+review code.ConfigUrlStoredBeforeSchemeValidation {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.AllowlistValidation, core.InputValidation]
+  text: "review connector URL configuration for URL syntax and scheme validation before storing or testing server-side connections"
+}
+review code.SwaggerParserExternalRefDereference {
+  category: "request_forgery"
+  kind: "target"
+  expected: [core.AllowlistValidation, core.InputValidation]
+  text: "review Swagger/OpenAPI parser validation for disabled external $ref dereferencing"
+}
+review code.CodeServerPathProxyPortConfusedProxy {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review code-server path proxy targets for numeric port validation before proxying requests"
+}
+review code.CodeDxJenkinsRemoteValidationMissingPostPermission {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.CsrfProtection, core.AuthorizationCheck]
+  text: "review Jenkins Code Dx remote-validation endpoints for @POST and item/admin permission checks before connecting to supplied URLs"
+}
+review code.JenkinsRemoteValidationMissingPostPermission {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.CsrfProtection, core.AuthorizationCheck]
+  text: "review Jenkins descriptor remote-validation endpoints for @POST and administrator permission checks before testing supplied URLs"
+}
+review code.JenkinsDescriptorPropertyFileValidationMissingPost {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review Jenkins descriptor property-file validation endpoints for @POST before loading request-supplied file paths or URLs"
+}
+review code.MultiOptionUrlValidationBypass {
+  category: "request_forgery"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review multi-option authentication URL validation for callback host allowlisting"
 }
 review code.SensitiveOperation {
   category: "auth"
@@ -169,11 +670,155 @@ review code.AccessPolicyReview {
   expected: [core.AuthorizationCheck]
   text: "review role or group policy configuration for overly broad access"
 }
+review code.UnvalidatedModelSelection {
+  category: "auth"
+  kind: "target"
+  expected: [core.InputValidation, core.AuthorizationCheck]
+  text: "verify request-selected model or classifier names are validated before lookup, processing, or response metadata"
+}
+review code.DisabledRelationshipMetadataExposure {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "verify relationship/resource metadata helpers exclude disabled, inaccessible, or invisible fields before returning relatable targets"
+}
+review code.ChefUserManagementWithoutAdminGuard {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Chef user-management routes for an admin-only controller guard before create, update, or destroy"
+}
+review code.JenkinsAdvisorWeakLayoutPermission {
+  category: "access_control"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins Advisor management-page layout permission for Overall/Administer gating"
+}
 review code.RequestScopePolicyReview {
   category: "auth"
   kind: "attention"
   expected: [core.AuthorizationCheck]
   text: "review request/resource scope consistency before dispatching the resource handler"
+}
+review code.ExternalResourceNamespaceControl {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Kubernetes object namespace selection against the reconciled resource namespace"
+}
+review code.KubernetesNamespaceNotInEgressPolicy {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Kubernetes egress NetworkPolicies using namespace metadata.name NotIn the current namespace"
+}
+review code.TenantServiceAccountAdmissionBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review tenant namespace service-account admission classification before namespace metadata or ownerReference updates"
+}
+review code.NamespacedSubjectKeyCollision {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review namespaced ServiceAccount subject keys for namespace collisions before returning tenant-scoped resources"
+}
+review code.HopByHopHeaderAuthBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review reverse-proxy impersonation handlers for hop-by-hop Connection header stripping before backend auth headers are written"
+}
+review code.BasicAuthStreamAuthBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review streaming/SSE auth option builders that enable Basic auth but do not set AuthRequired=true"
+}
+review code.BackendRouteMissingModuleAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify backend AJAX routes inherit or enforce permissions from the owning backend module"
+}
+review code.PluginManagementMissingAuthorization {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify plugin upload, install, uninstall, and status-change endpoints require operation-specific permissions"
+}
+review code.PublicVisibilityCacheInvalidationMissing {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "verify public visibility changes invalidate cached public sandbox proxy or preview status"
+}
+review code.ProxyClientIpSpoofingBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  text: "review gateway proxy handlers for source-IP header normalization before forwarding to backends that trust client IP"
+}
+review code.SamlFirstSignatureOnlyBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review SAML response signature verification to ensure every XMLDSIG signature is validated, not only the first Signature node"
+}
+review code.OptionalClientSignatureVerification {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review client-signature authentication paths to ensure a missing signature fails closed before accepting the certificate identity"
+}
+review code.SamlAssertionWrappingBypass {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review SAML assertion validation for a single direct Assertion element in the expected namespace before accepting a signed assertion"
+}
+review code.UnverifiedFederationMissingEvents {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review Matrix federation missing-events handling for VerifyEventSignatures before caching or accepting untrusted events"
+}
+review code.CiliumCliEtcdInitMountMismatch {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Cilium cluster-mesh etcd init-container mounts so auth setup writes to the same data directory used by the main etcd container"
+}
+review code.NextcloudCircleMemberAddMissingCircleCheck {
+  category: "auth"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Nextcloud Circles member-add APIs for circle visibility checks before accepting circle member IDs"
+}
+review code.NextcloudFileDropShareScopeBypass {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.OwnershipCheck]
+  text: "review Nextcloud file-drop metadata updates for share-root containment checks before accepting a requested file id"
+}
+review code.AbsoluteUriUserFolderLookup {
+  category: "access_control"
+  kind: "target"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "verify absolute file URI resolvers ignore caller-supplied user components and resolve user folders from the authenticated principal"
+}
+review code.CollectivesPublicTrashMissingEditPermission {
+  category: "access_control"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Nextcloud Collectives public trash index for edit-permission checks before listing deleted pages for shared collectives"
+}
+review code.WordPressMediaMutationMissingObjectPermission {
+  category: "access_control"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review WordPress media mutation handlers for object-specific attachment permission checks before previewing or replacing media"
 }
 review code.UserIdentityMappingReview {
   category: "auth"
@@ -199,6 +844,18 @@ review code.IdorPolicyReview {
   expected: [core.OwnershipCheck, core.AuthorizationCheck]
   text: "review object lookup or delete criteria for a current-principal ownership constraint"
 }
+review code.CommentUpdateMissingOwnershipConstraint {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review comment update queries for current-author or current-user ownership constraints"
+}
+review code.OwnedResourceDeleteMissingOwnershipCheck {
+  category: "auth"
+  kind: "attention"
+  expected: [core.OwnershipCheck, core.AuthorizationCheck]
+  text: "review resource delete handlers for admin or current-owner authorization before backend deletion"
+}
 review code.IncompleteIpDenylist {
   category: "request"
   kind: "attention"
@@ -209,16 +866,64 @@ review code.LocalFileUrlNavigation {
   kind: "attention"
   text: "review headless-browser navigation for file:// URL handling before caller-controlled URLs reach page.goto"
 }
+review code.ConvertSvgMultiSvgSanitizerBypass {
+  category: "path"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.PathAccessCheck]
+  text: "review convert-svg multi-SVG conversion for selecting only the first SVG before sanitizing and rendering in Puppeteer"
+}
+review code.UrlDecodedTraversalCheckExceptionBypass {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  text: "review URL-decoded path traversal checks for malformed percent escapes that bypass later parent-directory validation"
+}
 review code.ProtocolStateReview {
   category: "request"
   kind: "attention"
   text: "review protocol/state transitions for out-of-sequence, stale, or unauthenticated data accepted without the required state check"
+}
+review code.PostTlsIdentityRebindingMissingCheck {
+  category: "request"
+  kind: "target"
+  expected: [core.AuthenticationCheck]
+  text: "verify post-TLS identity exchanges compare stable peer identity fields before replacing the active handshake identity"
 }
 review code.StateChangingOp {
   category: "request"
   kind: "target"
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "verify state-changing request paths have CSRF protection and auth context"
+}
+review code.ClockworkWebJobCsrf {
+  category: "csrf"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "verify Clockwork Web job enable/disable actions require Rails forgery protection"
+}
+review code.RailsBasicAuthWeakCsrfStrategy {
+  category: "csrf"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "verify Rails HTTP Basic auth controllers use protect_from_forgery with: :exception so CSRF failures fail closed"
+}
+review code.BestWebSoftContactFormSettingsCsrf {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review BestWebSoft Contact Form settings saves for check_admin_referer and a matching wp_nonce_field"
+}
+review code.WordPressOptionUpdateMissingCsrf {
+  category: "csrf"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review WordPress option updates for check_admin_referer or wp_verify_nonce before saving request data"
+}
+review code.OAuthStateCookieValidationMissing {
+  category: "auth"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review OAuth/SSO callbacks for state cookie/session storage and comparison before token exchange"
 }
 review code.CsrfDisabled {
   category: "request"
@@ -238,10 +943,64 @@ review code.MissingHttpMethodAssertion {
   expected: [core.CsrfProtection, core.AuthenticationCheck]
   text: "review state-changing HTTP actions for explicit allowed-method assertions"
 }
+review code.CobblerDjangoStateChangeGetCsrf {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review Cobbler Django web actions for @require_POST plus CSRF-protected POST forms before state changes"
+}
+review code.JenkinsStaplerStateChangeMissingPost {
+  category: "csrf"
+  kind: "attention"
+  expected: [core.CsrfProtection]
+  text: "review Jenkins Stapler state-changing actions for @RequirePOST/@POST and POST-backed forms before mutating templates or configuration"
+}
 review code.InsecurePermission {
   category: "permission"
   kind: "target"
   text: "review broad permission assignment and surrounding privilege checks"
+}
+review code.InsecureCookie {
+  category: "cookie"
+  kind: "target"
+  expected: [core.CookieSecureFlag]
+  text: "ensure sensitive cookies are set with the Secure flag from configuration or an explicit true value"
+}
+review code.UnsanitizedSvgUpload {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "review uploaded SVG handling for XML/script sanitization before storing or serving"
+}
+review code.OverbroadRolePermissionGrant {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review non-admin or read-only role permission tables for configuration, backup, restore, or other privileged operation grants"
+}
+review code.RefererBasedAdminUserCreation {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  text: "review user creation flows for admin privilege derived from HTTP Referer instead of server-side setup state"
+}
+review code.JobOutputEventUpdateAuthorizationBypass {
+  category: "auth"
+  kind: "target"
+  expected: [core.AuthorizationCheck]
+  text: "review child job output handlers for authorization or configuration gates before accepting event or schedule update fields"
+}
+review code.InsecureExecutableDownload {
+  category: "supply_chain"
+  kind: "target"
+  expected: [core.CertificateValidation]
+  text: "review installer/runtime downloads for HTTPS transport or integrity verification before local execution"
+}
+review code.CertValidationDisabled {
+  category: "crypto"
+  kind: "target"
+  expected: [core.CertificateValidation]
+  text: "review TLS client options for disabled or missing certificate and hostname validation"
 }
 review code.CryptoOperation {
   category: "crypto"
@@ -270,10 +1029,317 @@ review code.PackageVersionSpecifierValidationReview {
   expected: [core.InputValidation]
   text: "review package version specifier validation before using the specifier in package installation"
 }
+review code.NodePreGypRemoteBinaryInstall {
+  category: "supply_chain"
+  kind: "target"
+  expected: [core.CodeExecutionValidation]
+  text: "review npm native module install manifests for remote node-pre-gyp binary downloads outside the package tarball"
+}
+review code.UnboundedJupyterKernelDependency {
+  category: "supply_chain"
+  kind: "attention"
+  text: "review Jupyter kernel runtime dependencies for upper compatibility caps before building gateway or remote-kernel images"
+}
 review code.CommandLineAssemblyReview {
   category: "command"
   kind: "attention"
   text: "review command-line assembly for unquoted placeholder values before process or application launch"
+}
+review code.GitDirShellCommandStringExecution {
+  category: "command"
+  kind: "target"
+  expected: [core.ProcessArgVector, core.ShellEscape]
+  text: "review git command helpers for execFile-style argv execution instead of shell command strings"
+}
+review code.UnsafeBuildClientCommandAssembly {
+  category: "command"
+  kind: "attention"
+  expected: [core.InputValidation, core.ShellEscape]
+  text: "review client build shell commands for filename/address/port validation before formatting into sh -c"
+}
+review code.ShellTruePackageManagerProbe {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review package-manager probe commands for argv-array subprocess execution instead of shell=True command strings"
+}
+review code.PartiallyEscapedSshCommand {
+  category: "command"
+  kind: "attention"
+  text: "review SSH command strings for shell quoting of every interpolated connection field, including username, host, and port"
+}
+review code.IncompleteCommandEscapeRegex {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review command sanitizer regexes that use alternation where a character class is required to remove shell metacharacters"
+}
+review code.ClamscanBinaryPathShellCommandInjection {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review Clamscan scanner binary verification for execFile-style argument separation instead of shell command strings"
+}
+review code.CodecovNodeGcovCommandInjection {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review Codecov Node gcov upload options for execFile-style argument separation instead of ampersand-only shell sanitization"
+}
+review code.CompileSassCleanupShellCommandWithoutPathCheck {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review compile-sass cleanup paths before formatting them into rm -r shell commands"
+}
+review code.ComposerGitBranchDiffCommandInjection {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review Composer git diff command construction for argv-array execution instead of branch-name string formatting"
+}
+review code.CommandStringWrapperExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review command wrapper calls for argv-array execution instead of formatted shell command strings"
+}
+review code.CommandOptionInjection {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review command arguments for end-of-options delimiters or option allowlist validation before passing escaped user values to option-taking CLI commands"
+}
+review code.ForOwnRecursiveDefaultsPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review recursive defaults merge keys for __proto__ filtering before assigning target[key]"
+}
+review code.NestedPathInheritedPropertyPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review nested path setters for __proto__/constructor/prototype filtering or own-property checks before assigning path segments"
+}
+review code.CoerciblePathSegmentPrototypePollution {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review nested path setters for primitive path-segment validation before bracket property access"
+}
+review code.ExpressionEvaluatorPrototypeNameAccess {
+  category: "prototype_pollution"
+  kind: "attention"
+  expected: [core.PrototypePollutionGuard]
+  text: "review expression evaluators for __proto__/constructor/prototype rejection before resolving variable or member tokens"
+}
+review code.GeneratedPathAccessorPrototypePollution {
+  category: "prototype_pollution"
+  kind: "target"
+  expected: [core.PrototypePollutionGuard]
+  text: "review generated path accessor helpers for removal or strict path-segment validation before Function compilation"
+}
+review code.McpToolCommandTemplateExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review MCP tool handlers for execFile or argv-array execution instead of shell command templates"
+}
+review code.ApiScanFoundActionCommandExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthenticationCheck]
+  text: "review API scan handlers that bind request options and forward found-action command settings into the scan engine"
+}
+review code.ConnectCmsCodestudiesPluginCodeExecution {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.CodeExecutionValidation, core.ShellEscape]
+  text: "review Connect-CMS Code Study plugin for removal or strict sandboxing before running submitted code on the server"
+}
+review code.OpnSenseRrdRestoreFilenameCommandInjection {
+  category: "command"
+  kind: "attention"
+  expected: [core.ShellEscape, core.InputValidation]
+  text: "review OPNsense RRD backup restore filenames for basename validation and shell-safe command execution"
+}
+review code.PythonTripleQuoteShellInterpolation {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.CodeExecutionValidation]
+  text: "review shell scripts that interpolate captured input into Python triple-quoted source strings"
+}
+review code.ReactNativeCliOpenUrlMiddlewareCommandExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review React Native CLI URL-opening middleware for http/https protocol allowlisting before open(url)"
+}
+review code.CloudStackBaremetalMacCommandInjection {
+  category: "command"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review CloudStack baremetal provision-done MAC validation before passing the value to shell-backed curl"
+}
+review code.IncompleteMassAssignmentIdUnset {
+  category: "mass_assignment"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review generic add handlers that unset identifier fields before request normalization rather than from the normalized input"
+}
+review code.ResponseParserFunctionEval {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.CodeExecutionValidation, core.InputValidation]
+  text: "review response parsers that compile response data with Function; prefer JSON.parse or a strict data parser"
+}
+review code.UnsafeJXPathContextEvaluation {
+  category: "code_execution"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify JXPath contexts disable Java functions before evaluating externally influenced XPath expressions"
+}
+review code.WerkzeugDebugConsoleExposure {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.AuthenticationCheck]
+  text: "review Flask/Werkzeug debug servers bound to external interfaces unless the eval console is disabled"
+}
+review code.ElectronPrivilegedUrlNodeIntegration {
+  category: "desktop"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Electron privileged URL handling for Node integration being disabled on chrome-devtools URLs"
+}
+review code.CommandLineAssemblyReview {
+  category: "command"
+  kind: "attention"
+  text: "review command-line assembly that appends contextual values before shell or process launch without observed shell quoting"
+}
+review code.TemplateInstallScriptHostExecution {
+  category: "command"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review template install execution for container or sandbox isolation before running author-controlled scripts"
+}
+review code.HostExpandedUrlSanitizedBeforeExpansionSsti {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review canonical URL helpers for sanitizing the full host-expanded URL after request Host or protocol metadata is added"
+}
+review code.UnparameterizedSqlQueryParser {
+  category: "sql"
+  kind: "attention"
+  text: "review SQL query builders for unparameterized fragments derived from caller-controlled values"
+}
+review code.UnvalidatedSqlIdentifierInterpolation {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review SQL builders that interpolate caller-selected table or column identifiers before an allowlist check"
+}
+review code.UnparameterizedSqlExportStringBuilder {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review database export query builders for parameterized values and quoted identifiers"
+}
+review code.ReportDateFilterSqlFragmentInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review report date filters for strict date/comparison validation or parameterized query construction before SQL execution"
+}
+review code.EnvFileVariableInjection {
+  category: "injection"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review .env file update helpers for dotenv-safe escaping or rejection of newline and quote syntax in values"
+}
+review code.PgEscapeStringSqlFilterInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization]
+  text: "review PostgreSQL filter fragments using pg_escape_string where pg_escape_literal or parameterization is required"
+}
+review code.EscapedSqlValueFunctionCallAllowed {
+  category: "sql"
+  kind: "target"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "verify escaped SQL value builders reject array-backed database function calls before composing SQL"
+}
+review code.UnescapedMysqlDsnDatabaseName {
+  category: "sql"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify MySQL database names are URL-escaped before being stored in connection context or interpolated into DSN strings"
+}
+review code.UnvalidatedSqlOrderDirection {
+  category: "sql"
+  kind: "target"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "verify ORDER BY direction values are normalized to an ASC/DESC allowlist before SQL concatenation"
+}
+review code.UnfilteredSearchWhereColumns {
+  category: "sql"
+  kind: "attention"
+  text: "review searchable query scopes that allowlist only some request keys before passing the full search array to where()"
+}
+review code.UnvalidatedNumericSqlInterpolation {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review request-derived numeric identifiers before ORM primary-key lookups or SQL predicates"
+}
+review code.UnvalidatedCoordinateSqlInterpolation {
+  category: "sql"
+  kind: "target"
+  expected: [core.InputValidation, core.SqlParameterization]
+  text: "verify geospatial SQL helpers coerce coordinate bounds before interpolating them into BETWEEN predicates"
+}
+review code.WordPressPostsWhereDateSqlInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.SqlParameterization, core.InputValidation]
+  text: "review WordPress posts_where filters that append date parameters to SQL without strict date or numeric validation"
+}
+review code.CodeIgniterActiveRecordOffsetSqlInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review CodeIgniter Active Record offset values for integer casting before query compilation"
+}
+review code.CraftCommercePurchasablesSortSqlInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Craft Commerce purchasables table sort columns for an explicit allowlist before Yii orderBy array-key use"
+}
+review code.ContaoListingModuleSqlIdentifierInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Contao listing module search and sort query parameters for field allowlists before SQL construction"
+}
+review code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthorizationCheck]
+  text: "review Contao Ajax toggleSubpalette field names for selector allowlists and field-level access checks before SQL updates"
+}
+review code.ZikulaThemeNameReflectedXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review Zikula Theme admin themename handling for request filtering or escaping before confirmation template rendering"
+}
+review code.CiviCrmScientificNotationNumericValidationBypass {
+  category: "sql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review CiviCRM numeric validators for exponent-form values before SQL integer parameters are accepted"
 }
 review code.RubyPipeOpenCommandExecution {
   category: "command"
@@ -290,15 +1356,113 @@ review code.SecurityKeyTrustOperation {
   kind: "target"
   text: "verify trust/key operations use a full collision-resistant identifier"
 }
+review code.ExpressParamArrayValuePollution {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review Express parameter lookup helpers for duplicate-parameter array normalization or rejection"
+}
 review code.PublicKeyHashBindingReview {
   category: "crypto"
   kind: "attention"
   text: "review signature verification flows that accept a public key without checking it matches the committed key hash"
 }
+review code.EcdhPeerPublicKeyMissingCurveValidation {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDH shared-secret derivation for peer public-key curve membership validation before scalar multiplication"
+}
+review code.JavaMailSmtpSslIdentityVerificationMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.CertificateValidation]
+  text: "review JavaMail SMTP SSL/TLS setup for mail.smtp.ssl.checkserveridentity=true before sending mail or credentials"
+}
+review code.PublicWeakChecksumUtility {
+  category: "crypto"
+  kind: "attention"
+  text: "review public checksum/hash utilities for weak algorithms and restrict non-cryptographic helpers to internal or package-private API"
+}
+review code.RepeatedKeyfileSubstitutionTables {
+  category: "crypto"
+  kind: "attention"
+  text: "review keyfile-based substitution-table generation for per-table mixing and keyfile-derived table order"
+}
+review code.RsaPkcs1DigestSuffixOnlyVerification {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review RSA PKCS#1 signature verification for full padding, separator, DigestInfo, and digest checks"
+}
+review code.TpmDiskKeyWeakPcrSealing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.StrongCrypto, core.InputValidation]
+  text: "review TPM disk-key sealing PCR selections for SHA256 PCR banks and inclusion of the secure-boot measurement PCR"
+}
+review code.EcdsaSignatureScalarBoundsMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDSA verification for r and s range checks before modular inverse and point arithmetic"
+}
+review code.EcPointIdentityElementMissing {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review elliptic-curve point double/add/mul operations for point-at-infinity handling before modular inversion and scalar multiplication"
+}
+review code.AuthenticodeSignaturePathBindingBypass {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.CertificateValidation, core.InputValidation]
+  text: "review Authenticode update verification for comparing Get-AuthenticodeSignature data.Path with the intended update file before accepting publisher names"
+}
+review code.DerSignatureNonCanonicalImport {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review DER/ECDSA signature import for canonical length parsing and rejection of unnecessary leading zeroes before BN construction"
+}
+review code.CryptoScalarRandomBitsByteLengthConfusion {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.SecureRandom, core.InputValidation]
+  text: "review elliptic-curve scalar or nonce helpers using random-bits APIs to ensure callers pass bit counts rather than byte counts"
+}
+review code.ConstellationLuks2AttachedHeaderActivation {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Constellation LUKS2 persistent-storage activation for detached-header metadata validation before opening host-provided volumes"
+}
+review code.Luks2AttachedHeaderActivation {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review LUKS2 persistent-storage activation for detached-header metadata validation before opening host-provided volumes"
+}
 review code.SecretComparisonReview {
   category: "crypto"
   kind: "attention"
   text: "review secret comparisons for ordinary equality or early-exit behavior where constant-time comparison is expected"
+}
+review code.CryptoImproperBlinding {
+  category: "crypto"
+  kind: "attention"
+  text: "review private-key blinding code for required subgroup/Jacobi/square hardening before inverse or unblinding use"
+}
+review code.EcdsaNonceBitLengthTimingLeak {
+  category: "crypto"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ECDSA signing for fixed-bit-length nonce scalar multiplication before using k in generator multiplication and inversion"
+}
+review code.CryptoMissingOptimizationBarrier {
+  category: "crypto"
+  kind: "attention"
+  text: "review constant-time scalar arithmetic for missing optimization barriers around secret-dependent masks"
 }
 review code.PremasterSecretLengthReview {
   category: "crypto"
@@ -311,15 +1475,149 @@ review code.ResourceReview {
   expected: [core.ResourceRelease]
   text: "verify resource usage is bounded, timed out, and released"
 }
+review code.RateLimitedMbufResponseLeak {
+  category: "resource"
+  kind: "attention"
+  expected: [core.ResourceRelease]
+  text: "review rate-limited TCP response helpers to ensure mbufs are consumed or freed on every return path"
+}
+review code.ThreadLocalScopeOverwriteWithoutCleanup {
+  category: "race"
+  kind: "target"
+  text: "verify ThreadLocal request or scope lifecycle setup clears any previous scope before installing a new per-thread cache"
+}
 review code.UnboundedResourceOperation {
   category: "resource"
   kind: "attention"
   text: "review long-lived resource operation for timeouts, message limits, and cancellation"
 }
+review code.EmptySourceSliceMemoryExpansion {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify empty source slices cannot still expand memory or zero-fill a caller-selected target size"
+}
+review code.ChatterBotSqlalchemySessionPoolExhaustion {
+  category: "resource"
+  kind: "attention"
+  text: "review SQLAlchemy session factories and generator-backed queries for bounded pools and guaranteed session cleanup"
+}
+review code.UnboundedRouteFilenameCacheAccess {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review route-derived cache filenames for a length bound before filesystem path construction"
+}
+review code.Free5gcChfRechargeInfoSplitPanic {
+  category: "resource"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review recharge route parsing for a split-result length check before indexing rating-group fields"
+}
+review code.ModexpZeroExponentIterationUnderflow {
+  category: "numeric"
+  kind: "target"
+  expected: [core.IntegerOverflowGuard]
+  text: "review modular exponentiation iteration-count arithmetic for zero-exponent underflow before gas accounting"
+}
+review code.NilMapMergeWritePanic {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review optional map merge paths for an empty-map initialization before writing merged values"
+}
+review code.CookieMaxAgeDurationSecondsPanic {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review cookie Max-Age parsing for a maximum-duration clamp before constructing Duration::seconds"
+}
+review code.EmmettUnhandledCookieParseException {
+  category: "resource"
+  kind: "attention"
+  expected: [core.ExceptionHandling]
+  text: "review Emmett request cookie parsing for exception handling around malformed Cookie headers"
+}
+review code.GsonObjectTypeAdapterRecursiveRead {
+  category: "resource"
+  kind: "attention"
+  text: "review Gson ObjectTypeAdapter JSON parsing for iterative traversal or an explicit nesting limit before recursive read calls"
+}
+review code.CommonsCompressBzip2FallbackSortMissing {
+  category: "resource"
+  kind: "attention"
+  text: "review bzip2 block sorting for fallback sorting when the main sorter exceeds its comparison work limit"
+}
+review code.ConduitHyperUnboundedBodyToBytes {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review conduit-hyper request body collection for a dominating Content-Length or size-hint limit before hyper::body::to_bytes"
+}
 review code.ZeroStepSequenceExpansion {
   category: "resource"
   kind: "attention"
   text: "review sequence expansion loops for parsed zero steps that prevent loop progress"
+}
+review code.ZipEntryCompressedSizeTokenRead {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review ZIP entry parsing for an inflate/output limit before reading entry content sized from compressed ZIP metadata"
+}
+review code.DeflateDecompressionMaxSafeIntegerLimit {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify deflate decompression output is capped to a small archive-entry limit instead of Number.MAX_SAFE_INTEGER"
+}
+review code.RecursiveCompressedPacketDecompression {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review compressed packet handlers for nested compressed or jumbo packet rejection before re-entering packet parsing"
+}
+review code.ZeroLengthRadiusAttributeValueParse {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review RADIUS attribute parsers for zero-length VSA/Tunnel-Password payload checks before value construction"
+}
+review code.UnboundedNaturalLanguageScheduleParse {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review natural-language schedule parsers for an input-length guard before grammar parsing"
+}
+review code.BufReadDiscardLoopWithoutEofGuard {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation, core.ExceptionHandling]
+  text: "review buffered discard loops for an empty-buffer EOF guard before consuming and subtracting progress"
+}
+review code.NumericParserMissingProgressCheck {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review numeric parsers for a cursor-progress guard before retrying fallback parse paths"
+}
+review code.PairwiseConstraintIntersectionDos {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review constraint-list intersection for sorted merge or bounded processing instead of pairwise nested intersection"
+}
+review code.RecursiveObjectParentResolveWithoutCycleGuard {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review object parent traversal for a shared visited-object or recursion guard across repeated parent resolution"
+}
+review code.WorldCoordinateSafeRangeMissing {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review world-edit coordinate operations for safe world-border range checks before block or chunk access"
 }
 review code.UnboundedStateGrowthReview {
   category: "resource"
@@ -331,10 +1629,32 @@ review code.UnboundedProtocolStateByIdentifier {
   kind: "attention"
   text: "review protocol state keyed by remote identifiers for fail-closed size/type checks before storage or queueing"
 }
+review code.UnderboundedProtocolCountLimit {
+  category: "resource"
+  kind: "attention"
+  text: "review protocol parser count limits against consensus or wire-format maximums"
+}
+review code.ProtocolListAmplification {
+  category: "resource"
+  kind: "attention"
+  text: "review zero-sized protocol list readers for traversal-budget amplification checks"
+}
+review code.ProtocolStatusVectorUnknownArgumentFallback {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review protocol status-vector decoders for fail-closed handling of unknown argument tags"
+}
 review code.UnboundedAllocationReview {
   category: "resource"
   kind: "attention"
   text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
+}
+review code.ArrayBufferTransferMaxLengthBypass {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ArrayBuffer transfer length checks against resizable-buffer maxByteLength before allocation"
 }
 review code.UnboundedDelimiterSplitCount {
   category: "resource"
@@ -345,6 +1665,12 @@ review code.LengthDerivedAllocation {
   category: "resource"
   kind: "attention"
   text: "review length-derived allocation for a dominating remaining-buffer or maximum-size check"
+}
+review code.FixedChunkCapacityGrowthIndex {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review fixed-chunk capacity growth to ensure the allocation is sized at least to the requested index before indexing"
 }
 review code.ReachableAssertionReview {
   category: "resource"
@@ -362,6 +1688,36 @@ review code.UncheckedDecodeResult {
   expected: [core.InputValidation]
   text: "review structured decode errors that are unwrapped instead of returned or rejected"
 }
+review code.UnvalidatedRatingRange {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review server-side range validation before applying user-submitted rating values"
+}
+review code.FrameworkRequestBeforeSessionValidation {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review request/session validation ordering before framework request or transport state is created"
+}
+review code.XmlLeadByteNameValidationMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review XML tokenizer lead-byte name parsing for invalid-character rejection before accepting name characters"
+}
+review code.DnsInterfaceNewlineValidationMissing {
+  category: "input_validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review DNS interface config validators for newline rejection before writing resolver configuration syntax"
+}
+review code.UnvalidatedChoiceControlField {
+  category: "input_validation"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review truthy early returns on caller-controlled choice fields before canonical allowed-value normalization"
+}
 review code.PolymorphicTypeSelectionReview {
   category: "input_validation"
   kind: "attention"
@@ -373,30 +1729,491 @@ review code.IncompleteArchiveFilenameValidation {
   kind: "attention"
   text: "review archive member filename validation for dangerous URI or stream-wrapper schemes"
 }
+review code.IncompleteDangerousUploadExtensionBlocklist {
+  category: "upload"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review dangerous upload extension blocklists for omitted executable extensions such as PHAR"
+}
+review code.ConcreteCmsIncompleteUploadExtensionBlacklist {
+  category: "upload"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review Concrete CMS upload extension blacklist for omitted executable extensions such as phar, php8, pht, shtml, cgi, and htaccess"
+}
+review code.StatamicAssetUploadPhpExtensionValidationBypass {
+  category: "upload"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review Statamic front-end form asset upload rules for explicit PHP executable extension rejection"
+}
+review code.ManualZipEntryFileWrite {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review manual zip extraction paths for destination-root containment before creating files"
+}
+review code.FilesystemImageDirentTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "reject filesystem image entry names containing '.', '..', absolute paths, or separators before recursive extraction"
+}
 review code.ArchiveSymlinkFilterBypass {
   category: "path"
   kind: "attention"
-  text: "review archive extraction symlink filters for library-specific callback signatures and symlink type values"
+  text: "review archive extraction for symlink and hard-link target validation before writing entries"
+}
+review code.LockFileCreateMissingNoFollow {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review lock-file creation for no-follow or equivalent symlink-safe open behavior"
+}
+review code.ContainersCommonFipsModeMountSymlink {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review FIPS subscription bind-mount sources for symlink-safe resolution inside the container root before mounting"
+}
+review code.PathBasedSandboxExposeBindRace {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review sandbox-expose handling for fd-based bind mounting instead of path-based filesystem arguments"
+}
+review code.ArchiveMarkerSymlinkOverwrite {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review archive extraction marker files for symlink-safe creation and explicit marker-entry filtering"
+}
+review code.HardlinkedFileOverwriteWithoutClobber {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "review filesystem writers for hard-link clobbering before writing file entries over existing paths"
+}
+review code.UploadFilePathTraversalWrite {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review upload helpers that accept full file paths or object keys for traversal checks before storage writes"
+}
+review code.CowAgentMemoryFilenameTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review memory content filename resolution for realpath containment before reading files"
+}
+review code.CherryPySessionIdFilePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review CherryPy file-session path construction for canonical containment of cookie-supplied session ids"
+}
+review code.BrowserlessWorkspaceFilePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review browserless workspace route path construction for containment before file reads or deletion"
+}
+review code.ClaspRemoteFilePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review remote Apps Script filenames for content-directory containment before local writes"
+}
+review code.DockerCliProgramDataPluginSearchPath {
+  category: "path"
+  kind: "attention"
+  text: "review Docker CLI Windows plugin discovery for lower-trust ProgramData search paths before executing plugin binaries"
+}
+review code.RubyFfiWindowsPosixLibrarySearchPath {
+  category: "path"
+  kind: "attention"
+  text: "review Ruby FFI native library fallback search paths for a Windows platform guard before retrying load from POSIX directories"
+}
+review code.CharmRouteFileStorePathAccess {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review route wildcard paths before file-store get, put, or delete operations"
 }
 review code.CatastrophicRegex {
   category: "resource"
   kind: "attention"
   text: "review static regex complexity and attacker-controlled match input length"
 }
+review code.UnboundedEmailRegexValidation {
+  category: "resource"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review email validation regexes for maximum input length checks before matching attacker-controlled strings"
+}
+review code.CsharpEnumParseMissCacheGrowth {
+  category: "resource"
+  kind: "attention"
+  text: "review C# enum string parse caches for inserting arbitrary failed lookup keys instead of precomputing valid enum strings"
+}
+review code.OversizedWebsocketPayloadDefault {
+  category: "resource"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review WebSocket or long-polling payload defaults for low, denial-of-service-resistant request body limits"
+}
+review code.RubyLineAnchorValidationBypass {
+  category: "resource"
+  kind: "attention"
+  text: "review Ruby validators that use ^ and $ anchors; use \\A and \\z for whole-string matching"
+}
+review code.UncheckedPythonCapiHashError {
+  category: "resource"
+  kind: "attention"
+  text: "review Python C extension hash callbacks for -1 error handling before cleanup continues"
+}
 review code.HtmlSanitizerLogicReview {
   category: "xss"
   kind: "attention"
   text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+}
+review code.IncompleteHtmlEntityEscape {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review strip_tags-only or partial entity escaping before browser-rendered HTML output"
+}
+review code.PhpWindowOpenerCallbackNameXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify request-controlled callback names rendered into window.opener JavaScript are escaped or restricted to safe identifiers"
+}
+review code.StoredHtmlWrite {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review stored HTML writes for server-side sanitization before the value is rendered"
+}
+review code.ErbHrefInterpolationHtmlEscapeMissing {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "escape Ruby ERB values interpolated into href attributes with h, html_escape, escape_html, or an equivalent HTML attribute escape helper"
+}
+review code.ErbHrefUrlHtmlEscapeOnly {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "validate or URI-encode URL-like values before rendering them into ERB href attributes; HTML escaping alone does not make a URL safe"
+}
+review code.ExpressSpaAssetFallbackReflectedXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "add explicit 404 handlers for static asset URL prefixes before an Express catch-all index.html fallback"
 }
 review code.UnescapedHtmlOptionRenderer {
   category: "xss"
   kind: "attention"
   text: "review option-renderer HTML assembled from option metadata and whether it is sanitized before insertion"
 }
+review code.JenkinsComputerQueueUnescapedTooltipXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Jenkins Computer Queue tooltips for h.escape around agent/cause text before rendering"
+}
+review code.JenkinsProjectDisplayNameXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Jenkins project display names for HTML escaping before graph or UI rendering"
+}
+review code.JenkinsTestResultNameXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Jenkins test result getName accessors for hudson.Util.escape or equivalent HTML escaping"
+}
+review code.PrestaShopContactformMessageEmailXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review PrestaShop contactform email template variables for htmlentitiesUTF8 around the submitted message"
+}
+review code.FreePbxContactManagerGroupLinkXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review FreePBX Contactmanager generated action links for integer narrowing of the group request parameter"
+}
+review code.OveleonCookiebarLocaleReflectedXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review Cookiebar block locale routing for Validator::isLocale before rendering the frontend template response"
+}
+review code.ComrakDangerousUrlCaseSensitiveGrammar {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Comrak dangerous URL grammar for case-insensitive blocking of data:, javascript:, vbscript:, and file: schemes"
+}
+review code.SchematronLinkHrefUnsafeSchemeDenylist {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Schematron xlink:href validation for lowercased safe-scheme allowlisting and dangerous character rejection"
+}
+review code.CentreonMyAccountContactXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Centreon contact name and alias displays for the fixed illegal-character escape mode before rendering stored values"
+}
+review code.JenkinsPluginForkedDirectoryBrowserWithoutCsp {
+  category: "xss"
+  kind: "attention"
+  text: "review Jenkins report-serving actions for CSP-aware DirectoryBrowserSupport from Jenkins core"
+}
+review code.CkeditorStaticProtectedSourceTokenBypass {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review CKEditor protected-source markers for per-conversion randomness before skipping already-protected HTML"
+}
+review code.CkeditorRawElementLiveDocumentRenderXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review CKEditor RawElement clipboard conversion for detached-document rendering before extracting plain text"
+}
+review code.ClassroomBookingsDisplayNameAltXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review classroombookings global menu labels for display-name escaping before image alt attribute rendering"
+}
+review code.CraftAnonymousTemplateRenderActionXss {
+  category: "xss"
+  kind: "attention"
+  text: "review Craft TemplatesController for a beforeAction direct-access guard before anonymous template rendering"
+}
+review code.PersistentModelTitleStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review persistent model/UI title assignment for HTML stripping or encoding before the value is stored and later rendered"
+}
+review code.QuickAppsUserRealNameStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review QuickApps user real-name accessors for h()-escaping before stored names are rendered"
+}
+review code.CodeSnippetsSafeModeQueryXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review Code Snippets safe-mode query URLs for boolean narrowing or escaping before attribute rendering"
+}
+review code.WordPressAddQueryArgHrefXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review WordPress add_query_arg URLs for esc_url or equivalent escaping before href attribute rendering"
+}
+review code.StoredUrlHrefAttributeXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review stored URL fields rendered into href attributes for URL sanitization and HTML attribute escaping"
+}
+review code.EzPublishSearchNumericParamXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review eZ Publish search module request numeric parameters for integer casts or is_numeric checks before template/search-state reuse"
+}
+review code.UnescapedQueueQueryStringXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review queue query-string helpers for URL escaping before embedding queue names in generated links"
+}
+review code.UnvalidatedRouteConfigKeyStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation, core.HtmlEscape]
+  text: "review route-derived configuration key writes for identifier validation before persistence and later UI rendering"
+}
+review code.UnescapedLocalFileContentHtmlRender {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "review file-content display endpoints for HTML escaping before printing local file contents"
+}
+review code.ResponseWriterScriptWindowIdXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review JSF ResponseWriter script output for writeText or equivalent escaping around window identifiers"
+}
+review code.PreservedRequestHiddenInputValueXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review PHP hidden input builders for HTML escaping before preserving request or plugin parameters"
+}
+review code.CollectiveContactWidgetTitleXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review collective.contact.widget term-contact titles for HTML escaping before objpath hidden input rendering"
+}
+review code.CodiadFilemanagerSearchCommandInjection {
+  category: "command-injection"
+  kind: "attention"
+  expected: [core.ShellEscape]
+  text: "review Codiad Filemanager search and find parameters for escapeshellarg before shell_exec command construction"
+}
+review code.ColorscoreImagemagickCommandInjection {
+  category: "command-injection"
+  kind: "attention"
+  expected: [core.ShellEscape, core.InputValidation]
+  text: "review colorscore ImageMagick convert command construction for shellescape and numeric option coercion"
+}
+review code.TotalJsAdminThemeXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Total.js admin theme grid and notification rendering for Thelpers.encode before HTML insertion"
+}
+review code.ElefantAdminPreviewMissingAdminXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.HtmlEscape]
+  text: "review Elefant admin preview for require_admin before rendering POST-supplied preview fields"
+}
+review code.ClientLightboxOptionXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review client lightbox option rendering for HTML sanitization, event-attribute filtering, and URL protocol allowlisting"
+}
+review code.RequestViewVariableHtmlEscapeMissing {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review request-derived view variables for htmlentities/htmlspecialchars before passing them into HTML view rendering"
+}
+review code.SvgOnclickWindowOpenLinkXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "review SVG onclick/window.open link rendering for protocol allowlisting and JavaScript-string-safe quoting"
+}
+review code.JavaScriptTemplateHtmlEscapeMismatch {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review template variables placed into JavaScript strings for context-specific escaping such as Encode.forJavaScript"
+}
+review code.BbcodeUrlTagProtocolXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review BBCode/UBB URL and image tag parsing for http/https protocol allowlisting before rendering href or src attributes"
+}
+review code.GouniverseCmsAliasXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Gouniverse CMS page-alias error responses for hb.Text or equivalent escaping before returning HTML"
+}
+review code.GleezRedactorEditorStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Gleez CMS Redactor editor enablement for stored HTML sanitization or disabled source-mode editing"
+}
+review code.FeehiUsernameStoredXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Feehi CMS username model loading for Html::encode before stored usernames are rendered"
+}
+review code.CocotaisEchoPlatformTagInjection {
+  category: "injection"
+  kind: "attention"
+  expected: [core.InputValidation, core.AuthorizationCheck]
+  text: "review Cocotais builtin echo replies for platform-tag filtering or permission checks before bot-privileged output"
+}
+review code.CockpitAuthArrayNosqlInjection {
+  category: "nosql"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Cockpit Auth::check for scalar is_string guards before auth arrays reach the authentication query"
+}
 review code.UnescapedTableExportHtml {
   category: "xss"
   kind: "attention"
   text: "review table-export callbacks that return raw cell HTML instead of text or escaped content"
+}
+review code.UnescapedHtmlPresenter {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review HTML presenters that interpolate computed or input-derived values into returned markup"
+}
+review code.UnescapedJsonTreeLabelXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify JSON tree or list labels escape stored names before returning them to browser UI components"
+}
+review code.RawDatatablesAttributeXss {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape]
+  text: "verify server-side DataTables raw columns escape model fields before inserting them into HTML attributes"
+}
+review code.UnescapedLinterIssueMessageXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review generated linter HTML reports for escaping diagnostic message text before template rendering"
+}
+review code.DspaceJspuiAutocompleteLabelXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review JSPUI autocomplete label rendering for escapeHtml around displayedValue before insertion into label HTML"
+}
+review code.UnescapedChartTooltipHtml {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review chart tooltip renderers that interpolate tooltip labels into HTML before innerHTML assignment"
+}
+review code.UnescapedChartTooltipDataName {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review chart tooltip formatters that return raw data item names instead of passing them through structured tooltip markup or escaping"
+}
+review code.PostMessageHtmlWriteMissingOriginCheck {
+  category: "xss"
+  kind: "target"
+  expected: [core.HtmlEscape, core.InputValidation]
+  text: "verify postMessage handlers validate sender origin before writing message.data into document.write, parsed HTML, or innerHTML"
+}
+review code.CheckmkPendingChangeTextUnescapeXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review pending-change popout data for HTML entity unescaping before frontend HTML insertion"
 }
 review code.HtmlAttributeRewriteReview {
   category: "xss"
@@ -409,6 +2226,295 @@ review code.UnescapedDiagnosticHtml {
   expected: [core.HtmlEscape]
   text: "review diagnostic log fields rendered as HTML for escaping of remote response data"
 }
+review code.UnescapedDocsOpenapiUrl {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review docs HTML helpers whose OpenAPI URL includes raw request query values; URL-encode query components before rendering"
+}
+review code.UnsafeWatchUrlProtocol {
+  category: "xss"
+  kind: "attention"
+  expected: [core.RedirectAllowlist]
+  text: "review stored watch URLs for protocol allowlist validation before rendering browser links"
+}
+review code.CommonMarkPreserveEntitiesUrlAttributeXss {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review CommonMark URL attribute escaping for entity preservation that can reconstitute unsafe schemes in browsers"
+}
+review code.LeagueCommonMarkUnsafeHtmlMode {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review League CommonMark Markdown conversion for html_input escaping, DisallowedRawHtmlExtension, or an HTML sanitizer"
+}
+review code.DocumizeMarkdownRenderWithoutSanitizer {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Markdown-to-HTML rendering for an HTML sanitizer such as bluemonday before browser output"
+}
+review code.BladeRawMarkdownRenderWithoutSanitizer {
+  category: "xss"
+  kind: "attention"
+  expected: [core.HtmlEscape]
+  text: "review Blade raw echo Markdown rendering for strip_tags, escaping, or HTML sanitization before browser output"
+}
+review code.CompassCsfleEjsonParserMissingStrictMode {
+  category: "injection"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review Compass CSFLE EJSON parsing for strict-mode parsing rather than shell/query parser evaluation"
+}
+review code.IncompleteGeneratedJsIdentifierReservedWords {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify generated JavaScript identifier validation rejects eval and arguments before names enter generated source"
+}
+review code.UnescapedGeneratedJavaStringFieldName {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review generated Java source templates for Java string escaping before embedding logical field names"
+}
+review code.UnfilteredAgentCommandTag {
+  category: "code_execution"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review AI output custom-tag parsers for command/control tags that must be consumed or hidden instead of rendered as markdown"
+}
+review code.LdapCrlCredentialReuse {
+  category: "secret"
+  kind: "attention"
+  text: "review LDAP CRL fetchers for credential isolation before connecting to certificate-supplied LDAP URLs"
+}
+review code.AbsolutePathDisclosure {
+  category: "secret"
+  kind: "attention"
+  text: "review externally visible identifiers or diagnostics for resolved local filesystem paths"
+}
+review code.PhpNegativeOffsetStringSearchWarningDisclosure {
+  category: "secret"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "review PHP negative-offset string searches on request keys for a strlen lower-bound guard"
+}
+review code.SensitiveConfigInfoLog {
+  category: "secret"
+  kind: "attention"
+  text: "review configuration object logging above debug level for inline credentials or target resource secrets"
+}
+review code.TyperPrettyExceptionLocalsSecretExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify Typer/Rich pretty exceptions hide local variables when token values are kept in CLI locals"
+}
+review code.RemoteUrlObjectDebugLog {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify remote repository URL objects are not logged before credentials, query strings, and fragments are stripped"
+}
+review code.RequestPathPercentSLogInjection {
+  category: "injection"
+  kind: "attention"
+  expected: [core.OutputEncoding]
+  text: "review request-path diagnostic logging for repr-style escaping or explicit control-character neutralization"
+}
+review code.TextAccessLogDefaultFormatInjection {
+  category: "injection"
+  kind: "target"
+  expected: [core.OutputEncoding]
+  text: "verify proxy access-log defaults use structured JSON formatting or equivalent JSON escaping for request-derived fields"
+}
+review code.VerboseHttpClientAuthorizationLog {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review verbose HTTP client logging for authorization-header, cookie, token, or request-body redaction before production use"
+}
+review code.VerboseHttpErrorObjectDisclosure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review HTTP error messages for verbose request, response-body, or TLS object formatting before the error can reach logs or callers"
+}
+review code.SensitiveTempFileDefaultPermission {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction, core.PathAccessCheck]
+  text: "create credential or private-key temporary files with owner-only permissions before writing secret material"
+}
+review code.TempFileDirectoryCreationRace {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "create temporary directories atomically instead of deleting a temporary file and recreating the same path as a directory"
+}
+review code.BulkEmailRecipientDisclosure {
+  category: "privacy"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "send notification emails per recipient or through blind-copy semantics so recipient addresses are not disclosed to other recipients"
+}
+review code.KubernetesTemplateSecretLookupExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Kubernetes template helper secret reads for namespace scoping and caller authorization before exposing the helper to templates"
+}
+review code.RepositorySourceMetadataExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify repository or Git remote URLs are redacted before being written to durable metadata outputs"
+}
+review code.RawDatabaseExceptionLog {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify database exception messages and traces are redacted before being written to error logs"
+}
+review code.AnsibleSnmpFactsCredentialsNoLogMissing {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review Ansible SNMP credential module options for no_log redaction before console output"
+}
+review code.JenkinsRemotingCallableSystemPropertiesLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins remoting callables that return System.getProperties for MasterToSlaveCallable or equivalent role restriction"
+}
+review code.ContainerdCriImageEnvAliasLeak {
+  category: "secret"
+  kind: "attention"
+  text: "copy imageConfig.Env before appending CRI container environment variables"
+}
+review code.ContainerPrimaryGidMissingSupplementalGroup {
+  category: "auth"
+  kind: "attention"
+  text: "add the configured container primary GID to supplemental groups after resolving RunAsGroup"
+}
+review code.CloakserveFingerprintSeedPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review cloakserve fingerprint seed handling for allowlist validation and contained cleanup before profile directory use"
+}
+review code.CodeRedProtectedMediaPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review CodeRed protected media serving for canonical containment under PROTECTED_MEDIA_ROOT before file access"
+}
+review code.CopypartyCprStaticPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review copyparty /.cpr static file serving for canonical containment under the embedded web directory"
+}
+review code.PublicUploadChunkPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review public chunk-upload temp path construction for checksum sanitization and realpath containment before append writes"
+}
+review code.TempPathJoinBeforeSeparatorCheck {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review temp filename joins for path-separator rejection or basename canonicalization before temp path registration"
+}
+review code.AssemblyLoadPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "reject traversal and drive-qualified assembly path components before dynamic assembly loading"
+}
+review code.DotNetArchiveOrRenamePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review .NET archive extraction or rename paths for Path.GetFullPath containment under the configured root"
+}
+review code.EmailAttachmentFilenamePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review email attachment extraction for basename canonicalization before joining attachment filenames into output paths"
+}
+review code.InternalAssetRoutePathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review internal static-asset handlers for realpath and root containment checks before serving package asset files"
+}
+review code.CanonicalPathStringPrefixContainment {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review canonical path string-prefix checks; use filesystem-aware Path containment for parent directory validation"
+}
+review code.LeadingDotSegmentOnlyRouteFilter {
+  category: "path"
+  kind: "attention"
+  expected: [core.InputValidation, core.PathAccessCheck]
+  text: "review route path filters that block only leading dot segments but allow nested dot-segment traversal"
+}
+review code.EncodedDotSegmentStaticPathBypass {
+  category: "path"
+  kind: "target"
+  expected: [core.InputValidation, core.PathAccessCheck]
+  text: "review static-file path filters for percent-decoding or explicit %2e dot-segment rejection before serving files"
+}
+review code.DecodedRequestStaticPathTraversal {
+  category: "path"
+  kind: "target"
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  text: "review decoded request paths appended to static-file roots for canonical containment before serving files"
+}
+review code.TemplatePathComponentTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
+}
+review code.RequestPluginNamePathTraversal {
+  category: "path"
+  kind: "target"
+  expected: [core.PathAccessCheck]
+  text: "reject path separators in request-bound plugin or module names before code-generation file creation"
+}
+review code.CallerControlledFilenameComponentPathTraversal {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathCanonicalization]
+  text: "review filename builders that concatenate caller-controlled name or version components without component encoding"
+}
+review code.EmbeddedDotSegmentFilenameWrite {
+  category: "path"
+  kind: "target"
+  expected: [core.PathCanonicalization]
+  text: "reject embedded parent-directory segments in caller-provided filenames before writing them under a storage directory"
+}
+review code.PrefixWildcardKeyEnumeration {
+  category: "path"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review key-value wildcard enumeration for delimiter-bounded prefixes before reading all returned records"
+}
+review code.TemplateDirectoryHiddenGlobCopy {
+  category: "path"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review downloaded template directory copies for hidden dot-glob recursion and disable hidden copy mode for untrusted template subdirectories"
+}
 review code.AmbiguousQueryParameterSeparator {
   category: "request"
   kind: "attention"
@@ -420,10 +2526,157 @@ review code.ConfigExposureReview {
   expected: [core.SecretRedaction]
   text: "verify config or diagnostic serialization redacts inline secrets before exposure"
 }
+review code.SensitiveModelJsonSerializationExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "return explicit safe fields or a public serializer instead of exposing full or privileged user/model representations"
+}
+review code.PermissiveCors {
+  category: "auth"
+  kind: "attention"
+  text: "review permissive CORS configuration and restrict allowed origins to trusted domains"
+}
+review code.WebSocketUpgradeMissingOriginCheck {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  text: "review WebSocket upgrade handlers for trusted Origin validation before handleUpgrade"
+}
+review code.BrowserPostExportMissingOriginGuard {
+  category: "request"
+  kind: "target"
+  expected: [core.CsrfProtection]
+  text: "review browser-reachable POST export endpoints for Origin or CSRF validation before export operations"
+}
+review code.CallFutureRawWeakStateRef {
+  category: "resource"
+  kind: "attention"
+  text: "review call future polling that creates a raw weak state reference before confirming a new callback registration is needed"
+}
 review code.SecretDatabindingReview {
   category: "secret"
   kind: "attention"
   text: "review secret configuration parameters for conversion into protected secret storage before persistence"
+}
+review code.JenkinsPlaintextDataboundCredential {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review Jenkins databound credential fields for hudson.util.Secret storage before job config.xml persistence"
+}
+review code.JenkinsCredentialsStartupLoadContextExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AuthorizationCheck]
+  text: "review Jenkins credentials providers for SYSTEM-context startup loading before persisted credential migration"
+}
+review code.JdbcCredentialAttributeExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review JDBC URL/property handling so user and password attributes are stripped before database-name, protocol metadata, or getURL exposure"
+}
+review code.WindowsRemotePathCredentialLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.PathAccessCheck]
+  text: "review privileged Windows path probes for UNC/network path rejection before file existence checks or config parsing"
+}
+review code.DefaultExternalRelaySecretExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review default relay/proxy/websocket hosts for product-owned trust boundaries before embedding tokens or upstream URLs"
+}
+review code.NuxtPublicRuntimeConfigSecretExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "keep tokens and credentials out of Nuxt public runtime config; merge them only into private runtimeConfig"
+}
+review code.UnvalidatedDependencyMapKeyDeserialization {
+  category: "supply_chain"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "validate dependency or package map keys during deserialization before they are accepted as manifest identifiers"
+}
+review code.UntrustedSupportUrlNotification {
+  category: "validation"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "derive support notification site identity from trusted request host data or defang user-supplied URLs before forwarding them to administrators"
+}
+review code.JenkinsJellySecretTextboxExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "render Jenkins secret-like configuration fields with f:password so stored values are masked and round-tripped encrypted"
+}
+review code.ExternalSettingTokenSyncUrlExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.AllowlistValidation]
+  text: "verify auth/session synchronization URLs read from runtime defaults are constrained to same-origin paths before token-bearing requests"
+}
+review code.RuntimeSettingsNestedCredentialsExposure {
+  category: "secret"
+  kind: "target"
+  expected: [core.SecretRedaction]
+  text: "verify settings responses remove every nested credentials object, not only the first known password field"
+}
+review code.CinnyServiceWorkerMediaAuthLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.AllowlistValidation]
+  text: "review service-worker media fetch authorization for homeserver-origin validation before adding bearer tokens"
+}
+review code.CkanSolrConnectionErrorDisclosure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review CKAN Solr search error handling for generic connection failures before API serialization"
+}
+review code.ExternalLinkReferrerLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.ReferrerPolicy]
+  text: "review external HTML links for rel=noreferrer or an equivalent referrer policy before rendering on token-bearing pages"
+}
+review code.KubernetesCurlAuthorizationHeaderLogLeak {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review Kubernetes client-go curl debug logging for authorization-header redaction before formatting header values"
+}
+review code.CredentialAttributeLogExposure {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review diagnostic logging for credential attributes such as access keys or secret keys"
+}
+review code.UnescapedContentDispositionFilename {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "verify attachment filenames are URL/header-escaped before being embedded in Content-Disposition response headers"
+}
+review code.UnencodedUrlQueryParameter {
+  category: "injection"
+  kind: "target"
+  expected: [core.InputValidation]
+  text: "URL-encode caller-controlled or stored values before appending them into generated query-string links"
+}
+review code.CoderAgentManifestInfoLog {
+  category: "secret"
+  kind: "attention"
+  expected: [core.SecretRedaction]
+  text: "review Coder workspace-agent manifest logs for redaction or omission before info-level logging"
+}
+review code.CloudreveWeakSecretPrng {
+  category: "crypto"
+  kind: "attention"
+  text: "replace Cloudreve util.RandStringRunes calls for secrets with RandStringRunesCrypto and rotate persisted generated secrets"
 }
 review code.SensitiveSettingsExposureReview {
   category: "auth"
@@ -458,11 +2711,58 @@ review code.LockAcquire {
   expected: [core.LockRelease]
   text: "verify the lock is released on every path"
 }
+review code.RecursiveJsonMarshalUnderLock {
+  category: "concurrency"
+  kind: "attention"
+  text: "review JSON marshaling while holding a receiver lock; avoid re-entering MarshalJSON on the same type"
+}
+review code.LocklessSharedMutation {
+  category: "concurrency"
+  kind: "attention"
+  expected: [core.LockRelease]
+  text: "review shared mutable state writes and confirm they are protected by a lock or atomic guard"
+}
+review code.PortRequestResponseCorrelationMissing {
+  category: "concurrency"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review async port request/response loops for per-request correlation identifiers and stale-response discard"
+}
 review code.XmlParserCreate {
   category: "xml"
   kind: "target"
   expected: [core.XmlHardening]
   text: "verify parser factory hardening disables dangerous XML features"
+}
+review code.CheckstyleExternalParameterEntitiesXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review Checkstyle SAXParserFactory feature setup for external parameter entities"
+}
+review code.CinderUnsafeMinidomXmlDeserializer {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review OpenStack Cinder extension XML deserializers for safe_minidom_parse_string before parsing request XML"
+}
+review code.CodeIgniterRestserverXmlEntityLoaderXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review CodeIgniter Rest Server XML request parsing for libxml_disable_entity_loader(true) before Format parses the body"
+}
+review code.PhpSimplexmlEntityLoaderXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review PHP SimpleXML parsing for libxml entity-loader hardening before externally influenced XML is parsed"
+}
+review code.PhpSimplexmlUnscopedEntityLoaderXxe {
+  category: "xml"
+  kind: "attention"
+  expected: [core.XmlHardening]
+  text: "review PHP SimpleXML parsing that toggles libxml entity loading without saving and restoring the previous loader state"
 }
 review code.UnboundedCopy {
   category: "memory"
@@ -478,6 +2778,52 @@ review code.RawMemoryCopySize {
   category: "memory"
   kind: "attention"
   text: "review raw memory copy size calculations and bounds checks"
+}
+review code.CjsonTrailingBackslashStringOverread {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review cJSON parse_string for a trailing-backslash guard before advancing past escaped bytes"
+}
+review code.UnboundedFileReadIntoFixedBuffer {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review file-read loops that write into fixed-size stack buffers for index bounds checks or dynamic resizing"
+}
+review code.ClamavWwpackStructsPointerOobWrite {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review WWPack section-table rewrites for containment checks before each computed structs write"
+}
+review code.MissingPostCopyBoundsCheck {
+  category: "memory"
+  kind: "attention"
+  text: "review second-stage memory copy bounds after the destination offset has advanced"
+}
+review code.ContikiSicslowpanFragmentOffsetOobWrite {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review Contiki-NG 6LoWPAN fragment offsets for offset-plus-length bounds checks before reassembly copies"
+}
+review code.LibreOfficeEnhwmfDibHeaderSizeUnderflow {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
+  text: "review LibreOffice EMF alpha-blend bitmap header size validation before DIBV5 delta allocation and copy"
+}
+review code.SignedMessageLengthUnderflowCopy {
+  category: "memory"
+  kind: "attention"
+  expected: [core.MemoryBoundsCheck]
+  text: "review signed-message length subtraction before memcpy; require a minimum signed-message length guard before deriving message length"
+}
+review code.CompressedBlockSizeCapacityMismatch {
+  category: "memory"
+  kind: "attention"
+  text: "review compressed block output capacity accounting before metadata and block writes"
 }
 review code.UnsafeMutableAlias {
   category: "memory"
@@ -498,6 +2844,11 @@ review code.UninitializedBufferExposure {
   category: "memory"
   kind: "attention"
   text: "review reserved-capacity buffer exposure and whether every byte is initialized before the callee can observe it"
+}
+review code.ClaxonResidualPartitionBufferExposure {
+  category: "memory"
+  kind: "attention"
+  text: "review residual partition decoding for a block-size divisibility guard before slicing the output buffer"
 }
 review code.SizeComputation {
   category: "memory"
@@ -534,35 +2885,182 @@ review code.FieldDerivedIndexAccess {
   kind: "attention"
   text: "review field-derived array index access and the dominating upper-bound checks"
 }
+review code.ZeroCountLastElementAccess {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review count-derived last-element accesses for an explicit nonzero element-count guard before indexing"
+}
+review code.ChakraScopeSlotArrayUncheckedIndex {
+  category: "memory"
+  kind: "attention"
+  text: "review Chakra scope-slot array writes for a checked helper before indexing property-id storage"
+}
+review code.FlowSpecOperatorLoopBoundOffByOne {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review FlowSpec chained operator decoders for an inclusive loop bound before writing match-value array entries"
+}
+review code.BinarySearchTableIndexGuardBypass {
+  category: "memory"
+  kind: "attention"
+  text: "review binary-search table lookups for min/max guards before indexing by the recomputed midpoint"
+}
+review code.PhpZvalArrayMergeMissingDestTypeCheck {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review PHP C API zval merge loops for destination zval array-type checks before Z_ARRVAL_PP(ptr)"
+}
 review code.IntegerSizeArithmetic {
   category: "numeric"
   kind: "attention"
   text: "review integer arithmetic used for address, size, or bounds calculations"
+}
+review code.RubyCgiEscapeHtmlLengthOverflow {
+  category: "numeric"
+  kind: "attention"
+  text: "review Ruby CGI escape_html allocation for checked multiplication before maximum HTML expansion"
+}
+review code.PythonUnicodeEscapeWideUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review Python unicode escape allocation for wide-build maximum escape expansion before writing \\U00xxxxxx sequences"
+}
+review code.CgifAddframeSignedFrameCountOverflow {
+  category: "numeric"
+  kind: "attention"
+  text: "review CGIF frame-count loop bounds for unsigned width-height multiplication before indexing image data"
+}
+review code.LengthMultiplierFormattedExpansionUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review strlen-multiplier output allocations before formatted numeric token expansion; digit growth may exceed the reserved per-character budget"
+}
+review code.GzipDeflateFixedExpansionUnderallocation {
+  category: "memory"
+  kind: "attention"
+  text: "review gzip/deflate output buffers sized as input length plus a fixed constant instead of worst-case expansion"
 }
 review code.UncheckedEncodedLengthArithmetic {
   category: "numeric"
   kind: "attention"
   text: "review serialized length arithmetic that narrows or scales sizes without checked overflow handling"
 }
+review code.ChGoCompressedSizeUint32Overflow {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.IntegerOverflowGuard]
+  text: "review ch-go compressed packet framing for a MaxUint32 overflow check before uint32 length writes"
+}
+review code.CimgPnmDimensionProductOverflow {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.IntegerOverflowGuard]
+  text: "review CImg get_load_pnm dimension-size checks for a widened width-height-depth multiplication before allocation or loading"
+}
 review code.PointerOffsetBoundsCheck {
   category: "numeric"
   kind: "attention"
   text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
+}
+review code.PointerAddOverflowAllocation {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review allocator pointer-plus-size arithmetic for wraparound checks before committing or returning the advanced pointer"
+}
+review code.ShiftedClusterSizeAllocationMissingBounds {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
+  text: "review filesystem cluster-size allocation for sector-bit and cluster-bit bounds before shift-derived sizes are used"
+}
+review code.OffsetLengthBoundsOverflow {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.IntegerOverflowGuard]
+  text: "review offset-plus-length bounds checks for widened arithmetic before comparing with the buffer length"
+}
+review code.RandomSpreadModuloZeroDenominator {
+  category: "numeric"
+  kind: "attention"
+  expected: [core.ZeroValueExclusion]
+  text: "review randomized timeout or retry spread modulo operations for an explicit nonzero guard on the count-derived denominator"
 }
 review code.UnsafeYamlConstructor {
   category: "deserialization"
   kind: "attention"
   text: "review SnakeYAML Constructor usage on untrusted YAML; prefer SafeConstructor"
 }
+review code.UnsafeYamlLoad {
+  category: "deserialization"
+  kind: "attention"
+  expected: [core.SafeDeserialization]
+  text: "review PyYAML unsafe load calls; prefer safe_load or an explicit SafeLoader/CSafeLoader/BaseLoader"
+}
+review code.CsvFormulaProneExportRow {
+  category: "injection"
+  kind: "attention"
+  expected: [core.CsvEscape]
+  text: "review CSV/export row construction from object fields and ensure formula-prone cells are escaped before export"
+}
+review code.ExportDefaultPublicFilesystemDisk {
+  category: "secret"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review export filesystem disk selection and remap public default disks to a private disk unless public export storage is explicit"
+}
 review code.UnderwidthFormattedIndex {
   category: "numeric"
   kind: "attention"
   text: "review formatted numeric strings before fixed-position indexing"
 }
+review code.IcmpEchoPayloadLengthUnderflow {
+  category: "memory"
+  kind: "attention"
+  expected: [core.InputValidation]
+  text: "review ICMP echo payload length handling for minimum-size checks before subtracting the echo header"
+}
+review code.IsolateLevelIncrementWithoutCap {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review bidi isolate nesting level updates for a cap before isolate-level array indexing"
+}
+review code.FlacDecoderBufferReuseWithoutBlocksizeCheck {
+  category: "memory"
+  kind: "target"
+  expected: [core.MemoryBoundsCheck]
+  text: "review FLAC decoder cached-buffer reuse for a blocksize check against the actual callback buffer capacity"
+}
+review code.UnsignedIndexConversionGuardBypass {
+  category: "numeric"
+  kind: "attention"
+  text: "review unsigned-to-signed index conversion guards; compare the converted value before later index use"
+}
+review code.UncheckedFfiLengthNarrowing {
+  category: "numeric"
+  kind: "attention"
+  text: "review FFI length casts from host-sized buffers into narrower C integer fields"
+}
 review code.ZeroSizeReallocation {
   category: "memory"
   kind: "attention"
   text: "review reallocation size guards and zero-size lifetime behavior"
+}
+review code.ConditionalFallbackListDoubleFree {
+  category: "memory"
+  kind: "attention"
+  expected: [core.ResourceRelease]
+  text: "review fallback error paths that free a parsed list before a successful fallback can continue into shared cleanup"
+}
+review code.ReallocFailurePathInputFree {
+  category: "memory"
+  kind: "target"
+  expected: [core.ResourceRelease]
+  text: "verify realloc failure paths preserve caller ownership of the original pointer instead of freeing it before returning null"
 }
 review code.PointerFree {
   category: "memory"

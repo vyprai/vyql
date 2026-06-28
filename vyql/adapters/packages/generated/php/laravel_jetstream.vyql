@@ -4,6 +4,8 @@ adapter php {
     sink method "updateProfilePhoto" -> code.FileUse
     sink method "deleteProfilePhoto" -> code.FileUse
     sink method "render" -> code.HtmlRender
-    mark method "redirectPath" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirectPath"
+    }
   }
 }

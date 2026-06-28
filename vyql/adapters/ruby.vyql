@@ -31,6 +31,15 @@ adapter ruby {
   source "ENV" -> code.SecretValue
   source "Rails.application.secrets" -> code.SecretValue
   source "credentials" -> code.SecretValue
+  flag code.HardcodedSecret in module {
+    lang "ruby"
+    assign contains_any ["config.secret_token="]
+    not assign contains_any ["config.secret_token=ENV", "config.secret_token=Rails.application.credentials", "config.secret_token=credentials"]
+    not expr "Rails.env=='test'"
+    not call path "ENV.fetch"
+    not call path "ENV.[]"
+    not call path "SecureRandom.hex"
+  }
 
   sink method "where" -> code.SqlExecution
   sink method "execute" -> code.SqlExecution
@@ -64,15 +73,32 @@ adapter ruby {
   sink method "delete_account" -> code.StateChangingOp
   sink method "grant_role" -> code.StateChangingOp
   sink method "make_admin" -> code.StateChangingOp
-  mark "change_password" -> code.AuthenticationRequiredOp
-  mark "update_password" -> code.AuthenticationRequiredOp
-  mark "reset_password" -> code.AuthenticationRequiredOp
-  mark "change_email" -> code.AuthenticationRequiredOp
-  mark "transfer_funds" -> code.AuthenticationRequiredOp
-  mark "delete_account" -> code.AuthenticationRequiredOp
-  mark "grant_role" -> code.AuthenticationRequiredOp
-  mark "make_admin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "change_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "update_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "reset_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "change_email"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transfer_funds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "delete_account"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grant_role"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "make_admin"
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
+  control "protect_from_forgery" -> core.CsrfProtection
   control "verify_authenticity_token" -> core.CsrfProtection
   control "validate_csrf_token" -> core.CsrfProtection
   control "authenticate_user!" -> core.AuthenticationCheck
@@ -166,8 +192,73 @@ adapter ruby {
   sink path "html_safe" -> code.HtmlRender
   sink path "render" -> code.HtmlRender
   sink path "content_tag" -> code.HtmlRender
-  sink path "concat" -> code.HtmlRender
+  sink exact "concat" -> code.HtmlRender
   sink path "safe_concat" -> code.HtmlRender
+  flag code.ErbHrefInterpolationHtmlEscapeMissing on any {
+    path "analysis.erb.unescaped_href_interpolation"
+    fact template "erb"
+    fact attr "href"
+  }
+  flag code.ErbHrefUrlHtmlEscapeOnly on any {
+    path "analysis.erb.html_escaped_url_href"
+    fact template "erb"
+    fact attr "href"
+    fact value "url-like"
+  }
+  flag code.RailsRawTranslationHtmlInterpolationXss on call {
+    path "raw"
+    operand {
+      path "t"
+    }
+    lacks call contains_any ["content_tag", "ERB::Util.html_escape", "ERB::Util.h", "CGI.escapeHTML", "Rack.Utils.escape_html"]
+  }
+  flag code.StoredHtmlWrite in function {
+    lang "ruby"
+    name "cama_comments_render_html"
+    has "#{comment.content}"
+    lacks "sanitize comment.content"
+  }
+  flag code.UnparameterizedSqlQueryParser in function {
+    lang "ruby"
+    has "find_by(params"
+    lacks "find_by(email:"
+  }
+  flag code.ChefUserManagementWithoutAdminGuard in class {
+    lang "ruby"
+    name "Users"
+    has "Chef::WebUIUser.cdb_load"
+    has "@user.cdb_save"
+    has "@user.cdb_destroy"
+    lacks "before :is_admin"
+  }
+  flag code.PersistentConnectionReuseAfterInterruptedResponse in function {
+    lang "ruby"
+    name "request"
+    has "datum=response(datum)"
+    has "datum[:persistent]"
+    has "reset"
+    lacks "@persistent_socket_reusable"
+  }
+  flag code.UnvalidatedCoordinateSqlInterpolation in function {
+    literal "BETWEEN"
+    lang "ruby"
+    function contains_any ["within_bounding_box", "bounding_box", "bbox"]
+    token param_name contains_any ["sw_lat", "southwest_lat", "south_lat", "min_lat", "lat_min"]
+    token param_name contains_any ["ne_lat", "northeast_lat", "north_lat", "max_lat", "lat_max"]
+    token param_name contains_any ["sw_lng", "sw_lon", "southwest_lng", "southwest_lon", "west_lng", "west_lon", "min_lng", "min_lon", "lng_min", "lon_min"]
+    token param_name contains_any ["ne_lng", "ne_lon", "northeast_lng", "northeast_lon", "east_lng", "east_lon", "max_lng", "max_lon", "lng_max", "lon_max"]
+    not call path contains_any ["sw_lat.to_f", "southwest_lat.to_f", "south_lat.to_f", "min_lat.to_f", "lat_min.to_f"]
+    not call path contains_any ["ne_lat.to_f", "northeast_lat.to_f", "north_lat.to_f", "max_lat.to_f", "lat_max.to_f"]
+  }
+  flag code.UnboundedNaturalLanguageScheduleParse in function {
+    lang "ruby"
+    function equals "parse"
+    call path "s.strip"
+    call path "Parser.parse"
+    call path "opts.merge"
+    call path "slots.to_crons"
+    not call path "s.length"
+  }
   sink path "ERB.new" -> code.TemplateRender
   sink path "Erubi.new" -> code.TemplateRender
   sink path "Erubis.new" -> code.TemplateRender
@@ -175,6 +266,58 @@ adapter ruby {
   sink path "Tilt.new" -> code.TemplateRender
   sink path "redirect_to" -> code.RedirectTarget
   sink path "redirect" -> code.RedirectTarget
+  flag code.ClockworkWebJobCsrf in class {
+    lang "ruby"
+    name "HomeController"
+    has "params[:job]"
+    has "params[:enable]"
+    has "ClockworkWeb.enable(job)"
+    has "ClockworkWeb.disable(job)"
+    lacks "protect_from_forgery"
+  }
+  flag code.RailsBasicAuthWeakCsrfStrategy in class {
+    lang "ruby"
+    class base "ActionController.Base"
+    call path "protect_from_forgery"
+    call path "http_basic_authenticate_with"
+    not call arg "protect_from_forgery:with=exception"
+  }
+  flag code.ColorscoreImagemagickCommandInjection in function {
+    lang "ruby"
+    name "initialize"
+    has "`convert #{image_path}"
+    has "-colors #{colors}"
+    has "-depth #{depth}"
+    lacks "shellescape"
+    lacks "colors.to_i"
+    lacks "depth.to_i"
+  }
+  flag code.WindowsBacktickDiffCommandInjection in function {
+    lang "ruby"
+    has "WINDOWS"
+    has "sprintf"
+    has "diff_options.join(' ')"
+    has "@paths.map"
+    has "cmd"
+    lacks "Open3.capture3"
+    lacks "Shellwords"
+    lacks "shellescape"
+  }
+  flag code.PostEditReportPrivateContentLeak in function {
+    lang "ruby"
+    name "report_post_edits"
+    has "FROM post_revisions pr"
+    has "JOIN posts p"
+    has "report.data << revision"
+    lacks "Archetype.private_message"
+    lacks "secure_category"
+  }
+  flag code.UnescapedQueueQueryStringXss in function {
+    lang "ruby"
+    name "url_path"
+    has "?queues=#{@queues.join(\",\")}"
+    lacks "CGI.escape(@queues.join"
+  }
   // HTTP response splitting / header injection (CWE-113).
   sink path "response.set_header" arg 1 -> code.ResponseHeaderWrite
   sink path "headers.__setitem__" arg 1 -> code.ResponseHeaderWrite
@@ -185,12 +328,24 @@ adapter ruby {
   sink path "logger.info" arg all -> code.LogOutput
   sink path "logger.warn" arg all -> code.LogOutput
   sink path "logger.error" arg all -> code.LogOutput
-  mark "Rails.logger.info" -> code.LogWrite
-  mark "Rails.logger.warn" -> code.LogWrite
-  mark "Rails.logger.error" -> code.LogWrite
-  mark "logger.info" -> code.LogWrite
-  mark "logger.warn" -> code.LogWrite
-  mark "logger.error" -> code.LogWrite
+  flag code.LogWrite on any {
+    path "Rails.logger.info"
+  }
+  flag code.LogWrite on any {
+    path "Rails.logger.warn"
+  }
+  flag code.LogWrite on any {
+    path "Rails.logger.error"
+  }
+  flag code.LogWrite on any {
+    path "logger.info"
+  }
+  flag code.LogWrite on any {
+    path "logger.warn"
+  }
+  flag code.LogWrite on any {
+    path "logger.error"
+  }
   // CSV/formula injection (CWE-1236).
   sink path "csv.write_row" arg all -> code.CsvCell
   sink path "CSV.generate_line" arg all -> code.CsvCell
@@ -207,44 +362,166 @@ adapter ruby {
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "Regexp.new" -> code.RegexCompile
   sink path "Regexp.compile" -> code.RegexCompile
-  mark "__regex.match" -> code.RegexMatch
+  flag code.RegexMatch on any {
+    path "__regex.match"
+  }
+  flag code.CatastrophicRegex in module {
+    lang "ruby"
+    literal contains_any ["(?:[^\\\"]|\\\\.)*?", "(?:[^\\\"]|\\\\.)*)"]
+    not literal contains_any ["(?:[^\\\"]|\\\\\")*?", "(?:[^\\\"]|\\\\\")*)"]
+  }
+  flag code.CatastrophicRegex in class {
+    lang "ruby"
+    literal contains_any ["\\A/([^/]+)/?([^/]+)?\\z", "^/([^/]+)/?([^/]+)?$"]
+    call path contains_any ["path.match", "path.match.to_a"]
+    not call path "path.split"
+    not call path contains_any ["model_id.include", "model_id.include?"]
+  }
+  flag code.RubyLineAnchorValidationBypass in function {
+    lang "ruby"
+    name "legal?"
+    has "string.to_s"
+    has "/^[0-9a-f]{24}$/i"
+  }
+  flag code.RubyFfiWindowsPosixLibrarySearchPath in function {
+    call path "FFI.DynamicLibrary.open"
+    lang "ruby"
+    function "ffi_lib"
+    call path "File.exist?"
+    literal "/usr/lib/"
+    literal "/usr/local/lib/"
+    not call path "FFI.Platform.windows?"
+  }
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "update_attributes" -> code.MassAssign
   sink method "assign_attributes" -> code.MassAssign
 
   // weak cipher (CWE-327) — named broken ciphers + named-value on Cipher.new("des-cbc")
-  mark "OpenSSL.Cipher.DES" -> code.WeakCipher
-  mark "OpenSSL.Cipher.RC4" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "des" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "rc4" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "rc2" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "bf" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "ecb" -> code.WeakCipher
-  mark "OpenSSL.Cipher.new" val "0000000000000000" -> code.StaticIv
-  mark "cipher.iv" val "0000000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.DES"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.RC4"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.new"
+    has "des"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.new"
+    has "rc4"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.new"
+    has "rc2"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.new"
+    has "bf"
+  }
+  flag code.WeakCipher on any {
+    path "OpenSSL.Cipher.new"
+    has "ecb"
+  }
+  flag code.StaticIv on any {
+    path "OpenSSL.Cipher.new"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "cipher.iv"
+    has "0000000000000000"
+  }
 
   // weak hash (CWE-327) — MD5/SHA1 digests
-  mark "Digest.MD5" -> code.WeakHash
-  mark "Digest.SHA1" -> code.WeakHash
-  mark "OpenSSL.Digest.MD5" -> code.WeakHash
-  mark "OpenSSL.Digest.SHA1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "Digest.MD5"
+  }
+  flag code.WeakHash on any {
+    path "Digest.SHA1"
+  }
+  flag code.WeakHash on any {
+    path "OpenSSL.Digest.MD5"
+  }
+  flag code.WeakHash on any {
+    path "OpenSSL.Digest.SHA1"
+  }
 
   // JWT signature not verified (CWE-347) — JWT.decode(token, nil, false) / algorithm "none"
-  mark "JWT.decode" val "false" -> code.JwtUnverified
-  mark "JWT.decode" val "algorithm=none" -> code.JwtUnverified
-  mark "JWT.encode" val "algorithm=none" -> code.JwtUnverified
-  mark "skip_before_action" val "verify_authenticity_token" -> code.CsrfDisabled
-  mark "verify_mode" val "VERIFY_NONE" -> code.CertValidationDisabled
-  mark exact "analysis.function.context" val "lang=ruby" val "SSLContext.new" val "ca_file" nval "verify_mode" -> code.CertValidationDisabled
-  mark "File.chmod" val "0777" -> code.InsecurePermission
-  mark "File.chmod" val "0666" -> code.InsecurePermission
-  mark "command" val "bridge-nf-call-iptables" val "echo 0" -> code.NetworkFilteringDisabled
-  mark "command" val "bridge-nf-call-ip6tables" val "echo 0" -> code.NetworkFilteringDisabled
-  mark "command" val "bridge-nf-call-arptables" val "echo 0" -> code.NetworkFilteringDisabled
-  mark "File.open" val "/tmp/" val "w" -> code.InsecureTempFile
-  mark "TCPSocket.open" -> code.ResourceHandle
-  mark "File.open" -> code.ResourceHandle
+  flag code.JwtUnverified on any {
+    path "JWT.decode"
+    has "false"
+  }
+  flag code.JwtUnverified on any {
+    path "JWT.decode"
+    fact algorithm "none"
+  }
+  flag code.JwtUnverified on any {
+    path "JWT.encode"
+    fact algorithm "none"
+  }
+  flag code.CsrfDisabled on any {
+    path "skip_before_action"
+    has "verify_authenticity_token"
+  }
+  flag code.CertValidationDisabled on any {
+    path "verify_mode"
+    has "VERIFY_NONE"
+  }
+  flag code.CertValidationDisabled in function {
+    lang "ruby"
+    has "SSLContext.new"
+    has "ca_file"
+    lacks "verify_mode"
+  }
+  flag code.CertValidationDisabled in function {
+    lang "ruby"
+    token function_name "create_client_from_token"
+    selector "@opts"
+    field "verify_ssl=OpenSSL::SSL::VERIFY_NONE"
+    call path "detect_version"
+    call path "Kubeclient.Client.new"
+  }
+  flag code.CertValidationDisabled in function {
+    lang "ruby"
+    call path "Fog.Kubevirt.Compute.new"
+    field "kubevirt_verify_ssl=ca_cert.present?"
+    lacks field "kubevirt_verify_ssl=true"
+  }
+  flag code.InsecurePermission on any {
+    path "File.chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "File.chmod"
+    has "0666"
+  }
+  flag code.NetworkFilteringDisabled on any {
+    path "command"
+    has "bridge-nf-call-iptables"
+    has "echo 0"
+  }
+  flag code.NetworkFilteringDisabled on any {
+    path "command"
+    has "bridge-nf-call-ip6tables"
+    has "echo 0"
+  }
+  flag code.NetworkFilteringDisabled on any {
+    path "command"
+    has "bridge-nf-call-arptables"
+    has "echo 0"
+  }
+  flag code.InsecureTempFile on any {
+    path "File.open"
+    has "/tmp/"
+    has "w"
+  }
+  flag code.ResourceHandle on any {
+    path "TCPSocket.open"
+  }
+  flag code.ResourceHandle on any {
+    path "File.open"
+  }
   control method "close" -> core.ResourceRelease
 
   // XPath injection (CWE-643) — Nokogiri doc.xpath(expr) / at_xpath(expr) (distinctive)
@@ -252,20 +529,59 @@ adapter ruby {
   sink method "at_xpath" -> code.XpathQuery
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client (loopback excluded; low sev)
-  mark "HTTParty" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "RestClient" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "open" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "URI.open" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "HTTParty"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "RestClient"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "open"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "URI.open"
+    has "http://"
+    lacks "127.0"
+  }
 
   // character-filter: gsub is always global.
   filter method "gsub" global
-  mark exact "analysis.function.context" val "lang=ruby" val "polymorphic_as" val "_type=" val "params[\"#{polymorphic_as}_type\"]" val "model.send" nval "valid_polymorphic_class" -> code.PolymorphicTypeSelectionReview
+  flag code.PolymorphicTypeSelectionReview in function {
+    lang "ruby"
+    has "polymorphic_as"
+    has "_type="
+    has "params[\"#{polymorphic_as}_type\"]"
+    has "model.send"
+    lacks "valid_polymorphic_class"
+  }
+  flag code.ReconfirmationDirtyTrackingRace in function {
+    lang "ruby"
+    name "postpone_email_change_until_confirmation_and_regenerate_confirmation_token"
+    has "self.unconfirmed_email = self.email"
+    has "self.email = self.devise_email_in_database"
+    has "self.confirmation_token = nil"
+    has "generate_confirmation_token"
+    lacks "devise_unconfirmed_email_will_change!"
+  }
   sink path "search" arg 1 -> code.LdapQuery
   sink path "Net::LDAP" arg 1 -> code.LdapQuery
   sink method "search" arg 1 -> code.LdapQuery
-  mark "Random.rand" -> code.WeakRandomValue
-  mark "rand" -> code.WeakRandomValue
-  mark "set_cookie" val "false" -> code.InsecureCookie
+  flag code.WeakRandomValue on any {
+    path "Random.rand"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand"
+  }
+  flag code.InsecureCookie on any {
+    path "set_cookie"
+    has "false"
+  }
   control "validate_role" -> core.InputValidation
   control "ldap_escape" -> core.LdapEscape
   control "xpath_escape" -> core.XpathEscape

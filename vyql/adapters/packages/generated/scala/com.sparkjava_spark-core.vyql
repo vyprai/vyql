@@ -14,6 +14,8 @@ adapter scala {
     source method "after" -> code.HttpInput
     source method "afterAfter" -> code.HttpInput
     sink method "halt" -> HtmlRender
-    mark method "redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "redirect"
+    }
   }
 }

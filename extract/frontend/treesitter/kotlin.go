@@ -73,7 +73,9 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		name := c.propName(n)
 		val := c.propValue(n)
 		if name != "" && val != nil {
-			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(val)}}
+			out := c.trailingLambdaStmts(val)
+			out = append(out, nir.Assign{Targets: []string{name}, Value: c.expr(val)})
+			return out
 		}
 		return nil
 	case "assignment":
@@ -210,6 +212,8 @@ func (c *ktConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 				out = append(out, c.collectBlocks(ch)...)
 			case "value_arguments", "call_suffix":
 				walk(ch) // lambda passed as a regular arg: `foo({ … })`
+			case "call_expression", "navigation_expression":
+				walk(ch)
 			}
 		}
 	}

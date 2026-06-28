@@ -8,7 +8,9 @@
 package golang
 
 import (
+	"bytes"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -177,6 +179,9 @@ func Extract(files []string, root string) (nir.Program, error) {
 type conv struct {
 	fset *token.FileSet
 	file string
+	// constValues holds simple file-scope constants so function-context marks can
+	// distinguish guards that use the same symbolic limit with different values.
+	constValues map[string]string
 	// hoisted holds synthetic FuncDefs lifted from func-literal expressions (inline
 	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
 	// their bodies and parameter-entry facts are analyzed instead of dropped.
@@ -205,11 +210,13 @@ func (c *conv) imports(f *ast.File) []nir.Import {
 func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	var out []nir.Stmt
 	methods := c.methodMap(decls)
+	c.constValues = c.collectConstValues(decls)
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
 			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		case *ast.GenDecl:
+			out = append(out, c.moduleContextStmts(fn)...)
 			out = append(out, c.typeContextStmts(fn, methods)...)
 			out = append(out, c.valueDeclStmts(fn)...)
 		}
@@ -219,6 +226,52 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	out = append(out, c.hoisted...)
 	c.hoisted = nil
 	return out
+}
+
+func (c *conv) collectConstValues(decls []ast.Decl) map[string]string {
+	out := map[string]string{}
+	for _, d := range decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok || len(vs.Names) == 0 || len(vs.Values) == 0 {
+				continue
+			}
+			for i, name := range vs.Names {
+				valIdx := i
+				if valIdx >= len(vs.Values) {
+					valIdx = len(vs.Values) - 1
+				}
+				if v := goConstToken(vs.Values[valIdx]); v != "" {
+					out[name.Name] = v
+				}
+			}
+		}
+	}
+	return out
+}
+
+func goConstToken(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		return x.Value
+	case *ast.Ident:
+		if x.Name == "true" || x.Name == "false" {
+			return x.Name
+		}
+	case *ast.UnaryExpr:
+		if x.Op == token.SUB {
+			if v := goConstToken(x.X); v != "" {
+				return "-" + v
+			}
+		}
+	case *ast.ParenExpr:
+		return goConstToken(x.X)
+	}
+	return ""
 }
 
 func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
@@ -250,6 +303,42 @@ func (c *conv) valueDeclStmts(gd *ast.GenDecl) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+func (c *conv) moduleContextStmts(gd *ast.GenDecl) []nir.Stmt {
+	if gd == nil || gd.Tok != token.VAR {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, spec := range gd.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok || len(vs.Names) == 0 || len(vs.Values) == 0 {
+			continue
+		}
+		tokens := []string{"lang=go"}
+		for _, name := range vs.Names {
+			tokens = append(tokens, "var_name:"+name.Name)
+		}
+		for _, value := range vs.Values {
+			if text := compactGoNode(c.fset, value); text != "" {
+				tokens = append(tokens, text)
+			}
+		}
+		out = append(out, nir.ExprStmt{Value: analysisCall("analysis.module.context", "context", c.loc(vs.Pos()), tokens...)})
+	}
+	return out
+}
+
+func compactGoNode(fset *token.FileSet, n ast.Node) string {
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, n); err != nil {
+		return ""
+	}
+	text := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(buf.String())
+	if len(text) > 4096 {
+		text = text[:4096]
+	}
+	return text
 }
 
 func (c *conv) methodMap(decls []ast.Decl) map[string]map[string]bool {
@@ -362,34 +451,60 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 		body = c.stmts(bodyNode.List)
 	}
 	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
-		ContextTokens: c.goFunctionTokens(name, bodyNode),
+		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
 		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
 }
 
-func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
+func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockStmt) []string {
 	var out []string
 	seen := map[string]bool{}
 	add := func(tok string) {
-		if tok == "" || seen[tok] || len(out) >= 128 {
+		if tok == "" || seen[tok] || len(out) >= 512 {
 			return
 		}
 		seen[tok] = true
 		out = append(out, tok)
 	}
+	add("lang=go")
 	if name != "" {
 		add("function_name:" + name)
+	}
+	if typ != nil && typ.Params != nil {
+		for _, p := range typ.Params.List {
+			if t := c.typeName(p.Type); t != "" {
+				add("param_type:" + t)
+			}
+		}
 	}
 	if body == nil {
 		return out
 	}
+	prevCall := ""
+	var priorCalls []string
+	seenCallPath := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
-		if len(out) >= 128 {
+		if len(out) >= 512 {
 			return false
 		}
 		if _, ok := n.(*ast.FuncLit); ok {
 			return false
 		}
 		switch x := n.(type) {
+		case *ast.KeyValueExpr:
+			key := c.path(x.Key)
+			if key == "" {
+				return true
+			}
+			add("field:" + key)
+			if lit, ok := x.Value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+				v, err := strconv.Unquote(lit.Value)
+				if err == nil && v != "" {
+					if len(v) > 256 {
+						v = v[:256]
+					}
+					add("field:" + key + "=" + v)
+				}
+			}
 		case *ast.BasicLit:
 			if x.Kind != token.STRING {
 				return true
@@ -402,6 +517,12 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 				v = v[:256]
 			}
 			add("literal:" + v)
+		case *ast.Ident:
+			if c.constValues != nil {
+				if v := c.constValues[x.Name]; v != "" {
+					add("const:" + x.Name + "=" + v)
+				}
+			}
 		case *ast.SelectorExpr:
 			if p := c.path(x); p != "" {
 				add("selector:" + p)
@@ -411,15 +532,63 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 			if p == "" {
 				return true
 			}
+			for _, before := range priorCalls {
+				add("call_before:" + before + ">" + p)
+			}
+			if !seenCallPath[p] {
+				seenCallPath[p] = true
+				priorCalls = append(priorCalls, p)
+				if len(priorCalls) > 32 {
+					priorCalls = priorCalls[1:]
+				}
+			}
+			if prevCall != "" {
+				add("call_order:" + prevCall + ">" + p)
+			}
+			prevCall = p
 			add("call_path:" + p)
 			if i := strings.LastIndex(p, "."); i >= 0 {
 				add("call:" + p[i+1:])
 			} else {
 				add("call:" + p)
 			}
+			for _, arg := range x.Args {
+				if tok := c.goAtomToken(arg); tok != "" {
+					add("call_arg:" + p + ":" + tok)
+				}
+			}
 		case *ast.BinaryExpr:
 			if tok := c.goBinaryToken(x); tok != "" {
 				add(tok)
+			}
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				left := c.goAtomToken(lhs)
+				right := c.goAtomToken(x.Rhs[i])
+				if left != "" && right != "" {
+					add("assign:" + left + "=" + right)
+				}
+			}
+			for _, rhs := range x.Rhs {
+				if tok := c.goAppendCopyToken(rhs); tok != "" {
+					add(tok)
+				}
+			}
+		case *ast.ValueSpec:
+			for i, name := range x.Names {
+				if i >= len(x.Values) || name == nil {
+					break
+				}
+				right := c.goAtomToken(x.Values[i])
+				if name.Name != "" && right != "" {
+					add("assign:" + name.Name + "=" + right)
+				}
+				if tok := c.goAppendCopyToken(x.Values[i]); tok != "" {
+					add(tok)
+				}
 			}
 		case *ast.IndexExpr:
 			for _, tok := range c.goIndexTokens(x.X, x.Index) {
@@ -429,10 +598,35 @@ func (c *conv) goFunctionTokens(name string, body *ast.BlockStmt) []string {
 			for _, tok := range c.goSliceTokens(x) {
 				add(tok)
 			}
+		case *ast.ReturnStmt:
+			for _, result := range x.Results {
+				if tok := c.goAtomToken(result); tok != "" {
+					add("return:" + tok)
+				}
+			}
 		}
 		return true
 	})
 	return out
+}
+
+func (c *conv) goAppendCopyToken(e ast.Expr) string {
+	call, ok := e.(*ast.CallExpr)
+	if !ok || c.path(call.Fun) != "append" || call.Ellipsis == token.NoPos || len(call.Args) < 2 {
+		return ""
+	}
+	lit, ok := call.Args[0].(*ast.CompositeLit)
+	if !ok {
+		return ""
+	}
+	arr, ok := lit.Type.(*ast.ArrayType)
+	if !ok || arr.Len != nil || len(lit.Elts) != 0 {
+		return ""
+	}
+	if src := c.goAtomToken(call.Args[1]); src != "" {
+		return "append_copy:" + src
+	}
+	return ""
 }
 
 func (c *conv) goIndexTokens(base ast.Expr, index ast.Expr) []string {
@@ -879,7 +1073,8 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		var parts []nir.Expr
 		for _, el := range ex.Elts {
 			if kv, ok := el.(*ast.KeyValueExpr); ok {
-				parts = append(parts, nir.Pair{Key: c.path(kv.Key), Value: c.expr(kv.Value), Loc: c.loc(kv.Pos())})
+				key := c.path(kv.Key)
+				parts = append(parts, nir.Pair{Key: key, Value: c.exprWithFuncHint(kv.Value, key), Loc: c.loc(kv.Pos())})
 			} else {
 				parts = append(parts, c.expr(el))
 			}
@@ -898,6 +1093,20 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		return nir.Seq{Parts: parts, Loc: c.loc(ex.Pos())}
 	}
 	return nir.Const{Loc: c.loc(e.Pos())}
+}
+
+func (c *conv) exprWithFuncHint(e ast.Expr, hint string) nir.Expr {
+	if ex, ok := e.(*ast.FuncLit); ok {
+		c.anonSeq++
+		name := "func#" + strconv.Itoa(c.anonSeq)
+		if hint != "" {
+			name = hint
+		}
+		fd := c.funcDef(name, ex.Type, ex.Body, false, c.loc(ex.Pos()))
+		c.hoisted = append(c.hoisted, fd)
+		return nir.Const{Loc: c.loc(ex.Pos())}
+	}
+	return c.expr(e)
 }
 
 func (c *conv) call(ex *ast.CallExpr) nir.Call {

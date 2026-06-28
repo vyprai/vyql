@@ -27,14 +27,14 @@ type language struct {
 var languages = []language{
 	{"go", map[string]bool{".go": true}, golang.Extract, frontend.GoAdapters},
 	{"python", map[string]bool{".py": true}, treesitter.ExtractPython, frontend.PythonAdapters},
-	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true},
+	{"javascript", map[string]bool{".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".mjs": true, ".cjs": true, ".vue": true, ".html": true, ".htm": true},
 		treesitter.ExtractJavaScript, frontend.JsAdapters},
-	{"ruby", map[string]bool{".rb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
+	{"ruby", map[string]bool{".rb": true, ".erb": true}, treesitter.ExtractRuby, frontend.RubyAdapters},
 	{"java", map[string]bool{".java": true}, treesitter.ExtractJava, frontend.JavaAdapters},
-	{"php", map[string]bool{".php": true, ".phtml": true}, treesitter.ExtractPHP, frontend.PHPAdapters},
+	{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, frontend.PHPAdapters},
 	{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, frontend.CSharpAdapters},
-	{"c", map[string]bool{".c": true, ".h": true}, treesitter.ExtractC, frontend.CAdapters},
-	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".hpp": true}, treesitter.ExtractCPP, frontend.CPPAdapters},
+	{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, frontend.CAdapters},
+	{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, frontend.CPPAdapters},
 	{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, frontend.RustAdapters},
 	{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, frontend.BashAdapters},
 	{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, frontend.ScalaAdapters},
@@ -49,10 +49,10 @@ var languages = []language{
 	{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, frontend.DartAdapters},
 	{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, frontend.GroovyAdapters},
 	// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML,
-	// Terraform, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
+	// Terraform, Python setup.cfg, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files yield no nodes so
 	// other repos are unaffected. "dockerfile" matches by basename (no extension).
 	{"config", map[string]bool{".xml": true, ".plist": true, ".yaml": true, ".yml": true,
-		".tf": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
+		".tf": true, ".cfg": true, ".json": true, ".jelly": true, ".jsp": true, ".tag": true, ".jst": true, ".def": true, ".svelte": true, ".html": true, ".erb": true, ".pest": true, ".sch": true, ".php": true, "dockerfile": true}, cfgfront.Extract, frontend.ConfigAdapters},
 	{"textpattern", textpattern.Extensions(), textpattern.Extract, frontend.TextPatternAdapters},
 }
 
@@ -86,7 +86,7 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
 		for _, lg := range languages {
-			files := treesitter.FilterEntries(entries, lg.exts)
+			files := filterEntriesForLanguage(entries, lg)
 			if len(files) == 0 {
 				continue
 			}
@@ -120,6 +120,51 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 		prog.Properties = props
 	}
 	return prog, ads, ctorTypes, stats, nil
+}
+
+func filterEntriesForLanguage(entries []treesitter.Entry, lg language) []string {
+	var out []string
+	for _, e := range entries {
+		if e.Ext == ".h" {
+			isCPP := headerLooksCPP(e.Path)
+			if lg.name == "cpp" && isCPP {
+				out = append(out, e.Path)
+			}
+			if lg.name == "c" && !isCPP && lg.exts[e.Ext] {
+				out = append(out, e.Path)
+			}
+			continue
+		}
+		if lg.exts[e.Ext] || lg.exts[e.Base] {
+			out = append(out, e.Path)
+		}
+	}
+	return out
+}
+
+func headerLooksCPP(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	text := string(b)
+	for _, marker := range []string{
+		"namespace ",
+		"class ",
+		"template<",
+		"template <",
+		"std::",
+		"::",
+		"public:",
+		"private:",
+		"protected:",
+		"new ",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // collectProperties parses every `.properties` file reachable from the scan paths into a

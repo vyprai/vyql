@@ -38,3 +38,103 @@ rule SecretComparisonObservableDiscrepancy {
   meta { id: "VYQL-CRY-006", severity: medium, cwe: [CWE_203, CWE_208], confidence_floor: medium }
   match code.SecretComparisonReview as cmp
 }
+
+rule CloudreveWeakSecretPrng {
+  meta { id: "VYQL-CRY-007", severity: high, cwe: [CWE_338, CWE_330], confidence_floor: high }
+  match code.CloudreveWeakSecretPrng as r
+}
+
+rule ConstellationLuks2AttachedHeaderActivation {
+  meta { id: "VYQL-CRY-008", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.ConstellationLuks2AttachedHeaderActivation as c
+}
+
+rule Luks2AttachedHeaderActivation {
+  meta { id: "VYQL-CRY-014", severity: high, cwe: [CWE_347, CWE_200], confidence_floor: high }
+  match code.Luks2AttachedHeaderActivation as c
+}
+
+rule CipherWithoutIntegrityHash {
+  meta { id: "VYQL-CRY-009", severity: high, cwe: [CWE_665], confidence_floor: high }
+  match code.CipherWithoutIntegrityHash as c
+}
+
+rule AttestationPredicateVerificationBypass {
+  meta { id: "VYQL-CRY-010", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.AttestationPredicateVerificationBypass as a
+}
+
+rule CryptoImproperBlinding {
+  meta { id: "VYQL-CRY-011", severity: high, cwe: [CWE_200, CWE_203, CWE_208], confidence_floor: high }
+  match code.CryptoImproperBlinding as b
+}
+
+rule CryptoMissingOptimizationBarrier {
+  meta { id: "VYQL-CRY-012", severity: high, cwe: [CWE_200, CWE_203, CWE_208, CWE_733], confidence_floor: high }
+  match code.CryptoMissingOptimizationBarrier as barrier
+}
+
+rule FastPasswordHash {
+  meta { id: "VYQL-CRY-013", severity: high, cwe: [CWE_328], confidence_floor: high }
+  match code.FastPasswordHash as h
+}
+
+rule EcdhPeerPublicKeyMissingCurveValidation {
+  meta { id: "VYQL-CRY-015", severity: high, cwe: [CWE_347, CWE_200], confidence_floor: high }
+  match code.EcdhPeerPublicKeyMissingCurveValidation as ecdh
+}
+
+rule EcdsaSignatureScalarBoundsMissing {
+  meta { id: "VYQL-CRY-016", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.EcdsaSignatureScalarBoundsMissing as ecdsa
+}
+
+rule AuthenticodeSignaturePathBindingBypass {
+  meta { id: "VYQL-CRY-017", severity: high, cwe: [CWE_347, CWE_154], confidence_floor: high }
+  match code.AuthenticodeSignaturePathBindingBypass as verifier
+}
+
+rule DerSignatureNonCanonicalImport {
+  meta { id: "VYQL-CRY-018", severity: high, cwe: [CWE_347, CWE_20], confidence_floor: high }
+  match code.DerSignatureNonCanonicalImport as der
+}
+
+rule CryptoScalarRandomBitsByteLengthConfusion {
+  meta { id: "VYQL-CRY-019", severity: high, cwe: [CWE_331, CWE_330], confidence_floor: high }
+  match code.CryptoScalarRandomBitsByteLengthConfusion as scalar
+}
+
+rule EcdsaNonceBitLengthTimingLeak {
+  meta { id: "VYQL-CRY-020", severity: high, cwe: [CWE_200, CWE_203, CWE_208], confidence_floor: high }
+  match code.EcdsaNonceBitLengthTimingLeak as nonce
+}
+
+rule JavaMailSmtpSslIdentityVerificationMissing {
+  meta { id: "VYQL-CRY-021", severity: high, cwe: [CWE_295], confidence_floor: high }
+  match code.JavaMailSmtpSslIdentityVerificationMissing as smtp
+}
+
+rule PublicWeakChecksumUtility {
+  meta { id: "VYQL-CRY-022", severity: medium, cwe: [CWE_327, CWE_328], confidence_floor: high }
+  match code.PublicWeakChecksumUtility as util
+}
+
+rule RepeatedKeyfileSubstitutionTables {
+  meta { id: "VYQL-CRY-023", severity: high, cwe: [CWE_327, CWE_326], confidence_floor: high }
+  match code.RepeatedKeyfileSubstitutionTables as table
+}
+
+rule RsaPkcs1DigestSuffixOnlyVerification {
+  meta { id: "VYQL-CRY-024", severity: high, cwe: [CWE_347], confidence_floor: high }
+  match code.RsaPkcs1DigestSuffixOnlyVerification as verifier
+}
+
+rule TpmDiskKeyWeakPcrSealing {
+  meta { id: "VYQL-CRY-025", severity: high, cwe: [CWE_327, CWE_347], confidence_floor: high }
+  match code.TpmDiskKeyWeakPcrSealing as sealing
+}
+
+rule EcPointIdentityElementMissing {
+  meta { id: "VYQL-CRY-026", severity: high, cwe: [CWE_347, CWE_20], confidence_floor: high }
+  match code.EcPointIdentityElementMissing as point
+}

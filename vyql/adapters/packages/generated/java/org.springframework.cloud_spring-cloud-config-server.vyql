@@ -5,6 +5,8 @@ adapter java {
   package "org.springframework.cloud:spring-cloud-config-server" {
     source method "encrypt" -> core.UserControlledData
     source method "decrypt" -> core.UserControlledData
-    mark method "validateEncryptionWeakness" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "validateEncryptionWeakness"
+    }
   }
 }

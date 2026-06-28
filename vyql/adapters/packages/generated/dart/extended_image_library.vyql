@@ -2,7 +2,9 @@ import code.{FilePathAccess, FileUse, WeakHash}
 
 adapter dart {
   package "extended_image_library" {
-    mark method "keyToMd5" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "keyToMd5"
+    }
     sink method "clearDiskCachedImage" -> code.FileUse
     sink method "getCachedImageFile" -> code.FilePathAccess
     sink method "getCachedImageFilePath" -> code.FilePathAccess

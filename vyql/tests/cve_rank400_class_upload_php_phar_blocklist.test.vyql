@@ -1,0 +1,49 @@
+# Rank 400 / CVE-2019-19576: class.upload.php omitted .phar from the
+# dangerous upload-extension blocklist, allowing PHP PHAR payload uploads on
+# deployments that execute PHAR files. The fix adds phar to the regex.
+
+test "rank400: class.upload.php dangerous extension blocklist omits phar"
+  lang php
+  expect VYQL-INJ-070
+  expect_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  function process($server_path = null) {
+      if ($this->processed) {
+          if ($this->no_script) {
+              if ((((substr($this->file_src_mime, 0, 5) == 'text/' && $this->file_src_mime != 'text/rtf') || strpos($this->file_src_mime, 'javascript') !== false)  && (substr($file_src_name, -4) != '.txt'))
+                  || preg_match('/\.(php|php5|php4|php3|phtml|pl|py|cgi|asp|js)$/i', $this->file_src_name)
+                  || $this->file_force_extension && empty($file_src_name_ext)) {
+                  $this->file_src_mime = 'text/plain';
+                  if ($this->file_src_name_ext) $file_src_name_body = $file_src_name_body . '.' . $this->file_src_name_ext;
+                  $file_src_name_ext = 'txt';
+                  $file_src_name = $file_src_name_body . '.' . $file_src_name_ext;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank400: class.upload.php dangerous extension blocklist includes phar"
+  lang php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  function process($server_path = null) {
+      if ($this->processed) {
+          if ($this->no_script) {
+              if ((((substr($this->file_src_mime, 0, 5) == 'text/' && $this->file_src_mime != 'text/rtf') || strpos($this->file_src_mime, 'javascript') !== false)  && (substr($file_src_name, -4) != '.txt'))
+                  || preg_match('/\.(php|php5|php4|php3|phtml|pl|py|cgi|asp|js|phar)$/i', $this->file_src_name)
+                  || $this->file_force_extension && empty($file_src_name_ext)) {
+                  $this->file_src_mime = 'text/plain';
+                  if ($this->file_src_name_ext) $file_src_name_body = $file_src_name_body . '.' . $this->file_src_name_ext;
+                  $file_src_name_ext = 'txt';
+                  $file_src_name = $file_src_name_body . '.' . $file_src_name_ext;
+              }
+          }
+      }
+  }
+  ```

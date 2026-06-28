@@ -146,7 +146,45 @@ func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 	}
-	return []nir.Stmt{nir.FuncDef{Name: fname, Params: params, Body: body, Loc: L, ParamEntries: c.exParamEntries(fname, params)}}
+	return []nir.Stmt{nir.FuncDef{Name: fname, Params: params, Body: body, Loc: L, ParamEntries: c.exParamEntries(fname, params), ContextTokens: c.exFunctionContext(fname, n)}}
+}
+
+func (c *exConv) exFunctionContext(name string, n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	body := lastChildKind(n, "do_block")
+	if body == nil {
+		body = n
+	}
+	bodyText := c.text(body)
+	tokens := []string{
+		"lang=elixir",
+		"name=" + name,
+		bodyText,
+		strings.Join(strings.Fields(bodyText), ""),
+	}
+	seenCalls := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		if cur.Kind() == "call" {
+			if kids := namedChildren(cur); len(kids) > 0 {
+				if path := c.dotted(kids[0]); path != "" && !seenCalls[path] {
+					seenCalls[path] = true
+					tokens = append(tokens, "call_path:"+path)
+					tokens = append(tokens, "call:"+lastSeg(path))
+				}
+			}
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return tokens
 }
 
 func (c *exConv) exParamEntries(name string, params []string) []nir.ParamEntry {

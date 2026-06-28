@@ -1,0 +1,63 @@
+module tests.cve.rank941.geddy_decoded_static_path;
+
+test "rank941: decoded request path is served from static root without containment"
+  lang javascript
+  file index.js
+  expect VYQL-PATH-052
+  expect_review code.DecodedRequestStaticPathTraversal
+  code
+  ```
+  var fs = require('fs');
+  var path = require('path');
+  var utils = { file: { existsSync: function (p) { return true; } } };
+
+  function App() {
+    this.config = { staticFilePath: '/srv/public' };
+    this.handleStaticFile = function (staticPath, params, reqUrl, reqObj, respObj) {};
+    this.handleNotFound = function (reqUrl, params, reqObj, respObj) {};
+    this.handleNoMatchedRoute = function (method, reqUrl, params, reqObj, respObj) {
+      var staticPath;
+      staticPath = this.config.staticFilePath + decodeURIComponent(reqUrl);
+      staticPath = staticPath.split('?')[0];
+      if (utils.file.existsSync(staticPath)) {
+        this.handleStaticFile(staticPath, params, reqUrl, reqObj, respObj, params);
+      }
+      else {
+        this.handleNotFound(reqUrl, params, reqObj, respObj);
+      }
+    };
+  }
+  ```
+
+test "rank941: resolved static path with root containment is accepted"
+  lang javascript
+  file index.js
+  reject VYQL-PATH-052
+  reject_review code.DecodedRequestStaticPathTraversal
+  code
+  ```
+  var fs = require('fs');
+  var path = require('path');
+  var utils = { file: { existsSync: function (p) { return true; } } };
+
+  function App() {
+    this.config = { staticFilePath: '/srv/public' };
+    this.handleStaticFile = function (staticPath, params, reqUrl, reqObj, respObj) {};
+    this.handleNotFound = function (reqUrl, params, reqObj, respObj) {};
+    this.handleNoMatchedRoute = function (method, reqUrl, params, reqObj, respObj) {
+      var staticPath;
+      staticPath = path.resolve(path.join(this.config.staticFilePath, decodeURIComponent(reqUrl)));
+      if (staticPath.indexOf(this.config.staticFilePath) !== 0) {
+        this.handleNotFound(reqUrl, params, reqObj, respObj);
+        return;
+      }
+      staticPath = staticPath.split('?')[0];
+      if (utils.file.existsSync(staticPath)) {
+        this.handleStaticFile(staticPath, params, reqUrl, reqObj, respObj, params);
+      }
+      else {
+        this.handleNotFound(reqUrl, params, reqObj, respObj);
+      }
+    };
+  }
+  ```

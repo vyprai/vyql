@@ -17,12 +17,26 @@ adapter cpp {
     source method "gk_i64readfilebin" -> code.StoredDataRead
     sink method "gk_i64writefilebin" -> code.FileUse
     source method "gk_zreadfilebin" -> code.StoredDataRead
-    mark method "re_compile_fastmap" -> code.RegexCompile
-    mark method "re_search" -> code.RegexCompile
-    mark method "re_search_2" -> code.RegexCompile
-    mark method "re_match" -> code.RegexCompile
-    mark method "re_match_2" -> code.RegexCompile
-    mark method "re_exec" -> code.RegexCompile
-    mark method "regexec" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "re_compile_fastmap"
+    }
+    flag code.RegexCompile on any {
+      method "re_search"
+    }
+    flag code.RegexCompile on any {
+      method "re_search_2"
+    }
+    flag code.RegexCompile on any {
+      method "re_match"
+    }
+    flag code.RegexCompile on any {
+      method "re_match_2"
+    }
+    flag code.RegexCompile on any {
+      method "re_exec"
+    }
+    flag code.RegexCompile on any {
+      method "regexec"
+    }
   }
 }

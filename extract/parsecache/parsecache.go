@@ -1,8 +1,6 @@
 // Package parsecache is a content-addressed, BadgerDB-backed cache of per-file NIR parse
 // results. Tree-sitter parsing dominates scan time on large repos; a re-scan of an unchanged
-// checkout (the CI / iterative-dev case) can skip it entirely. The cache is OPT-IN via the
-// $VYQL_CACHE environment variable (a directory) — like a build cache — so a normal one-shot
-// scan writes nothing to disk.
+// checkout can skip it entirely when a caller explicitly provides a cache.
 //
 // Keys are sha256(salt ∥ langTag ∥ root ∥ abs ∥ content): the salt is derived from the running
 // executable (so any rebuild — i.e. any frontend change — auto-invalidates the whole cache),
@@ -18,7 +16,6 @@ import (
 	"encoding/hex"
 	"os"
 	"strconv"
-	"sync"
 
 	badger "github.com/dgraph-io/badger/v4"
 
@@ -32,28 +29,22 @@ type Cache struct {
 	salt []byte
 }
 
-var (
-	shared   *Cache
-	openOnce sync.Once
-)
+// Open creates a Badger-backed cache in dir. CLI callers should prefer explicit command
+// flags over environment-variable configuration.
+func Open(dir string) (*Cache, error) {
+	opts := badger.DefaultOptions(dir).WithLogger(nil)
+	db, err := badger.Open(opts)
+	if err != nil {
+		return nil, err
+	}
+	return &Cache{db: db, salt: execSalt()}, nil
+}
 
-// Shared returns the process-wide cache opened from $VYQL_CACHE, or nil if the variable is
-// unset or the database cannot be opened (caching is best-effort and never fatal). Opened
-// once; Badger holds a directory lock, so a single instance is shared across frontends.
+// Shared returns the process-wide cache. The CLI no longer opens a cache from
+// environment variables, so this is intentionally nil unless a future explicit
+// cache owner is wired in.
 func Shared() *Cache {
-	openOnce.Do(func() {
-		dir := os.Getenv("VYQL_CACHE")
-		if dir == "" {
-			return
-		}
-		opts := badger.DefaultOptions(dir).WithLogger(nil)
-		db, err := badger.Open(opts)
-		if err != nil {
-			return // another process holds the lock, or the path is bad — silently disable
-		}
-		shared = &Cache{db: db, salt: execSalt()}
-	})
-	return shared
+	return nil
 }
 
 // execSalt derives a cache-busting salt from the running binary (path + size + mtime), so a

@@ -3,6 +3,8 @@ import code.{HttpInput, RedirectTarget}
 adapter kotlin {
   package "javax.portlet:portlet-api" {
     source method "getReader" -> code.HttpInput
-    mark method "sendRedirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "sendRedirect"
+    }
   }
 }

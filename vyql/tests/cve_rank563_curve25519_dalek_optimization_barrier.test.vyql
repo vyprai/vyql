@@ -1,0 +1,82 @@
+# Rank 563 / CVE-2024-58262: Scalar52::sub used a secret-dependent
+# underflow mask in constant-time arithmetic without an optimization barrier.
+
+test "rank563: curve25519-dalek scalar subtraction lacks mask optimization barrier"
+  lang rust
+  file scalar.rs
+  expect VYQL-CRY-012
+  expect_review code.CryptoMissingOptimizationBarrier
+  code
+  ```
+  pub struct Scalar52([u64; 5]);
+
+  mod constants {
+      pub static L: [u64; 5] = [1, 2, 3, 4, 5];
+  }
+
+  impl Scalar52 {
+      pub const ZERO: Scalar52 = Scalar52([0; 5]);
+
+      pub fn sub(a: &Scalar52, b: &Scalar52) -> Scalar52 {
+          let mut difference = Scalar52::ZERO;
+          let mask = (1u64 << 52) - 1;
+
+          let mut borrow: u64 = 0;
+          for i in 0..5 {
+              borrow = a[i].wrapping_sub(b[i] + (borrow >> 63));
+              difference[i] = borrow & mask;
+          }
+
+          let underflow_mask = ((borrow >> 63) ^ 1).wrapping_sub(1);
+          let mut carry: u64 = 0;
+          for i in 0..5 {
+              carry = (carry >> 52) + difference[i] + (constants::L[i] & underflow_mask);
+              difference[i] = carry & mask;
+          }
+
+          difference
+      }
+  }
+  ```
+
+test "rank563: curve25519-dalek scalar subtraction black-boxes mask"
+  lang rust
+  file scalar.rs
+  reject VYQL-CRY-012
+  reject_review code.CryptoMissingOptimizationBarrier
+  code
+  ```
+  pub struct Scalar52([u64; 5]);
+
+  mod constants {
+      pub static L: [u64; 5] = [1, 2, 3, 4, 5];
+  }
+
+  impl Scalar52 {
+      pub const ZERO: Scalar52 = Scalar52([0; 5]);
+
+      pub fn sub(a: &Scalar52, b: &Scalar52) -> Scalar52 {
+          fn black_box(value: u64) -> u64 {
+              unsafe { core::ptr::read_volatile(&value) }
+          }
+
+          let mut difference = Scalar52::ZERO;
+          let mask = (1u64 << 52) - 1;
+
+          let mut borrow: u64 = 0;
+          for i in 0..5 {
+              borrow = a[i].wrapping_sub(b[i] + (borrow >> 63));
+              difference[i] = borrow & mask;
+          }
+
+          let underflow_mask = ((borrow >> 63) ^ 1).wrapping_sub(1);
+          let mut carry: u64 = 0;
+          for i in 0..5 {
+              carry = (carry >> 52) + difference[i] + (constants::L[i] & black_box(underflow_mask));
+              difference[i] = carry & mask;
+          }
+
+          difference
+      }
+  }
+  ```

@@ -4,8 +4,12 @@ import core.{AuthenticationCheck}
 adapter groovy {
   package "org.springframework.social:spring-social-security" {
     source method "attemptAuthentication" -> code.HttpInput
-    mark method "buildSignupUrl" -> code.RedirectTarget
-    mark method "getRedirectUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "buildSignupUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "getRedirectUrl"
+    }
     control method "attemptAuthentication" -> core.AuthenticationCheck
   }
 }

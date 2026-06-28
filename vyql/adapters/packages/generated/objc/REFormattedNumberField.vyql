@@ -3,6 +3,8 @@ import core.{UserControlledData}
 
 adapter objc {
   package "REFormattedNumberField" {
-    mark method "re_stringWithNumberFormat:" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "re_stringWithNumberFormat:"
+    }
   }
 }

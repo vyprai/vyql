@@ -14,16 +14,93 @@ rule UnparameterizedSqlQueryParser {
   match code.UnparameterizedSqlQueryParser as sink
 }
 
+rule UnvalidatedSqlIdentifierInterpolation {
+  meta { id: "VYQL-INJ-152", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnvalidatedSqlIdentifierInterpolation as sink
+}
+
+rule UnparameterizedSqlExportStringBuilder {
+  meta { id: "VYQL-INJ-194", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnparameterizedSqlExportStringBuilder as sink
+}
+
+rule ReportDateFilterSqlFragmentInjection {
+  meta { id: "VYQL-INJ-196", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.ReportDateFilterSqlFragmentInjection as sink
+}
+
+rule PgEscapeStringSqlFilterInjection {
+  meta { id: "VYQL-INJ-154", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.PgEscapeStringSqlFilterInjection as sink
+}
+
+rule EscapedSqlValueFunctionCallAllowed {
+  meta { id: "VYQL-INJ-183", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.EscapedSqlValueFunctionCallAllowed as sink
+}
+
+rule UnescapedMysqlDsnDatabaseName {
+  meta { id: "VYQL-INJ-191", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.UnescapedMysqlDsnDatabaseName as sink
+}
+
+rule UnvalidatedSqlOrderDirection {
+  meta { id: "VYQL-INJ-124", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.UnvalidatedSqlOrderDirection as sink
+}
+
+rule UnfilteredSearchWhereColumns {
+  meta { id: "VYQL-INJ-050", severity: high, cwe: [CWE_89, CWE_287], confidence_floor: medium }
+  match code.UnfilteredSearchWhereColumns as sink
+}
+
+rule UnvalidatedNumericSqlInterpolation {
+  meta { id: "VYQL-INJ-073", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.UnvalidatedNumericSqlInterpolation as sink
+}
+
+rule UnvalidatedCoordinateSqlInterpolation {
+  meta { id: "VYQL-INJ-188", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.UnvalidatedCoordinateSqlInterpolation as sink
+}
+
+rule WordPressPostsWhereDateSqlInjection {
+  meta { id: "VYQL-INJ-158", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.WordPressPostsWhereDateSqlInjection as sink
+}
+
+rule CodeIgniterActiveRecordOffsetSqlInjection {
+  meta { id: "VYQL-INJ-085", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.CodeIgniterActiveRecordOffsetSqlInjection as sink
+}
+
+rule CraftCommercePurchasablesSortSqlInjection {
+  meta { id: "VYQL-INJ-091", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.CraftCommercePurchasablesSortSqlInjection as sink
+}
+
+rule ContaoListingModuleSqlIdentifierInjection {
+  meta { id: "VYQL-INJ-103", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.ContaoListingModuleSqlIdentifierInjection as sink
+}
+
+rule CiviCrmScientificNotationNumericValidationBypass {
+  meta { id: "VYQL-INJ-064", severity: high, cwe: [CWE_89, CWE_20], confidence_floor: high }
+  match code.CiviCrmScientificNotationNumericValidationBypass as validator
+}
+
 rule Command {
   meta { id: "VYQL-INJ-002", severity: critical, cwe: [CWE_78], benchmark: cmdi }
   taint core.UserControlledData -> code.CommandExecution
   unless sanitized_by core.ShellEscape
+  unless guarded_by core.CommandArgumentValidation
 }
 
 rule StoredCommand {
   meta { id: "VYQL-INJ-032", severity: high, cwe: [CWE_78] }
   taint code.DatabaseRead -> code.CommandExecution
   unless sanitized_by core.ShellEscape
+  unless guarded_by core.CommandArgumentValidation
 }
 
 rule RubyPipeOpenCommand {
@@ -37,9 +114,129 @@ rule CommandOptionInjection {
   match code.CommandOptionInjection as sink
 }
 
+rule CommandLineAssembly {
+  meta { id: "VYQL-INJ-053", severity: high, cwe: [CWE_77], confidence_floor: medium }
+  match code.CommandLineAssemblyReview as sink
+}
+
+rule GitDirShellCommandStringExecution {
+  meta { id: "VYQL-INJ-182", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.GitDirShellCommandStringExecution as sink
+}
+
+rule MsgfmtPathShellCommandInterpolation {
+  meta { id: "VYQL-INJ-139", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.MsgfmtPathShellCommandInterpolation as sink
+}
+
+rule UnsafeBuildClientCommandAssembly {
+  meta { id: "VYQL-INJ-060", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.UnsafeBuildClientCommandAssembly as sink
+}
+
+rule ShellTruePackageManagerProbe {
+  meta { id: "VYQL-INJ-129", severity: high, cwe: [CWE_78], confidence_floor: high }
+  match code.ShellTruePackageManagerProbe as sink
+}
+
+rule TemplateInstallScriptHostExecution {
+  meta { id: "VYQL-INJ-054", severity: critical, cwe: [CWE_78], confidence_floor: medium }
+  match code.TemplateInstallScriptHostExecution as sink
+}
+
+rule HostExpandedUrlSanitizedBeforeExpansionSsti {
+  meta { id: "VYQL-INJ-118", severity: critical, cwe: [CWE_94, CWE_1336], confidence_floor: high }
+  match code.HostExpandedUrlSanitizedBeforeExpansionSsti as sink
+}
+
+rule PartiallyEscapedSshCommand {
+  meta { id: "VYQL-INJ-052", severity: critical, cwe: [CWE_77], confidence_floor: medium }
+  match code.PartiallyEscapedSshCommand as sink
+}
+
+rule IncompleteCommandEscapeRegex {
+  meta { id: "VYQL-INJ-056", severity: critical, cwe: [CWE_77], confidence_floor: medium }
+  match code.IncompleteCommandEscapeRegex as sink
+}
+
+rule ClamscanBinaryPathShellCommandInjection {
+  meta { id: "VYQL-INJ-068", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.ClamscanBinaryPathShellCommandInjection as sink
+}
+
+rule PythonTripleQuoteShellInterpolation {
+  meta { id: "VYQL-INJ-071", severity: high, cwe: [CWE_94, CWE_78], confidence_floor: high }
+  match code.PythonTripleQuoteShellInterpolation as sink
+}
+
+rule ReactNativeCliOpenUrlMiddlewareCommandExecution {
+  meta { id: "VYQL-INJ-072", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.ReactNativeCliOpenUrlMiddlewareCommandExecution as sink
+}
+
+rule CloudStackBaremetalMacCommandInjection {
+  meta { id: "VYQL-INJ-074", severity: critical, cwe: [CWE_78, CWE_20], confidence_floor: high }
+  match code.CloudStackBaremetalMacCommandInjection as sink
+}
+
+rule CodecovNodeGcovCommandInjection {
+  meta { id: "VYQL-INJ-084", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.CodecovNodeGcovCommandInjection as sink
+}
+
+rule CompileSassCleanupShellCommandInjection {
+  meta { id: "VYQL-INJ-095", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.CompileSassCleanupShellCommandWithoutPathCheck as sink
+}
+
+rule ComposerGitBranchDiffCommandInjection {
+  meta { id: "VYQL-INJ-096", severity: critical, cwe: [CWE_78, CWE_88], confidence_floor: high }
+  match code.ComposerGitBranchDiffCommandInjection as sink
+}
+
+rule WindowsBacktickDiffCommandInjection {
+  meta { id: "VYQL-INJ-135", severity: critical, cwe: [CWE_78, CWE_88], confidence_floor: high }
+  match code.WindowsBacktickDiffCommandInjection as sink
+}
+
+rule CommandStringWrapperExecution {
+  meta { id: "VYQL-INJ-119", severity: critical, cwe: [CWE_78, CWE_88, CWE_150, CWE_157], confidence_floor: high }
+  match code.CommandStringWrapperExecution as sink
+}
+
+rule McpToolCommandTemplateExecution {
+  meta { id: "VYQL-INJ-120", severity: critical, cwe: [CWE_77, CWE_78], confidence_floor: high }
+  match code.McpToolCommandTemplateExecution as sink
+}
+
+rule McpSqlExecutionMissingValidation {
+  meta { id: "VYQL-INJ-149", severity: critical, cwe: [CWE_89, CWE_863], confidence_floor: high }
+  match code.McpSqlExecutionMissingValidation as sink
+}
+
+rule ApiScanFoundActionCommandExecution {
+  meta { id: "VYQL-INJ-123", severity: critical, cwe: [CWE_78, CWE_15], confidence_floor: high }
+  match code.ApiScanFoundActionCommandExecution as sink
+}
+
+rule ConnectCmsCodestudiesPluginCodeExecution {
+  meta { id: "VYQL-INJ-100", severity: critical, cwe: [CWE_94, CWE_78], confidence_floor: high }
+  match code.ConnectCmsCodestudiesPluginCodeExecution as sink
+}
+
+rule OpnSenseRrdRestoreFilenameCommandInjection {
+  meta { id: "VYQL-INJ-114", severity: critical, cwe: [CWE_78, CWE_20], confidence_floor: high }
+  match code.OpnSenseRrdRestoreFilenameCommandInjection as sink
+}
+
 rule ProtocolCommandInjection {
   meta { id: "VYQL-INJ-040", severity: high, cwe: [CWE_349], confidence_floor: medium }
   match code.ProtocolCommandInjection as sink
+}
+
+rule CredentialProtocolNewlineInjection {
+  meta { id: "VYQL-INJ-193", severity: high, cwe: [CWE_93, CWE_349, CWE_200], confidence_floor: high }
+  match code.CredentialProtocolNewlineInjection as sink
 }
 
 rule Code {
@@ -51,6 +248,26 @@ rule Code {
 rule RequestReferenceEval {
   meta { id: "VYQL-INJ-038", severity: critical, cwe: [CWE_94], confidence_floor: medium }
   match code.RequestReferenceEval as sink
+}
+
+rule DynamicFunctionMutableObjectEval {
+  meta { id: "VYQL-INJ-147", severity: critical, cwe: [CWE_94], confidence_floor: high }
+  match code.DynamicFunctionMutableObjectEval as sink
+}
+
+rule ResponseParserFunctionEval {
+  meta { id: "VYQL-INJ-197", severity: high, cwe: [CWE_94, CWE_95], confidence_floor: high }
+  match code.ResponseParserFunctionEval as sink
+}
+
+rule UnsafeJXPathContextEvaluation {
+  meta { id: "VYQL-INJ-189", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: high }
+  match code.UnsafeJXPathContextEvaluation as sink
+}
+
+rule WerkzeugDebugConsoleExposure {
+  meta { id: "VYQL-INJ-057", severity: critical, cwe: [CWE_94, CWE_77], confidence_floor: medium }
+  match code.WerkzeugDebugConsoleExposure as sink
 }
 
 rule Vm2HostCallbackBridge {
@@ -68,6 +285,11 @@ rule PackageInstallCodeExecution {
   match code.PackageInstallExecution as sink
 }
 
+rule NodePreGypRemoteBinaryInstall {
+  meta { id: "VYQL-INJ-181", severity: high, cwe: [CWE_829, CWE_494], confidence_floor: high }
+  match code.NodePreGypRemoteBinaryInstall as sink
+}
+
 rule PrivilegedWorkflowUntrustedCodeExecution {
   meta { id: "VYQL-INJ-044", severity: critical, cwe: [CWE_94, CWE_95], confidence_floor: medium }
   match code.PrivilegedWorkflowUntrustedCodeExecution as sink
@@ -80,9 +302,164 @@ rule Xss {
   unless guarded_by core.SafeResponseContentType
 }
 
+rule PhpWindowOpenerCallbackNameXss {
+  meta { id: "VYQL-INJ-190", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PhpWindowOpenerCallbackNameXss as sink
+}
+
+rule ErbHrefInterpolationHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-185", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
+  match code.ErbHrefInterpolationHtmlEscapeMissing as sink
+}
+
+rule ErbHrefUrlHtmlEscapeOnly {
+  meta { id: "VYQL-INJ-186", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.ErbHrefUrlHtmlEscapeOnly as sink
+}
+
+rule ExpressSpaAssetFallbackReflectedXss {
+  meta { id: "VYQL-INJ-187", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.ExpressSpaAssetFallbackReflectedXss as sink
+}
+
+rule JavaScriptTemplateHtmlEscapeMismatch {
+  meta { id: "VYQL-INJ-171", severity: high, cwe: [CWE_79, CWE_116], confidence_floor: high }
+  match code.JavaScriptTemplateHtmlEscapeMismatch as sink
+}
+
 rule UnsafeEmbeddableAllowlist {
   meta { id: "VYQL-INJ-020", severity: high, cwe: [CWE_79] }
   match code.UnsafeEmbeddableAllowlist as sink
+}
+
+rule JavaScriptUrlRedirectXss {
+  meta { id: "VYQL-INJ-116", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JavaScriptUrlRedirectXss as sink
+}
+
+rule WebViewServerRedirectUrlValidationBypass {
+  meta { id: "VYQL-INJ-176", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.WebViewServerRedirectUrlValidationBypass as sink
+}
+
+rule RequestBackedFooterScriptXss {
+  meta { id: "VYQL-INJ-177", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestBackedFooterScriptXss as sink
+}
+
+rule UnescapedJsonTreeLabelXss {
+  meta { id: "VYQL-INJ-125", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedJsonTreeLabelXss as sink
+}
+
+rule RawDatatablesAttributeXss {
+  meta { id: "VYQL-INJ-126", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RawDatatablesAttributeXss as sink
+}
+
+rule UnescapedLinterIssueMessageXss {
+  meta { id: "VYQL-INJ-166", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedLinterIssueMessageXss as sink
+}
+
+rule DspaceJspuiAutocompleteLabelXss {
+  meta { id: "VYQL-INJ-151", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.DspaceJspuiAutocompleteLabelXss as sink
+}
+
+rule WordPressAddQueryArgHrefXss {
+  meta { id: "VYQL-INJ-128", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.WordPressAddQueryArgHrefXss as sink
+}
+
+rule StoredUrlHrefAttributeXss {
+  meta { id: "VYQL-INJ-195", severity: high, cwe: [CWE_79, CWE_116, CWE_20], confidence_floor: high }
+  match code.StoredUrlHrefAttributeXss as sink
+}
+
+rule EzPublishSearchNumericParamXss {
+  meta { id: "VYQL-INJ-170", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.EzPublishSearchNumericParamXss as sink
+}
+
+rule UnescapedQueueQueryStringXss {
+  meta { id: "VYQL-INJ-131", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedQueueQueryStringXss as sink
+}
+
+rule UnvalidatedRouteConfigKeyStoredXss {
+  meta { id: "VYQL-INJ-159", severity: high, cwe: [CWE_79, CWE_20], confidence_floor: high }
+  match code.UnvalidatedRouteConfigKeyStoredXss as sink
+}
+
+rule ResponseWriterScriptWindowIdXss {
+  meta { id: "VYQL-INJ-132", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.ResponseWriterScriptWindowIdXss as sink
+}
+
+rule IncompleteGeneratedJsIdentifierReservedWords {
+  meta { id: "VYQL-INJ-127", severity: high, cwe: [CWE_94, CWE_20], confidence_floor: high }
+  match code.IncompleteGeneratedJsIdentifierReservedWords as validator
+}
+
+rule UnescapedGeneratedJavaStringFieldName {
+  meta { id: "VYQL-INJ-175", severity: high, cwe: [CWE_94, CWE_116], confidence_floor: high }
+  match code.UnescapedGeneratedJavaStringFieldName as codegen
+}
+
+rule UnfilteredAgentCommandTag {
+  meta { id: "VYQL-INJ-153", severity: critical, cwe: [CWE_94], confidence_floor: high }
+  match code.UnfilteredAgentCommandTag as sink
+}
+
+rule EnvFileVariableInjection {
+  meta { id: "VYQL-INJ-156", severity: high, cwe: [CWE_15, CWE_74], confidence_floor: high }
+  match code.EnvFileVariableInjection as sink
+}
+
+rule JenkinsComputerQueueUnescapedTooltipXss {
+  meta { id: "VYQL-INJ-097", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsComputerQueueUnescapedTooltipXss as sink
+}
+
+rule JenkinsProjectDisplayNameXss {
+  meta { id: "VYQL-INJ-133", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsProjectDisplayNameXss as sink
+}
+
+rule JenkinsTestResultNameXss {
+  meta { id: "VYQL-INJ-173", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsTestResultNameXss as sink
+}
+
+rule PrestaShopContactformMessageEmailXss {
+  meta { id: "VYQL-INJ-101", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PrestaShopContactformMessageEmailXss as sink
+}
+
+rule FreePbxContactManagerGroupLinkXss {
+  meta { id: "VYQL-INJ-102", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.FreePbxContactManagerGroupLinkXss as sink
+}
+
+rule OveleonCookiebarLocaleReflectedXss {
+  meta { id: "VYQL-INJ-104", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.OveleonCookiebarLocaleReflectedXss as sink
+}
+
+rule ZikulaThemeNameReflectedXss {
+  meta { id: "VYQL-INJ-113", severity: medium, cwe: [CWE_79], confidence_floor: high }
+  match code.ZikulaThemeNameReflectedXss as sink
+}
+
+rule UnsanitizedSvgUpload {
+  meta { id: "VYQL-INJ-115", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnsanitizedSvgUpload as sink
+}
+
+rule ComrakDangerousUrlCaseSensitiveGrammar {
+  meta { id: "VYQL-INJ-098", severity: high, cwe: [CWE_79, CWE_178], confidence_floor: high }
+  match code.ComrakDangerousUrlCaseSensitiveGrammar as grammar
 }
 
 rule MarkdownNegotiationBypass {
@@ -100,6 +477,11 @@ rule UnescapedRequestGlobalTemplateVar {
   match code.UnescapedRequestGlobalTemplateVar as sink
 }
 
+rule CentreonMyAccountContactXss {
+  meta { id: "VYQL-INJ-055", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.CentreonMyAccountContactXss as sink
+}
+
 rule UnescapedHtmlOptionRenderer {
   meta { id: "VYQL-INJ-041", severity: high, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedHtmlOptionRenderer as sink
@@ -108,6 +490,156 @@ rule UnescapedHtmlOptionRenderer {
 rule UnescapedTableExportHtml {
   meta { id: "VYQL-INJ-045", severity: high, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedTableExportHtml as sink
+}
+
+rule UnescapedHtmlPresenter {
+  meta { id: "VYQL-INJ-122", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedHtmlPresenter as sink
+}
+
+rule UnescapedChartTooltipHtml {
+  meta { id: "VYQL-INJ-061", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedChartTooltipHtml as sink
+}
+
+rule UnescapedChartTooltipDataName {
+  meta { id: "VYQL-INJ-157", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedChartTooltipDataName as sink
+}
+
+rule IncompleteHtmlEventHandlerStrip {
+  meta { id: "VYQL-INJ-136", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.IncompleteHtmlEventHandlerStrip as sink
+}
+
+rule DropdownEntryLabelInnerHtmlXss {
+  meta { id: "VYQL-INJ-138", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.DropdownEntryLabelInnerHtmlXss as sink
+}
+
+rule PostMessageHtmlWriteMissingOriginCheck {
+  meta { id: "VYQL-INJ-192", severity: high, cwe: [CWE_79, CWE_346], confidence_floor: high }
+  match code.PostMessageHtmlWriteMissingOriginCheck as sink
+}
+
+rule AjaxBackslashProtocolRelativeUrlXss {
+  meta { id: "VYQL-INJ-140", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.AjaxBackslashProtocolRelativeUrlXss as sink
+}
+
+rule DocutilsRestUnsafeDirectiveRendering {
+  meta { id: "VYQL-INJ-142", severity: high, cwe: [CWE_79, CWE_22], confidence_floor: high }
+  match code.DocutilsRestUnsafeDirectiveRendering as sink
+}
+
+rule CraftAnonymousTemplateRenderActionXss {
+  meta { id: "VYQL-INJ-076", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CraftAnonymousTemplateRenderActionXss as sink
+}
+
+rule PersistentModelTitleStoredXss {
+  meta { id: "VYQL-INJ-117", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PersistentModelTitleStoredXss as sink
+}
+
+rule QuickAppsUserRealNameStoredXss {
+  meta { id: "VYQL-INJ-077", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.QuickAppsUserRealNameStoredXss as sink
+}
+
+rule CodeSnippetsSafeModeQueryXss {
+  meta { id: "VYQL-INJ-086", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CodeSnippetsSafeModeQueryXss as sink
+}
+
+rule CollectiveContactWidgetTitleXss {
+  meta { id: "VYQL-INJ-089", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CollectiveContactWidgetTitleXss as sink
+}
+
+rule CommonMarkPreserveEntitiesUrlAttributeXss {
+  meta { id: "VYQL-INJ-092", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CommonMarkPreserveEntitiesUrlAttributeXss as sink
+}
+
+rule LeagueCommonMarkUnsafeHtmlMode {
+  meta { id: "VYQL-INJ-178", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.LeagueCommonMarkUnsafeHtmlMode as sink
+}
+
+rule DocumizeMarkdownRenderWithoutSanitizer {
+  meta { id: "VYQL-INJ-093", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.DocumizeMarkdownRenderWithoutSanitizer as sink
+}
+
+rule BladeRawMarkdownRenderWithoutSanitizer {
+  meta { id: "VYQL-INJ-155", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.BladeRawMarkdownRenderWithoutSanitizer as sink
+}
+
+rule CompassCsfleEjsonParserMissingStrictMode {
+  meta { id: "VYQL-INJ-094", severity: high, cwe: [CWE_94, CWE_20], confidence_floor: high }
+  match code.CompassCsfleEjsonParserMissingStrictMode as sink
+}
+
+rule CodiadFilemanagerSearchCommandInjection {
+  meta { id: "VYQL-INJ-087", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.CodiadFilemanagerSearchCommandInjection as sink
+}
+
+rule ColorscoreImagemagickCommandInjection {
+  meta { id: "VYQL-INJ-090", severity: critical, cwe: [CWE_78], confidence_floor: high }
+  match code.ColorscoreImagemagickCommandInjection as sink
+}
+
+rule TotalJsAdminThemeXss {
+  meta { id: "VYQL-INJ-078", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.TotalJsAdminThemeXss as sink
+}
+
+rule ElefantAdminPreviewMissingAdminXss {
+  meta { id: "VYQL-INJ-160", severity: high, cwe: [CWE_79, CWE_862], confidence_floor: high }
+  match code.ElefantAdminPreviewMissingAdminXss as sink
+}
+
+rule ClientLightboxOptionXss {
+  meta { id: "VYQL-INJ-161", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.ClientLightboxOptionXss as sink
+}
+
+rule RequestViewVariableHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-162", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestViewVariableHtmlEscapeMissing as sink
+}
+
+rule SvgOnclickWindowOpenLinkXss {
+  meta { id: "VYQL-INJ-163", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.SvgOnclickWindowOpenLinkXss as sink
+}
+
+rule BbcodeUrlTagProtocolXss {
+  meta { id: "VYQL-INJ-164", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.BbcodeUrlTagProtocolXss as sink
+}
+
+rule GouniverseCmsAliasXss {
+  meta { id: "VYQL-INJ-079", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.GouniverseCmsAliasXss as sink
+}
+
+rule GleezRedactorEditorStoredXss {
+  meta { id: "VYQL-INJ-080", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.GleezRedactorEditorStoredXss as sink
+}
+
+rule FeehiUsernameStoredXss {
+  meta { id: "VYQL-INJ-081", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.FeehiUsernameStoredXss as sink
+}
+
+rule CocotaisEchoPlatformTagInjection {
+  meta { id: "VYQL-INJ-083", severity: high, cwe: [CWE_74], confidence_floor: high }
+  match code.CocotaisEchoPlatformTagInjection as sink
 }
 
 rule UnescapedExceptionMessageMarkup {
@@ -123,6 +655,21 @@ rule IncompleteHtmlEntityEscape {
 rule UnescapedDiagnosticHtml {
   meta { id: "VYQL-INJ-047", severity: medium, cwe: [CWE_79], confidence_floor: medium }
   match code.UnescapedDiagnosticHtml as sink
+}
+
+rule UnescapedDocsOpenapiUrl {
+  meta { id: "VYQL-INJ-051", severity: high, cwe: [CWE_79], confidence_floor: medium }
+  match code.UnescapedDocsOpenapiUrl as docs
+}
+
+rule UnsafeWatchUrlProtocol {
+  meta { id: "VYQL-INJ-059", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnsafeWatchUrlProtocol as sink
+}
+
+rule CheckmkPendingChangeTextUnescapeXss {
+  meta { id: "VYQL-INJ-063", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CheckmkPendingChangeTextUnescapeXss as sink
 }
 
 rule PdfJsEvalSupported {
@@ -145,6 +692,26 @@ rule StoredHtmlWriteRequiresSanitization {
   meta { id: "VYQL-INJ-028", severity: high, cwe: [CWE_79], confidence_floor: low }
   match code.StoredHtmlWrite as sink
   unless guarded_by core.HtmlEscape
+}
+
+rule JenkinsPluginForkedDirectoryBrowserWithoutCsp {
+  meta { id: "VYQL-INJ-065", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.JenkinsPluginForkedDirectoryBrowserWithoutCsp as sink
+}
+
+rule CkeditorStaticProtectedSourceTokenBypass {
+  meta { id: "VYQL-INJ-066", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CkeditorStaticProtectedSourceTokenBypass as sink
+}
+
+rule CkeditorRawElementLiveDocumentRenderXss {
+  meta { id: "VYQL-INJ-067", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CkeditorRawElementLiveDocumentRenderXss as sink
+}
+
+rule ClassroomBookingsDisplayNameAltXss {
+  meta { id: "VYQL-INJ-069", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.ClassroomBookingsDisplayNameAltXss as sink
 }
 
 // Stored / second-order XSS — data read back from the database (assumed attacker-
@@ -172,6 +739,12 @@ rule Xpath {
 rule Nosql {
   meta { id: "VYQL-INJ-007", severity: high, cwe: [CWE_943] }
   taint core.UserControlledData -> code.NosqlQuery
+  unless sanitized_by core.NosqlParameterization
+}
+
+rule CockpitAuthArrayNosqlInjection {
+  meta { id: "VYQL-INJ-082", severity: critical, cwe: [CWE_943], confidence_floor: high }
+  match code.CockpitAuthArrayNosqlInjection as sink
 }
 
 rule Template {
@@ -194,14 +767,34 @@ rule UnneutralizedDiagnosticValue {
   match code.UnneutralizedDiagnosticValue as diagnostic
 }
 
+rule RequestPathPercentSLogInjection {
+  meta { id: "VYQL-INJ-174", severity: medium, cwe: [CWE_117, CWE_150], confidence_floor: high }
+  match code.RequestPathPercentSLogInjection as diagnostic
+}
+
+rule TextAccessLogDefaultFormatInjection {
+  meta { id: "VYQL-INJ-184", severity: medium, cwe: [CWE_117, CWE_150], confidence_floor: high }
+  match code.TextAccessLogDefaultFormatInjection as diagnostic
+}
+
 rule HttpResponseSplitting {
   meta { id: "VYQL-INJ-010", severity: medium, cwe: [CWE_113] }
   taint core.UserControlledData -> code.ResponseHeaderWrite
 }
 
+rule UnescapedContentDispositionFilename {
+  meta { id: "VYQL-INJ-172", severity: medium, cwe: [CWE_113, CWE_116], confidence_floor: high }
+  match code.UnescapedContentDispositionFilename as sink
+}
+
 rule AmbiguousQueryParameterSeparator {
   meta { id: "VYQL-INJ-046", severity: medium, cwe: [CWE_444], confidence_floor: medium }
   match code.AmbiguousQueryParameterSeparator as sink
+}
+
+rule UnencodedUrlQueryParameter {
+  meta { id: "VYQL-INJ-150", severity: high, cwe: [CWE_116, CWE_20], confidence_floor: high }
+  match code.UnencodedUrlQueryParameter as sink
 }
 
 // Untrusted data used as a printf-style FORMAT string (CWE-134).
@@ -214,6 +807,16 @@ rule FormatString {
 rule MassAssignment {
   meta { id: "VYQL-INJ-012", severity: medium, cwe: [CWE_915] }
   taint core.UserControlledData -> code.MassAssign
+}
+
+rule IncompleteMassAssignmentIdUnset {
+  meta { id: "VYQL-INJ-058", severity: high, cwe: [CWE_915], confidence_floor: medium }
+  match code.IncompleteMassAssignmentIdUnset as sink
+}
+
+rule PythonDunderPathClassPollution {
+  meta { id: "VYQL-INJ-143", severity: critical, cwe: [CWE_915], confidence_floor: high }
+  match code.PythonDunderPathClassPollution as sink
 }
 
 // Untrusted object recursively merged into a target — prototype pollution (CWE-1321).
@@ -233,10 +836,138 @@ rule UncheckedPrototypeConfigKey {
   match code.UncheckedPrototypeConfigKey as key
 }
 
+rule PrototypeKeyCachePoisoning {
+  meta { id: "VYQL-INJ-049", severity: high, cwe: [CWE_1321], confidence_floor: medium }
+  match code.PrototypeKeyCachePoisoning as cache
+}
+
+rule CspParserProtoDirectivePollution {
+  meta { id: "VYQL-INJ-105", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.CspParserProtoDirectivePollution as sink
+}
+
+rule ControlledMergeInheritedKeyPrototypePollution {
+  meta { id: "VYQL-INJ-106", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.ControlledMergeInheritedKeyPrototypePollution as sink
+}
+
+rule ChartkickRecursiveExtendPrototypePollution {
+  meta { id: "VYQL-INJ-062", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.ChartkickRecursiveExtendPrototypePollution as sink
+}
+
+rule CollectionExtendPrototypePollution {
+  meta { id: "VYQL-INJ-088", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.CollectionExtendPrototypePollution as sink
+}
+
+rule CookiexDeepPrototypePollution {
+  meta { id: "VYQL-INJ-107", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.CookiexDeepPrototypePollution as sink
+}
+
+rule ForOwnRecursiveDefaultsPrototypePollution {
+  meta { id: "VYQL-INJ-130", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.ForOwnRecursiveDefaultsPrototypePollution as sink
+}
+
+rule NestedPathInheritedPropertyPrototypePollution {
+  meta { id: "VYQL-INJ-134", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.NestedPathInheritedPropertyPrototypePollution as sink
+}
+
+rule CoerciblePathSegmentPrototypePollution {
+  meta { id: "VYQL-INJ-165", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.CoerciblePathSegmentPrototypePollution as sink
+}
+
+rule ExpressionEvaluatorPrototypeNameAccess {
+  meta { id: "VYQL-INJ-167", severity: high, cwe: [CWE_1321], confidence_floor: high }
+  match code.ExpressionEvaluatorPrototypeNameAccess as sink
+}
+
+rule GeneratedPathAccessorPrototypePollution {
+  meta { id: "VYQL-INJ-179", severity: high, cwe: [CWE_1321, CWE_94], confidence_floor: high }
+  match code.GeneratedPathAccessorPrototypePollution as sink
+}
+
+rule CordysRequestParamXssFilterDisabled {
+  meta { id: "VYQL-INJ-108", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.CordysRequestParamXssFilterDisabled as sink
+}
+
+rule RequestTextParamHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-146", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RequestTextParamHtmlEscapeMissing as sink
+}
+
+rule FlarumTranslatorRawStringParameterXss {
+  meta { id: "VYQL-INJ-111", severity: critical, cwe: [CWE_79], confidence_floor: high }
+  match code.FlarumTranslatorRawStringParameterXss as sink
+}
+
+rule SchematronLinkHrefUnsafeSchemeDenylist {
+  meta { id: "VYQL-INJ-169", severity: high, cwe: [CWE_79, CWE_178], confidence_floor: high }
+  match code.SchematronLinkHrefUnsafeSchemeDenylist as sink
+}
+
+rule RailsRawTranslationHtmlInterpolationXss {
+  meta { id: "VYQL-INJ-148", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.RailsRawTranslationHtmlInterpolationXss as sink
+}
+
+rule InstallerHiddenFieldXss {
+  meta { id: "VYQL-INJ-137", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.InstallerHiddenFieldXss as sink
+}
+
+rule PreservedRequestHiddenInputValueXss {
+  meta { id: "VYQL-INJ-168", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.PreservedRequestHiddenInputValueXss as sink
+}
+
+rule HighlightedSearchResultHtmlEscapeMissing {
+  meta { id: "VYQL-INJ-144", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.HighlightedSearchResultHtmlEscapeMissing as sink
+}
+
+rule BufferedErrorPageRequestMetadataXss {
+  meta { id: "VYQL-INJ-145", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.BufferedErrorPageRequestMetadataXss as sink
+}
+
+rule UnescapedLocalFileContentHtmlRender {
+  meta { id: "VYQL-INJ-180", severity: high, cwe: [CWE_79], confidence_floor: high }
+  match code.UnescapedLocalFileContentHtmlRender as sink
+}
+
+rule ContaoAjaxToggleSubpaletteSqlIdentifierInjection {
+  meta { id: "VYQL-INJ-112", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection as sink
+}
+
+rule DotcmsSqlUtilBlacklistBypass {
+  meta { id: "VYQL-INJ-109", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.DotcmsSqlUtilBlacklistBypass as sink
+}
+
+rule DotcmsFormsOrderBySqlInjection {
+  meta { id: "VYQL-INJ-110", severity: high, cwe: [CWE_89], confidence_floor: high }
+  match code.DotcmsFormsOrderBySqlInjection as sink
+}
+
 // Untrusted data written to a CSV/spreadsheet cell — formula injection (CWE-1236).
 rule CsvInjection {
   meta { id: "VYQL-INJ-014", severity: low, cwe: [CWE_1236] }
   taint core.UserControlledData -> code.CsvCell
+  unless sanitized_by core.CsvEscape
+}
+
+// Export builders that assemble spreadsheet/CSV rows from object fields before a downstream
+// writer sees them still need formula escaping at row construction time.
+rule CsvFormulaProneExportRow {
+  meta { id: "VYQL-INJ-121", severity: low, cwe: [CWE_1236], confidence_floor: medium }
+  match code.CsvFormulaProneExportRow as sink
 }
 
 // Untrusted filename/destination when saving an uploaded file (CWE-434).
@@ -250,9 +981,29 @@ rule IncompleteFileExtensionValidation {
   match code.IncompleteFileExtensionValidation as validator
 }
 
+rule DjangoAttachmentSaveWithoutModelValidation {
+  meta { id: "VYQL-INJ-141", severity: medium, cwe: [CWE_434], confidence_floor: high }
+  match code.DjangoAttachmentSaveWithoutModelValidation as sink
+}
+
 rule UncheckedUploadedImageProcessing {
   meta { id: "VYQL-INJ-043", severity: medium, cwe: [CWE_434], confidence_floor: medium }
   match code.UncheckedUploadedImageProcessing as processor
+}
+
+rule IncompleteDangerousUploadExtensionBlocklist {
+  meta { id: "VYQL-INJ-070", severity: critical, cwe: [CWE_434], confidence_floor: high }
+  match code.IncompleteDangerousUploadExtensionBlocklist as validator
+}
+
+rule ConcreteCmsIncompleteUploadExtensionBlacklist {
+  meta { id: "VYQL-INJ-099", severity: critical, cwe: [CWE_434], confidence_floor: high }
+  match code.ConcreteCmsIncompleteUploadExtensionBlacklist as config
+}
+
+rule StatamicAssetUploadPhpExtensionValidationBypass {
+  meta { id: "VYQL-INJ-075", severity: critical, cwe: [CWE_434], confidence_floor: high }
+  match code.StatamicAssetUploadPhpExtensionValidationBypass as validator
 }
 
 // Untrusted data evaluated as an expression-language expression — SpEL/OGNL/MVEL/EL (CWE-917).

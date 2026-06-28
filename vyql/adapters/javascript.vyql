@@ -10,6 +10,7 @@ adapter javascript {
   // Library option bags are caller-controlled under the library profile. These option
   // fields have appeared in code-generation CVEs where the public API reaches an internal
   // compiler callback through a cache/helper the analyzer cannot inline.
+  source "options.pattern" -> code.PatternOptionInput
   source "options.timezone" -> core.UserControlledData
   source "config.timezone" -> core.UserControlledData
   source path "analysis.parameter.entry" val "decorator_method:Get" -> code.HttpInput
@@ -25,6 +26,8 @@ adapter javascript {
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcMain" val "call_method:once" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:on" nval "param_index:0" -> code.HttpInput
   source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_path:ipcRenderer" val "call_method:once" nval "param_index:0" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:function_param" val "function_name:resolve" val "param_name:args" -> code.HttpInput
+  source path "analysis.parameter.entry" val "entry_kind:function_param" val "function_name:resolve" val "param_name:variables" -> code.HttpInput
   source "req.body" -> code.HttpInput
   source "req.query" -> code.HttpInput
   source "req.params" -> code.HttpInput
@@ -36,12 +39,14 @@ adapter javascript {
   source "req.header" -> code.HttpInput
   source "req.param" -> code.HttpInput
   source "req.files" -> code.HttpInput
+  source "file.name" -> code.FileUpload
   source "req.file" -> code.FileUpload
   source "req.files" -> code.FileUpload
   source "req.rawBody" -> code.HttpInput
   source "req.url" -> code.HttpInput
   source "req.path" -> code.HttpInput
   source "req.originalUrl" -> code.HttpInput
+  source "req.method" -> code.HttpInput
   source "request.body" -> code.HttpInput
   source "request.query" -> code.HttpInput
   source "request.params" -> code.HttpInput
@@ -76,6 +81,11 @@ adapter javascript {
   // function application are attacker-controlled by sandbox code.
   source "otherFromThisArguments" -> core.UserControlledData
 
+  flag code.NuxtPublicRuntimeConfigSecretExposure in module {
+    call path "defineNuxtModule"
+    literal "public_runtime_secret_config"
+  }
+
   // Browser / SPA DOM entry points (attacker-controlled URL / storage / window state)
   source "location.search" -> code.DomInput
   source "location.hash" -> code.DomInput
@@ -98,6 +108,14 @@ adapter javascript {
   // in a client model and later render model fields into the DOM.
   source "response.json" -> code.DomInput
   source "res.json" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:getJSON" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:ajax" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:get" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:post" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:jsonWrapper" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJson" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:call_lambda_param" val "call_method:fetchJSON" -> code.DomInput
+  source path "analysis.parameter.entry" val "entry_kind:global_function_assignment" -> code.DomInput
   source "queryParams" -> code.DomInput
   // jQuery data-* reads can carry server/user-controlled DOM content into client-side HTML.
   source method "data" -> code.DomInput
@@ -110,11 +128,251 @@ adapter javascript {
   // Parsed browser XML/HTML often comes from network responses; values extracted from it
   // are attacker-controlled unless independently verified.
   source method "parseFromString" -> core.UserControlledData
-  mark exact "analysis.function.context" val "lang=javascript" val "copyIn" val "file.path" val "info.extension" nval "sanitizeSvg" nval "DOMPurify" -> code.StoredHtmlWrite
-  mark exact "analysis.function.context" val "lang=javascript" val "newTomSelect" val "directoryName" val "return`<" nval "sanitizeDirectoryName" nval "textContent" nval "innerHTML" -> code.UnescapedHtmlOptionRenderer
-  mark exact "analysis.function.context" val "lang=javascript" val "getAttribute" val "data-content" val "optionContent" val "innerHTML" val "appendChild" nval "sanitizeHtml" nval "DOMPurify" nval "sanitize-html" -> code.UnescapedHtmlOptionRenderer
-  mark exact "analysis.module.context" val "lang=javascript" val "onCellHtmlData" val "htmlData" val "returnhtmlData" val "tableExport" val "escape:false" nval "escape:true" nval "returncell.text" nval "returncell.text()" -> code.UnescapedTableExportHtml
-  mark exact "analysis.module.context" val "lang=javascript" val "tar.extract" val "ignore:isSymlink" val "functionisSymlink(entry)" val "entry.type==='SymbolicLink'" nval "functionisSymlink(_,entry)" nval "entry.type==='symlink'" -> code.ArchiveSymlinkFilterBypass
+  flag code.StoredHtmlWrite in function {
+    lang "javascript"
+    call path contains_any ["copyIn", "Promise.promisify"]
+    call path "path.extname"
+    selector "file.path"
+    selector "info.extension"
+    not call path "sanitizeSvg"
+    not call path "DOMPurify"
+  }
+  flag code.UnescapedHtmlOptionRenderer in function {
+    lang "javascript"
+    call path "newTomSelect"
+    identifier "directoryName"
+    literal "<"
+    not call path "sanitizeDirectoryName"
+    not selector "textContent"
+    not selector "innerHTML"
+  }
+  flag code.UnescapedHtmlOptionRenderer in function {
+    lang "javascript"
+    call path "getAttribute"
+    literal "data-content"
+    identifier "optionContent"
+    selector "innerHTML"
+    call path "appendChild"
+    not call path "sanitizeHtml"
+    not call path "DOMPurify"
+    not literal "sanitize-html"
+  }
+  flag code.HighlightedSearchResultHtmlEscapeMissing on any {
+    path exact "analysis.function.context"
+    lang "javascript"
+    name "search"
+    call path "ignoreDiacriticalMarks"
+    literal "search-keyword"
+    identifier "matchingPost"
+    not call path "escapeHtml"
+  }
+  flag code.UnescapedTableExportHtml in module {
+    lang "javascript"
+    identifier "onCellHtmlData"
+    identifier "htmlData"
+    call path "tableExport"
+    token prop "escape=false"
+    not token prop "escape=true"
+    not call path "cell.text"
+  }
+  flag code.UnescapedHtmlPresenter in module {
+    lang "javascript"
+    token prop "presentType=html"
+    call path "present"
+    call path "Utils.printable"
+    literal "<td>${value}</td>"
+    not call path "Utils.escapeHtml"
+    not call path "DOMPurify"
+  }
+  flag code.UninitializedBufferExposure in module {
+    lang "javascript"
+    selector "name.encode"
+    call path "Buffer.allocUnsafe"
+    call path "name.encodingLength"
+    call path "str.replace"
+    selector "name.encodingLength"
+    call path "Buffer.byteLength"
+    not call arg "Buffer.byteLength:n.replace"
+  }
+  flag code.UnescapedChartTooltipHtml in function {
+    lang "javascript"
+    selector "tooltipModel.body"
+    selector "tooltipModel.labelColors"
+    call path "generateTooltipContent"
+    selector "innerHTML"
+    not call path "replaceChildren"
+    not selector "textContent"
+  }
+  flag code.UnescapedChartTooltipDataName in function {
+    lang "javascript"
+    name "formatTooltip"
+    call arg "itemModel.get:name"
+    identifier "name"
+    call arg "createTooltipMarkup:nameValue"
+    not token prop "name=itemName"
+    not call arg "encodeHTML:name"
+    not call arg "escapeHTML:name"
+    not call arg "escapeHtml:name"
+  }
+  flag code.DropdownEntryLabelInnerHtmlXss in function {
+    lang "javascript"
+    name "addDropDownEntry"
+    selector "li.innerHTML"
+    literal "dropdown-item"
+    identifier "label"
+    not call arg "sanitizeHTML:label"
+    not selector "textContent"
+  }
+  flag code.PrivilegedContainer in function {
+    lang "javascript"
+    literal contains_any ["docker run -dt", "dockerrun-dt"]
+    literal contains_any ["--privileged=true", "--cap-add SYS_ADMIN", "--cap-addSYS_ADMIN", "--device /dev/fuse", "--device/dev/fuse"]
+    call path "exec"
+    not selector "appConfig.capabilities"
+    not literal "--privileged=false"
+  }
+  flag code.DefaultPermissiveCorsConfig in module {
+    lang "javascript"
+    token prop "CORS_ENABLED=true"
+    token prop "CORS_ORIGIN=true"
+    not token prop "CORS_ENABLED=false"
+    not token prop "CORS_ORIGIN=false"
+  }
+  flag code.WebSocketUpgradeMissingOriginCheck in class {
+    lang "javascript"
+    token prop "noServer=true"
+    call "handleUpgrade"
+    call "bind"
+    token literal "sec-websocket-protocol"
+    not selector contains_any ["headers.origin", ".origin"]
+    not literal contains_any ["origin", "Origin"]
+  }
+  flag code.PostMessageHtmlWriteMissingOriginCheck in function {
+    lang "javascript"
+    selector "message.data"
+    call path contains_any ["document.write", "parseFromString"]
+    selector contains "innerHTML"
+    not selector contains_any ["message.origin", "event.origin", ".origin"]
+    not literal contains_any ["origin", "Origin"]
+  }
+  flag code.IncompleteHtmlEventHandlerStrip in module {
+    lang "javascript"
+    has "ViewSource"
+    has "stripScripts"
+    has "stripIFrames"
+    has "stripComments"
+    has "_stripScripts"
+    has "_stripIFrames"
+    has "_filter"
+    lacks "stripEventHandlers"
+    lacks "_stripEventHandlers"
+  }
+  flag code.ClientLightboxOptionXss in module {
+    lang "javascript"
+    has "setHTMLContent"
+    has "setMessage(html)"
+    lacks "DOMPurify"
+    lacks "sanitize(html)"
+    lacks "sanitizeHtml(html)"
+  }
+  flag code.ClientLightboxOptionXss in module {
+    lang "javascript"
+    has "setVideoContent"
+    has "options.videoParams"
+    has "$('<video>',videoParams)"
+    lacks "startsWith('on')"
+    lacks "startsWith(\"on\")"
+    lacks "deletevideoParams[key]"
+  }
+  flag code.ClientLightboxOptionXss in module {
+    lang "javascript"
+    has "setSlideshowContent"
+    has "options.slides.forEach"
+    has "data-elementor-slideshow-video"
+    has "slide.image"
+    lacks "isValidUrl"
+    lacks "startsWith(protocol)"
+  }
+  flag code.AjaxBackslashProtocolRelativeUrlXss in module {
+    lang "javascript"
+    has "function ajax(url, handler)"
+    has "url[0] != '/'"
+    has "url[1] == '/'"
+    has "$.ajax"
+    has "url: url"
+    has "$(receivedHtml).find('.paginate-container')"
+    has ".append($(this).html())"
+    lacks "startsWith"
+    lacks "replace(/\\\\/g,'/')"
+    lacks "new URL"
+  }
+  flag code.JobOutputEventUpdateAuthorizationBypass in function {
+    literal "Got job update from child"
+    literal "update_event"
+    assign "job[key]=data[key]"
+    not literal "allow_event_updates_from_jobs"
+    not selector "data.update_event"
+  }
+  flag code.PublicVisibilityCacheInvalidationMissing in module {
+    lang "javascript"
+    has "ProxyCacheInvalidationService"
+    has "RUNNER_INFO_CACHE_PREFIX"
+    has "SandboxEvents.ARCHIVED"
+    has "redis.del"
+    lacks "SandboxEvents.PUBLIC_STATUS_UPDATED"
+    lacks "PUBLIC_CACHE_PREFIX"
+  }
+  flag code.EcdhPeerPublicKeyMissingCurveValidation in function {
+    lang "javascript"
+    name "deriveSharedSecret"
+    has "publicKey.Q.multiply(this.d)"
+    has "zeroBuffer(S.getX().toBigInteger().toString(16),this._size)"
+    lacks "onCurve(publicKey)"
+    lacks "validatePublicKey(publicKey)"
+    lacks "isOnCurve(publicKey)"
+  }
+  flag code.TotalJsAdminThemeXss in module {
+    lang "javascript"
+    has "COMPONENT('grid'"
+    has "column.format"
+    has "m.value=column.template?column.template(items[i],column):column.render?column.render(val,column,items[i]):val==null?'':(column.format?val.format(column.format):val)"
+    has "builder.push(self.template(m,column))"
+    lacks "Thelpers.encode((column.format?val.format(column.format):val))"
+  }
+  flag code.UnescapedLinterIssueMessageXss in function {
+    lang "javascript"
+    name "renderIssue"
+    has "issueTemplate({"
+    has "message:message.message"
+    lacks "message:_.escape(message.message)"
+  }
+  flag code.CocotaisEchoPlatformTagInjection in module {
+    lang "javascript"
+    token builtin "echo"
+    has "\"/echo\""
+    has "_msgs.join(\" \")"
+    has "event.reply(content)"
+  }
+  flag code.ArchiveSymlinkFilterBypass in module {
+    lang "javascript"
+    has "tar.extract"
+    token ignore "isSymlink"
+    has "functionisSymlink(entry)"
+    has "entry.type==='SymbolicLink'"
+    lacks "functionisSymlink(_,entry)"
+    lacks "entry.type==='symlink'"
+  }
+  flag code.FlarumTranslatorRawStringParameterXss in function {
+    lang "javascript"
+    name "preprocessParameters"
+    has "if('user'inparameters)"
+    has "extract(parameters,'user')"
+    has "parameters.username"
+    has "returnparameters;"
+    lacks "escapedParameters"
+    lacks "typeofparamValue==='string'"
+    lacks "<>{parameters[param]}</>"
+  }
   // Next.js App Router — searchParams (page prop / destructured) + nextUrl query
   source "searchParams" -> code.HttpInput
   source "req.nextUrl" -> code.HttpInput
@@ -139,6 +397,12 @@ adapter javascript {
   // ueberDB key-glob read: db.findKeys("pad:"+id+"*") — an unsanitized id in the key pattern
   // reads keys outside the intended namespace (CWE-22-style traversal of the kv store).
   sink method "findKeys" -> code.FilePathAccess
+  flag code.PrefixWildcardKeyEnumeration in function {
+    lang "javascript"
+    has "db.findKeys(\"pad:\"+padId+\"*\""
+    has "db.get(records[key]"
+    lacks "\"pad:\"+padId+\":*\""
+  }
   sink path "client.query" -> code.SqlExecution
   sink path "mysql.query" -> code.SqlExecution
   sink path "pg.query" -> code.SqlExecution
@@ -152,14 +416,65 @@ adapter javascript {
   sink method "deleteAccount" -> code.StateChangingOp
   sink method "grantRole" -> code.StateChangingOp
   sink method "makeAdmin" -> code.StateChangingOp
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
+  flag code.RefererBasedAdminUserCreation in function {
+    lang "javascript"
+    call path "req.header"
+    call path "url.parse"
+    literal "Referer"
+    literal "/admin/setup"
+    selector "urlParts.path"
+    assign "isAdmin=true"
+    call path "db.users.insert"
+    lacks call path "db.users.count"
+  }
+  flag code.ExpressParamArrayValuePollution in function {
+    lang "javascript"
+    selector "req.params"
+    selector "req.body"
+    selector "req.query"
+    lacks call path "Array.isArray"
+  }
+  flag code.BrowserPostExportMissingOriginGuard in function {
+    lang "javascript"
+    name "<lambda>"
+    call path "app.post"
+    selector "req.body.path"
+    call path "exportAll"
+    not selector "req.headers.origin"
+    not call contains_any ["verifyCsrfToken", "validateCsrfToken", "checkCsrf", "csrf"]
+  }
+  flag code.WebhookUrlFetchMissingSsrfGuard in function {
+    lang "javascript"
+    name contains_any ["callWebhook", "sendWebhook", "deliverWebhook", "postWebhook"]
+    call path contains_any ["axios.post", "axios.request", "request.post", "undici.fetch", "fetch"]
+    selector contains_any ["webhookUrl.url", "webhook.url", "callbackUrl", "callback.url"]
+    not token identifier "secureDispatcher"
+    not call contains_any ["safeFetch", "fetchWithSsrfGuard", "validateUrl", "assertPublicUrl"]
+  }
   // CSRF protection — explicit token verification (guards RF-003 via a PROTECTS edge)
   control "verifyCsrfToken" -> core.CsrfProtection
   control "validateCsrfToken" -> core.CsrfProtection
@@ -175,24 +490,175 @@ adapter javascript {
   control "requireOwner" -> core.OwnershipCheck
   control "isOwner" -> core.OwnershipCheck
   control "ownsResource" -> core.OwnershipCheck
-  mark exact "analysis.function.context" val "isLocalRequest" val "isLocal||awaithasValidToken" nval "hasValidCliToken" -> code.LocalRequestBypassReview
-  mark exact "analysis.function.context" val "lang=javascript" val "authorized_keys?.includes(data.pubkey)" val "private_keys[data.pubkey]" val "!noscraper" nval "pubkeyInConfig" nval "authorized_keys?.length&&!pubkeyInConfig" -> code.AccessPolicyReview
-  mark exact "analysis.function.context" val "lang=javascript" val "user==username&&pass==password" nval "timingSafeCompare" nval "tsscmp" -> code.SecretComparisonReview
+  flag code.LocalRequestBypassReview in function {
+    has "isLocalRequest"
+    has "isLocal||awaithasValidToken"
+    lacks "hasValidCliToken"
+  }
+  flag code.AccessPolicyReview in function {
+    lang "javascript"
+    has "authorized_keys?.includes(data.pubkey)"
+    has "private_keys[data.pubkey]"
+    has "!noscraper"
+    lacks "pubkeyInConfig"
+    lacks "authorized_keys?.length&&!pubkeyInConfig"
+  }
+  flag code.SecretComparisonReview in function {
+    lang "javascript"
+    call path "secure-compare"
+    call path "keys.findIndex"
+  }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass", "username", "user"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass", "username", "user"]
+    }
+    lacks call contains_any ["scmp", "tsscmp", "timingSafeEqual", "safeCompare", "timingSafeCompare"]
+  }
+  flag code.SecretComparisonReview on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token", "xsrf-token", "auth-token", "api-key", "signature", "secret"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key", "password", "pass"]
+    }
+    lacks call contains_any ["scmp", "tsscmp", "timingSafeEqual", "safeCompare"]
+  }
   // SSRF / open-redirect allowlist validators (guard the fetch/redirect they dominate).
-  mark exact "analysis.function.context" val "lang=javascript" val "ctx.request?.method" val "POST" val "return;" val "callbackURL" val "redirectTo" val "trustedOrigins" val "validateURL" -> code.MethodGatedRedirectValidationBypass
+  flag code.MethodGatedRedirectValidationBypass in function {
+    lang "javascript"
+    selector contains_any ["ctx.request.method", "ctx.request?.method"]
+    literal "POST"
+    identifier "callbackURL"
+    identifier "redirectTo"
+    identifier "trustedOrigins"
+    call path "validateURL"
+  }
+  flag code.CinnyServiceWorkerMediaAuthLeak in function {
+    lang "javascript"
+    call path "event.respondWith"
+    call path "askForAccessToken"
+    call path "fetchConfig"
+    literal "/_matrix/client/v1/media/download"
+    literal "/_matrix/client/v1/media/thumbnail"
+    not call path "validMediaRequest"
+  }
+  flag code.IncompleteIpDenylist in function {
+    lang "javascript"
+    name "isValidPublicIPv4Address"
+    call path "parseInt"
+    expr "first===10"
+    expr "first===127"
+    expr "first===169&&second===254"
+    expr "first===172&&second>=16&&second<=31"
+    expr "first===192&&second===168"
+  }
+  flag code.CkeditorStaticProtectedSourceTokenBypass in function {
+    lang "javascript"
+    name "protectSource"
+    has "protectedHtml"
+    has "cke_tempcomment"
+    has "/cke_temp(comment)?/"
+    has "'<!--{cke_temp}'"
+    lacks "randomNumber"
+    lacks "cke_temp_"
+  }
+  flag code.CkeditorRawElementLiveDocumentRenderXss in function {
+    lang "javascript"
+    name "viewToPlainText"
+    has "viewItem.is('rawElement')"
+    has "document.createElement('div')"
+    has "viewItem.render(tempElement,converter)"
+    has "domElementToPlainText(tempElement)"
+    lacks "createHTMLDocument"
+  }
+  flag code.CodeServerPathProxyPortConfusedProxy in function {
+    lang "javascript"
+    name "getProxyTarget"
+    has "req.params.port"
+    has "0.0.0.0:"
+    has "req.originalUrl.slice(base.length)"
+    lacks "parseInt(req.params.port,10)"
+  }
+  flag code.JavaScriptUrlRedirectXss in function {
+    lang "javascript"
+    has "URLSearchParams(window.location.search).get"
+    has "window.location=decodeURI"
+    lacks "redirect[0]==='/'"
+    lacks "redirect[1]!=='/'"
+  }
+  flag code.DesktopProtocolRedirectWithoutAllowlist in function {
+    name contains_any ["openDesktopIDE", "openExternal", "openDesktop", "redirectToDesktop"]
+    call path "URL"
+    call path "window.location.href"
+    token identifier contains_any ["url", "desktopLink", "redirect"]
+    literal "http:"
+    literal "https:"
+    not call path contains_any ["trustedProtocols.includes", "allowedProtocols.includes"]
+    not literal contains_any ["vscode:", "vscode-insiders:", "jetbrains-gateway:"]
+  }
   control "isSafeRedirect" -> core.RedirectAllowlist
   control "isValidRedirect" -> core.RedirectAllowlist
   control "isAllowedRedirect" -> core.RedirectAllowlist
   control "isUrlAllowed" -> core.AllowlistValidation
   control "isAllowedHost" -> core.AllowlistValidation
   control "validateUrl" -> core.AllowlistValidation
-  mark exact "analysis.function.context" val "name=updateDynamicPageSriHashes" val "integrityRegex.exec(attrs)" val "globalHashes[t2].set(src,sriHash)" nval "Detected reference to not explicitly allowed external resource" -> code.ExternalResourceIntegrityReview
+  control "validateFetchUrl" -> core.AllowlistValidation
+  control "isUrlSafeToOpen" -> core.AllowlistValidation
+  flag code.ExternalResourceIntegrityReview in function {
+    name "updateDynamicPageSriHashes"
+    has "integrityRegex.exec(attrs)"
+    has "globalHashes[t2].set(src,sriHash)"
+    lacks "Detected reference to not explicitly allowed external resource"
+  }
   // Electron: shell.openExternal can launch arbitrary apps/protocols from a URL
   sink path "shell.openExternal" -> code.CommandExecution
+  // React Native CLI's development-server URL opener passed request body `url`
+  // directly to the OS browser opener before CVE-2025-11953 added protocol checks.
+  flag code.ReactNativeCliOpenUrlMiddlewareCommandExecution in function {
+    lang "javascript"
+    name "openURLMiddleware"
+    has "req.body"
+    has "awaitopen(url);"
+    lacks "newURL(url)"
+    lacks "parsedUrl.protocol"
+  }
+  flag code.CloudBaseOpenUrlSsrf in function {
+    lang "javascript"
+    has "/api/open-url"
+    has "req.body"
+    has "awaitopenUrl(url,undefined,this._mcpServer);"
+    lacks "isUrlSafeToOpen(url)"
+    lacks "validation.safe"
+  }
   // Electron insecure renderer config (named-value on the BrowserWindow options)
-  mark "BrowserWindow" val "nodeIntegration=true" -> code.ElectronNodeIntegration
-  mark "BrowserWindow" val "contextIsolation=false" -> code.ElectronNodeIntegration
-  mark "webPreferences" val "nodeIntegration=true" -> code.ElectronNodeIntegration
+  flag code.ElectronNodeIntegration on any {
+    path "BrowserWindow"
+    has "nodeIntegration=true"
+  }
+  flag code.ElectronNodeIntegration on any {
+    path "BrowserWindow"
+    has "contextIsolation=false"
+  }
+  flag code.ElectronNodeIntegration on any {
+    path "webPreferences"
+    has "nodeIntegration=true"
+  }
+  flag code.ElectronNodeIntegration in function {
+    lang "javascript"
+    has "will-attach-webview"
+    has "webPreferences.nodeIntegration=false"
+    lacks "webPreferences.contextIsolation=true"
+  }
+  flag code.ElectronPrivilegedUrlNodeIntegration in module {
+    lang "javascript"
+    expr "window.location.protocol==='chrome-devtools:'"
+    assign "nodeIntegration=true"
+  }
 
   sink path "child_process.exec" -> code.CommandExecution
   sink path "child_process.execSync" -> code.CommandExecution
@@ -230,6 +696,123 @@ adapter javascript {
   sink path "shell.exec" -> code.CommandExecution
   sink path "webpack-shell-plugin-next" -> code.CommandExecution
   sink path "WebpackShellPlugin" -> code.CommandExecution
+  flag code.CodecovNodeGcovCommandInjection in module {
+    lang "javascript"
+    has "functionsanitizeVar(arg)"
+    has "arg.replace(/&/g,'')"
+    has "args.options['gcov-root']"
+    has "args.options['gcov-exec']"
+    has "args.options['gcov-args']"
+    has "execSync(gcov)"
+    lacks "execFileSync(gcov)"
+  }
+  flag code.AuthenticodeSignaturePathBindingBypass in function {
+    lang "javascript"
+    name "verifySignature"
+    has "Get-AuthenticodeSignature"
+    has "LiteralPath"
+    call path "parseOut"
+    selector "data.SignerCertificate.Subject"
+    has "publisherNames"
+    not selector "data.Path"
+    not call path "path.normalize"
+  }
+  flag code.DerSignatureNonCanonicalImport in function {
+    lang "javascript"
+    call path "getLength"
+    call path "data.slice"
+    has "newBN(r)"
+    has "newBN(s)"
+    has "r[0]===0&&(r[1]&0x80)"
+    has "s[0]===0&&(s[1]&0x80)"
+    lacks "else{returnfalse;}"
+    lacks "val>>>=0"
+    lacks "val<=0x7f"
+  }
+  flag code.ClamscanBinaryPathShellCommandInjection in function {
+    lang "javascript"
+    name "_is_clamav_binary"
+    has "version_cmds"
+    has "${path}--version"
+    has "cp_exec(version_cmds[scanner])"
+    lacks "cp_execfile"
+  }
+  flag code.CompileSassCleanupShellCommandWithoutPathCheck in function {
+    lang "javascript"
+    name "setupCleanupOnExit"
+    has "exec"
+    has "rm-r"
+    has "cssPath"
+    lacks "fs.lstat"
+  }
+  flag code.McpToolCommandTemplateExecution in module {
+    lang "javascript"
+    call path "server.tool"
+    literal contains_any ["lsof -t -i tcp:${port}", "ps -p ${pid} -o comm="]
+    not call path "execFile"
+  }
+  flag code.CommandStringWrapperExecution in function {
+    lang "javascript"
+    name "writeConfigRemote"
+    call path "execAsyncRemote"
+    identifier "traefikConfig"
+    identifier "configPath"
+    literal "echo"
+    not call arg "encodeBase64:traefikConfig"
+    not literal "base64 -d"
+    not literal "shell-quote"
+    not call path "shellQuote.quote"
+  }
+  flag code.CommandStringWrapperExecution in function {
+    call path contains_any ["utils.run", "run"]
+    call arg contains_any ["utils.run:gitclone", "utils.run:git clone", "run:gitclone", "run:git clone"]
+    not call path contains_any ["runWithSpawn", "spawn", "execFile"]
+  }
+  flag code.CommandStringWrapperExecution in function {
+    call path contains_any ["child_process.execSync", "execSync"]
+    token identifier contains_any ["command", "cmd"]
+    not call path contains_any ["execFile", "execFileSync", "spawn", "spawnSync"]
+  }
+  flag code.CommandOptionInjection in function {
+    name "clone"
+    call path "?.gitExec"
+    literal contains_any ["clone${repository}", "clone${remote}", "clone${url}"]
+    not literal contains_any ["--${repository}", "--${remote}", "--${url}"]
+  }
+  flag code.CommandOptionInjection in function {
+    call path contains_any ["spawn", "crossSpawn", "child_process.spawn", "spawnSync"]
+    fact git_clone_argv_missing_delimiter "true"
+  }
+  flag code.GitPackSignatureSearchParsingBypass in function {
+    call path contains_any ["?.lastIndexOf", "req.body.lastIndexOf"]
+    literal "PACK"
+    call path contains_any ["?.slice", "req.body.slice"]
+    call path "getPackMeta"
+    not token identifier "packDataOffset"
+    not literal "PACK_SIGNATURE"
+  }
+  flag code.GitDirShellCommandStringExecution in class {
+    lang "javascript"
+    call path "child_process.exec"
+    call path "args.join"
+    literal "git --git-dir="
+    attr path "?.path"
+    not call path "child_process.execFile"
+  }
+  flag code.DynamicFunctionMutableObjectEval in function {
+    lang "javascript"
+    has "newFunction('node'"
+    has "props(expr,'node.')"
+    lacks "Object.freeze(node)"
+  }
+  flag code.ResponseParserFunctionEval in function {
+    lang "javascript"
+    call path "Function"
+    call path "parsedResponse.push"
+    literal contains_any ["return ", "\"use strict\"; return "]
+    token identifier "data"
+    not call path "JSON.parse"
+  }
   sink path "eval" -> code.CodeEval
   sink path "Function" -> code.CodeEval
   sink path "vm.runInNewContext" -> code.CodeEval
@@ -237,10 +820,54 @@ adapter javascript {
   sink path "vm.runInContext" -> code.CodeEval
   sink path "vm.compileFunction" -> code.CodeEval
   sink path "vm2.run" -> code.CodeEval
-  mark "eval" val "ref." val "parts" -> code.RequestReferenceEval
-  mark exact "analysis.function.context" val "new VM" val "sandbox.templateFilters" val "sandbox.templateGlobals" val "vm.run" nval "isolated-vm" nval "Isolate" -> code.Vm2HostCallbackBridge
+  flag code.RequestReferenceEval on any {
+    path "eval"
+    has "ref."
+    has "parts"
+  }
+  flag code.Vm2HostCallbackBridge in function {
+    has "new VM"
+    has "sandbox.templateFilters"
+    has "sandbox.templateGlobals"
+    has "vm.run"
+    lacks "isolated-vm"
+    lacks "Isolate"
+  }
+  flag code.CompassCsfleEjsonParserMissingStrictMode in function {
+    name "textToEncryptedFieldConfig"
+    has "parseFilter(text)"
+    lacks "parseShellStringToEJSON"
+    lacks "ParseMode.Strict"
+  }
+  flag code.IncompleteGeneratedJsIdentifierReservedWords in module {
+    lang "javascript"
+    has "JS_RESERVED_WORDS"
+    has "isValidJsIdentifier"
+    has "compileShellApiFunctionName"
+    has "dbgateApi.${functionName}"
+    has "'enum'"
+    lacks "'eval'"
+    lacks "'arguments'"
+  }
+  flag code.UnfilteredAgentCommandTag in function {
+    name "parseCustomTags"
+    token identifier "customTagNames"
+    literal "dyad-execute-sql"
+    literal "dyad-codebase-context"
+    token identifier "tagPattern"
+    not literal "dyad-command"
+  }
+  flag code.EnvFileVariableInjection in function {
+    lang "javascript"
+    name "updateEnvFile"
+    call path "Object.entries"
+    literal "${key}=\"${value}\""
+    call path "fs.writeFileSync"
+    not call path "dotenv.parse"
+    not call contains_any ["stringify", "JSON.stringify"]
+  }
   sink path "globalEval" -> code.CodeEval
-  sink path "require" -> code.DynamicCodeLoad
+  sink exact "require" -> code.DynamicCodeLoad
   sink path "import" -> code.DynamicCodeLoad
   sink path "pdfjs.getDocument" -> code.PdfJsDocumentLoad
   // vm2-style bridge boundary: applying a host function with sandbox-provided args
@@ -265,6 +892,7 @@ adapter javascript {
   sink path "axios.request" -> code.UrlFetch
   sink path "axios" -> code.UrlFetch
   sink path "fetch" -> code.UrlFetch
+  sink path "cross-fetch" -> code.UrlFetch
   sink path "node-fetch" -> code.UrlFetch
   sink path "http.get" -> code.UrlFetch
   sink path "https.get" -> code.UrlFetch
@@ -274,9 +902,41 @@ adapter javascript {
   // headless-browser navigation (Puppeteer/Playwright `page.goto(url)`) fetches an
   // attacker-controllable URL server-side -> SSRF (CVE-2026-5323, a11y-mcp).
   sink method "goto" -> code.UrlFetch
-  mark exact "analysis.function.context" val "page.goto(request.url,requestOptions)" nval "request.url.trim().toLowerCase().substring(0,4)==='file'" -> code.LocalFileUrlNavigation
+  flag code.LocalFileUrlNavigation in function {
+    has "page.goto(request.url,requestOptions)"
+    lacks "request.url.trim().toLowerCase().substring(0,4)==='file'"
+  }
+  flag code.SwaggerParserExternalRefDereference in function {
+    lang "javascript"
+    call path "yaml.safeLoad"
+    call path "swaggerParser.validate"
+    token identifier "loaded"
+    not token prop "external=false"
+  }
+  flag code.HardlinkedFileOverwriteWithoutClobber in function {
+    lang "javascript"
+    name "statCb"
+    call path "get-type"
+    call path "rimraf"
+    call path "create"
+    attr path "self._path"
+    attr path "self.type"
+    not binary "current.nlink>1"
+  }
+  flag code.ConvertSvgMultiSvgSanitizerBypass in function {
+    lang "javascript"
+    has "cheerio.default.html"
+    has "this[_sanitize]"
+    has "cheerio.load(input,null,false)('svg')"
+    has "<body>${svg}</body>"
+    has "this[_getPage](html)"
+    lacks "cheerio.load(input,null,false)('svg:first')"
+  }
   sink path "request.get" -> code.UrlFetch
   sink path "request.post" -> code.UrlFetch
+  sink path "request-promise" -> code.UrlFetch
+  sink path "requestPromise" -> code.UrlFetch
+  sink path "rp" -> code.UrlFetch
   sink path "needle.get" -> code.UrlFetch
   sink path "needle.post" -> code.UrlFetch
   sink path "superagent.get" -> code.UrlFetch
@@ -284,6 +944,8 @@ adapter javascript {
   sink path "got" -> code.UrlFetch
   sink path "got.get" -> code.UrlFetch
   sink path "got.post" -> code.UrlFetch
+  sink path "got.stream" -> code.UrlFetch
+  sink path "undici.fetch" -> code.UrlFetch
   sink path "undici.request" -> code.UrlFetch
   sink path "fetch.default" -> code.UrlFetch
   sink path "fs.writeFile" -> code.UnsafeUpload
@@ -309,11 +971,26 @@ adapter javascript {
   sink path "readdirSync" -> code.FilePathAccess
   sink path "unlinkSync" -> code.FilePathAccess
   sink path "mkdirSync" -> code.FilePathAccess
+  flag code.FileCheck on any {
+    path "fs.lstat"
+  }
+  flag code.FileCheck on any {
+    path "fs.lstatSync"
+  }
+  flag code.FileUse on any {
+    path "fs.chown"
+  }
+  flag code.FileUse on any {
+    path "fs.chownSync"
+  }
   sink path "fsPromises.readFile" -> code.FilePathAccess
   sink path "fsp.readFile" -> code.FilePathAccess
   sink path "fse.readFile" -> code.FilePathAccess
+  sink path "fs.promises.readFile" -> code.FilePathAccess
+  sink path "fs.promises.writeFile" -> code.FilePathAccess
   sink path "res.sendFile" -> code.FilePathAccess
   sink path "res.download" -> code.FilePathAccess
+  sink path "res.attachment" -> code.FilePathAccess
   sink path "zip.file" -> code.FilePathAccess
   sink path "extractEntryTo" -> code.ArchiveEntryWrite
   sink path "zip.extractEntryTo" -> code.ArchiveEntryWrite
@@ -355,15 +1032,39 @@ adapter javascript {
   sink path "logger.debug" arg all -> code.LogOutput
   sink path "log.info" arg all -> code.LogOutput
   sink path "log.error" arg all -> code.LogOutput
-  mark "console.log" -> code.LogWrite
-  mark "console.warn" -> code.LogWrite
-  mark "console.error" -> code.LogWrite
-  mark "logger.info" -> code.LogWrite
-  mark "logger.warn" -> code.LogWrite
-  mark "logger.error" -> code.LogWrite
-  mark "logger.debug" -> code.LogWrite
-  mark "log.info" -> code.LogWrite
-  mark "log.error" -> code.LogWrite
+  flag code.LogWrite on any {
+    path "console.log"
+  }
+  flag code.LogWrite on any {
+    path "console.warn"
+  }
+  flag code.LogWrite on any {
+    path "console.error"
+  }
+  flag code.LogWrite on any {
+    path "logger.info"
+  }
+  flag code.LogWrite on any {
+    path "logger.warn"
+  }
+  flag code.LogWrite on any {
+    path "logger.error"
+  }
+  flag code.LogWrite on any {
+    path "logger.debug"
+  }
+  flag code.RemoteUrlObjectDebugLog on call {
+    path "logger.debug"
+    operand {
+      identifier contains_any ["url", "uri"]
+    }
+  }
+  flag code.LogWrite on any {
+    path "log.info"
+  }
+  flag code.LogWrite on any {
+    path "log.error"
+  }
   // CSV/formula injection (CWE-1236) — common csv-stringify/fast-csv writer APIs.
   sink path "csv.write" arg all -> code.CsvCell
   sink path "csvStream.write" arg all -> code.CsvCell
@@ -381,13 +1082,14 @@ adapter javascript {
   sink path "insertAdjacentHTML" arg 1 -> code.HtmlRender
   // jQuery root calls can parse an HTML string, unlike scoped lookups such as
   // $(document).find(selector).
-  sink exact "$" val "selector" -> code.HtmlRender
-  sink exact "jQuery" val "selector" -> code.HtmlRender
+  sink exact "$" arg 0 -> code.HtmlRender
+  sink exact "jQuery" arg 0 -> code.HtmlRender
   sink path "$.html" -> code.HtmlRender
   sink path "el.html" -> code.HtmlRender
   sink method "html" -> code.HtmlRender
   sink method "append" -> code.HtmlRender
   sink method "prepend" -> code.HtmlRender
+  sink method "replaceWith" -> code.HtmlRender
   // Contao/SimpleModal-style modal helpers render the `title` field as HTML.
   sink path "M.show" arg 0 collection val "title" -> code.HtmlRender
   // Stored XSS: writing attacker-controlled markup into high-signal HTML-bearing
@@ -410,10 +1112,15 @@ adapter javascript {
   sink method "bypassSecurityTrustStyle" -> code.HtmlRender
   sink path "handlebars.compile" -> code.TemplateRender
   sink path "Handlebars.compile" -> code.TemplateRender
+  sink path "mustache.render" arg 0 -> code.TemplateRender
+  sink path "Mustache.render" arg 0 -> code.TemplateRender
   sink path "ejs.render" -> code.TemplateRender
   sink path "ejs.compile" -> code.TemplateRender
   sink path "pug.compile" -> code.TemplateRender
   sink path "pug.render" -> code.TemplateRender
+  sink path "res.render" arg 0 -> code.TemplateRender
+  sink path "reply.view" arg 0 -> code.TemplateRender
+  sink path "ctx.render" arg 0 -> code.TemplateRender
   sink path "lodash.template" -> code.TemplateRender
   sink path "_.template" -> code.TemplateRender
   sink path "nunjucks.renderString" -> code.TemplateRender
@@ -447,6 +1154,12 @@ adapter javascript {
   control "parseInt" -> core.SqlParameterization
   control "parseFloat" -> core.HtmlEscape
   control "parseFloat" -> core.SqlParameterization
+  // jQuery element construction with DOM option fields sets properties/text through
+  // DOM APIs rather than parsing the supplied values as markup.
+  control "$" val "text" -> core.HtmlEscape
+  control "jQuery" val "text" -> core.HtmlEscape
+  control "$" val "href" -> core.HtmlEscape
+  control "jQuery" val "href" -> core.HtmlEscape
   // numeric coercion is also INPUT VALIDATION: the value is confined to a number, so it
   // cannot carry a forged identity/role into a trust context (CWE-501). FN-safe — real
   // trust-boundary violations write the raw string, with no Number()/parseInt() coercion.
@@ -462,11 +1175,27 @@ adapter javascript {
   control "validator.isAlphanumeric" -> core.InputValidation
   control "validator.isInt" -> core.InputValidation
   control "validator.isNumeric" -> core.InputValidation
-  mark "string.replace" val "&amp;" val "\\w+;" nval "#\\d" nval "#x" -> code.IncompleteHtmlEntityEscape
+  control "BodySchema.parse" -> core.NosqlParameterization
+  control "ParamsSchema.parse" -> core.NosqlParameterization
+  control "QuerySchema.parse" -> core.NosqlParameterization
+  control "ChatInputGuideListBodySchema.parse" -> core.NosqlParameterization
+  control "GetQuoteBodySchema.parse" -> core.NosqlParameterization
+  control "GetCollectionQuoteBodySchema.parse" -> core.NosqlParameterization
+  control "CreateQuestionGuideBodySchema.parse" -> core.NosqlParameterization
+  control "GetHelperBotChatRecordsParamsSchema.parse" -> core.NosqlParameterization
+  flag code.IncompleteHtmlEntityEscape on any {
+    path "string.replace"
+    has "&amp;"
+    has "\\w+;"
+    lacks "#\\d"
+    lacks "#x"
+  }
   control "encode" -> core.HtmlEscape
   control "encodeEntities" -> core.HtmlEscape
+  control "escapeHtml" -> core.HtmlEscape
   control "escapeHTML" -> core.HtmlEscape
   control "escape-html" -> core.HtmlEscape
+  control "utils.escape" -> core.HtmlEscape
   control "he.encode" -> core.HtmlEscape
   control "validator.escape" -> core.HtmlEscape
   control "lodash.escape" -> core.HtmlEscape
@@ -479,6 +1208,12 @@ adapter javascript {
   control "sqlstring.escape" -> core.SqlParameterization
   control "shell-quote.quote" -> core.ShellEscape
   control "shellQuote.quote" -> core.ShellEscape
+  control "isValidHost" -> core.CommandArgumentValidation
+  control "isAllowedHost" -> core.CommandArgumentValidation
+  control "validateHost" -> core.CommandArgumentValidation
+  control "validator.isFQDN" -> core.CommandArgumentValidation
+  control "net.isIP" -> core.CommandArgumentValidation
+  control "analysis.javascript.command_argument_regex_guard" -> core.CommandArgumentValidation
 
   // ── UNSOUND neutralizers (`assume`) ───────────────────────────────────────────────
   // These MIGHT defuse the threat but cannot be proven to, so they NEVER suppress a flow.
@@ -515,9 +1250,102 @@ adapter javascript {
 
   // regex compile (ReDoS, CWE-1333) — tainted PATTERN arg0
   sink path "RegExp" -> code.RegexCompile
+  control method "escapeRegExp" -> core.RegexEscape
+  control method "escapeStringRegexp" -> core.RegexEscape
+  control method "replace" val "\\$&" -> core.RegexEscape
+  control method "replace" val "[.\\-+*:]" val "\\\\." -> core.RegexEscape
+  flag code.CatastrophicRegex on any {
+    path "__regex.match"
+  }
   sink receiver "replace" val "+)*m" -> code.RegexMatch
-  mark "RegExp" val "d]*(?:;" -> code.CatastrophicRegex
-  mark method "match" val "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}" nval "^\\{((?:,|\\{,+\\})+)\\}" -> code.CatastrophicRegex
+  flag code.CatastrophicRegex on any {
+    path "RegExp"
+    has "d]*(?:;"
+  }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    has "constpattern=["
+    has "].join"
+    has "newRegExp(pattern"
+    has "d]*(?:;"
+    lacks "[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|"
+  }
+  flag code.CatastrophicRegex on any {
+    method "match"
+    has "^\\{(,+(?:(\\{,+\\})*),*|,*(?:(\\{,+\\})*),+)\\}"
+    lacks "^\\{((?:,|\\{,+\\})+)\\}"
+  }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    has "constcommentre=/\\/\\*[^*]*\\*+([^/*][^*]*\\*+)*\\//g"
+    lacks "[^]*?(?:\\*\\/|$)"
+  }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    literal contains "[\\{\\[].*[\\/]*.*[\\}\\]]$"
+    call path "enclosure.test"
+    not literal contains "[\\{\\[].*[\\}\\]]$"
+  }
+  flag code.CatastrophicRegex on any {
+    method "match"
+    has "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]"
+    lacks "([^*]|\\*(?!\\/))*?"
+  }
+  flag code.CatastrophicRegex on any {
+    path "replace"
+    has "\\s*\\n\\s*"
+  }
+  flag code.CatastrophicRegex on any {
+    path "StringPrototypeSplit"
+    has "\\s*,\\s*"
+  }
+  flag code.CatastrophicRegex on any {
+    method "split"
+    has "\\s*,\\s*"
+  }
+  flag code.CatastrophicRegex in function {
+    lang "javascript"
+    has "varhwb=/^hwb\\("
+    has "string.match(hwb)"
+    lacks "\\d{0,3}"
+    lacks "(?:\\.\\d+)?"
+  }
+  flag code.CatastrophicRegex in module {
+    lang "javascript"
+    has "String(validFunction(this)).match(re)"
+    has "([\\0-')-\\uffff]+)*"
+    has "([\\0-(*-\\uffff]*)"
+    lacks "this.name||\"\""
+    lacks "args.join(\",\")"
+    lacks "args.join(\", \")"
+  }
+  flag code.UnboundedEmailRegexValidation in function {
+    lang "javascript"
+    has "/^\\S+@\\S+$/.test(email)"
+    has "dns.resolveMx(email.split('@')[1]"
+    lacks "MAX_EMAIL_LEN<email.length"
+    lacks "email.length>300"
+    lacks "email.length>=300"
+  }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:10e7"
+    has "newwsModule.Server({"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:100e6"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
+  flag code.OversizedWebsocketPayloadDefault in class {
+    lang "javascript"
+    has "maxHttpBufferSize:104857600"
+    has "maxPayload:this.opts.maxHttpBufferSize"
+    lacks "maxHttpBufferSize:1e6"
+  }
 
   // mass assignment (CWE-915) — request body -> bulk bind
   sink method "bulkCreate" -> code.MassAssign
@@ -532,7 +1360,182 @@ adapter javascript {
   sink path "jQuery.extend" arg 2 -> code.ProtoPollute
   sink path "__js_dynamic_property_write" -> code.ProtoPollute
   control "analysis.function.context" val "curr[prop]===constructor.prototype" val "curr[prop]={}" -> core.PrototypePollutionGuard
-  mark exact "analysis.function.context" val "name=separateExposeGlobals" val "Object.keys(shims).forEach" val "exposeGlobals[k]=exp" val "onlyShims[k]=val" nval "k==='__proto__'||k==='constructor'" -> code.UncheckedPrototypeConfigKey
+  control "analysis.function.context" val "Object.prototype.hasOwnProperty.call(pointer,key)" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "lang=javascript" val "name=getPaths" val "segment !== '__proto__'" val "segment !== 'constructor'" val "segment !== 'prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "k=='__proto__'||k=='constructor'||k=='prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "k==='__proto__'||k==='constructor'||k==='prototype'" -> core.PrototypePollutionGuard
+  control "analysis.function.context" val "key1==='__proto__'" -> core.PrototypePollutionGuard
+  flag code.UncheckedPrototypeConfigKey in function {
+    name "separateExposeGlobals"
+    has "Object.keys(shims).forEach"
+    has "exposeGlobals[k]=exp"
+    has "onlyShims[k]=val"
+    lacks "k==='__proto__'||k==='constructor'"
+  }
+  flag code.PrototypeKeyCachePoisoning in function {
+    lang "javascript"
+    name "cachedPathRelative"
+    has "cache[from]"
+    has "cache[from][to]"
+    has "relative.call(path,from,to)"
+    has "cache[from]=cache[from]||{}"
+    lacks "Object.create(null)"
+  }
+  flag code.CspParserProtoDirectivePollution in module {
+    lang "javascript"
+    has "constresult:PolicyResult={}"
+    has "directiveKey===\"__proto__\""
+    has "Object.defineProperty(result,directiveKey"
+    has "value:directiveValue"
+    lacks "newMap()"
+    lacks "result.set(directiveKey,directiveValue)"
+  }
+  flag code.ControlledMergeInheritedKeyPrototypePollution in function {
+    lang "javascript"
+    name "iterateAndMerge"
+    has "for(varattrinobj2)"
+    has "result[attr]=clone(obj2[attr])"
+    has "result[attr]=iterateAndMerge(obj1[attr],obj2[attr])"
+    lacks "Object.getOwnPropertyNames(obj2)"
+    lacks "allowedAttrs.includes(attr)"
+  }
+  flag code.ControlledMergeInheritedKeyPrototypePollution in function {
+    lang "javascript"
+    has "for(varxinprops)"
+    has "obj[x]=props[x]"
+    has "obj[x]=jqMix(obj[x],props[x])"
+    lacks "__proto__"
+    lacks "constructor"
+    lacks "Object.keys(props)"
+    lacks "Object.getOwnPropertyNames(props)"
+    lacks "hasOwnProperty.call(props,x)"
+  }
+  flag code.ControlledMergeInheritedKeyPrototypePollution in function {
+    lang "javascript"
+    index "base.__subscript"
+    index "obj.__subscript"
+    expr "typeofvalue==='object'"
+    call path "Array.isArray"
+    not literal "__proto__"
+    not literal "constructor"
+    not literal "prototype"
+  }
+  flag code.ChartkickRecursiveExtendPrototypePollution in function {
+    lang "javascript"
+    name "extend"
+    has "for(keyinsource)"
+    has "target[key]=source[key]"
+    has "extend(target[key],source[key])"
+    lacks "key===\"__proto__\""
+  }
+  flag code.CollectionExtendPrototypePollution in module {
+    lang "javascript"
+    has "Collection.prototype.extend"
+    has "forEach((el,key)=>"
+    has "byLink"
+    has "setVal(data,key,val)"
+    lacks "key==='__proto__'"
+  }
+  flag code.CollectionExtendPrototypePollution in module {
+    lang "javascript"
+    has "_core.Collection.prototype.extend"
+    has "forEach((el,key)=>"
+    has "_link.byLink"
+    has "setVal(data,key,val)"
+    lacks "key==='__proto__'"
+  }
+  flag code.CookiexDeepPrototypePollution in module {
+    lang "javascript"
+    has "Object.keys(b).forEach(key=>"
+    has "a[key]=b[key]"
+    has "delegate.call(this,a[key],b[key])"
+    lacks "invalids.includes(key)"
+    lacks "'__proto__'"
+  }
+  flag code.ForOwnRecursiveDefaultsPrototypePollution in function {
+    lang "javascript"
+    name "copy"
+    call path "lazy.forOwn"
+    token subscript "target[key]"
+    call path "defaultsDeep"
+    not expr "key==='__proto__'"
+  }
+  flag code.TemplateDirectoryHiddenGlobCopy in function {
+    lang "javascript"
+    name "downloadTemplate"
+    call path "fs.statSync"
+    call path "d.copy"
+    not token prop "hide=false"
+  }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    lang "javascript"
+    has "currentKeyPath"
+    has "remainingKeyPath"
+    has "obj[currentKeyPath]"
+    has "obj[currentKeyPath]={}"
+    has "setByKeyPath(innerObj,remainingKeyPath,value)"
+    lacks "hasOwn(obj,currentKeyPath)"
+    lacks "Object.prototype.hasOwnProperty.call(obj,currentKeyPath)"
+  }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    lang "javascript"
+    call path "key.split"
+    call path "split.shift"
+    call path "__js_dynamic_property_write"
+    not literal "__proto__"
+  }
+  flag code.NestedPathInheritedPropertyPrototypePollution in function {
+    lang "javascript"
+    index "keys.__subscript"
+    index "object.__subscript"
+    expr "nextinobject"
+    call path "__js_dynamic_property_write"
+    not literal "__proto__"
+    not literal "constructor"
+    not literal "prototype"
+  }
+  flag code.UrlPathParameterCaseNormalizationBypass in function {
+    lang "javascript"
+    name "getUrlParams"
+    call path "nodeUrl.parse"
+    call path "parsed.pathname.split"
+    call path "_.tail"
+    index "parts.__subscript"
+    call path "__js_dynamic_property_write"
+    not call path "parts[].toLowerCase"
+  }
+  flag code.CoerciblePathSegmentPrototypePollution in function {
+    lang "javascript"
+    has "path.length-1"
+    has "temp=path[i]"
+    has "temp===\"constructor\"||temp===\"__proto__\"||temp===\"prototype\""
+    has "obj[temp]===void0"
+    has "obj=obj[temp]"
+    has "obj[temp]=value"
+    lacks "temp.constructor!==String&&temp.constructor!==Number"
+    lacks "typeof temp"
+    lacks "String(temp)"
+  }
+  flag code.ExpressionEvaluatorPrototypeNameAccess in function {
+    lang "javascript"
+    expr "type===IVAR"
+    expr "type===IMEMBER"
+    expr "item.valueinexpr.functions"
+    selector "item.value"
+    selector "expr.functions"
+    token index_base "values"
+    token index_key "item.value"
+    lacks fact prototype_name_guard "true"
+  }
+  flag code.GeneratedPathAccessorPrototypePollution in function {
+    lang "javascript"
+    call path "parsepath"
+    call path "builder.push"
+    call path "Function"
+    literal contains_any ["__proto__", "constructor", "prototype"]
+    not call path contains_any ["Object.hasOwn", "hasOwnProperty"]
+    not literal contains_any ["removed method"]
+  }
   // Polluted inherited option reads in template/compiler APIs can control generated code.
   sink path "opts.client" -> code.ProtoPollute
   sink path "opts.escape" -> code.ProtoPollute
@@ -545,93 +1548,442 @@ adapter javascript {
   // weak cipher (CWE-327) value-matched
   // weak cipher (CWE-327): fire unless a strong AEAD/256-bit algorithm literal is present
   // (catches ecb/cbc/des/rc4/aes-128 + dynamic algorithm vars; accepts FP on dynamic-strong).
-  mark "simplecrypt" val "aes-192-ecb" -> code.WeakCipher
-  mark "createCipheriv" nval "gcm" nval "chacha" nval "poly1305" -> code.WeakCipher
-  mark "createCipheriv" val "0000000000000000" -> code.StaticIv
-  mark "createCipheriv" val "000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "simplecrypt"
+    has "aes-192-ecb"
+  }
+  flag code.WeakCipher on any {
+    path "createCipheriv"
+    lacks "gcm"
+    lacks "chacha"
+    lacks "poly1305"
+  }
+  flag code.StaticIv on any {
+    path "createCipheriv"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "createCipheriv"
+    has "000000000000"
+  }
 
   // weak hash (CWE-328) — crypto.createHash('md5'|'sha1') (value-matched).
   // weak hash (CWE-328): value-match the weak algorithm on the createHash node. Precise —
   // resolves indirection too (createHash(['sha1'][0]) / const-propped vars put the literal in
   // the args) and does NOT mis-fire on the chained .update()/.digest() nodes.
-  mark "createHash" val "md5" -> code.WeakHash
-  mark "createHash" val "md4" -> code.WeakHash
-  mark "createHash" val "md2" -> code.WeakHash
-  mark "createHash" val "sha1" -> code.WeakHash
-  mark "createHash" val "ripemd" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "createHash"
+    has "md5"
+  }
+  flag code.WeakHash on any {
+    path "createHash"
+    has "md4"
+  }
+  flag code.WeakHash on any {
+    path "createHash"
+    has "md2"
+  }
+  flag code.WeakHash on any {
+    path "createHash"
+    has "sha1"
+  }
+  flag code.WeakHash on any {
+    path "createHash"
+    has "ripemd"
+  }
 
   // Package managers and monorepo tools execute project-controlled lifecycle
   // scripts during install/sync. Treat explicit installer invocations as code
   // execution even when the command string itself is constant.
-  mark "spawnSync" val "install" -> code.PackageInstallExecution
-  mark "spawnSync" val "sync" -> code.PackageInstallExecution
-  mark "child_process.spawnSync" val "install" -> code.PackageInstallExecution
-  mark "child_process.spawnSync" val "sync" -> code.PackageInstallExecution
-  mark "execFileSync" val "install" -> code.PackageInstallExecution
-  mark "execFileSync" val "sync" -> code.PackageInstallExecution
-  mark "child_process.execFileSync" val "install" -> code.PackageInstallExecution
-  mark "child_process.execFileSync" val "sync" -> code.PackageInstallExecution
+  flag code.PackageInstallExecution on any {
+    path "spawnSync"
+    has "install"
+  }
+  flag code.PackageInstallExecution on any {
+    path "spawnSync"
+    has "sync"
+  }
+  flag code.PackageInstallExecution on any {
+    path "child_process.spawnSync"
+    has "install"
+  }
+  flag code.PackageInstallExecution on any {
+    path "child_process.spawnSync"
+    has "sync"
+  }
+  flag code.PackageInstallExecution on any {
+    path "execFileSync"
+    has "install"
+  }
+  flag code.PackageInstallExecution on any {
+    path "execFileSync"
+    has "sync"
+  }
+  flag code.PackageInstallExecution on any {
+    path "child_process.execFileSync"
+    has "install"
+  }
+  flag code.PackageInstallExecution on any {
+    path "child_process.execFileSync"
+    has "sync"
+  }
 
   // Embeddable iframe allowlists that include domains able to host attacker content
   // become XSS when paired with same-origin sandboxing/srcdoc embed behavior.
-  mark "Set" val "dddice.com" -> code.UnsafeEmbeddableAllowlist
+  flag code.UnsafeEmbeddableAllowlist on any {
+    path "Set"
+    has "dddice.com"
+  }
   // Next.js middleware that rewrites to markdown solely on an acceptsMarkdown()
   // predicate can serve markdown to clients that also prefer HTML.
-  mark "acceptsMarkdown" -> code.MarkdownNegotiationBypass
+  flag code.MarkdownNegotiationBypass on any {
+    path "acceptsMarkdown"
+  }
   // PDF.js eval support allows malicious PDFs to execute embedded JavaScript.
-  mark "__object_literal" val "isEvalSupported=true" -> code.PdfJsEvalSupported
+  flag code.PdfJsEvalSupported on any {
+    path "__object_literal"
+    has "isEvalSupported=true"
+  }
+  // Default relay/proxy URL builders that embed caller URL/token metadata into
+  // a hardcoded fallback host need trust-boundary review.
+  flag code.DefaultExternalRelaySecretExposure in function {
+    lang "javascript"
+    name "buildRelayUrl"
+    literal "herokuapp.com"
+    call arg "encodeURIComponent:gurl"
+    identifier contains_any ["token", "gurl"]
+    not identifier "configuredRelayHost"
+  }
+  // Runtime/default settings that choose auth/session token sync URLs must be
+  // constrained to same-origin paths before token-bearing requests are installed.
+  flag code.ExternalSettingTokenSyncUrlExposure in function {
+    lang "javascript"
+    call path "getExperimentalSetting"
+    literal contains_any ["authTokenSyncURL", "tokenSyncURL", "tokenSyncUrl", "sessionSyncURL", "sessionSyncUrl"]
+    call path contains_any ["mintCookieFactory", "syncToken", "syncSession", "tokenSync", "sessionSync"]
+    not call path "startsWith"
+  }
+  // Settings APIs that clone runtime configuration and redact one known secret
+  // subtree can still leak sibling nested credential objects.
+  flag code.RuntimeSettingsNestedCredentialsExposure in module {
+    lang "javascript"
+    call path "apiApp.get"
+    literal "/api/settings"
+    call path "JSON.parse"
+    call path "JSON.stringify"
+    selector "runtime.settings"
+    selector "tosend.smtp.password"
+    selector "settings.daqstore"
+    call path "res.json"
+    not selector "tosend.daqstore.credentials"
+  }
 
   // weak randomness (CWE-330) — presence of Math.random() (non-crypto PRNG).
   // crypto.randomBytes / randomUUID (CSPRNG) are deliberately NOT marked.
-  mark "Math.random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "Math.random"
+  }
 
   // TLS cert validation disabled (CWE-295) — rejectUnauthorized:false
-  mark "https.request" val "rejectUnauthorized=false" -> code.CertValidationDisabled
-  mark "https.get" val "rejectUnauthorized=false" -> code.CertValidationDisabled
-  mark "https.Agent" val "rejectUnauthorized=false" -> code.CertValidationDisabled
-  mark "tls.connect" val "rejectUnauthorized=false" -> code.CertValidationDisabled
-  mark exact "analysis.function.context" val "responseBuffer.push(chunk)" val "Buffer.concat(responseBuffer).length>config.maxContentLength" nval "stream.destroy()" -> code.UnboundedResourceOperation
-  mark exact "analysis.function.context" val "lang=javascript" val "body.split('&').length" val "len>limit?undefined:len-1" nval "indexOf('&'" -> code.UnboundedDelimiterSplitCount
-  mark exact "analysis.function.context" val "lang=javascript" val "Math.abs(numeric(n[2]))" val "test(i,y)" val "i+=incr" nval "Math.max(Math.abs(numeric(n[2])),1)" -> code.ZeroStepSequenceExpansion
-  mark "fs.openSync" -> code.ResourceHandle
-  mark "fs.open" -> code.ResourceHandle
+  flag code.CertValidationDisabled on any {
+    path "https.request"
+    has "rejectUnauthorized=false"
+  }
+  flag code.CertValidationDisabled on any {
+    path "https.get"
+    has "rejectUnauthorized=false"
+  }
+  flag code.CertValidationDisabled on any {
+    path "https.Agent"
+    has "rejectUnauthorized=false"
+  }
+  flag code.CertValidationDisabled on any {
+    path "tls.connect"
+    has "rejectUnauthorized=false"
+  }
+  flag code.CertValidationDisabled in module {
+    lang "javascript"
+    has "this.rejectUnauthorized=opts.rejectUnauthorized===undefined?null:opts.rejectUnauthorized"
+    has "rejectUnauthorized:this.rejectUnauthorized"
+    lacks "opts.rejectUnauthorized===undefined?true:opts.rejectUnauthorized"
+  }
+  flag code.UnboundedResourceOperation in function {
+    has "responseBuffer.push(chunk)"
+    has "Buffer.concat(responseBuffer).length>config.maxContentLength"
+    lacks "stream.destroy()"
+  }
+  flag code.UnboundedDelimiterSplitCount in function {
+    lang "javascript"
+    has "body.split('&').length"
+    has "len>limit?undefined:len-1"
+    lacks "indexOf('&'"
+  }
+  flag code.ZeroStepSequenceExpansion in function {
+    lang "javascript"
+    has "Math.abs(numeric(n[2]))"
+    has "test(i,y)"
+    has "i+=incr"
+    lacks "Math.max(Math.abs(numeric(n[2])),1)"
+  }
+  flag code.ZipEntryCompressedSizeTokenRead on call {
+    path "tokenizer.readToken"
+    operand {
+      path "Token.StringType"
+      path "zipHeader.compressedSize"
+    }
+  }
+  flag code.DeflateDecompressionMaxSafeIntegerLimit on call {
+    path "decompressDeflateRawWithLimit"
+    operand {
+      path "Number.MAX_SAFE_INTEGER"
+    }
+  }
+  flag code.FoldedHeaderContinuationCrash in function {
+    lang "javascript"
+    has "this.buffer.split(RE_CRLF)"
+    has "lines[i][0]"
+    has "RE_HDR.exec(lines[i])"
+    has "this.header[h]"
+    has "lines[i]"
+    lacks "if(h)"
+    lacks "if(h!==undefined)"
+    lacks "if(h!=null)"
+  }
+  flag code.ResourceHandle on any {
+    path "fs.openSync"
+  }
+  flag code.ResourceHandle on any {
+    path "fs.open"
+  }
   control "fs.closeSync" -> core.ResourceRelease
   control "fs.close" -> core.ResourceRelease
-  mark exact "analysis.function.context" val "maxContentLength" val "Buffer.concat(responseBuffer).length>config.maxContentLength" val "reject(createError" nval "stream.destroy" -> code.UnstoppedLimitedStream
-  mark exact "analysis.function.context" val "name=processMessage" val "protocolMsg" val "HISTORY_SYNC_NOTIFICATION" val "APP_STATE_SYNC_KEY_SHARE" val "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE" nval "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe" -> code.ProtocolStateReview
-  mark exact "analysis.function.context" val "_downloadFromWorkingDir" val "join(localDirPath,file.name)" val "downloadTo(localPath,file.name)" nval "basename(file.name)" -> code.RemoteListingDownloadPath
-  mark exact "analysis.function.context" val "name=<lambda>" val "callbackData.hasOwnProperty(\"status\")" val "data.status==-1" val "callbackFun(callbackData)" nval "callbackData.status==-1" -> code.ClientAuthFailureResponseReview
-  mark exact "analysis.function.context" val "prisma.accounts.update" val "where:{id}" val "passwordHash" val "originalPassword" nval "currentUserId" nval "ctx.id" -> code.IdorPolicyReview
+  flag code.UnstoppedLimitedStream in function {
+    has "maxContentLength"
+    has "Buffer.concat(responseBuffer).length>config.maxContentLength"
+    has "reject(createError"
+    lacks "stream.destroy"
+  }
+  flag code.ProtocolStateReview in function {
+    name "processMessage"
+    has "protocolMsg"
+    has "HISTORY_SYNC_NOTIFICATION"
+    has "APP_STATE_SYNC_KEY_SHARE"
+    has "PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE"
+    lacks "SELF_ONLY_TYPES.has(protocolMsg.type)&&!message.key.fromMe"
+  }
+  flag code.PostTlsIdentityRebindingMissingCheck in function {
+    lang "javascript"
+    call path "?.sendPacket"
+    call path "?.readPacket"
+    selector "?.identity.body.protocolVersion"
+    selector "?.identity.body.deviceId"
+    assign "?.identity=awaitthis.readPacket()"
+    not binary contains_any [
+      "this.identity.body.protocolVersion!==identity.body.protocolVersion",
+      "this.identity.body.deviceId!==identity.body.deviceId",
+      "this.identity.body.protocolVersion!=identity.body.protocolVersion",
+      "this.identity.body.deviceId!=identity.body.deviceId"
+    ]
+  }
+  flag code.RemoteListingDownloadPath in function {
+    has "_downloadFromWorkingDir"
+    has "join(localDirPath,file.name)"
+    has "downloadTo(localPath,file.name)"
+    lacks "basename(file.name)"
+  }
+  flag code.BrowserlessWorkspaceFilePathTraversal in function {
+    name "<lambda>"
+    has "req.params[0]"
+    has "path.join(workspaceDir,file)"
+    has "res.sendFile(filePath"
+    lacks "filePath.includes(workspaceDir)"
+  }
+  flag code.BrowserlessWorkspaceFilePathTraversal in function {
+    name "<lambda>"
+    has "req.params[0]"
+    has "path.join(workspaceDir,file)"
+    has "rimraf(filePath"
+    lacks "filePath.includes(workspaceDir)"
+  }
+  flag code.ClaspRemoteFilePathTraversal in function {
+    name "fetchRemote"
+    has "script.projects.getContent"
+    has "response.data.files"
+    has "f.name"
+    has "path.resolve(contentDir"
+    lacks "isInside"
+  }
+  flag code.UnvalidatedDynamicRequirePathTraversal in function {
+    lang "javascript"
+    name "runWidget"
+    has "widgetId"
+    has "widget-${widgetId}.js"
+    has "path.join(__dirname,file)"
+    has "require(path.join(__dirname,file))"
+    lacks "resolveWidgetPath"
+    lacks "path.relative"
+    lacks "widgetIdPattern"
+  }
+  flag code.EncodedDotSegmentStaticPathBypass in function {
+    lang "javascript"
+    selector "req.isStaticFile"
+    selector "req.uri.pathname"
+    call path "req.uri.pathname.indexOf"
+    literal "./"
+    call path "req.$total_file"
+    not literal "%2e"
+    not literal "%2E"
+    not call path "decodeURIComponent"
+    not call path "decodeURI"
+  }
+  flag code.ExpressSpaAssetFallbackReflectedXss in module {
+    lang "javascript"
+    call path "express.static"
+    literal "/*"
+    literal contains_any ["./build/index.html", "./src/client/index.html"]
+    not literal "/js/*"
+    not literal "/images/*"
+    not literal "/styles/*"
+  }
+  flag code.DecodedRequestStaticPathTraversal in function {
+    lang "javascript"
+    attr path "config.staticFilePath"
+    call path "decodeURIComponent"
+    call path "utils.file.existsSync"
+    call path "handleStaticFile"
+    not call path "indexOf"
+    not call path "startsWith"
+    not call path "path.relative"
+  }
+  flag code.ClientAuthFailureResponseReview in function {
+    name "<lambda>"
+    has "callbackData.hasOwnProperty(\"status\")"
+    has "data.status==-1"
+    has "callbackFun(callbackData)"
+    lacks "callbackData.status==-1"
+  }
+  flag code.IdorPolicyReview in function {
+    has "prisma.accounts.update"
+    has "where:{id}"
+    has "passwordHash"
+    has "originalPassword"
+    lacks "currentUserId"
+    lacks "ctx.id"
+  }
 
   // JWT signature not verified (CWE-347) — jsonwebtoken alg none
-  mark "jwt.verify" val "algorithms=none" -> code.JwtUnverified
-  mark "jwt.sign" val "algorithm=none" -> code.JwtUnverified
+  flag code.JwtUnverified on any {
+    path "jwt.verify"
+    fact algorithms "none"
+  }
+  flag code.JwtUnverified on any {
+    path "jwt.sign"
+    fact algorithm "none"
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.sign"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
+  }
+  flag code.WeakJwtSecret on call {
+    path "jwt.verify"
+    call arg contains_any ["secret", "jwt-secret", "change-me", "changeme", "password"]
+  }
   // explicit CSRF middleware disablement.
-  mark "lusca.csrf" val "false" -> code.CsrfDisabled
-  mark "csrfProtection" val "false" -> code.CsrfDisabled
+  flag code.CsrfDisabled on any {
+    path "lusca.csrf"
+    has "false"
+  }
+  flag code.CsrfDisabled on any {
+    path "csrfProtection"
+    has "false"
+  }
 
   // cleartext channel (CWE-319) — http:// URL to an HTTP client, excluding loopback
   // dev traffic (127.0.x); still FP-prone for other internal hosts → low sev.
-  mark "axios" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "axios"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "fetch"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
+  flag code.CleartextChannel on any {
+    path "node:url.URL"
+    has "http://"
+    lacks "127.0"
+    lacks "localhost"
+  }
+  flag code.InsecureExecutableDownload in module {
+    lang "javascript"
+    has "jrePrefix"
+    has "OpenJDK-JRE"
+    has "http://bundled-openjdk-jre"
+    has "download(jreUrl,jreTempFile"
+    has "http.request"
+    lacks "https://storage.googleapis.com"
+  }
   // Reconstructing a browser Request while copying headers but dropping redirect policy
   // can turn caller-specified `redirect: "error"` into the default follow behavior.
   sink method "newRequest" arg 1 collection val "headers" nval "redirect" -> code.RequestPolicyStripped
 
   // insecure cookie (CWE-614) — a security flag EXPLICITLY disabled (omission not flagged).
-  mark "res.cookie" val "httpOnly=false" -> code.InsecureCookie
-  mark "res.cookie" nval "secure=true" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "res.cookie"
+    has "httpOnly=false"
+  }
+  flag code.InsecureCookie on any {
+    path "res.cookie"
+    not fact secure "true"
+  }
 
   // permissive CORS (CWE-942) — ACAO header set to "*" (multi-val: name AND wildcard)
-  mark "res.header" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "res.set" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "res.setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  flag code.PermissiveCors on any {
+    path "res.header"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "res.set"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "res.setHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
 
   // clickjacking (CWE-1021) — frame protection EXPLICITLY disabled (omission not flagged):
   // X-Frame-Options: ALLOWALL, or helmet frameguard turned off.
-  mark "res.setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "res.set" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "res.header" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "helmet" val "frameguard=false" -> code.MissingFrameProtection
+  flag code.MissingFrameProtection on any {
+    path "res.setHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "res.set"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "res.header"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "helmet"
+    has "frameguard=false"
+  }
 
   // character-filtering replace(/regex/g, repl): the engine analyzes the output
   // alphabet (charfilter.go) -> sound sanitizer where it excludes the sink excluded_chars.
@@ -642,7 +1994,11 @@ adapter javascript {
   sink method "all" -> code.SqlExecution
   sink method "get" -> code.SqlExecution
   sink method "each" -> code.SqlExecution
-  sink method "exec" -> code.SqlExecution
+  sink path "db.exec" -> code.SqlExecution
+  sink path "database.exec" -> code.SqlExecution
+  sink path "connection.exec" -> code.SqlExecution
+  sink path "sqlite.exec" -> code.SqlExecution
+  sink path "sqlite3.exec" -> code.SqlExecution
   sink method "prepare" -> code.SqlExecution
 
   // xpath (npm xpath) — the expression is arg0.

@@ -9,13 +9,17 @@ adapter cpp {
 
     sink method "parse" -> code.Deserialization
     sink method "write" -> code.NetworkSend
-    mark method "set_redirect" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "set_redirect"
+    }
     sink method "open" -> code.FilePathAccess
     sink method "connect" -> code.NetworkConnect
     sink method "set_file_content" -> code.FilePathAccess
     sink method "send" -> code.NetworkSend
     sink method "set_header" -> code.ResponseHeaderWrite
 
-    mark method "hash_core" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "hash_core"
+    }
   }
 }

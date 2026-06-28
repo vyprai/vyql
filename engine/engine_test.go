@@ -112,60 +112,6 @@ func label(s usg.Store, id, concept string) {
 	s.AddLabel(id, usg.Label{Concept: concept})
 }
 
-func TestPossibilityFindingsUseConceptReviewData(t *testing.T) {
-	onto := ontology.New()
-	onto.Add(ontology.Concept{
-		Name:             "Target",
-		Package:          "custom",
-		Kind:             "sink",
-		VulnerableTo:     []string{"custom.Condition"},
-		ReviewCategory:   "custom-category",
-		ReviewCondition:  "custom condition text",
-		ReviewEvidence:   "custom evidence text",
-		ReviewAssumption: "custom assumption text",
-		ReviewConfidence: "medium",
-	})
-	store := usg.NewInMemStore()
-	store.AddNode(usg.Node{ID: "target", Type: "code.Call", Props: map[string]string{"loc": "x:1"}})
-	store.AddLabel("target", usg.Label{Concept: "custom.Target"})
-
-	got := New(onto, store).PossibilityFindings(nil)
-	if len(got) != 1 {
-		t.Fatalf("possibility findings = %d, want 1", len(got))
-	}
-	rc := got[0].ReviewConditions[0]
-	if rc.Category != "custom-category" ||
-		rc.Condition != "custom condition text" ||
-		rc.Evidence != "custom evidence text" ||
-		rc.Assumption != "custom assumption text" ||
-		rc.Confidence != "medium" {
-		t.Fatalf("review condition was not data-driven: %+v", rc)
-	}
-}
-
-func TestPossibilityFindingsDeduplicateSameCallSite(t *testing.T) {
-	onto := ontology.New()
-	onto.Add(ontology.Concept{
-		Name:         "Target",
-		Package:      "custom",
-		Kind:         "sink",
-		VulnerableTo: []string{"custom.Condition"},
-	})
-	store := usg.NewInMemStore()
-	for _, id := range []string{"call-a", "call-b"} {
-		store.AddNode(usg.Node{ID: id, Type: "code.Call", Props: map[string]string{
-			"loc":  "x.go:10",
-			"path": "pd.parseOctetString",
-		}})
-		store.AddLabel(id, usg.Label{Concept: "custom.Target"})
-	}
-
-	got := New(onto, store).PossibilityFindings(nil)
-	if len(got) != 1 {
-		t.Fatalf("possibility findings = %d, want 1", len(got))
-	}
-}
-
 func TestEngineDoesNotHardcodeOntologyConcepts(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

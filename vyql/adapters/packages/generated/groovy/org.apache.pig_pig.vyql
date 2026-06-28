@@ -3,7 +3,11 @@ adapter groovy {
     sink method "exec" -> code.CommandExecution
     sink method "file" -> code.FilePathAccess
     sink method "load" -> code.Deserialization
-    mark method "RANDOM" -> code.WeakRandomValue
-    mark method "sum" -> code.WeakHash
+    flag code.WeakRandomValue on any {
+      method "RANDOM"
+    }
+    flag code.WeakHash on any {
+      method "sum"
+    }
   }
 }

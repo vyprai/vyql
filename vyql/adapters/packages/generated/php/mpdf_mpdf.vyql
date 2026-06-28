@@ -8,7 +8,9 @@ adapter php {
     sink method "print_ob_button" -> code.HtmlRender
     sink method "print_ob_checkbox" -> code.HtmlRender
     sink method "print_ob_radio" -> code.HtmlRender
-    mark method "SetFormSubmit" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "SetFormSubmit"
+    }
     source method "SetFormSubmit" -> code.HttpInput
   }
 }

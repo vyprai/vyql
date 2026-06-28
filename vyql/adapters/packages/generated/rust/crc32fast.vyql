@@ -2,8 +2,14 @@ import code.{WeakHash}
 
 adapter rust {
   package "crc32fast" {
-    mark method "hash" -> code.WeakHash
-    mark method "update" -> code.WeakHash
-    mark method "finalize" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "hash"
+    }
+    flag code.WeakHash on any {
+      method "update"
+    }
+    flag code.WeakHash on any {
+      method "finalize"
+    }
   }
 }

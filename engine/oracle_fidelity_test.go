@@ -49,6 +49,60 @@ rule GuardedFlow {
 	}
 }
 
+func TestGuardedByFunctionContextSummary(t *testing.T) {
+	rule := `
+package test;
+rule GuardedFlow {
+  meta { id: "TEST-GUARDED", severity: high }
+  taint custom.Input -> custom.Target
+  unless guarded_by custom.Transform
+}
+`
+	counts, errs := runRule(t, rule, func(s usg.Store) {
+		s.AddNode(usg.Node{ID: "in", Type: "code.Name", Scope: "sample.py/fn1@1", Props: map[string]string{"loc": "sample.py:1"}})
+		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
+		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
+		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 3, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:1"}})
+		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
+	})
+	if len(errs) != 0 {
+		t.Fatalf("well-typed guard should compile, got %v", errs)
+	}
+	if counts[0] != 0 {
+		t.Fatalf("same-function context summary should suppress, got %d", counts[0])
+	}
+
+	counts, _ = runRule(t, rule, func(s usg.Store) {
+		s.AddNode(usg.Node{ID: "in", Type: "code.Name", Scope: "sample.py/fn1@1", Props: map[string]string{"loc": "sample.py:1"}})
+		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+		s.AddNode(usg.Node{ID: "target", Type: "code.Call", Scope: "sample.py/fn1@2", Region: "sample.py/fn1", HasOrder: true, Order: 2, Props: map[string]string{"loc": "sample.py:2"}})
+		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
+		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Scope: "sample.py/fn2@3", Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:10"}})
+		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "target"})
+	})
+	if counts[0] != 1 {
+		t.Fatalf("different-function context summary should not suppress, got %d", counts[0])
+	}
+
+	counts, _ = runRule(t, rule, func(s usg.Store) {
+		s.AddNode(usg.Node{ID: "in", Type: "code.Attr", Scope: "sample.py/fn2@1", Props: map[string]string{"loc": "sample.py:31"}})
+		s.AddLabel("in", usg.Label{Concept: "custom.Input"})
+		s.AddNode(usg.Node{ID: "param", Type: "code.Param", Scope: "sample.py/fn1@2", Props: map[string]string{"loc": "sample.py:6"}})
+		s.AddNode(usg.Node{ID: "target", Type: "code.Arg", Scope: "sample.py/fn1/try8@3", Region: "sample.py/fn1/try8", Props: map[string]string{"loc": "sample.py:25"}})
+		s.AddLabel("target", usg.Label{Concept: "custom.Target"})
+		s.AddNode(usg.Node{ID: "summary", Type: "code.Call", Region: "sample.py/fn1", HasOrder: true, Order: 4, Props: map[string]string{"callee_path": "analysis.function.context", "loc": "sample.py:6"}})
+		s.AddLabel("summary", usg.Label{Concept: "custom.Transform"})
+		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "in", Dst: "param"})
+		s.AddEdge(usg.Edge{Type: "FLOWS", Src: "param", Dst: "target"})
+	})
+	if counts[0] != 0 {
+		t.Fatalf("callee function context summary should suppress callee-internal sink, got %d", counts[0])
+	}
+}
+
 func TestRefinementAndDisjunctiveControls(t *testing.T) {
 	rule := `
 package test;

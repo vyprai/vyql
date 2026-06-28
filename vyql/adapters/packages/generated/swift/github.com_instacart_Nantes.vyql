@@ -1,7 +1,11 @@
 adapter swift {
   package "github.com/instacart/Nantes" {
-    mark method "setAttributedText" -> code.RedirectTarget
-    mark method "addLink" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "setAttributedText"
+    }
+    flag code.RedirectTarget on any {
+      method "addLink"
+    }
     source method "enabledTextCheckingTypes" -> core.UserControlledData
   }
 }

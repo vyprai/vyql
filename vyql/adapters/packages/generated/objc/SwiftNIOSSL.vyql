@@ -1,6 +1,8 @@
 adapter objc {
   package "SwiftNIOSSL" {
     source method "AES_set_encrypt_key" -> code.SecretValue
-    mark method "MD5" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "MD5"
+    }
   }
 }

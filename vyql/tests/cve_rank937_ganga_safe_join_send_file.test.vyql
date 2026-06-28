@@ -1,0 +1,41 @@
+# Rank 937 / CVE-2022-31507: Ganga joined an attacker-controlled browse path
+# with a job directory using os.path.join before passing it to Flask send_file.
+
+test "rank937: os.path.join with route path reaches send_file"
+  lang python
+  file routes.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  from flask import send_file
+
+  @app.route("/job/<int:job_id>/browse/<path:path>")
+  def job_browse(job_id: int, path):
+      job_info = query_internal_api(f"/internal/jobs/{job_id}", "get")
+      job_base_dir = os.path.dirname(os.path.dirname(job_info["outputdir"]))
+      abs_path = os.path.join(job_base_dir, path)
+      if os.path.isfile(abs_path):
+          return send_file(abs_path)
+      return render_template("browse.html")
+  ```
+
+test "rank937: safe_join contains route path before send_file"
+  lang python
+  file routes.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+  from flask import send_file
+  from werkzeug.utils import safe_join
+
+  @app.route("/job/<int:job_id>/browse/<path:path>")
+  def job_browse(job_id: int, path):
+      job_info = query_internal_api(f"/internal/jobs/{job_id}", "get")
+      job_base_dir = os.path.dirname(os.path.dirname(job_info["outputdir"]))
+      abs_path = safe_join(job_base_dir, path)
+      if os.path.isfile(abs_path):
+          return send_file(abs_path)
+      return render_template("browse.html")
+  ```

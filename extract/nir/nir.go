@@ -16,6 +16,10 @@ package nir
 
 import "encoding/gob"
 
+// JSArgumentsParam is a synthetic parameter used by the JavaScript frontend for
+// exported functions that read the `arguments` object.
+const JSArgumentsParam = "__arguments__"
+
 // register every concrete Expr/Stmt so gob can (de)serialize the interface fields of Module
 // — used by the parse cache and the incremental-lowering delta cache.
 func init() {
@@ -90,6 +94,7 @@ type CallEffect struct {
 // Format is a taint-propagating string build (f-string, %, +, .format).
 type Format struct {
 	Parts []Expr
+	Text  string
 	Loc   string
 }
 
@@ -265,7 +270,7 @@ type Block struct{ Stmts []Stmt }
 
 // Structured control-flow nodes (B1 / WS0). Frontends emit these instead of a flat
 // Block when they preserve branch structure; the lowering builds a real CFG (CONTROL
-// edges) from them under VYQL_CFG. With the flag off — or for a frontend that hasn't
+// edges) from them. For a frontend that has not
 // been converted — they are lowered like a Block (flatten), so they are fully additive
 // and behaviour-preserving. Cond is retained for taint and (later) path feasibility.
 type If struct {
@@ -299,10 +304,11 @@ type Switch struct {
 
 // Try models exception control flow: Body, zero+ Handlers (catch/except bodies), Finally.
 type Try struct {
-	Body     []Stmt
-	Handlers [][]Stmt
-	Finally  []Stmt
-	Loc      string
+	Body          []Stmt
+	Handlers      [][]Stmt
+	HandlerParams []string
+	Finally       []Stmt
+	Loc           string
 }
 
 func (Assign) isStmt()    {}

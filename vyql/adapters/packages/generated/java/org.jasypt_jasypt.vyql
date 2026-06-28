@@ -2,9 +2,15 @@ import code.{SecretValue, WeakCipher, WeakHash}
 
 adapter java {
   package "org.jasypt:jasypt" {
-    mark method "encrypt" -> code.WeakCipher
-    mark method "decrypt" -> code.WeakCipher
-    mark method "digest" -> code.WeakHash
+    flag code.WeakCipher on any {
+      method "encrypt"
+    }
+    flag code.WeakCipher on any {
+      method "decrypt"
+    }
+    flag code.WeakHash on any {
+      method "digest"
+    }
     source method "setPassword" -> code.SecretValue
     source method "getPassword" -> code.SecretValue
   }

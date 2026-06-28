@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter scala {
   package "oro:oro" {
-    mark method "compile" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "compile"
+    }
   }
 }

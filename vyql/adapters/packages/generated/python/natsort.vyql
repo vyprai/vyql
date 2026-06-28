@@ -6,6 +6,8 @@ adapter python {
     sink method "parse_bytes_factory" -> code.Deserialization
     sink method "parse_number_or_none_factory" -> code.Deserialization
     sink method "parse_path_factory" -> code.Deserialization
-    mark method "regex_chooser" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "regex_chooser"
+    }
   }
 }

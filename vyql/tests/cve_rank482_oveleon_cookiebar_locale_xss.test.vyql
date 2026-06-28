@@ -1,0 +1,85 @@
+# Rank 482 / CVE-2024-47069: Oveleon Cookiebar accepted the route locale in
+# /cookiebar/block/{locale}/{id} and rendered it through the frontend template.
+# The fix rejects invalid locale route values before the response is built.
+
+test "rank482: Oveleon Cookiebar block locale reaches template response"
+  lang php
+  file CookiebarController.php
+  expect VYQL-INJ-104
+  expect_review code.OveleonCookiebarLocaleReflectedXss
+  code
+  ```
+  <?php
+  namespace Oveleon\ContaoCookiebar\Controller;
+
+  use Contao\FrontendTemplate;
+  use Contao\System;
+  use Contao\Validator;
+  use Symfony\Component\HttpFoundation\Request;
+  use Symfony\Component\HttpFoundation\Response;
+
+  class CookiebarController
+  {
+      public function blockAction(Request $request, $locale, $id)
+      {
+          $this->framework->initialize();
+
+          System::loadLanguageFile('tl_cookiebar', $locale);
+
+          $strUrl = $request->get('redirect');
+
+          if (!Validator::isUrl($strUrl)) {
+              return new Response('The redirect destination must be a valid URL.', Response::HTTP_BAD_REQUEST);
+          }
+
+          $objTemplate = new FrontendTemplate('ccb_element_blocker');
+          $objTemplate->language = $locale;
+          $objTemplate->redirect = $request->get('redirect');
+
+          return $objTemplate->getResponse();
+      }
+  }
+  ```
+
+test "rank482: Oveleon Cookiebar validates block locale before response"
+  lang php
+  file CookiebarController.php
+  reject VYQL-INJ-104
+  reject_review code.OveleonCookiebarLocaleReflectedXss
+  code
+  ```
+  <?php
+  namespace Oveleon\ContaoCookiebar\Controller;
+
+  use Contao\FrontendTemplate;
+  use Contao\System;
+  use Contao\Validator;
+  use Symfony\Component\HttpFoundation\Request;
+  use Symfony\Component\HttpFoundation\Response;
+
+  class CookiebarController
+  {
+      public function blockAction(Request $request, $locale, $id)
+      {
+          $this->framework->initialize();
+
+          System::loadLanguageFile('tl_cookiebar', $locale);
+
+          if (!Validator::isLocale($locale)) {
+              return new Response('The URL must contain a valid locale.', Response::HTTP_BAD_REQUEST);
+          }
+
+          $strUrl = $request->get('redirect');
+
+          if (!Validator::isUrl($strUrl)) {
+              return new Response('The redirect destination must be a valid URL.', Response::HTTP_BAD_REQUEST);
+          }
+
+          $objTemplate = new FrontendTemplate('ccb_element_blocker');
+          $objTemplate->language = $locale;
+          $objTemplate->redirect = $request->get('redirect');
+
+          return $objTemplate->getResponse();
+      }
+  }
+  ```

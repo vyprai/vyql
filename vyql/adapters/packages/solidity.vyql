@@ -11,8 +11,12 @@ adapter solidity {
     sink method "send" -> ExternalCall
     sink method "transfer" -> ExternalCall
     sink path "selfdestruct" -> PrivilegedOp
-    mark "state_write" -> StateWrite
-    mark "tx.origin" -> TxOriginAuth
+    flag StateWrite on any {
+      path "state_write"
+    }
+    flag TxOriginAuth on any {
+      path "tx.origin"
+    }
     control "msg.sender" -> AuthenticationCheck
   }
   package "@chainlink/contracts" {

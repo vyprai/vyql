@@ -273,8 +273,28 @@ adapter neutral {
   flow path "read_into" arg 0 from result
   flow prefix "parse" arg 1 from args 0
   control receiver method "checked" -> custom.Transform
-  mark method "setMode" val "true" -> custom.Marker
-  mark exact "Widget" -> custom.Marker
+  flag custom.Marker on any {
+    method "setMode"
+    has "true"
+  }
+  flag custom.Marker on any {
+    path exact "Widget"
+  }
+  flag custom.Marker in function {
+    lang "javascript"
+    name "validate"
+    not call path "crypto.timingSafeEqual"
+    selector "signature.r"
+    literal "classifier"
+    annotation "POST"
+    param type "Secret"
+    method name "MarshalYAML"
+    class bases "HTMLSerializer"
+    call "fromString"
+    fact index_kind "field_derived"
+    token identifier "nerModel"
+    attr path "$tasks.title"
+  }
 }
 `
 	decls, err := Parse(src)
@@ -294,7 +314,7 @@ adapter neutral {
 	if th == nil || th.QualifiedName() != "sample.Condition" {
 		t.Fatalf("threat decl not parsed: %+v", th)
 	}
-	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 14 {
+	if ad == nil || ad.Name != "neutral" || len(ad.Mappings) != 15 {
 		t.Fatalf("adapter decl not parsed: %+v", ad)
 	}
 	if ad.Mappings[0].Kind != "source" || ad.Mappings[0].Concept != "custom.Source" {
@@ -330,12 +350,39 @@ adapter neutral {
 	if ad.Mappings[11].Kind != "control_receiver_method" || ad.Mappings[11].Concept != "custom.Transform" {
 		t.Fatalf("control_receiver_method mapping wrong: %+v", ad.Mappings[11])
 	}
-	if ad.Mappings[12].Kind != "mark_method" || ad.Mappings[12].Pattern != "setMode" ||
-		len(ad.Mappings[12].ValMatches) != 1 || ad.Mappings[12].ValMatches[0] != "true" {
-		t.Fatalf("value-matched mark wrong: %+v", ad.Mappings[12])
+	if ad.Mappings[12].Kind != "flag" || ad.Mappings[12].Flag == nil ||
+		ad.Mappings[12].Flag.NodeKind != "any" ||
+		len(ad.Mappings[12].Flag.Predicates) != 2 ||
+		ad.Mappings[12].Flag.Predicates[0].Property != "method" ||
+		ad.Mappings[12].Flag.Predicates[0].Values[0] != "setMode" ||
+		ad.Mappings[12].Flag.Predicates[1].Values[0] != "true" {
+		t.Fatalf("value-matched flag wrong: %+v", ad.Mappings[12])
 	}
-	if ad.Mappings[13].Kind != "mark" || !ad.Mappings[13].Exact {
-		t.Fatalf("exact mark wrong: %+v", ad.Mappings[13])
+	if ad.Mappings[13].Kind != "flag" || ad.Mappings[13].Flag == nil ||
+		len(ad.Mappings[13].Flag.Predicates) != 1 ||
+		ad.Mappings[13].Flag.Predicates[0].Property != "path" ||
+		!ad.Mappings[13].Flag.Predicates[0].Exact {
+		t.Fatalf("exact flag wrong: %+v", ad.Mappings[13])
+	}
+	if ad.Mappings[14].Kind != "flag" || ad.Mappings[14].Concept != "custom.Marker" ||
+		ad.Mappings[14].Flag == nil || ad.Mappings[14].Flag.Scope != "function" ||
+		len(ad.Mappings[14].Flag.Predicates) != 13 ||
+		ad.Mappings[14].Flag.Predicates[0].Property != "tokens" ||
+		ad.Mappings[14].Flag.Predicates[0].Values[0] != "lang=javascript" ||
+		ad.Mappings[14].Flag.Predicates[1].Values[0] != "name=validate" ||
+		ad.Mappings[14].Flag.Predicates[2].Values[0] != "call_path:crypto.timingSafeEqual" ||
+		!ad.Mappings[14].Flag.Predicates[2].Negative ||
+		ad.Mappings[14].Flag.Predicates[3].Values[0] != "selector:signature.r" ||
+		ad.Mappings[14].Flag.Predicates[4].Values[0] != "literal:classifier" ||
+		ad.Mappings[14].Flag.Predicates[5].Values[0] != "annotation:POST" ||
+		ad.Mappings[14].Flag.Predicates[6].Values[0] != "param_type:Secret" ||
+		ad.Mappings[14].Flag.Predicates[7].Values[0] != "method:MarshalYAML" ||
+		ad.Mappings[14].Flag.Predicates[8].Values[0] != "class_bases=HTMLSerializer" ||
+		ad.Mappings[14].Flag.Predicates[9].Values[0] != "call:fromString" ||
+		ad.Mappings[14].Flag.Predicates[10].Values[0] != "index_kind=field_derived" ||
+		ad.Mappings[14].Flag.Predicates[11].Values[0] != "identifier:nerModel" ||
+		ad.Mappings[14].Flag.Predicates[12].Values[0] != "attr_path:$tasks.title" {
+		t.Fatalf("context flag wrong: %+v", ad.Mappings[14])
 	}
 }
 
@@ -377,7 +424,7 @@ rule ContainerRule {
 		t.Fatalf("sink import = %q", got)
 	}
 	if got := ad.Mappings[2].Packages; len(got) != 1 || got[0] != "pkg" {
-		t.Fatalf("package gate = %#v", got)
+		t.Fatalf("package block = %#v", got)
 	}
 	if got := ad.Mappings[3].Concept; got != "core.Transform" {
 		t.Fatalf("alias import = %q", got)

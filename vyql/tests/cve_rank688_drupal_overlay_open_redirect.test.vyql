@@ -1,0 +1,36 @@
+test "rank688 drupal overlay closes request path without external-url guard"
+  lang php
+  expect VYQL-RF-002
+  code
+  ```
+  <?php
+  function overlay_init() {
+    $current_path = current_path();
+    if (isset($_GET['render']) && $_GET['render'] == 'overlay') {
+      if (!path_is_admin($current_path)) {
+        overlay_close_dialog($current_path, array('query' => drupal_get_query_parameters(NULL, array('q', 'render'))));
+      }
+    }
+  }
+  ?>
+  ```
+
+test "rank688 drupal overlay external-url guard suppresses redirect finding"
+  lang php
+  reject VYQL-RF-002
+  code
+  ```
+  <?php
+  function overlay_init() {
+    $current_path = current_path();
+    if (isset($_GET['render']) && $_GET['render'] == 'overlay') {
+      if (!path_is_admin($current_path)) {
+        if (url_is_external($current_path)) {
+          $current_path = '<front>';
+        }
+        overlay_close_dialog($current_path, array('query' => drupal_get_query_parameters(NULL, array('q', 'render'))));
+      }
+    }
+  }
+  ?>
+  ```

@@ -1,0 +1,24 @@
+test "cve rank567 cvrf-csaf-converter: objectify.parse without disabled entity resolution is XXE"
+  lang python
+  expect VYQL-DESER-004
+  code
+  ```
+  from lxml import objectify
+
+  def _open_and_validate_file(file_path):
+      xml_objectified = objectify.parse(file_path)
+      return xml_objectified.getroot()
+  ```
+
+test "cve rank567 cvrf-csaf-converter: objectify.makeparser resolve_entities false suppresses XXE"
+  lang python
+  reject VYQL-DESER-004
+  code
+  ```
+  from lxml import objectify
+
+  def _open_and_validate_file(file_path):
+      parser = objectify.makeparser(resolve_entities=False)
+      xml_objectified = objectify.parse(file_path, parser)
+      return xml_objectified.getroot()
+  ```

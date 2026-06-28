@@ -2,6 +2,8 @@ import code.{RedirectTarget}
 
 adapter objc {
   package "IQKeyboardManager" {
-    mark method "textView:shouldInteractWithURL:inRange:interaction:" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "textView:shouldInteractWithURL:inRange:interaction:"
+    }
   }
 }

@@ -8,3 +8,8 @@ rule InsecureElectronConfig {
   meta { id: "VYQL-DSK-001", severity: high, cwe: [CWE_829] }
   match code.ElectronNodeIntegration as c
 }
+
+rule ElectronPrivilegedUrlNodeIntegration {
+  meta { id: "VYQL-DSK-002", severity: high, cwe: [CWE_829, CWE_94], confidence_floor: high }
+  match code.ElectronPrivilegedUrlNodeIntegration as c
+}

@@ -3,8 +3,12 @@ import core.{InputValidation, PathCanonicalization}
 
 adapter go {
   package "github.com/asaskevich/govalidator" {
-    mark method "Matches" -> code.RegexCompile
-    mark method "StringMatches" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "Matches"
+    }
+    flag code.RegexCompile on any {
+      method "StringMatches"
+    }
     control method "SafeFileName" -> core.PathCanonicalization
     control method "IsFilePath" -> core.InputValidation
     control method "IsWinFilePath" -> core.InputValidation

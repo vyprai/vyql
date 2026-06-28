@@ -3,6 +3,8 @@ import code.{HttpInput, RedirectTarget}
 adapter javascript {
   package "connect-history-api-fallback" {
     source method "module.exports" -> code.HttpInput
-    mark method "module.exports" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "module.exports"
+    }
   }
 }

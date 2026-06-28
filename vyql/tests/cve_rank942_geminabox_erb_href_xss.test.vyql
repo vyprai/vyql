@@ -1,0 +1,26 @@
+# Rank 942 / CVE-2017-14506: Geminabox interpolated gem homepage metadata into
+# ERB href attributes without escaping.
+
+test "rank942: erb href interpolation lacks html escaping"
+  lang ruby
+  file gem.erb
+  expect VYQL-INJ-185
+  expect_review code.ErbHrefInterpolationHtmlEscapeMissing
+  code
+  ```
+  <% spec.authors.map do |author|
+    "<a href='#{spec.homepage}'>#{author}</a>"
+  end.join(', ') %>
+  ```
+
+test "rank942: erb href interpolation escapes homepage"
+  lang ruby
+  file gem.erb
+  reject VYQL-INJ-185
+  reject_review code.ErbHrefInterpolationHtmlEscapeMissing
+  code
+  ```
+  <% spec.authors.map do |author|
+    "<a href='#{h(spec.homepage)}'>#{author}</a>"
+  end.join(', ') %>
+  ```

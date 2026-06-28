@@ -62,6 +62,42 @@ rule ComposedMatch {
 	}
 }
 
+func TestMatchConfidenceIgnoresUnrelatedCoLocatedLabel(t *testing.T) {
+	rule := `
+package test;
+rule PreciseMatch {
+  meta { id: "X-MATCH", confidence_floor: high }
+  match custom.Precise as p
+}
+`
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	onto := ontology.New()
+	onto.Add(ontology.Concept{Name: "Precise", Package: "custom", Kind: "sink"})
+	onto.Add(ontology.Concept{Name: "Generic", Package: "custom", Kind: "sink"})
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "n", Type: "code.BinOp", Props: map[string]string{"loc": "x:1"}})
+	g.AddLabel("n", usg.Label{Concept: "custom.Precise", Provenance: usg.Provenance{Confidence: "high", Fidelity: "resolved"}})
+	g.AddLabel("n", usg.Label{Concept: "custom.Generic", Provenance: usg.Provenance{Confidence: "low", Fidelity: "syntactic"}})
+
+	fs, err := New(onto, g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("expected high-confidence precise match despite colocated generic label, got %d", len(fs))
+	}
+	if fs[0].Confidence != "high" {
+		t.Fatalf("confidence = %q, want high", fs[0].Confidence)
+	}
+}
+
 func TestConceptMatchAndTransition(t *testing.T) {
 	actionRule := `
 package test;
@@ -155,5 +191,37 @@ rule CountDerivedElementAccess {
 	}
 	if len(fs) != 0 {
 		t.Fatalf("qualified dominating branch guard should suppress match, got %d", len(fs))
+	}
+}
+
+func TestMatchGuardedBySameXmlFactoryHardening(t *testing.T) {
+	rule := `
+package vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  match code.XmlParserCreate as p
+  unless guarded_by core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "Parser.java:10", Region: "Parser.java/static", Props: map[string]string{"callee_path": "FACTORY.setFeature"}})
+	g.AddLabel("hardening", usg.Label{Concept: "core.XmlHardening"})
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "Parser.java:20", Region: "Parser.java/fn1", Props: map[string]string{"callee_path": "FACTORY.newDocumentBuilder"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parser.Parse(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("same XML factory hardening should suppress parser creation, got %d", len(fs))
 	}
 }

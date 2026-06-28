@@ -8,7 +8,9 @@ adapter scala {
     sink method "setTrustStore" -> code.FilePathAccess
     source method "setKeyStoreKeyPassword" -> code.SecretValue
     source method "setTrustStorePassword" -> code.SecretValue
-    mark method "setSecureRandomAlgorithm" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "setSecureRandomAlgorithm"
+    }
     control method "validateUrlAllowed" -> core.InputValidation
   }
 }

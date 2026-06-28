@@ -1,0 +1,98 @@
+test "rank608: privileged Windows daemon probes remote config path before UNC rejection"
+  lang cpp
+  file DaemonApp.cpp
+  expect VYQL-SEC-020
+  expect_review code.WindowsRemotePathCredentialLeak
+  code
+  ```
+  #define Q_OS_WIN
+  class QString {
+  public:
+    bool isEmpty() const;
+  };
+  class QFileInfo {
+  public:
+    static bool exists(const QString &path);
+  };
+  class QSettings {
+  public:
+    enum Format { IniFormat };
+    QSettings(const QString &path, Format format);
+    int value(int key) const;
+  };
+  class Watchdog {
+  public:
+    void setProcessConfig(const std::string &command, bool elevate);
+  };
+  class DaemonApp {
+    QString m_configFile;
+    Watchdog *m_pWatchdog;
+  public:
+    void applyWatchdogCommand() const {
+  #if defined(Q_OS_WIN)
+      if (m_configFile.isEmpty()) {
+        return;
+      }
+      if (!QFileInfo::exists(m_configFile)) {
+        return;
+      }
+      QSettings config(m_configFile, QSettings::IniFormat);
+      auto command = std::string("deskflow --settings");
+      bool elevate = config.value(1);
+      m_pWatchdog->setProcessConfig(command, elevate);
+  #endif
+    }
+  };
+  ```
+
+test "rank608: privileged Windows daemon rejects UNC config paths before probing"
+  lang cpp
+  file DaemonApp.cpp
+  reject VYQL-SEC-020
+  reject_review code.WindowsRemotePathCredentialLeak
+  code
+  ```
+  #define Q_OS_WIN
+  class QString {
+  public:
+    bool isEmpty() const;
+    bool startsWith(const QString &prefix) const;
+  };
+  QString QStringLiteral(const char *s);
+  class QFileInfo {
+  public:
+    static bool exists(const QString &path);
+  };
+  class QSettings {
+  public:
+    enum Format { IniFormat };
+    QSettings(const QString &path, Format format);
+    int value(int key) const;
+  };
+  class Watchdog {
+  public:
+    void setProcessConfig(const std::string &command, bool elevate);
+  };
+  class DaemonApp {
+    QString m_configFile;
+    Watchdog *m_pWatchdog;
+  public:
+    void applyWatchdogCommand() const {
+  #if defined(Q_OS_WIN)
+      if (m_configFile.isEmpty()) {
+        return;
+      }
+      if (m_configFile.startsWith(QStringLiteral("\\\\")) || m_configFile.startsWith(QStringLiteral("//"))) {
+        return;
+      }
+      if (!QFileInfo::exists(m_configFile)) {
+        return;
+      }
+      QSettings config(m_configFile, QSettings::IniFormat);
+      auto command = std::string("deskflow --settings");
+      bool elevate = config.value(1);
+      m_pWatchdog->setProcessConfig(command, elevate);
+  #endif
+    }
+  };
+  ```

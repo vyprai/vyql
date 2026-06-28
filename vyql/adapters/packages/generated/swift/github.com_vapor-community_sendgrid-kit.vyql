@@ -3,7 +3,9 @@ adapter swift {
   package "github.com/vapor-community/sendgrid-kit" {
     sink method "send" -> code.NetworkSend
     sink method "validateEmail" -> code.NetworkSend
-    mark method "uploadBulkEmailValidationFile" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "uploadBulkEmailValidationFile"
+    }
     sink method "uploadBulkEmailValidationFile" -> code.NetworkSend
   }
 }

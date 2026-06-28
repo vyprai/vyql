@@ -2,8 +2,14 @@ import code.{WeakRandomValue}
 
 adapter php {
   package "paragonie/random-lib" {
-    mark method "RandomLib\\Generator::generate" -> code.WeakRandomValue
-    mark method "RandomLib\\Generator::generateInt" -> code.WeakRandomValue
-    mark method "RandomLib\\Generator::generateString" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "RandomLib\\Generator::generate"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomLib\\Generator::generateInt"
+    }
+    flag code.WeakRandomValue on any {
+      method "RandomLib\\Generator::generateString"
+    }
   }
 }

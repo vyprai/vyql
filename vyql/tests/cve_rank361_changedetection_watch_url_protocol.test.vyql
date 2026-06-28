@@ -1,0 +1,58 @@
+test "rank361: changedetection watch link returns stored URL without protocol allowlist"
+  lang python
+  expect VYQL-INJ-059
+  expect_review code.UnsafeWatchUrlProtocol
+  code
+  ```
+  class model(dict):
+      @property
+      def link(self):
+          url = self.get('url', '')
+          ready_url = url
+          if '{%' in url or '{{' in url:
+              from jinja2 import Environment
+              jinja2_env = Environment(extensions=['jinja2_time.TimeExtension'])
+              try:
+                  ready_url = str(jinja2_env.from_string(url).render())
+              except Exception:
+                  return ''
+
+          return ready_url
+  ```
+
+test "rank361: changedetection watch link rejects unsafe protocols before rendering"
+  lang python
+  reject VYQL-INJ-059
+  reject_review code.UnsafeWatchUrlProtocol
+  code
+  ```
+  import os
+  import re
+
+  SAFE_PROTOCOL_REGEX='^(http|https|ftp|file):'
+
+  def is_safe_url(test_url):
+      pattern = re.compile(os.getenv('SAFE_PROTOCOL_REGEX', SAFE_PROTOCOL_REGEX), re.IGNORECASE)
+      if not pattern.match(test_url.strip()):
+          return False
+      return True
+
+  class model(dict):
+      @property
+      def link(self):
+
+          url = self.get('url', '')
+          if not is_safe_url(url):
+              return 'DISABLED'
+
+          ready_url = url
+          if '{%' in url or '{{' in url:
+              from jinja2 import Environment
+              jinja2_env = Environment(extensions=['jinja2_time.TimeExtension'])
+              try:
+                  ready_url = str(jinja2_env.from_string(url).render())
+              except Exception:
+                  return ''
+
+          return ready_url
+  ```

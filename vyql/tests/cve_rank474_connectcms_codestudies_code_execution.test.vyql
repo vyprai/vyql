@@ -1,0 +1,77 @@
+# Rank 474 / CVE-2026-32276: Connect-CMS removed the Code Study plugin
+# because authenticated users could submit code_text and run it server-side.
+
+test "rank474: Connect-CMS Code Study saves and executes submitted code"
+  lang php
+  file CodestudiesPlugin.php
+  expect VYQL-INJ-100
+  expect_review code.ConnectCmsCodestudiesPluginCodeExecution
+  code
+  ```
+  <?php
+  class CodestudiesPlugin extends UserPluginBase {
+      public function getPublicFunctions() {
+          $functions = array();
+          $functions['post'] = ['savecode', 'run', 'deletecode'];
+          return $functions;
+      }
+
+      public function declareRole() {
+          $role_ckeck_table = array();
+          $role_ckeck_table["run"] = array('role_reporter');
+          return $role_ckeck_table;
+      }
+
+      private function saveImpl($request, $page_id, $frame_id, $codestudy_id) {
+          $codestudies = new Codestudies();
+          $codestudies->study_lang = $request->study_lang;
+          $codestudies->code_text = $request->code_text;
+          $codestudies->save();
+          return $codestudies->id;
+      }
+
+      private function runCheck($codestudy) {
+          $this->run_check_msgs = array();
+      }
+
+      public function run($request, $page_id, $frame_id, $codestudy_id) {
+          $codestudy_id = $this->saveImpl($request, $page_id, $frame_id, $codestudy_id);
+          $codestudy = Codestudies::where('id', $codestudy_id)->first();
+          if ($codestudy->study_lang == 'php') {
+              Storage::put('codestudy/' . $codestudy_id . '.php', $codestudy->code_text);
+              $cmd = 'php ' . storage_path('app/codestudy/' . $codestudy_id . '.php');
+              exec("$cmd 2>&1", $result);
+          } elseif ($codestudy->study_lang == 'java') {
+              Storage::put('codestudy/Main.java', $codestudy->code_text);
+              $cmd = 'javac -encoding UTF-8 ' . storage_path('app/codestudy/Main.java');
+              exec("$cmd 2>&1", $result);
+              $cmd = 'java -Dfile.encoding=UTF-8 -classpath ' . storage_path('app/codestudy') . ' Main';
+              exec("$cmd 2>&1", $result);
+          }
+          $this->runCheck($codestudy);
+      }
+  }
+  ```
+
+test "rank474: Code Study plugin removed"
+  lang php
+  file ContentsPlugin.php
+  reject VYQL-INJ-100
+  reject_review code.ConnectCmsCodestudiesPluginCodeExecution
+  code
+  ```
+  <?php
+  class ContentsPlugin extends UserPluginBase {
+      public function getPublicFunctions() {
+          $functions = array();
+          $functions['post'] = ['save'];
+          return $functions;
+      }
+
+      public function save($request) {
+          $content = new Contents();
+          $content->content_text = $request->content_text;
+          $content->save();
+      }
+  }
+  ```

@@ -1,0 +1,38 @@
+test "rank736: element-plus table popper writes unescaped overflow tooltip HTML"
+  lang javascript
+  profile library
+  file util.ts
+  expect VYQL-INJ-004
+  code
+  ```
+  export function createTablePopper(parentNode, trigger, popperContent) {
+    function renderContent() {
+      const content = document.createElement('div')
+      content.className = 'el-popper'
+      content.innerHTML = popperContent
+      return content
+    }
+    return renderContent()
+  }
+  ```
+
+test "rank736: element-plus table popper escapes overflow tooltip HTML"
+  lang javascript
+  profile library
+  file util.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import escapeHtml from 'escape-html'
+
+  export function createTablePopper(parentNode, trigger, popperContent) {
+    function renderContent() {
+      const content = document.createElement('div')
+      content.className = 'el-popper'
+      const safeContent = escapeHtml(popperContent)
+      content.innerHTML = safeContent
+      return content
+    }
+    return renderContent()
+  }
+  ```

@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "ret" {
-    mark method "tokenizer" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "tokenizer"
+    }
   }
 }

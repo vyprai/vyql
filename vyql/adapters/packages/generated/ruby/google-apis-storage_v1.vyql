@@ -9,7 +9,9 @@ adapter ruby {
     control method "insert_object_access_control" -> core.AuthorizationCheck
     control method "update_object_access_control" -> core.AuthorizationCheck
     control method "patch_object_access_control" -> core.AuthorizationCheck
-    mark method "insert_object" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "insert_object"
+    }
     sink method "copy_object" -> code.FileUse
   }
 }

@@ -1,10 +1,18 @@
 import code.{FilePathAccess, RedirectTarget, NetworkSend}
 adapter ruby {
   package "rack-rewrite" {
-    mark method "r301" -> code.RedirectTarget
-    mark method "r302" -> code.RedirectTarget
-    mark method "r303" -> code.RedirectTarget
-    mark method "r307" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "r301"
+    }
+    flag code.RedirectTarget on any {
+      method "r302"
+    }
+    flag code.RedirectTarget on any {
+      method "r303"
+    }
+    flag code.RedirectTarget on any {
+      method "r307"
+    }
     sink method "send_file" -> code.FilePathAccess
     sink method "x_send_file" -> code.FilePathAccess
     sink method "send_data" -> code.NetworkSend

@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"bytes"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -17,24 +19,238 @@ import (
 // Ripper frontend). All binary operators are treated as taint-propagating
 // (string build), matching frontend_ruby.py.
 type rbConv struct {
-	src  []byte
-	root string
-	file string
+	src        []byte
+	root       string
+	file       string
+	visibility string
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
 func ExtractRuby(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	var ruby, erb []string
+	for _, f := range files {
+		if strings.HasSuffix(strings.ToLower(f), ".erb") {
+			erb = append(erb, f)
+		} else {
+			ruby = append(ruby, f)
+		}
+	}
+	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
+		c := &rbConv{src: src, root: root, file: rel}
+		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
+		return nir.Module{Key: "", File: rel, Body: body}, true
+	}
+	mods := parseModules(ruby, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
 			return p
 		},
-		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &rbConv{src: src, root: root, file: rel}
-			return nir.Module{Key: "", File: rel, Body: c.blockChildren(tree.RootNode())}, true
-		})
+		build)
+	mods = append(mods, parseERBModules(erb, root, build)...)
 	return nir.Program{SelfName: "self", Modules: mods}, nil
+}
+
+func parseERBModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		code, ok := erbRubySource(src)
+		if !ok {
+			continue
+		}
+		parser := tree_sitter.NewParser()
+		_ = parser.SetLanguage(tree_sitter.NewLanguage(tsruby.Language()))
+		tree := parser.Parse(code, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(code, f, relPath(root, f)+"#erb.rb", tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Body = append(m.Body, erbUnescapedHrefInterpolationObservations(src, relPath(root, f)+"#erb.rb")...)
+			m.Body = append(m.Body, erbHtmlEscapedUrlHrefObservations(src, relPath(root, f)+"#erb.rb")...)
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+var erbHrefInterpolationRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["'][^"']*#\{([^}]*)\}`)
+var erbHrefOutputRe = regexp.MustCompile(`(?i)\bhref\s*=\s*["']\s*<%=\s*([^%]+?)\s*%>`)
+
+func erbUnescapedHrefInterpolationObservations(src []byte, rel string) []nir.Stmt {
+	var out []nir.Stmt
+	for i, line := range strings.Split(string(src), "\n") {
+		for _, m := range erbHrefInterpolationRe.FindAllStringSubmatch(line, -1) {
+			if len(m) < 2 {
+				continue
+			}
+			expr := strings.TrimSpace(m[1])
+			if expr == "" || erbInterpolationExprEscaped(expr) || !erbHrefInterpolationExprNeedsEscaping(expr) {
+				continue
+			}
+			loc := rel + ":" + itoa(i+1)
+			path := "analysis.erb.unescaped_href_interpolation"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: loc, Value: "lang=ruby"},
+					nir.Const{Loc: loc, Value: "template=erb"},
+					nir.Const{Loc: loc, Value: "attr=href"},
+					nir.Const{Loc: loc, Value: "expr=" + expr},
+				},
+				Path:   path,
+				Method: "unescaped_href_interpolation",
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func erbInterpolationExprEscaped(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	for _, prefix := range []string{
+		"h(",
+		"html_escape(",
+		"escape_html(",
+		"Rack::Utils.escape_html(",
+		"ERB::Util.html_escape(",
+		"CGI.escapeHTML(",
+	} {
+		if strings.HasPrefix(expr, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func erbHrefInterpolationExprNeedsEscaping(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	return strings.Contains(expr, ".") ||
+		strings.Contains(expr, "[") ||
+		strings.HasPrefix(expr, "@")
+}
+
+func erbHtmlEscapedUrlHrefObservations(src []byte, rel string) []nir.Stmt {
+	var out []nir.Stmt
+	for i, line := range strings.Split(string(src), "\n") {
+		for _, m := range erbHrefOutputRe.FindAllStringSubmatch(line, -1) {
+			if len(m) < 2 {
+				continue
+			}
+			expr, helper, ok := erbHtmlEscapeCall(strings.TrimSpace(m[1]))
+			if !ok || !erbHrefExprLooksURLValue(expr) {
+				continue
+			}
+			loc := rel + ":" + itoa(i+1)
+			path := "analysis.erb.html_escaped_url_href"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: loc, Value: "lang=ruby"},
+					nir.Const{Loc: loc, Value: "template=erb"},
+					nir.Const{Loc: loc, Value: "attr=href"},
+					nir.Const{Loc: loc, Value: "value=url-like"},
+					nir.Const{Loc: loc, Value: "helper=" + helper},
+					nir.Const{Loc: loc, Value: "expr=" + expr},
+				},
+				Path:   path,
+				Method: "html_escaped_url_href",
+				Loc:    loc,
+			}})
+		}
+	}
+	return out
+}
+
+func erbHtmlEscapeCall(expr string) (string, string, bool) {
+	for _, h := range []struct {
+		prefix string
+		name   string
+	}{
+		{"h(", "html_escape"},
+		{"escape(", "html_escape"},
+		{"html_escape(", "html_escape"},
+		{"escape_html(", "html_escape"},
+		{"Rack::Utils.escape_html(", "html_escape"},
+		{"ERB::Util.html_escape(", "html_escape"},
+		{"CGI.escapeHTML(", "html_escape"},
+	} {
+		if !strings.HasPrefix(expr, h.prefix) || !strings.HasSuffix(expr, ")") {
+			continue
+		}
+		inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(expr, h.prefix), ")"))
+		if inner == "" {
+			continue
+		}
+		return inner, h.name, true
+	}
+	return "", "", false
+}
+
+func erbHrefExprLooksURLValue(expr string) bool {
+	lower := strings.ToLower(expr)
+	for _, marker := range []string{"url", "uri", "href", "homepage", "website", "link"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func erbRubySource(src []byte) ([]byte, bool) {
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	found := false
+	for i := 0; i+1 < len(src); {
+		if src[i] != '<' || src[i+1] != '%' {
+			i++
+			continue
+		}
+		start := i + 2
+		if start < len(src) && src[start] == '#' {
+			if end := bytes.Index(src[start:], []byte("%>")); end >= 0 {
+				i = start + end + 2
+			} else {
+				break
+			}
+			continue
+		}
+		if start < len(src) && src[start] == '=' {
+			start++
+		}
+		endRel := bytes.Index(src[start:], []byte("%>"))
+		if endRel < 0 {
+			break
+		}
+		end := start + endRel
+		copy(out[start:end], src[start:end])
+		found = true
+		i = end + 2
+	}
+	return out, found
 }
 
 func (c *rbConv) loc(n *tree_sitter.Node) string {
@@ -75,9 +291,6 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "method", "singleton_method":
-		// Ruby methods are PUBLIC by default (the gem's API surface). A `private`/`protected`
-		// marker would hide subsequent methods — not tracked yet, so this slightly
-		// over-marks; the library param-source is caller-conditional, which absorbs that.
 		body := field(n, "body")
 		name := c.text(field(n, "name"))
 		params := c.params(field(n, "parameters"))
@@ -88,13 +301,24 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			ParamEntries: c.rbParamEntries(name, params),
 			Body:         c.rbMethodBody(body),
 			Loc:          L,
-			Exported:     true,
+			Exported:     c.rubyExportedMethod(name),
 		})
 		return out
 	case "class", "module":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+		bases := c.rubyClassBases(n)
+		out := c.rubyClassContext(n, bases)
+		oldVisibility := c.visibility
+		c.visibility = "public"
+		body := c.body(field(n, "body"))
+		c.visibility = oldVisibility
+		out = append(out, nir.ClassDef{Name: c.text(field(n, "name")), Bases: bases, Body: body, Loc: L})
+		return out
 	case "singleton_class":
-		return c.body(field(n, "body"))
+		oldVisibility := c.visibility
+		c.visibility = "public"
+		body := c.body(field(n, "body"))
+		c.visibility = oldVisibility
+		return body
 	case "assignment":
 		left := field(n, "left")
 		right := c.expr(field(n, "right"))
@@ -183,12 +407,22 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	name := c.text(field(fn, "name"))
+	params := c.params(field(fn, "parameters"))
 	loc := c.loc(fn)
 	text := c.text(body)
 	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name},
+		nir.Const{Loc: loc, Value: "lang=ruby\x00name=" + name + "\x00function_name:" + name},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for i, p := range params {
+		args = append(args,
+			nir.Const{Loc: loc, Value: "param_name:" + p},
+			nir.Const{Loc: loc, Value: "param_index:" + itoa(i)},
+		)
+	}
+	for _, tok := range c.rbStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.function.context", Loc: loc},
@@ -197,6 +431,195 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rbConv) rubyModuleContext(root *tree_sitter.Node) []nir.Stmt {
+	if root == nil {
+		return nil
+	}
+	loc := c.file + ":1"
+	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=ruby"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for _, tok := range c.rbStructuredContextTokens(root) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.module.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func (c *rbConv) rubyClassContext(cls *tree_sitter.Node, bases []string) []nir.Stmt {
+	body := field(cls, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(cls, "name"))
+	loc := c.loc(cls)
+	text := c.text(body)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: rubyClassTokenString(name, bases)},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rbCompactText(text)},
+	}
+	for _, tok := range c.rbStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.class.context", Loc: loc},
+		Args:   args,
+		Path:   "analysis.class.context",
+		Method: "context",
+		Loc:    loc,
+	}}}
+}
+
+func rubyClassTokenString(name string, bases []string) string {
+	tokens := []string{"lang=ruby", "name=" + name, "class_name:" + name}
+	for _, base := range bases {
+		if base == "" {
+			continue
+		}
+		tokens = append(tokens, "class_base:"+base)
+	}
+	if len(bases) > 0 {
+		tokens = append(tokens, "class_bases="+strings.Join(bases, ","))
+	}
+	return strings.Join(tokens, "\x00")
+}
+
+func (c *rbConv) rubyClassBases(cls *tree_sitter.Node) []string {
+	if cls == nil || cls.Kind() != "class" {
+		return nil
+	}
+	base := field(cls, "superclass")
+	if base == nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, value := range []string{c.dotted(base), rbCompactText(c.text(base)), strings.ReplaceAll(rbCompactText(c.text(base)), "::", ".")} {
+		value = strings.TrimPrefix(value, "<")
+		value = strings.TrimSpace(value)
+		if value == "" || value == "?" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
+}
+
+func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.rbContextPath(left); lhs != "" {
+				if rhs := rbContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+					for _, suffix := range rbDottedSuffixes(lhs) {
+						add("assign:" + suffix + "=" + rhs)
+					}
+				}
+				add("selector:" + lhs)
+				for _, suffix := range rbDottedSuffixes(lhs) {
+					add("selector:" + suffix)
+				}
+			}
+		case "binary":
+			if expr := rbCompactText(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "pair":
+			if key := rbCompactText(c.keyName(field(n, "key"))); key != "" {
+				if val := rbContextValue(c.text(field(n, "value"))); val != "" {
+					add("field:" + key + "=" + val)
+				}
+			}
+		case "call", "method_call", "command", "command_call":
+			if path := c.dotted(n); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+				add("selector:" + path)
+			}
+		case "element_reference":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+		case "string", "heredoc_body", "heredoc_content":
+			if lit := rbContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		case "regex":
+			if lit := rubyRegexPattern(c.text(n)); lit != "" {
+				add("regex:" + rbCompactText(lit))
+				add("literal:" + rbCompactText(lit))
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *rbConv) rbContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return rbCompactText(c.text(n))
+}
+
+func rbDottedSuffixes(path string) []string {
+	parts := strings.Split(path, ".")
+	if len(parts) < 3 {
+		return nil
+	}
+	out := make([]string, 0, len(parts)-2)
+	for i := 1; i < len(parts)-1; i++ {
+		out = append(out, strings.Join(parts[i:], "."))
+	}
+	return out
+}
+
+func rbContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return rbCompactText(s)
 }
 
 func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
@@ -330,6 +753,10 @@ func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
+		if vis := c.rubyVisibilityMarker(ch); vis != "" {
+			c.visibility = vis
+			continue
+		}
 		if isRbCallNode(ch) && rbCallHasHeredocArg(ch) && i+1 < len(kids) && kids[i+1].Kind() == "heredoc_body" {
 			out = append(out, c.callStmtWithExtraArg(ch, c.expr(kids[i+1]))...)
 			i++
@@ -338,6 +765,25 @@ func (c *rbConv) rbStmtList(kids []*tree_sitter.Node) []nir.Stmt {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
+}
+
+func (c *rbConv) rubyVisibilityMarker(n *tree_sitter.Node) string {
+	if !isRbCallNode(n) {
+		return ""
+	}
+	switch strings.TrimSpace(c.text(n)) {
+	case "public", "private", "protected":
+		return strings.TrimSpace(c.text(n))
+	default:
+		return ""
+	}
+}
+
+func (c *rbConv) rubyExportedMethod(name string) bool {
+	if strings.HasPrefix(name, "_") {
+		return false
+	}
+	return c.visibility == "" || c.visibility == "public"
 }
 
 func isRbCallNode(n *tree_sitter.Node) bool {

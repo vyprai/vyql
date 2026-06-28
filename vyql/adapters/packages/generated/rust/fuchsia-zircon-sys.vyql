@@ -15,7 +15,9 @@ adapter rust {
     sink method "zx_fifo_write" -> code.StoredDataWrite
     source method "zx_process_read_memory" -> core.UserControlledData
     sink method "zx_process_write_memory" -> code.StoredDataWrite
-    mark method "zx_resource_create" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "zx_resource_create"
+    }
     source method "zx_socket_read" -> code.NetworkData
     sink method "zx_socket_write" -> code.NetworkSend
     source method "zx_vmo_read" -> core.UserControlledData

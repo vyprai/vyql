@@ -4,6 +4,8 @@ import core.{AuthenticationCheck}
 adapter perl {
   package "Nitesi" {
     control method "Nitesi::Account::Password::check_password" -> core.AuthenticationCheck
-    mark method "Nitesi::Account::Password::password" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "Nitesi::Account::Password::password"
+    }
   }
 }

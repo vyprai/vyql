@@ -7,6 +7,8 @@ adapter php {
     sink method "create" -> code.SqlExecution
     sink method "edit" -> code.SqlExecution
     sink method "remove" -> code.SqlExecution
-    mark method "upload" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "upload"
+    }
   }
 }

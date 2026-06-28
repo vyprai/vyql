@@ -55,6 +55,60 @@ test "sca: setup.py patched certificate validation dependency is clean"
   )
   ```
 
+test "sca: open PyPI dependency range can select malicious release"
+  lang python
+  expect VYQL-SCA-001
+  expect VYQL-SCA-004
+  file setup.py
+  code
+  ```
+  from setuptools import setup
+
+  setup(
+      install_requires=[
+          'exotel>=0.1.5',
+      ],
+  )
+  ```
+
+test "sca: pinned PyPI dependency avoids malicious release"
+  lang python
+  reject VYQL-SCA-001
+  reject VYQL-SCA-004
+  file setup.py
+  code
+  ```
+  from setuptools import setup
+
+  setup(
+      install_requires=[
+          'exotel==0.1.5',
+      ],
+  )
+  ```
+
+test "sca: setup.cfg unbounded requests dependency can select vulnerable TLS validation release"
+  lang config
+  expect VYQL-SCA-006
+  file setup.cfg
+  code
+  ```
+  [options]
+  install_requires =
+      requests[socks]>=2.22.0
+  ```
+
+test "sca: setup.cfg requests dependency capped at patched TLS validation release is clean"
+  lang config
+  reject VYQL-SCA-006
+  file setup.cfg
+  code
+  ```
+  [options]
+  install_requires =
+      requests[socks] >=2.22.0, <=2.31.0
+  ```
+
 test "sca: vulnerable git submodule commit is reported"
   lang python
   expect VYQL-SCA-005

@@ -7,10 +7,18 @@ adapter dart {
     source method "write" -> code.SecretValue
     source method "delete" -> code.SecretValue
     source method "deleteAll" -> code.SecretValue
-    mark method "_getEncryptionKey" -> code.WeakCipher
-    mark method "_getWrapKey" -> code.WeakCipher
-    mark method "_decryptValue" -> code.WeakCipher
-    mark method "_crypto" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "_getEncryptionKey"
+    }
+    flag code.WeakCipher on any {
+      method "_getWrapKey"
+    }
+    flag code.WeakCipher on any {
+      method "_decryptValue"
+    }
+    flag code.WeakCipher on any {
+      method "_crypto"
+    }
     source method "encryptionKey" -> code.SecretValue
     source method "jwk" -> code.SecretValue
     source method "wrapKey" -> code.SecretValue

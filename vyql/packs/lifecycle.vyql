@@ -6,3 +6,33 @@ rule LockNotReleased {
   match code.LockAcquire as l
   unless closed_by core.LockRelease
 }
+
+rule CiliumBroadTcFilterCleanup {
+  meta { id: "VYQL-LIFE-002", severity: high, cwe: [CWE_755, CWE_284], confidence_floor: high }
+  match code.CiliumBroadTcFilterCleanup as c
+}
+
+rule RecursiveJsonMarshalUnderLock {
+  meta { id: "VYQL-LIFE-003", severity: low, cwe: [CWE_667], confidence_floor: medium }
+  match code.RecursiveJsonMarshalUnderLock as m
+}
+
+rule StateMutationBeforeOperationPreconditions {
+  meta { id: "VYQL-LIFE-004", severity: high, cwe: [CWE_696, CWE_460], confidence_floor: high }
+  match code.StateMutationBeforeOperationPreconditions as op
+}
+
+rule BlockingReadInAcceptLoop {
+  meta { id: "VYQL-LIFE-005", severity: high, cwe: [CWE_400, CWE_667], confidence_floor: high }
+  match code.BlockingReadInAcceptLoop as read
+}
+
+rule StateCommitBeforeExternalWriteAccounting {
+  meta { id: "VYQL-LIFE-006", severity: high, cwe: [CWE_696, CWE_755], confidence_floor: high }
+  match code.StateCommitBeforeExternalWriteAccounting as op
+}
+
+rule PersistentConnectionReuseAfterInterruptedResponse {
+  meta { id: "VYQL-LIFE-007", severity: high, cwe: [CWE_444, CWE_841], confidence_floor: high }
+  match code.PersistentConnectionReuseAfterInterruptedResponse as conn
+}

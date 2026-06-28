@@ -2,7 +2,11 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "@babel/helper-regex" {
-    mark method "is" -> code.RegexCompile
-    mark method "pullFlag" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "is"
+    }
+    flag code.RegexCompile on any {
+      method "pullFlag"
+    }
   }
 }

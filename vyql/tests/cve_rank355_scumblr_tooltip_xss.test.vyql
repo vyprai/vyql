@@ -1,0 +1,55 @@
+test "rank355: Scumblr attack vector tooltip note is unescaped ERB"
+  lang config
+  file _vulnerability.html.erb
+  expect VYQL-INJ-028
+  code
+  ```
+  <span data-tooltip aria-haspopup="true" class="has-tip tip-left" title="<%= vect["note"]%>"><i class="fi-info"></i></span>
+  ```
+
+test "rank355: Scumblr attack vector tooltip note is escaped"
+  lang config
+  file _vulnerability.html.erb
+  reject VYQL-INJ-028
+  code
+  ```
+  <span data-tooltip aria-haspopup="true" class="has-tip tip-left" title="<%= h(vect["note"])%>"><i class="fi-info"></i></span>
+  ```
+
+test "rank355: Scumblr task option description tooltip is unescaped ERB"
+  lang config
+  file _options_fields.html.erb
+  expect VYQL-INJ-028
+  code
+  ```
+  <span data-tooltip aria-haspopup="true" class="has-tip tip-right" title="<%= value[:description] %>"><i class="fi-info"></i></span>
+  ```
+
+test "rank355: Scumblr task option description tooltip is escaped"
+  lang config
+  file _options_fields.html.erb
+  reject VYQL-INJ-028
+  code
+  ```
+  <span data-tooltip aria-haspopup="true" class="has-tip tip-right" title="<%= h(value[:description]) %>"><i class="fi-info"></i></span>
+  ```
+
+test "rank355: Scumblr task status message is concatenated unescaped"
+  lang config
+  file index.html.erb
+  expect VYQL-INJ-028
+  code
+  ```
+  <% message +=  "<br/>" + task.metadata.try(:[], "_last_status_message").to_s if task.metadata.try(:[], "_last_status_message")%>
+  <td class="<%= status_class %> has-tip bettertooltip" data-tooltip title="<%= message %>">&nbsp;</td>
+  ```
+
+test "rank355: Scumblr task status message is escaped before tooltip render"
+  lang config
+  file index.html.erb
+  reject VYQL-INJ-028
+  code
+  ```
+  <% message +=  "<br/>" + h(task.metadata.try(:[], "_last_status_message").to_s) if task.metadata.try(:[], "_last_status_message") %>
+  <td class="<%= status_class %> has-tip bettertooltip" data-tooltip title="<%= message %>">&nbsp;</td>
+  ```

@@ -1,0 +1,60 @@
+# Rank 410 / CVE-2020-8565: Kubernetes client-go toCurl() formatted request
+# headers into verbose curl-command logs without masking Authorization/Bearer
+# values. The patch calls maskValue(key, value) inside toCurl before formatting.
+
+test "rank410: client-go toCurl logs request headers without masking"
+  lang go
+  expect VYQL-SEC-010
+  expect_review code.KubernetesCurlAuthorizationHeaderLogLeak
+  code
+  ```
+  package transport
+
+  import "fmt"
+
+  type requestInfo struct {
+      RequestHeaders map[string][]string
+      RequestVerb    string
+      RequestURL     string
+  }
+
+  func (r *requestInfo) toCurl() string {
+      headers := ""
+      for key, values := range r.RequestHeaders {
+          for _, value := range values {
+              headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
+          }
+      }
+      return fmt.Sprintf("curl -k -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
+  }
+  ```
+
+test "rank410: client-go toCurl masks request headers before formatting"
+  lang go
+  reject VYQL-SEC-010
+  reject_review code.KubernetesCurlAuthorizationHeaderLogLeak
+  code
+  ```
+  package transport
+
+  import "fmt"
+
+  type requestInfo struct {
+      RequestHeaders map[string][]string
+      RequestVerb    string
+      RequestURL     string
+  }
+
+  func maskValue(key string, value string) string { return value }
+
+  func (r *requestInfo) toCurl() string {
+      headers := ""
+      for key, values := range r.RequestHeaders {
+          for _, value := range values {
+              value = maskValue(key, value)
+              headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
+          }
+      }
+      return fmt.Sprintf("curl -k -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
+  }
+  ```

@@ -1,0 +1,97 @@
+# Rank 875 / CVE-2026-34078: Flatpak portal converted sandbox-expose
+# paths back into --filesystem arguments, leaving a symlink/race sandbox escape.
+
+test "rank875: Flatpak portal uses path-based sandbox expose arguments"
+  lang c
+  file portal/flatpak-portal.c
+  expect VYQL-PATH-047
+  expect_review code.PathBasedSandboxExposeBindRace
+  code
+  ```
+  static char *filesystem_arg(const char *path, int readonly) {
+    return g_strdup_printf("--filesystem=%s", path);
+  }
+
+  static char *filesystem_sandbox_arg(const char *path, const char *sandbox, int readonly) {
+    return g_strdup_printf("--filesystem=%s/sandbox/%s", path, sandbox);
+  }
+
+  static char *get_path_for_fd(int fd, int *writable_out, GError **error) {
+    char path_buffer[4096];
+    readlink("/proc/self/fd/9", path_buffer, sizeof path_buffer);
+    stat(path_buffer, 0);
+    access(path_buffer, R_OK);
+    return g_strdup(path_buffer);
+  }
+
+  static int handle_spawn(GVariant *arg_options, GPtrArray *flatpak_argv, char **sandbox_expose,
+                          char **sandbox_expose_ro, const char *instance_path, int *fds) {
+    GVariant *sandbox_expose_fd = NULL;
+    GVariant *sandbox_expose_fd_ro = NULL;
+    GError *error = NULL;
+    int i;
+    g_variant_lookup(arg_options, "sandbox-expose", "^as", &sandbox_expose);
+    g_variant_lookup(arg_options, "sandbox-expose-ro", "^as", &sandbox_expose_ro);
+    sandbox_expose_fd = g_variant_lookup_value(arg_options, "sandbox-expose-fd", G_VARIANT_TYPE("ah"));
+    sandbox_expose_fd_ro = g_variant_lookup_value(arg_options, "sandbox-expose-fd-ro", G_VARIANT_TYPE("ah"));
+    if (instance_path) {
+      for (i = 0; sandbox_expose[i] != 0; i++)
+        g_ptr_array_add(flatpak_argv, filesystem_sandbox_arg(instance_path, sandbox_expose[i], 0));
+      for (i = 0; sandbox_expose_ro[i] != 0; i++)
+        g_ptr_array_add(flatpak_argv, filesystem_sandbox_arg(instance_path, sandbox_expose_ro[i], 1));
+    }
+    if (sandbox_expose_fd != NULL) {
+      char *path = get_path_for_fd(fds[0], 0, &error);
+      g_ptr_array_add(flatpak_argv, filesystem_arg(path, 0));
+    }
+    return 1;
+  }
+  ```
+
+test "rank875: Flatpak portal remaps exposed paths to bind fds"
+  lang c
+  file portal/flatpak-portal.c
+  reject VYQL-PATH-047
+  reject_review code.PathBasedSandboxExposeBindRace
+  code
+  ```
+  static int validate_opath_fd(int fd, int needs_writable, GError **error) {
+    int fd_flags = fcntl(fd, F_GETFL);
+    struct stat st_buf;
+    fstat(fd, &st_buf);
+    return faccessat(fd, "", R_OK, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW) == 0;
+  }
+
+  static int fd_map_remap_fd(GArray *fd_map, int *max_fd_in_out, int fd) {
+    return ++(*max_fd_in_out);
+  }
+
+  static int handle_spawn(GVariant *arg_options, GPtrArray *flatpak_argv, char **sandbox_expose,
+                          char **sandbox_expose_ro, const char *instance_path, int *fds) {
+    GVariant *sandbox_expose_fd = NULL;
+    GVariant *sandbox_expose_fd_ro = NULL;
+    GError *error = NULL;
+    GArray *fd_map = NULL;
+    int max_fd = -1;
+    int instance_sandbox_fd = -1;
+    int expose_fd;
+    int remapped_fd;
+    int i;
+    g_variant_lookup(arg_options, "sandbox-expose", "^as", &sandbox_expose);
+    g_variant_lookup(arg_options, "sandbox-expose-ro", "^as", &sandbox_expose_ro);
+    sandbox_expose_fd = g_variant_lookup_value(arg_options, "sandbox-expose-fd", G_VARIANT_TYPE("ah"));
+    sandbox_expose_fd_ro = g_variant_lookup_value(arg_options, "sandbox-expose-fd-ro", G_VARIANT_TYPE("ah"));
+    instance_sandbox_fd = glnx_chaseat(AT_FDCWD, instance_path, GLNX_CHASE_RESOLVE_NO_SYMLINKS, &error);
+    for (i = 0; sandbox_expose[i] != 0; i++) {
+      expose_fd = glnx_chaseat(instance_sandbox_fd, sandbox_expose[i],
+                               GLNX_CHASE_RESOLVE_NO_SYMLINKS | GLNX_CHASE_RESOLVE_BENEATH, &error);
+      remapped_fd = fd_map_remap_fd(fd_map, &max_fd, expose_fd);
+      g_ptr_array_add(flatpak_argv, g_strdup_printf("--bind-fd=%d", remapped_fd));
+    }
+    if (sandbox_expose_fd != NULL && validate_opath_fd(fds[0], 1, &error)) {
+      remapped_fd = fd_map_remap_fd(fd_map, &max_fd, fds[0]);
+      g_ptr_array_add(flatpak_argv, g_strdup_printf("--ro-bind-fd=%d", remapped_fd));
+    }
+    return 1;
+  }
+  ```

@@ -1,9 +1,17 @@
 import code.{WeakRandomValue}
 adapter rust {
   package "aead" {
-    mark method "encrypt_in_place" -> code.WeakRandomValue
-    mark method "decrypt_in_place" -> code.WeakRandomValue
-    mark method "encrypt_in_place_detached" -> code.WeakRandomValue
-    mark method "decrypt_in_place_detached" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "encrypt_in_place"
+    }
+    flag code.WeakRandomValue on any {
+      method "decrypt_in_place"
+    }
+    flag code.WeakRandomValue on any {
+      method "encrypt_in_place_detached"
+    }
+    flag code.WeakRandomValue on any {
+      method "decrypt_in_place_detached"
+    }
   }
 }

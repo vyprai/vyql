@@ -3,7 +3,7 @@
 // Marks cryptographic operations (cipher/sign/verify/hash/KDF/key-gen) as
 // code.CryptoOperation. No CONFIRMED rule consumes this concept, so these labels are
 // inert in normal scans (zero effect on default output / benchmarks). The possibility
-// tier (VYQL_POSSIBILITY=1) surfaces each as a "review this crypto logic" finding for the
+// flag surface exposes each as a "review this crypto logic" item for the
 // AI/triage pass — the bug class behind many crypto CVEs (bypassed verification, weak
 // key/IV handling) that static taint cannot prove. cross_language: crypto APIs recur by
 // name across ecosystems.
@@ -11,59 +11,153 @@ adapter cryptoreview {
   meta { fidelity: syntactic, cross_language: true, auto_apply: graph }
 
   // Node.js / JS-TS crypto
-  mark "crypto.createCipheriv" -> code.CryptoOperation
-  mark "crypto.createDecipheriv" -> code.CryptoOperation
-  mark "crypto.createCipher" -> code.CryptoOperation
-  mark "crypto.createSign" -> code.CryptoOperation
-  mark "crypto.createVerify" -> code.CryptoOperation
-  mark "crypto.publicEncrypt" -> code.CryptoOperation
-  mark "crypto.privateDecrypt" -> code.CryptoOperation
-  mark "crypto.pbkdf2" -> code.CryptoOperation
-  mark "crypto.scrypt" -> code.CryptoOperation
-  mark "crypto.generateKeyPair" -> code.CryptoOperation
+  flag code.CryptoOperation on any {
+    path "crypto.createCipheriv"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.createDecipheriv"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.createCipher"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.createSign"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.createVerify"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.publicEncrypt"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.privateDecrypt"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.pbkdf2"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.scrypt"
+  }
+  flag code.CryptoOperation on any {
+    path "crypto.generateKeyPair"
+  }
 
   // JVM (java/kotlin) + .NET — by dotted path so generic getInstance is crypto-scoped
-  mark "Cipher.getInstance" -> code.CryptoOperation
-  mark "Signature.getInstance" -> code.CryptoOperation
-  mark "Mac.getInstance" -> code.CryptoOperation
-  mark "KeyGenerator.getInstance" -> code.CryptoOperation
-  mark "KeyPairGenerator.getInstance" -> code.CryptoOperation
-  mark method "doFinal" -> code.CryptoOperation
-  mark method "EncryptValue" -> code.CryptoOperation
-  mark method "DecryptValue" -> code.CryptoOperation
+  flag code.CryptoOperation on any {
+    path "Cipher.getInstance"
+  }
+  flag code.CryptoOperation on any {
+    path "Signature.getInstance"
+  }
+  flag code.CryptoOperation on any {
+    path "Mac.getInstance"
+  }
+  flag code.CryptoOperation on any {
+    path "KeyGenerator.getInstance"
+  }
+  flag code.CryptoOperation on any {
+    path "KeyPairGenerator.getInstance"
+  }
+  flag code.CryptoOperation on any {
+    method "doFinal"
+  }
+  flag code.CryptoOperation on any {
+    method "EncryptValue"
+  }
+  flag code.CryptoOperation on any {
+    method "DecryptValue"
+  }
 
   // Go x/crypto + stdlib
-  mark "aes.NewCipher" -> code.CryptoOperation
-  mark "cipher.NewGCM" -> code.CryptoOperation
-  mark "rsa.SignPKCS1v15" -> code.CryptoOperation
-  mark "rsa.VerifyPKCS1v15" -> code.CryptoOperation
-  mark "ecdsa.Sign" -> code.CryptoOperation
-  mark "ecdsa.Verify" -> code.CryptoOperation
-  mark "hmac.New" -> code.CryptoOperation
+  flag code.CryptoOperation on any {
+    path "aes.NewCipher"
+  }
+  flag code.CryptoOperation on any {
+    path "cipher.NewGCM"
+  }
+  flag code.CryptoOperation on any {
+    path "rsa.SignPKCS1v15"
+  }
+  flag code.CryptoOperation on any {
+    path "rsa.VerifyPKCS1v15"
+  }
+  flag code.CryptoOperation on any {
+    path "ecdsa.Sign"
+  }
+  flag code.CryptoOperation on any {
+    path "ecdsa.Verify"
+  }
+  flag code.CryptoOperation on any {
+    path "hmac.New"
+  }
 
   // .NET (System.Security.Cryptography)
-  mark "Aes.Create" -> code.CryptoOperation
-  mark "SymmetricAlgorithm.Create" -> code.CryptoOperation
-  mark "HashAlgorithm.Create" -> code.CryptoOperation
-  mark method "CreateEncryptor" -> code.CryptoOperation
-  mark method "CreateDecryptor" -> code.CryptoOperation
-  mark method "TransformFinalBlock" -> code.CryptoOperation
-  mark method "GenerateKey" -> code.CryptoOperation
-  mark method "GenerateIV" -> code.CryptoOperation
-  mark "CryptoStream" -> code.CryptoOperation
-  mark "RSACryptoServiceProvider" -> code.CryptoOperation
-  mark "AesManaged" -> code.CryptoOperation
-  mark "TripleDESCryptoServiceProvider" -> code.CryptoOperation
-  mark "RijndaelManaged" -> code.CryptoOperation
-  mark "ProtectedData.Protect" -> code.CryptoOperation
-  mark "ProtectedData.Unprotect" -> code.CryptoOperation
-  mark "Rfc2898DeriveBytes" -> code.CryptoOperation
+  flag code.CryptoOperation on any {
+    path "Aes.Create"
+  }
+  flag code.CryptoOperation on any {
+    path "SymmetricAlgorithm.Create"
+  }
+  flag code.CryptoOperation on any {
+    path "HashAlgorithm.Create"
+  }
+  flag code.CryptoOperation on any {
+    method "CreateEncryptor"
+  }
+  flag code.CryptoOperation on any {
+    method "CreateDecryptor"
+  }
+  flag code.CryptoOperation on any {
+    method "TransformFinalBlock"
+  }
+  flag code.CryptoOperation on any {
+    method "GenerateKey"
+  }
+  flag code.CryptoOperation on any {
+    method "GenerateIV"
+  }
+  flag code.CryptoOperation on any {
+    path "CryptoStream"
+  }
+  flag code.CryptoOperation on any {
+    path "RSACryptoServiceProvider"
+  }
+  flag code.CryptoOperation on any {
+    path "AesManaged"
+  }
+  flag code.CryptoOperation on any {
+    path "TripleDESCryptoServiceProvider"
+  }
+  flag code.CryptoOperation on any {
+    path "RijndaelManaged"
+  }
+  flag code.CryptoOperation on any {
+    path "ProtectedData.Protect"
+  }
+  flag code.CryptoOperation on any {
+    path "ProtectedData.Unprotect"
+  }
+  flag code.CryptoOperation on any {
+    path "Rfc2898DeriveBytes"
+  }
 
   // C / OpenSSL
-  mark "EVP_EncryptInit_ex" -> code.CryptoOperation
-  mark "EVP_DecryptInit_ex" -> code.CryptoOperation
-  mark "EVP_DigestSignInit" -> code.CryptoOperation
-  mark "EVP_DigestVerifyInit" -> code.CryptoOperation
-  mark "RSA_sign" -> code.CryptoOperation
-  mark "RSA_verify" -> code.CryptoOperation
+  flag code.CryptoOperation on any {
+    path "EVP_EncryptInit_ex"
+  }
+  flag code.CryptoOperation on any {
+    path "EVP_DecryptInit_ex"
+  }
+  flag code.CryptoOperation on any {
+    path "EVP_DigestSignInit"
+  }
+  flag code.CryptoOperation on any {
+    path "EVP_DigestVerifyInit"
+  }
+  flag code.CryptoOperation on any {
+    path "RSA_sign"
+  }
+  flag code.CryptoOperation on any {
+    path "RSA_verify"
+  }
 }

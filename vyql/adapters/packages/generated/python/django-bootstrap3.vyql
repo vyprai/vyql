@@ -5,6 +5,8 @@ adapter python {
     sink method "render_script_tag" -> code.HtmlRender
     sink method "render_link_tag" -> code.HtmlRender
     sink method "render_template_file" -> code.TemplateRender
-    mark method "url_replace_param" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "url_replace_param"
+    }
   }
 }

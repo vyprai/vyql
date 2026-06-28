@@ -1,0 +1,52 @@
+# Rank 503 / CVE-2026-2035: OPNsense restored backup-supplied
+# RRD filenames through an rrdtool restore shell command.
+
+test "rank503: OPNsense RRD restore filename reaches exec command"
+  lang php
+  expect VYQL-INJ-114
+  expect_review code.OpnSenseRrdRestoreFilenameCommandInjection
+  code
+  ```
+  <?php
+  function rrd_import()
+  {
+      global $config;
+
+      foreach ($config['rrddata']['rrddatafile'] as $rrd) {
+          if (!empty($rrd['xmldata'])) {
+              $rrd_file = "/var/db/rrd/{$rrd['filename']}";
+              $xml_file = preg_replace('/\.rrd$/', ".xml", $rrd_file);
+              if (file_put_contents($xml_file, gzinflate(base64_decode($rrd['xmldata']))) === false) {
+                  continue;
+              }
+              $output = array();
+              $status = null;
+              exec("/usr/local/bin/rrdtool restore -f '{$xml_file}' '{$rrd_file}'", $output, $status);
+          }
+      }
+  }
+  ```
+
+test "rank503: OPNsense RRD restore uses basename and shell_safe"
+  lang php
+  reject VYQL-INJ-114
+  reject_review code.OpnSenseRrdRestoreFilenameCommandInjection
+  code
+  ```
+  <?php
+  function rrd_import()
+  {
+      global $config;
+
+      foreach ($config['rrddata']['rrddatafile'] as $rrd) {
+          $rrd_file = "/var/db/rrd/" . basename($rrd['filename']);
+          if (!empty($rrd['xmldata'])) {
+              $xml_file = preg_replace('/\.rrd$/', ".xml", $rrd_file);
+              if (file_put_contents($xml_file, gzinflate(base64_decode($rrd['xmldata']))) === false) {
+                  continue;
+              }
+              $output = shell_safe('/usr/local/bin/rrdtool %s %s %s %s', ['restore', '-f', $xml_file, $rrd_file]);
+          }
+      }
+  }
+  ```

@@ -4,6 +4,8 @@ adapter objc {
   package "OHAttributedLabel" {
     sink method "processMarkupInAttributedString" -> code.Deserialization
     sink method "attributedStringByProcessingMarkupInString" -> code.Deserialization
-    mark method "addCustomLink" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "addCustomLink"
+    }
   }
 }

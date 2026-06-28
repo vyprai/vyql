@@ -2,8 +2,12 @@ import code.{RegexCompile, Deserialization}
 
 adapter rust {
   package "matchers" {
-    mark method "new" -> code.RegexCompile
-    mark method "new_anchored" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "new"
+    }
+    flag code.RegexCompile on any {
+      method "new_anchored"
+    }
     sink method "read_matches" -> code.Deserialization
   }
 }

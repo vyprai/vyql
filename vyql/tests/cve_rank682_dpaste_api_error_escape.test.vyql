@@ -1,0 +1,40 @@
+# Rank 682 / CVE-2023-49277: dpaste reflected invalid API lexer/expire
+# parameters in BadRequest responses without HTML escaping.
+
+test "rank682: dpaste API bad-request response reflects invalid lexer"
+  lang python
+  file views.py
+  expect VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponseBadRequest
+
+  @app.post("/api/")
+  def post(request):
+      lexer = request.POST.get("lexer", "text").strip()
+      if lexer not in ["text", "python"]:
+          return HttpResponseBadRequest(
+              'Invalid lexer "%s" given. Valid lexers are: %s'
+              % (lexer, ", ".join(["text", "python"]))
+          )
+      return HttpResponseBadRequest("No content given")
+  ```
+
+test "rank682: dpaste API bad-request response escapes invalid lexer"
+  lang python
+  file views.py
+  reject VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponseBadRequest
+  from django.utils.html import escape
+
+  @app.post("/api/")
+  def post(request):
+      lexer = request.POST.get("lexer", "text").strip()
+      if lexer not in ["text", "python"]:
+          return HttpResponseBadRequest(
+              f'Invalid lexer choice "{escape(lexer)}" given. Valid lexer values are: {", ".join(["text", "python"])}'
+          )
+      return HttpResponseBadRequest("No content given")
+  ```

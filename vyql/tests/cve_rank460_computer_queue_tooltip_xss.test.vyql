@@ -1,0 +1,35 @@
+# Rank 460 / CVE-2020-2259: Jenkins Computer Queue Plugin rendered queue
+# item agent/cause text into a tooltip without escaping. The fix escapes
+# item.causesDescription and item.why before composing the tooltip.
+
+test "rank460: Computer Queue tooltip starts with unescaped item why text"
+  lang config
+  file queue.jelly
+  expect VYQL-INJ-097
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <j:forEach var="item" items="${it.items()}">
+      <td class="pane" width="100%" tooltip="${item.why}${h.escape(item.params)}&lt;br&gt;${%WaitingFor(item.inQueueForString)}" style="white-space: normal;">
+        ${item.task.fullDisplayName}
+      </td>
+    </j:forEach>
+  </j:jelly>
+  ```
+
+test "rank460: Computer Queue tooltip escapes agent/cause text"
+  lang config
+  file queue.jelly
+  reject VYQL-INJ-097
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core">
+    <j:forEach var="item" items="${it.items()}">
+      <td class="pane" width="100%" tooltip="${h.escape(item.causesDescription)}${h.escape(item.why)}${h.escape(item.params)}&lt;br&gt;${%WaitingFor(item.inQueueForString)}" style="white-space: normal;">
+        ${item.task.fullDisplayName}
+      </td>
+    </j:forEach>
+  </j:jelly>
+  ```

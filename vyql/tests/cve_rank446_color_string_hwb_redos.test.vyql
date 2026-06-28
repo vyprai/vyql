@@ -1,0 +1,52 @@
+# Rank 446 / CVE-2021-29060: color-string's HWB parser used an
+# ambiguous hue regex where \d* is followed by \d+, allowing ReDoS.
+
+test "rank446: color-string hwb parser has ambiguous hue regex"
+  lang javascript
+  file index.js
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  var cs = { get: {} };
+
+  cs.get.hwb = function (string) {
+    if (!string) {
+      return null;
+    }
+
+    var hwb = /^hwb\(\s*([+-]?\d*[\.]?\d+)(?:deg)?\s*,\s*([+-]?[\d\.]+)%\s*,\s*([+-]?[\d\.]+)%\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
+    var match = string.match(hwb);
+
+    if (match) {
+      return [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])];
+    }
+
+    return null;
+  };
+  ```
+
+test "rank446: color-string hwb parser bounds the hue regex"
+  lang javascript
+  file index.js
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  var cs = { get: {} };
+
+  cs.get.hwb = function (string) {
+    if (!string) {
+      return null;
+    }
+
+    var hwb = /^hwb\(\s*([+-]?\d{0,3}(?:\.\d+)?)(?:deg)?\s*,\s*([+-]?[\d\.]+)%\s*,\s*([+-]?[\d\.]+)%\s*(?:,\s*([+-]?[\d\.]+)\s*)?\)$/;
+    var match = string.match(hwb);
+
+    if (match) {
+      return [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])];
+    }
+
+    return null;
+  };
+  ```

@@ -1,0 +1,92 @@
+# Rank 758 / CVE-2016-15006: EnigmaX keyfile scrambling reused the
+# same keyfile-derived substitution-table schedule instead of mixing per table.
+
+test "rank758: keyfile bytes directly drive each substitution table"
+  lang c
+  file main.c
+  expect VYQL-CRY-023
+  expect_review code.RepeatedKeyfileSubstitutionTables
+  code
+  ```
+  #define BUFFER_SIZE 16384
+  static unsigned char scrambleAsciiTables[16][256];
+
+  void scramble(FILE* keyFile){
+    for (int j = 0; j < 16; ++j)
+    {
+      char temp = 0;
+
+      for (int i = 0; i < 256; ++i)
+      {
+        scrambleAsciiTables[j][i] = i;
+      }
+
+      if (keyFile != NULL){
+        int size;
+        char extractedString[BUFFER_SIZE] = "";
+        while((size = fread(extractedString, 1, BUFFER_SIZE, keyFile)) > 0){
+          for (int i = 0; i < size; ++i)
+          {
+            temp = scrambleAsciiTables[j][i%256];
+            scrambleAsciiTables[j][i%256] = scrambleAsciiTables[j][(unsigned char)(extractedString[i])];
+            scrambleAsciiTables[j][(unsigned char)(extractedString[i])] = temp;
+          }
+        }
+        rewind(keyFile);
+      }
+    }
+  }
+  ```
+
+test "rank758: keyfile bytes are mixed with generated table state"
+  lang c
+  file main.c
+  reject VYQL-CRY-023
+  reject_review code.RepeatedKeyfileSubstitutionTables
+  code
+  ```
+  #define BUFFER_SIZE 16384
+  static unsigned char scrambleAsciiTables[16][256];
+  static char usingKeyFile = 0;
+  static char scramblingTablesOrder[BUFFER_SIZE];
+
+  void scramble(FILE* keyFile){
+    for (int j = 0; j < 16; ++j)
+    {
+      char temp = 0;
+
+      for (int i = 0; i < 256; ++i)
+      {
+        scrambleAsciiTables[j][i] = i;
+      }
+
+      if (usingKeyFile){
+        int size;
+        char extractedString[BUFFER_SIZE] = "";
+        unsigned char random256;
+        while((size = fread(extractedString, 1, BUFFER_SIZE, keyFile)) > 0){
+          for (int i = 0; i < size; ++i)
+          {
+            random256 = generateNumber() ^ extractedString[i];
+            temp = scrambleAsciiTables[j][i%256];
+            scrambleAsciiTables[j][i%256] = scrambleAsciiTables[j][random256];
+            scrambleAsciiTables[j][random256] = temp;
+          }
+        }
+        rewind(keyFile);
+      }
+    }
+    if(usingKeyFile){
+      int j = 0;
+      char temp[BUFFER_SIZE];
+      while(j < BUFFER_SIZE){
+        int charactersRead = fread(temp, 1, BUFFER_SIZE, keyFile);
+        for (int i = 0; i < charactersRead; ++i)
+        {
+          scramblingTablesOrder[j] = temp[i] & (1+2+4+8);
+          j++;
+        }
+      }
+    }
+  }
+  ```

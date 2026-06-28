@@ -2,7 +2,11 @@ import code.{RedirectTarget}
 
 adapter dart {
   package "map_launcher" {
-    mark method "showMarker" -> code.RedirectTarget
-    mark method "showDirections" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "showMarker"
+    }
+    flag code.RedirectTarget on any {
+      method "showDirections"
+    }
   }
 }

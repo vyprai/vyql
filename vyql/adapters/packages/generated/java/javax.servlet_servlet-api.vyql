@@ -12,8 +12,12 @@ adapter java {
     sink method "getWriter" -> code.HtmlRender
     sink method "getOutputStream" -> code.HtmlRender
 
-    mark method "forward" -> code.RedirectTarget
-    mark method "include" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "forward"
+    }
+    flag code.RedirectTarget on any {
+      method "include"
+    }
 
     sink method "getRealPath" -> code.FilePathAccess
   }

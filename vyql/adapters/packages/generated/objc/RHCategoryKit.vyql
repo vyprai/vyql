@@ -9,6 +9,8 @@ adapter objc {
     sink method "RSAEncryptWithPublicKeyData" -> code.StoredDataWrite
     source method "RSADecryptWithPrivateKey" -> code.StoredDataRead
     source method "RSADecryptWithPrivateKeyData" -> code.StoredDataRead
-    mark method "rh_stringWithMD5Encode" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "rh_stringWithMD5Encode"
+    }
   }
 }

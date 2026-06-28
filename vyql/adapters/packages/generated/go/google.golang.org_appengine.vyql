@@ -6,8 +6,14 @@ adapter go {
     source method "AccessToken" -> code.SecretValue
     source method "CurrentOAuth" -> code.HttpInput
     source method "OAuthConsumerKey" -> code.SecretValue
-    mark method "LoginURL" -> code.RedirectTarget
-    mark method "LoginURLFederated" -> code.RedirectTarget
-    mark method "LogoutURL" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "LoginURL"
+    }
+    flag code.RedirectTarget on any {
+      method "LoginURLFederated"
+    }
+    flag code.RedirectTarget on any {
+      method "LogoutURL"
+    }
   }
 }

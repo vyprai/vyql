@@ -24,17 +24,13 @@ import (
 )
 
 // generatedRoot is the directory holding the generated per-package adapter corpus,
-// laid out as <root>/<lang>/<pkg>.vyql. Defaults to the data dir; $VYQL_PACKAGE_ADAPTERS
-// overrides it so an uncommitted corpus can be evaluated without staging into vyql/.
+// laid out as <root>/<lang>/<pkg>.vyql.
 func generatedRoot() string {
-	if v := os.Getenv("VYQL_PACKAGE_ADAPTERS"); v != "" {
-		return v
-	}
 	return filepath.Join(datadir.Root(), "adapters", "packages", "generated")
 }
 
 // GeneratedRoot exports generatedRoot so the incremental adapter-label cache can fingerprint
-// the specific generated per-package files a scan loads (honoring $VYQL_PACKAGE_ADAPTERS).
+// the specific generated per-package files a scan loads.
 func GeneratedRoot() string { return generatedRoot() }
 
 // DependencyEvidence collects the project's dependency surface from an already-built

@@ -1,0 +1,92 @@
+# Rank 627 / CVE-2026-41948: Dify joined a caller-controlled plugin
+# daemon path into an internal service base URL before decoding and
+# rejecting traversal segments.
+test "rank627: plugin daemon request path is joined without traversal validation"
+  lang python
+  file base.py
+  expect VYQL-PATH-030
+  code
+  ```
+  from typing import Any
+  import json
+
+  from yarl import URL
+
+  plugin_daemon_inner_api_baseurl = URL("http://plugin-daemon")
+
+  class Settings:
+      PLUGIN_DAEMON_KEY = "secret"
+
+  dify_config = Settings()
+
+  class BasePluginClient:
+      def _prepare_request(
+          self,
+          path: str,
+          headers: dict[str, str] | None,
+          data: bytes | dict[str, Any] | str | None,
+          params: dict[str, Any] | None,
+          files: dict[str, Any] | None,
+      ) -> tuple[str, dict[str, str], bytes | dict[str, Any] | str | None, dict[str, Any] | None, dict[str, Any] | None]:
+          url = plugin_daemon_inner_api_baseurl / path
+          prepared_headers = dict(headers or {})
+          prepared_headers["X-Api-Key"] = dify_config.PLUGIN_DAEMON_KEY
+
+          prepared_data: bytes | dict[str, Any] | str | None = (
+              data if isinstance(data, (bytes, str, dict)) or data is None else None
+          )
+          if isinstance(data, dict):
+              if prepared_headers.get("Content-Type") == "application/json":
+                  prepared_data = json.dumps(data)
+              else:
+                  prepared_data = data
+
+          return str(url), prepared_headers, prepared_data, params, files
+  ```
+
+test "rank627: plugin daemon request path rejects decoded traversal segments"
+  lang python
+  file base.py
+  reject VYQL-PATH-030
+  code
+  ```
+  from typing import Any
+  import json
+  from urllib.parse import unquote
+
+  from yarl import URL
+
+  plugin_daemon_inner_api_baseurl = URL("http://plugin-daemon")
+
+  class Settings:
+      PLUGIN_DAEMON_KEY = "secret"
+
+  dify_config = Settings()
+
+  class BasePluginClient:
+      def _prepare_request(
+          self,
+          path: str,
+          headers: dict[str, str] | None,
+          data: bytes | dict[str, Any] | str | None,
+          params: dict[str, Any] | None,
+          files: dict[str, Any] | None,
+      ) -> tuple[str, dict[str, str], bytes | dict[str, Any] | str | None, dict[str, Any] | None, dict[str, Any] | None]:
+          decoded_path = unquote(path)
+          if any(seg.lower() in ("..", "%2e%2e") for seg in decoded_path.split("/")):
+              raise ValueError(f"Invalid plugin daemon path: traversal sequence detected in {path!r}")
+          url = plugin_daemon_inner_api_baseurl / path
+          prepared_headers = dict(headers or {})
+          prepared_headers["X-Api-Key"] = dify_config.PLUGIN_DAEMON_KEY
+
+          prepared_data: bytes | dict[str, Any] | str | None = (
+              data if isinstance(data, (bytes, str, dict)) or data is None else None
+          )
+          if isinstance(data, dict):
+              if prepared_headers.get("Content-Type") == "application/json":
+                  prepared_data = json.dumps(data)
+              else:
+                  prepared_data = data
+
+          return str(url), prepared_headers, prepared_data, params, files
+  ```

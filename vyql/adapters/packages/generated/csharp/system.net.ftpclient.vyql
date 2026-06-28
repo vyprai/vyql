@@ -13,6 +13,8 @@ adapter csharp {
     sink method "OpenWrite" -> code.NetworkSend
     sink method "BeginOpenWrite" -> code.NetworkSend
     sink method "EndOpenWrite" -> code.NetworkSend
-    mark method "GetMD5" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "GetMD5"
+    }
   }
 }

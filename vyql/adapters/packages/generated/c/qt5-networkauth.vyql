@@ -2,7 +2,11 @@ import code.{WeakRandomValue}
 
 adapter c {
   package "qt5-networkauth" {
-    mark method "QAbstractOAuth::generateRandomString" -> code.WeakRandomValue
-    mark method "QAbstractOAuth2Private::generateRandomState" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "QAbstractOAuth::generateRandomString"
+    }
+    flag code.WeakRandomValue on any {
+      method "QAbstractOAuth2Private::generateRandomState"
+    }
   }
 }

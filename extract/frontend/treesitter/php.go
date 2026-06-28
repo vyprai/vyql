@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"strings"
 	"unicode"
 
@@ -22,23 +23,79 @@ type phConv struct {
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
 func ExtractPHP(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	mods := parseModulesPreprocess(files, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(tsphp.LanguagePHP()))
 			return p
 		},
+		phpNormalizeLegacyScriptTags,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
 			body = append(body, c.phpModuleContext(tree.RootNode())...)
+			body = append(body, c.phpSimplexmlLoaderObservations()...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
+func phpNormalizeLegacyScriptTags(src []byte) []byte {
+	s := string(src)
+	lower := strings.ToLower(s)
+	if !strings.Contains(lower, "<script language=\"php\"") {
+		return src
+	}
+	out := []byte(s)
+	replacePreserveWidth := func(start, end int, repl string) {
+		copy(out[start:end], []byte(repl))
+		for i := start + len(repl); i < end; i++ {
+			if out[i] != '\n' && out[i] != '\r' {
+				out[i] = ' '
+			}
+		}
+	}
+	searchFrom := 0
+	for {
+		lower = strings.ToLower(string(out))
+		start := strings.Index(lower[searchFrom:], "<script language=\"php\"")
+		if start < 0 {
+			break
+		}
+		start += searchFrom
+		endRel := strings.Index(lower[start:], ">")
+		if endRel < 0 {
+			break
+		}
+		end := start + endRel + 1
+		replacePreserveWidth(start, end, "<?php")
+		searchFrom = end
+	}
+	lower = strings.ToLower(string(out))
+	searchFrom = 0
+	for {
+		start := strings.Index(lower[searchFrom:], "</script>")
+		if start < 0 {
+			break
+		}
+		start += searchFrom
+		end := start + len("</script>")
+		replacePreserveWidth(start, end, "?>")
+		searchFrom = end
+	}
+	return out
+}
+
 func (c *phConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *phConv) locAtByte(offset int) string {
+	if offset < 0 || offset > len(c.src) {
+		offset = 0
+	}
+	line := 1 + bytes.Count(c.src[:offset], []byte{'\n'})
+	return c.file + ":" + itoa(line)
 }
 
 func (c *phConv) text(n *tree_sitter.Node) string {
@@ -178,6 +235,19 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	switch inner.Kind() {
+	case "print_intrinsic":
+		var args []nir.Expr
+		for _, a := range namedChildren(inner) {
+			args = append(args, c.expr(a))
+		}
+		L := c.loc(inner)
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "print", Loc: L},
+			Args:   args,
+			Path:   "print",
+			Method: "print",
+			Loc:    L,
+		}}}
 	case "assignment_expression", "augmented_assignment_expression":
 		left := field(inner, "left")
 		right := c.expr(field(inner, "right"))
@@ -193,23 +263,25 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: c.loc(inner)}}}
 		}
-		// subscript write ($arr[$k] = v) — two effects: (1) a write to the base's path
-		// ($bag['key'] -> "bag") so path mappings can match writes;
-		// (2) when the base is a plain variable, a flow join `$arr = combine($arr, v)` so a
-		// later read of $arr carries v's flow (an array built element-by-element stays linked).
-		// Without (2)
-		// the value taint was dropped at the discarded write.
+		// subscript write ($arr[$k] = v) — emit a synthetic __setitem__ call so lowering can
+		// track constant-key array slots precisely while still tainting whole-array reads.
 		if left != nil && left.Kind() == "subscript_expression" {
 			if kids := namedChildren(left); len(kids) > 0 {
 				base := kids[0]
-				write := nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right},
-					Path: c.dotted(base), Method: "", Loc: c.loc(inner)}}
-				if base.Kind() == "variable_name" {
-					bn := c.text(base)
-					join := nir.Assign{Targets: []string{bn},
-						Value: nir.Format{Parts: []nir.Expr{nir.Name{ID: bn, Loc: c.loc(base)}, right}, Loc: c.loc(inner)}}
-					return []nir.Stmt{write, join}
+				var key nir.Expr = nir.Const{Loc: c.loc(left)}
+				if len(kids) > 1 {
+					key = c.expr(kids[1])
 				}
+				baseExpr := c.expr(base)
+				path := c.dotted(base)
+				if path != "" {
+					path += ".__setitem__"
+				}
+				write := nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: baseExpr, Attr: "__setitem__", Loc: c.loc(left)},
+					Args:   []nir.Expr{right, key},
+					Path:   path, Method: "__setitem__", Loc: c.loc(inner),
+				}}
 				return []nir.Stmt{write}
 			}
 		}
@@ -258,7 +330,9 @@ func (c *phConv) phpModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	if root == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.module.context", c.loc(root), "module", "lang=php", c.text(root))
+	tokens := []string{"lang=php"}
+	tokens = append(tokens, c.phpAstContextTokens(root)...)
+	return c.phpContextCall("analysis.module.context", c.loc(root), "module", tokens, c.text(root))
 }
 
 func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
@@ -267,7 +341,21 @@ func (c *phConv) phpFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	name := c.text(field(fn, "name"))
-	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", "lang=php\x00name="+name, c.text(body))
+	tokens := []string{"lang=php", "name=" + name}
+	ptypes := c.paramTypes(field(fn, "parameters"))
+	seenTypes := map[string]bool{}
+	for _, p := range c.params(field(fn, "parameters")) {
+		if t := ptypes[p]; t != "" {
+			tokens = append(tokens, "param_type:"+t)
+			if !seenTypes[t] {
+				seenTypes[t] = true
+				tokens = append(tokens, "function_param_type:"+t)
+			}
+		}
+	}
+	tokens = append(tokens, c.phpAstContextTokens(field(fn, "attributes"))...)
+	tokens = append(tokens, c.phpAstContextTokens(body)...)
+	return c.phpContextCall("analysis.function.context", c.loc(fn), "context", tokens, c.text(body))
 }
 
 func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt {
@@ -275,15 +363,24 @@ func (c *phConv) phpClassContext(cls *tree_sitter.Node, name string) []nir.Stmt 
 	if body == nil {
 		return nil
 	}
-	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", "lang=php\x00name="+name, c.text(body))
+	tokens := []string{"lang=php", "name=" + name}
+	tokens = append(tokens, c.phpAstContextTokens(field(cls, "attributes"))...)
+	tokens = append(tokens, c.phpAstContextTokens(body)...)
+	return c.phpContextCall("analysis.class.context", c.loc(cls), "context", tokens, c.text(body))
 }
 
-func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.Stmt {
-	args := []nir.Expr{
-		nir.Const{Loc: loc, Value: prefix},
+func (c *phConv) phpContextCall(path, loc, method string, tokens []string, text string) []nir.Stmt {
+	args := make([]nir.Expr, 0, len(tokens)+2)
+	for _, tok := range tokens {
+		if tok == "" {
+			continue
+		}
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	args = append(args,
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: phpCompactText(text)},
-	}
+	)
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
@@ -291,6 +388,301 @@ func (c *phConv) phpContextCall(path, loc, method, prefix, text string) []nir.St
 		Method: method,
 		Loc:    loc,
 	}}}
+}
+
+func (c *phConv) phpSimplexmlLoaderObservations() []nir.Stmt {
+	compact := phpCompactText(string(c.src))
+	if !strings.Contains(compact, "simplexml_load_string(") ||
+		!strings.Contains(compact, "libxml_disable_entity_loader(true)") {
+		return nil
+	}
+	if strings.Contains(compact, "=libxml_disable_entity_loader(true)") &&
+		strings.Contains(compact, "libxml_disable_entity_loader($") {
+		return nil
+	}
+	loader := phpSavedEntityLoaderVar(compact)
+	if loader != "" && strings.Contains(compact, "libxml_disable_entity_loader("+loader+")") {
+		return nil
+	}
+	loc := c.locAtByte(bytes.Index(c.src, []byte("simplexml_load_string")))
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: "analysis.php.simplexml_unscoped_entity_loader", Loc: loc},
+		Path:   "analysis.php.simplexml_unscoped_entity_loader",
+		Method: "simplexml_unscoped_entity_loader",
+		Loc:    loc,
+	}}}
+}
+
+func phpSavedEntityLoaderVar(compact string) string {
+	const marker = "=libxml_disable_entity_loader(true)"
+	idx := strings.Index(compact, marker)
+	if idx <= 0 {
+		return ""
+	}
+	start := idx - 1
+	for start >= 0 {
+		ch := compact[start]
+		if ch == '$' || ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' {
+			start--
+			continue
+		}
+		break
+	}
+	name := compact[start+1 : idx]
+	if strings.HasPrefix(name, "$") {
+		return name
+	}
+	return ""
+}
+
+func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "function_definition", "method_declaration":
+			if name := c.text(field(cur, "name")); name != "" {
+				add("function_name:" + name)
+			}
+		case "attribute":
+			name, short := c.phpAttributeName(cur)
+			if name != "" {
+				add("annotation:" + name)
+				if short != "" && short != name {
+					add("annotation:" + short)
+				}
+			}
+			if text := phpCompactText(c.text(cur)); text != "" {
+				add("annotation_text:" + text)
+			}
+			if args := field(cur, "parameters"); args != nil {
+				for _, arg := range namedChildren(args) {
+					argText := phpCompactText(c.text(arg))
+					if argText == "" {
+						continue
+					}
+					add("annotation_arg:" + argText)
+					if name != "" {
+						add("annotation_arg:" + name + ":" + argText)
+					}
+					if short != "" && short != name {
+						add("annotation_arg:" + short + ":" + argText)
+					}
+				}
+			}
+		case "property_declaration":
+			prop := phpCompactText(c.text(cur))
+			if prop != "" && strings.Contains(prop, "$") {
+				add("property:" + prop)
+			}
+			for _, lit := range c.phpLiteralTokens(cur) {
+				add("property_literal:" + lit)
+			}
+		case "assignment_expression", "augmented_assignment_expression":
+			left := field(cur, "left")
+			right := field(cur, "right")
+			leftText := phpCompactText(c.text(left))
+			rightText := phpCompactText(c.text(right))
+			if leftText != "" && rightText != "" {
+				add("assign:" + leftText + "=" + rightText)
+			}
+			for _, path := range c.phpCallPaths(right) {
+				add("assign_call:" + path)
+				if method := lastSeg(path); method != "" {
+					add("assign_call_method:" + method)
+				}
+				if leftText != "" {
+					add("assign_call:" + leftText + ":" + path)
+					if method := lastSeg(path); method != "" {
+						add("assign_call_method:" + leftText + ":" + method)
+					}
+				}
+			}
+			for _, lit := range c.phpLiteralTokens(right) {
+				add("assign_literal:" + lit)
+				if leftText != "" {
+					add("assign_literal:" + leftText + ":" + lit)
+				}
+			}
+			if leftText != "" && strings.HasPrefix(leftText, "$GLOBALS[") {
+				add("global_subscript_write=true")
+			}
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			path := c.dotted(cur)
+			add("call_path:" + path)
+			if method := lastSeg(path); method != "" {
+				add("call:" + method)
+			}
+			if args := field(cur, "arguments"); args != nil {
+				for _, arg := range namedChildren(args) {
+					argText := phpCompactText(c.text(arg))
+					if argText == "" {
+						continue
+					}
+					add("call_arg:" + path + ":" + argText)
+					if method := lastSeg(path); method != "" {
+						add("call_arg_method:" + method + ":" + argText)
+					}
+				}
+			}
+		case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+			add("call_path:include")
+			add("call:include")
+			for _, arg := range namedChildren(cur) {
+				argText := phpCompactText(c.text(arg))
+				if argText == "" {
+					continue
+				}
+				add("call_arg:include:" + argText)
+				add("call_arg_method:include:" + argText)
+			}
+		case "member_access_expression":
+			add("attr_path:" + c.dotted(cur))
+		case "subscript_expression":
+			add("subscript:" + phpCompactText(c.text(cur)))
+		case "cast_expression":
+			castType := phpCastType(c.text(cur))
+			if castType == "" {
+				break
+			}
+			add("cast:" + castType)
+			kids := namedChildren(cur)
+			if len(kids) == 0 {
+				break
+			}
+			expr := kids[len(kids)-1]
+			exprText := phpCompactText(c.text(expr))
+			if exprText != "" {
+				add("cast:" + castType + ":" + exprText)
+			}
+			for _, path := range c.phpCallPaths(expr) {
+				add("cast_call:" + castType + ":" + path)
+				for _, lit := range c.phpLiteralTokens(expr) {
+					add("cast_call_literal:" + castType + ":" + path + ":" + lit)
+				}
+			}
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *phConv) phpAttributeName(n *tree_sitter.Node) (string, string) {
+	if n == nil || n.Kind() != "attribute" {
+		return "", ""
+	}
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "arguments" {
+			continue
+		}
+		name := strings.TrimPrefix(c.text(ch), "\\")
+		if name == "" {
+			continue
+		}
+		return name, lastSeg(name)
+	}
+	return "", ""
+}
+
+func phpCastType(text string) string {
+	compact := strings.ToLower(phpCompactText(text))
+	if !strings.HasPrefix(compact, "(") {
+		return ""
+	}
+	end := strings.Index(compact, ")")
+	if end <= 1 {
+		return ""
+	}
+	switch strings.TrimSpace(compact[1:end]) {
+	case "int", "integer":
+		return "int"
+	case "bool", "boolean":
+		return "bool"
+	case "float", "double", "real":
+		return "float"
+	case "string":
+		return "string"
+	case "array":
+		return "array"
+	case "object":
+		return "object"
+	default:
+		return ""
+	}
+}
+
+func (c *phConv) phpCallPaths(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "function_call_expression", "member_call_expression", "scoped_call_expression":
+			path := c.dotted(cur)
+			if path != "" && !seen[path] {
+				seen[path] = true
+				out = append(out, path)
+			}
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *phConv) phpLiteralTokens(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		switch cur.Kind() {
+		case "string", "encapsed_string", "integer", "float", "boolean", "name", "qualified_name":
+			add(strings.Trim(phpCompactText(c.text(cur)), `"'`))
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
 }
 
 func phpCompactText(s string) string {
@@ -525,6 +917,20 @@ func (c *phConv) foreachVarNames(n *tree_sitter.Node, out *[]string) {
 	}
 }
 
+func (c *phConv) phpInterpolatedParts(n *tree_sitter.Node, out *[]nir.Expr) {
+	if n == nil {
+		return
+	}
+	switch n.Kind() {
+	case "variable_name", "member_access_expression", "subscript_expression", "dynamic_variable_name":
+		*out = append(*out, c.expr(n))
+		return
+	}
+	for _, ch := range namedChildren(n) {
+		c.phpInterpolatedParts(ch, out)
+	}
+}
+
 func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
@@ -544,12 +950,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "encapsed_string", "heredoc", "string_value":
 		// interpolated string: taint-propagating over the embedded variables
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
-			if ch.Kind() == "variable_name" || ch.Kind() == "member_access_expression" ||
-				ch.Kind() == "subscript_expression" || ch.Kind() == "dynamic_variable_name" {
-				parts = append(parts, c.expr(ch))
-			}
-		}
+		c.phpInterpolatedParts(n, &parts)
 		if len(parts) > 0 {
 			parts = append([]nir.Expr{nir.Const{Loc: L, Value: c.text(n)}}, parts...)
 			return nir.Format{Parts: parts, Loc: L}
@@ -582,13 +983,19 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: path, Method: name, Loc: L}
 	case "object_creation_expression":
 		var typ string
+		var argsNode *tree_sitter.Node
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "name" || ch.Kind() == "qualified_name" {
 				typ = c.text(ch)
-				break
+			}
+			if ch.Kind() == "arguments" {
+				argsNode = ch
 			}
 		}
-		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: typ, Method: typ, Loc: L}
+		if argsNode == nil {
+			argsNode = field(n, "arguments")
+		}
+		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(argsNode), Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
@@ -624,7 +1031,11 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "conditional_expression":
-		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
+		then := field(n, "consequence")
+		if then == nil {
+			then = field(n, "body")
+		}
+		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(then), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "anonymous_function", "anonymous_function_creation_expression":
 		// `function ($req, $res) use ($x) { … }` — a closure (the dominant PHP route-handler
 		// shape, e.g. Utopia/Slim `->action(function (...) { … })`). Without this it fell to the

@@ -10,17 +10,13 @@ import (
 )
 
 // syncCollector, when non-nil, makes buildGraphWith assemble a graph-database change-feed during
-// the scan (per-module node/edge/label rows for the modules that changed). It is set only when
-// graph sync is requested ($VYQL_SYNC), so the normal scan path pays nothing.
+// the scan (per-module node/edge/label rows for the modules that changed).
 var syncCollector *graphsync.Collector
 
-// syncEnabled reports the output path for the change-feed, or "" if graph sync is off. Sync needs
-// the cache (it is the incremental engine + the module manifest); without $VYQL_CACHE it is off.
+// syncOutputPath reports the output path for the change-feed, or "" if graph sync is off.
+// There is no environment-variable switch; a future explicit CLI flag can wire this back in.
 func syncOutputPath() string {
-	if parsecache.Shared() == nil {
-		return ""
-	}
-	return os.Getenv("VYQL_SYNC")
+	return ""
 }
 
 // manifestKey stores the set of module namespaces present at the last sync, so the next scan can

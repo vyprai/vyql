@@ -1,0 +1,33 @@
+# Rank 779 / CVE-2023-43630: EVE sealed disk keys to a SHA1 PCR
+# selection that omitted PCR 14.
+test "rank779: disk key sealing uses SHA1 PCR selection without PCR14"
+  lang go
+  expect VYQL-CRY-025
+  expect_review code.TpmDiskKeyWeakPcrSealing
+  code
+  ```
+  package evetpm
+
+  import "github.com/google/go-tpm/tpm2"
+
+  var (
+      // DiskKeySealingPCRs represents PCRs that we use for sealing.
+      DiskKeySealingPCRs = tpm2.PCRSelection{Hash: tpm2.AlgSHA1, PCRs: []int{0, 1, 2, 3, 4, 6, 7, 8, 9, 13}}
+  )
+  ```
+
+test "rank779: disk key sealing uses SHA256 PCR selection with PCR14"
+  lang go
+  reject VYQL-CRY-025
+  reject_review code.TpmDiskKeyWeakPcrSealing
+  code
+  ```
+  package evetpm
+
+  import "github.com/google/go-tpm/tpm2"
+
+  var (
+      // DiskKeySealingPCRs represents PCRs that we use for sealing.
+      DiskKeySealingPCRs = tpm2.PCRSelection{Hash: tpm2.AlgSHA256, PCRs: []int{0, 1, 2, 3, 4, 6, 7, 8, 9, 13, 14}}
+  )
+  ```

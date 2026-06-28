@@ -253,7 +253,7 @@ func addPackRuleIDNeedles(t *testing.T, seen map[string]bool) {
 	}
 }
 
-func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockSinkRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -271,7 +271,7 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated sink fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block sink fired without evidence: %+v", got)
 	}
 
 	withImport := usg.NewInMemStore()
@@ -283,7 +283,7 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withImport); len(got) != 1 || got[0].NodeID != "arg" || got[0].Concept != "custom.Target" {
-		t.Fatalf("package-gated sink did not fire with import evidence: %+v", got)
+		t.Fatalf("explicit package-block sink did not fire with import evidence: %+v", got)
 	}
 
 	withSBOM := usg.NewInMemStore()
@@ -295,7 +295,41 @@ func TestPackageGatedSinkRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:3", "callee_path": "samplepkg.handle", "method": "handle", "arg0": "arg",
 	}})
 	if got := adapter.Apply(withSBOM); len(got) != 1 || got[0].NodeID != "arg" {
-		t.Fatalf("package-gated sink did not fire with SBOM evidence: %+v", got)
+		t.Fatalf("explicit package-block sink did not fire with SBOM evidence: %+v", got)
+	}
+}
+
+func TestExplicitPackageBlockParamSourceRequiresPackageEvidence(t *testing.T) {
+	defer SetActiveSources(nil)
+	SetActiveSources(map[string]bool{"custom.ParamSource": true})
+
+	spec := adapterSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		ParamSources: []paramSourceSpec{{
+			Concept:  "custom.ParamSource",
+			Packages: []string{"samplepkg"},
+		}},
+	}
+	adapter := spec.paramSourceAdapter()
+
+	withoutPkg := usg.NewInMemStore()
+	withoutPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.x:2", "exported": "true",
+	}})
+	if got := adapter.Apply(withoutPkg); len(got) != 0 {
+		t.Fatalf("explicit package-block param source fired without evidence: %+v", got)
+	}
+
+	withPkg := usg.NewInMemStore()
+	withPkg.AddNode(usg.Node{ID: "imp", Type: "code.Import", Props: map[string]string{
+		"loc": "sample.x:1", "module": "samplepkg", "package": "samplepkg",
+	}})
+	withPkg.AddNode(usg.Node{ID: "param", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.x:2", "exported": "true",
+	}})
+	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "param" || got[0].Concept != "custom.ParamSource" || got[0].Specificity != 3 {
+		t.Fatalf("explicit package-block param source did not fire with evidence: %+v", got)
 	}
 }
 
@@ -389,6 +423,1234 @@ func TestValueMatchedSinkUsesUpstreamTokensWhenCallHasNoDirectStrings(t *testing
 	}
 }
 
+func TestContextFlagSyntaxBuildsScopedFlag(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.SecretComparison in function {
+    lang "javascript"
+    call path "parseOut"
+    selector "data.x-csrf-token"
+    token identifier "providedToken"
+    not call path "crypto.timingSafeEqual"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context flag: %v", err)
+	}
+	ad, ok := decls[0].(*parser.AdapterDecl)
+	if !ok {
+		t.Fatalf("expected adapter decl, got %#v", decls[0])
+	}
+	spec := specFromDecl(ad)
+	if len(spec.Flags) != 1 {
+		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
+	}
+	flag := spec.Flags[0]
+	if flag.Scope != "function" || len(flag.Predicates) != 5 ||
+		flag.Predicates[0].Values[0] != "lang=javascript" ||
+		flag.Predicates[1].Values[0] != "call_path:parseOut" ||
+		flag.Predicates[2].Values[0] != "selector:data.x-csrf-token" ||
+		flag.Predicates[3].Values[0] != "identifier:providedToken" ||
+		!flag.Predicates[4].Negative {
+		t.Fatalf("unexpected context flag spec: %#v", flag)
+	}
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.js:1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken",
+	}})
+	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.js:5",
+		"callee_path": "parseOut",
+		"method":      "parseOut",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.SecretComparison" {
+		t.Fatalf("context flag did not label matching context node: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample-fixed.js:2",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=javascript\x00selector:data.x-csrf-token\x00identifier:providedToken\x00call_path:crypto.timingSafeEqual",
+	}})
+	store.AddNode(usg.Node{ID: "fixed-parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample-fixed.js:5",
+		"callee_path": "parseOut",
+		"method":      "parseOut",
+	}})
+	store.AddNode(usg.Node{ID: "fixed-safe", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample-fixed.js:6",
+		"callee_path": "crypto.timingSafeEqual",
+		"method":      "timingSafeEqual",
+	}})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 1 {
+		t.Fatalf("context flag should skip scope with matching excluded call, got %+v", got)
+	}
+}
+
+func TestContextFlagAstCallPredicatesPreferLexicalScope(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter java {
+  flag custom.WorldAccess in function {
+    function "safe"
+    call path "world.getBlockAt"
+    not call contains_any ["testCoord"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse scoped context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "World.java:10",
+		Scope: "World.java/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "function_name:safe",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "other-call",
+		Type:  "code.Call",
+		Loc:   "World.java:30",
+		Scope: "World.java/fn2",
+		Props: map[string]string{
+			"callee_path": "world.getBlockAt",
+			"method":      "getBlockAt",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context flag matched call outside lexical scope: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "local-call",
+		Type:  "code.Call",
+		Loc:   "World.java:12",
+		Scope: "World.java/fn1/if0.t",
+		Props: map[string]string{
+			"callee_path": "world.getBlockAt",
+			"method":      "getBlockAt",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.WorldAccess" {
+		t.Fatalf("context flag did not match nested in-scope call: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "guard",
+		Type:  "code.Call",
+		Loc:   "World.java:11",
+		Scope: "World.java/fn1",
+		Props: map[string]string{
+			"callee_path": "testCoords",
+			"method":      "testCoords",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context flag should skip guarded lexical scope, got %+v", got)
+	}
+}
+
+func TestContextFlagIndexesScopedContextAndMatchesOrderedSelectorScope(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.ShareInfoLeak in function {
+    function "shareInfoHandler"
+    call path "store.Share.GetByHash"
+    call path "getShareURL"
+    selector "shareLink.Token"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse scoped selector flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "share.go:610",
+		Scope: "share.go/fn77@1361",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "function_name:shareInfoHandler",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lookup",
+		Type:  "code.Call",
+		Loc:   "share.go:613",
+		Scope: "share.go/fn77@1370",
+		Props: map[string]string{
+			"callee_path": "store.Share.GetByHash",
+			"method":      "GetByHash",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "token",
+		Type:  "code.Attr",
+		Loc:   "share.go:618",
+		Scope: "share.go/fn77@1384",
+		Props: map[string]string{
+			"callee_path": "shareLink.Token",
+			"method":      "Token",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "url",
+		Type:  "code.Call",
+		Loc:   "share.go:618",
+		Scope: "share.go/fn77@1386",
+		Props: map[string]string{
+			"callee_path": "getShareURL",
+			"method":      "getShareURL",
+		},
+	})
+
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.ShareInfoLeak" {
+		t.Fatalf("context flag did not match ordered same-function call and selector evidence: %+v", got)
+	}
+}
+
+func TestAstFlagMatchesUnorderedBinopOperands(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.SecretComparison on binop {
+    op any ["==", "==="]
+    operand {
+      key contains_any ["csrf-token", "x-csrf-token"]
+    }
+    operand {
+      identifier contains_any ["token", "secret", "signature", "key"]
+    }
+    lacks call contains_any ["scmp", "timingSafeEqual"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "cmp", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.js:10", "op": "===", "callee_path": "__binop.eq", "method": "eq", "arg0": "a0", "arg1": "a1",
+	}})
+	store.AddNode(usg.Node{ID: "a0", Type: "code.Arg"})
+	store.AddNode(usg.Node{ID: "a1", Type: "code.Arg"})
+	store.AddNode(usg.Node{ID: "header", Type: "code.Subscript", Props: map[string]string{
+		"loc": "sample.js:10", "callee_path": "data.__subscript", "method": "[]", "str_args": "x-csrf-token",
+	}})
+	store.AddNode(usg.Node{ID: "candidate", Type: "code.Param", Props: map[string]string{
+		"loc": "sample.js:10", "name": "providedToken",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "header", Dst: "a0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "candidate", Dst: "a1"})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "cmp" || got[0].Concept != "custom.SecretComparison" {
+		t.Fatalf("AST flag did not label matching binop: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:20", "callee_path": "crypto.timingSafeEqual", "method": "timingSafeEqual",
+	}})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 0 {
+		t.Fatalf("AST flag should skip file with constant-time comparison call: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedLiteralAndSubscriptPredicates(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.PrototypeMerge in function {
+    lang "javascript"
+    index "base.__subscript"
+    token subscript "obj[key]"
+    not literal "__proto__"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "merge.js:1",
+		Scope: "merge.js/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=javascript",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "base-sub",
+		Type:  "code.Subscript",
+		Loc:   "merge.js:9",
+		Scope: "merge.js/fn1/loop",
+		Props: map[string]string{"callee_path": "base.__subscript", "method": "[]"},
+	})
+	store.AddNode(usg.Node{
+		ID:    "obj-sub",
+		Type:  "code.Subscript",
+		Loc:   "merge.js:6",
+		Scope: "merge.js/fn1/loop",
+		Props: map[string]string{"callee_path": "obj.__subscript", "method": "[]", "str_args": "key"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST flag did not match scoped subscript nodes: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "proto-literal",
+		Type:  "code.Const",
+		Loc:   "merge.js:5",
+		Scope: "merge.js/fn1",
+		Props: map[string]string{"str_args": "__proto__"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST flag should skip scoped prototype literal guard: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedSelectorContainsAny(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.LockOpen in function {
+    lang "python"
+    selector contains_any ["lock_file", ".lock", "lock"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context ast selector flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "lock.py:1",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lock-attr",
+		Type:  "code.Attr",
+		Loc:   "lock.py:9",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "self.lock_file",
+			"method":      "lock_file",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST flag did not match selector contains_any text: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "other-ctx",
+		Type:  "code.Call",
+		Loc:   "other.py:1",
+		Scope: "other.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 {
+		t.Fatalf("context AST flag should stay file/scope-local, got %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedBinaryPredicate(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.EmptyPayloadCheck in function {
+    lang "go"
+    binary "len(payload)==0"
+    not binary "len(checked)==0"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context binary flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "handler.go:1",
+		Scope: "handler.go/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=go",
+		},
+	})
+	for _, node := range []usg.Node{
+		{ID: "payload", Type: "code.Param", Loc: "handler.go:1", Scope: "handler.go/fn1", Props: map[string]string{"name": "payload"}},
+		{ID: "len-call", Type: "code.Call", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"callee_path": "len", "method": "len"}},
+		{ID: "zero", Type: "code.Const", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"str_args": "0"}},
+		{ID: "arg0", Type: "code.Arg", Loc: "handler.go:4", Scope: "handler.go/fn1/if1"},
+		{ID: "arg1", Type: "code.Arg", Loc: "handler.go:4", Scope: "handler.go/fn1/if1"},
+		{ID: "cmp", Type: "code.BinOp", Loc: "handler.go:4", Scope: "handler.go/fn1/if1", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "arg0", "arg1": "arg1"}},
+	} {
+		store.AddNode(node)
+	}
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "payload", Dst: "len-call"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "len-call", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "zero", Dst: "arg1"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST binary flag did not match scoped binop: %+v", got)
+	}
+
+	for _, node := range []usg.Node{
+		{ID: "checked", Type: "code.Param", Loc: "handler.go:1", Scope: "handler.go/fn1", Props: map[string]string{"name": "checked"}},
+		{ID: "checked-len", Type: "code.Call", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"callee_path": "len", "method": "len"}},
+		{ID: "checked-zero", Type: "code.Const", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"str_args": "0"}},
+		{ID: "checked-arg0", Type: "code.Arg", Loc: "handler.go:5", Scope: "handler.go/fn1/if2"},
+		{ID: "checked-arg1", Type: "code.Arg", Loc: "handler.go:5", Scope: "handler.go/fn1/if2"},
+		{ID: "checked-cmp", Type: "code.BinOp", Loc: "handler.go:5", Scope: "handler.go/fn1/if2", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "checked-arg0", "arg1": "checked-arg1"}},
+	} {
+		store.AddNode(node)
+	}
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked", Dst: "checked-len"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-len", Dst: "checked-arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "checked-zero", Dst: "checked-arg1"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST binary flag should skip scoped negative binop: %+v", got)
+	}
+}
+
+func TestCContextFlagMatchesICMPEchoLengthUnderflowTokens(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter c {
+  flag custom.IcmpEchoPayloadLengthUnderflow in function {
+    lang "c"
+    name "prvProcessICMPMessage_IPv6"
+    token switch_case "ipICMP_PING_REPLY_IPv6"
+    selector contains "usPayloadLength"
+    assign contains "uxDataLength=uxDataLength-sizeof"
+    selector "pxICMPEchoHeader.usIdentifier"
+    call path "FreeRTOS_ntohs"
+    call path "vApplicationPingReplyHook"
+    binary contains_any ["uxDataLength-sizeof(*pxICMPEchoHeader)", "uxDataLength-sizeof"]
+    not binary contains_any ["uxDataLength<sizeof(*pxICMPEchoHeader)", "sizeof(*pxICMPEchoHeader)>uxDataLength"]
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse C context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	tokens := strings.Join([]string{
+		"lang=c",
+		"name=prvProcessICMPMessage_IPv6",
+		"switch_case:ipICMP_PING_REPLY_IPv6",
+		"assign:uxDataLength=uxDataLength-sizeof(*pxICMPEchoHeader)",
+		"call_path:FreeRTOS_ntohs",
+		"call_path:vApplicationPingReplyHook",
+		"binary:uxDataLength-sizeof(*pxICMPEchoHeader)",
+	}, "\x00")
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "FreeRTOS_ND.c:1", Scope: "FreeRTOS_ND.c/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    tokens,
+	}})
+	store.AddNode(usg.Node{ID: "payload", Type: "code.Attr", Loc: "FreeRTOS_ND.c:10", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"path": "pxICMPPacket.xIPHeader.usPayloadLength",
+	}})
+	store.AddNode(usg.Node{ID: "ident", Type: "code.Attr", Loc: "FreeRTOS_ND.c:20", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"path": "pxICMPEchoHeader.usIdentifier",
+	}})
+	store.AddNode(usg.Node{ID: "ntohs", Type: "code.Call", Loc: "FreeRTOS_ND.c:10", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"callee_path": "FreeRTOS_ntohs",
+		"method":      "FreeRTOS_ntohs",
+	}})
+	store.AddNode(usg.Node{ID: "hook", Type: "code.Call", Loc: "FreeRTOS_ND.c:20", Scope: "FreeRTOS_ND.c/fn1/case0", Props: map[string]string{
+		"callee_path": "vApplicationPingReplyHook",
+		"method":      "vApplicationPingReplyHook",
+	}})
+
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("C ICMP echo context flag did not match, got %+v", got)
+	}
+}
+
+func TestContextFlagAstSoftLockNoFollowPredicateMix(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.LockNoFollow in function {
+    lang "python"
+    call path "os.open"
+    selector "os.O_CREAT"
+    selector "os.O_EXCL"
+    selector contains_any ["lock_file", ".lock", "lock"]
+    not literal "O_NOFOLLOW"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse soft-lock context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "lock.py:1",
+		Scope: "lock.py/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=python",
+		},
+	})
+	for _, node := range []usg.Node{
+		{ID: "open", Type: "code.Call", Loc: "lock.py:9", Scope: "lock.py/fn1/try2", Props: map[string]string{"callee_path": "os.open", "method": "open"}},
+		{ID: "create", Type: "code.Attr", Loc: "lock.py:5", Scope: "lock.py/fn1", Props: map[string]string{"callee_path": "os.O_CREAT", "method": "O_CREAT"}},
+		{ID: "excl", Type: "code.Attr", Loc: "lock.py:6", Scope: "lock.py/fn1", Props: map[string]string{"callee_path": "os.O_EXCL", "method": "O_EXCL"}},
+		{ID: "lock", Type: "code.Attr", Loc: "lock.py:9", Scope: "lock.py/fn1/try2", Props: map[string]string{"callee_path": "self.lock_file", "method": "lock_file"}},
+	} {
+		store.AddNode(node)
+	}
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("soft-lock context flag did not match AST predicate mix: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "nofollow", Type: "code.Const", Loc: "lock.py:7", Scope: "lock.py/fn1", Props: map[string]string{"str_args": "O_NOFOLLOW"}})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("soft-lock context flag should skip no-follow hardening: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedCallArgPredicates(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.DirectJsonEncode in function {
+    lang "php"
+    call arg "json_encode:$data[$field_name]"
+    not call arg "json_encode:$value"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "fields.php:1",
+		Scope: "fields.php/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=php",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "encode",
+		Type:  "code.Call",
+		Loc:   "fields.php:9",
+		Scope: "fields.php/fn1/if2",
+		Props: map[string]string{
+			"callee_path": "json_encode",
+			"method":      "json_encode",
+			"str_args":    "$data[$field_name]",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not match scoped call argument: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "fixed",
+		Type:  "code.Call",
+		Loc:   "fields.php:10",
+		Scope: "fields.php/fn1",
+		Props: map[string]string{
+			"callee_path": "json_encode",
+			"method":      "json_encode",
+			"str_args":    "$value",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST call-arg flag should honor excluded scoped argument: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedCallArgPredicatesInspectArgumentNodes(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.GitCloneWrapper in function {
+    call path "utils.run"
+    call arg contains "utils.run:git clone"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "index.js:1", Scope: "index.js/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "run", Type: "code.Call", Loc: "index.js:20", Scope: "index.js/fn1/try2", Props: map[string]string{
+		"callee_path": "utils.run",
+		"method":      "run",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "index.js:20", Scope: "index.js/fn1/try2"})
+	store.AddNode(usg.Node{ID: "fmt", Type: "code.Format", Loc: "index.js:20", Scope: "index.js/fn1/try2", Props: map[string]string{
+		"str_args": "git clone ${remoteUrl} ${tmpDir}",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fmt", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "run"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect argument expression nodes: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedCallArgPredicatesInspectNestedCallArguments(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.BulkMailRecipients in function {
+    call path "SendMail"
+    call arg contains "SendMail:getUserEmailsByNames"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context nested call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "mail.go:20", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "mail.go:20", Scope: "mail.go/fn1"})
+	store.AddNode(usg.Node{ID: "lookup", Type: "code.Call", Loc: "mail.go:20", Scope: "mail.go/fn1", Props: map[string]string{
+		"callee_path": "getUserEmailsByNames",
+		"method":      "getUserEmailsByNames",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect nested call argument: %+v", got)
+	}
+}
+
+func TestContextFlagAstScopedCallArgPredicatesInspectNamePath(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter go {
+  flag custom.BulkMailRecipients in function {
+    call path "SendMail"
+    call arg "SendMail:tos"
+    not call arg "SendMail:__object_literal"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Loc: "issue_mail.go:1", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+	}})
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "arg", Type: "code.Arg", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1"})
+	store.AddNode(usg.Node{ID: "tos", Type: "code.Name", Loc: "issue_mail.go:20", Scope: "issue_mail.go/fn1", Props: map[string]string{
+		"path": "tos",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "tos", Dst: "arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg", Dst: "send"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context AST call-arg flag did not inspect Go name path: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2", Props: map[string]string{
+		"callee_path": "SendMail",
+		"method":      "SendMail",
+	}})
+	store.AddNode(usg.Node{ID: "fixedArg", Type: "code.Arg", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2"})
+	store.AddNode(usg.Node{ID: "single", Type: "code.Seq", Loc: "issue_mail.go:24", Scope: "issue_mail.go/fn1/loop2", Props: map[string]string{
+		"path": "__object_literal",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "single", Dst: "fixedArg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixedArg", Dst: "fixed"})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context AST call-arg flag should honor object-literal exclusion: %+v", got)
+	}
+}
+
+func TestDirectFlagCallArgPredicatesUseCallArguments(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter python {
+  flag custom.UnhardenedXmlParser on call {
+    path "etree.XMLParser"
+    call arg "etree.XMLParser:huge_tree=True"
+    not call arg "etree.XMLParser:resolve_entities=False"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse direct call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:   "parser",
+		Type: "code.Call",
+		Props: map[string]string{
+			"callee_path": "etree.XMLParser",
+			"method":      "XMLParser",
+			"str_args":    "huge_tree=True",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+		t.Fatalf("direct call-arg flag should match call arguments: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:   "hardened",
+		Type: "code.Call",
+		Props: map[string]string{
+			"callee_path": "etree.XMLParser",
+			"method":      "XMLParser",
+			"str_args":    "huge_tree=True\x00resolve_entities=False",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "parser" {
+		t.Fatalf("direct call-arg flag should reject hardened call arguments: %+v", got)
+	}
+}
+
+func TestContextFlagAstSubscriptPredicatesHonorKeys(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.PasswordOnlySessionHash in function {
+    lang "php"
+    name "authenticate"
+    token subscript "$u['password']"
+    not token subscript "$u['permissions']"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context subscript flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "auth.php:10",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=php\x00name=authenticate",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "password",
+		Type:  "code.Subscript",
+		Loc:   "auth.php:12",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "password"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context subscript flag should match password without permissions: %+v", got)
+	}
+	store.AddNode(usg.Node{
+		ID:    "permissions",
+		Type:  "code.Subscript",
+		Loc:   "auth.php:12",
+		Scope: "auth.php/fn1",
+		Props: map[string]string{"callee_path": "$u.__subscript", "str_args": "permissions"},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context subscript flag should reject matching permissions key: %+v", got)
+	}
+}
+
+func TestContextFlagIgnoresUnscopedParamsFromOtherFunctions(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.RemoteUrlDebugLog in function {
+    lang "javascript"
+    name "fetchRepo"
+    call path "logger.debug"
+    token identifier "url"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context identifier flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "file.ts:40",
+		Scope: "file.ts/fn2",
+		Props: map[string]string{
+			"callee_path": "analysis.function.context",
+			"method":      "context",
+			"str_args":    "lang=javascript\x00name=fetchRepo",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "debug",
+		Type:  "code.Call",
+		Loc:   "file.ts:45",
+		Scope: "file.ts/fn2",
+		Props: map[string]string{"callee_path": "logger.debug", "method": "debug"},
+	})
+	store.AddNode(usg.Node{
+		ID:   "other-param",
+		Type: "code.Param",
+		Loc:  "file.ts:10",
+		Props: map[string]string{
+			"name": "url",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context identifier flag matched unscoped param from a different function: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:   "local-param",
+		Type: "code.Param",
+		Loc:  "file.ts:40",
+		Props: map[string]string{
+			"name": "url",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 1 || got[0].NodeID != "ctx" {
+		t.Fatalf("context identifier flag should match unscoped param on context declaration line: %+v", got)
+	}
+}
+
+func TestContextFlagCallArgDoesNotUseCompactTokenFallback(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.DirectJsonEncode in function {
+    lang "php"
+    call arg "json_encode:$data[$field_name]"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context call-arg flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:1",
+		"region":      "fields.php/fn1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php\x00call_arg:json_encode:$data[$field_name]",
+	}})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("context call-arg flag should require scoped AST call evidence, got %+v", got)
+	}
+}
+
+func TestContextFlagStructuredTokenEqualsUsesTokenBoundary(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter ruby {
+  flag custom.ExactParse in function {
+    function equals "parse"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context exact-token flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:10",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:parse",
+	}})
+	store.AddNode(usg.Node{ID: "do-parse", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:20",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:do_parse",
+	}})
+	store.AddNode(usg.Node{ID: "parse-cron", Type: "code.Call", Props: map[string]string{
+		"loc":         "nat.rb:30",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00function_name:parse_cron",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "parse" {
+		t.Fatalf("context exact-token flag should only match function_name:parse, got %+v", got)
+	}
+}
+
+func TestContextFlagAstPredicatesUseRegionWhenScopeIsEmpty(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter php {
+  flag custom.ScopedLiteral in function {
+    lang "php"
+    literal "multiple_dropdown_action"
+    call arg "json_encode:$data[$field_name]"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse region-scoped context flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "target-ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:10",
+		"region":      "fields.php/fn1",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php",
+	}})
+	store.AddNode(usg.Node{ID: "other-ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:30",
+		"region":      "fields.php/fn2",
+		"callee_path": "analysis.function.context",
+		"method":      "context",
+		"str_args":    "lang=php",
+	}})
+	store.AddNode(usg.Node{ID: "lit", Type: "code.Const", Props: map[string]string{
+		"loc":      "fields.php:11",
+		"region":   "fields.php/fn1",
+		"str_args": "multiple_dropdown_action",
+	}})
+	store.AddNode(usg.Node{ID: "encode", Type: "code.Call", Props: map[string]string{
+		"loc":         "fields.php:12",
+		"region":      "fields.php/fn1/if1",
+		"callee_path": "json_encode",
+		"method":      "json_encode",
+		"str_args":    "$data[$field_name]",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "target-ctx" {
+		t.Fatalf("context AST flag should use region as lexical scope, got %+v", got)
+	}
+}
+
+func TestContextFlagStructuredTokenContainsSearchesTokenPayload(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter ruby {
+  flag custom.RailsSecretToken in module {
+    lang "ruby"
+    assign contains_any [".config.secret_token="]
+    not expr "Rails.env=='test'"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse context structured-token flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "secret_token.rb:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+	}})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.RailsSecretToken" {
+		t.Fatalf("context structured-token flag did not search token payload: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "fixed", Type: "code.Call", Props: map[string]string{
+		"loc":         "secret_token_fixed.rb:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=ruby\x00assign:FatFreeCRM.Application.config.secret_token=51aa366864a80316a85cff0d3762347f4ae3d029d548bef034d56e82b1a2ffac5353ee6719d9b64e4354e2a0b1a901679f46a851c360a2ea377188e4b196b6b6",
+	}})
+	store.AddNode(usg.Node{ID: "fixed-env", Type: "code.Param", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"name": "Rails.env"}})
+	store.AddNode(usg.Node{ID: "fixed-test", Type: "code.Const", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"str_args": "test"}})
+	store.AddNode(usg.Node{ID: "fixed-arg0", Type: "code.Arg", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module"})
+	store.AddNode(usg.Node{ID: "fixed-arg1", Type: "code.Arg", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module"})
+	store.AddNode(usg.Node{ID: "fixed-cmp", Type: "code.BinOp", Loc: "secret_token_fixed.rb:2", Scope: "secret_token_fixed.rb/module", Props: map[string]string{"op": "==", "callee_path": "__binop.eq", "method": "eq", "arg0": "fixed-arg0", "arg1": "fixed-arg1"}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-env", Dst: "fixed-arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "fixed-test", Dst: "fixed-arg1"})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 1 {
+		t.Fatalf("context structured-token flag should skip test-only guarded scope, got %+v", got)
+	}
+}
+
+func TestModuleContextFlagStructuredPredicatesUseAstNodes(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter c {
+  flag custom.PathBasedSandboxExposeBindRace in module {
+    lang "c"
+    call path "filesystem_sandbox_arg"
+    literal "sandbox-expose"
+    not call path "fd_map_remap_fd"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse module context ast flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{
+		ID:    "ctx",
+		Type:  "code.Call",
+		Loc:   "portal.c:1",
+		Scope: "portal.c",
+		Props: map[string]string{
+			"callee_path": "analysis.module.context",
+			"method":      "context",
+			"str_args":    "lang=c",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "lookup",
+		Type:  "code.Call",
+		Loc:   "portal.c:12",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "g_variant_lookup",
+			"method":      "g_variant_lookup",
+		},
+	})
+	store.AddNode(usg.Node{
+		ID:    "literal",
+		Type:  "code.Const",
+		Loc:   "portal.c:12",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{"str_args": "sandbox-expose"},
+	})
+	store.AddNode(usg.Node{
+		ID:    "arg",
+		Type:  "code.Call",
+		Loc:   "portal.c:16",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "filesystem_sandbox_arg",
+			"method":      "filesystem_sandbox_arg",
+		},
+	})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "ctx" || got[0].Concept != "custom.PathBasedSandboxExposeBindRace" {
+		t.Fatalf("module context flag should match AST call/literal predicates even when context tokens are sparse: %+v", got)
+	}
+
+	store.AddNode(usg.Node{
+		ID:    "safe",
+		Type:  "code.Call",
+		Loc:   "portal.c:20",
+		Scope: "portal.c/handle_spawn",
+		Props: map[string]string{
+			"callee_path": "fd_map_remap_fd",
+			"method":      "fd_map_remap_fd",
+		},
+	})
+	if got := spec.flagAdapter().Apply(store); len(got) != 0 {
+		t.Fatalf("module context flag should honor AST negative call predicates: %+v", got)
+	}
+}
+
+func TestAstFlagMatchesDownstreamFlowPredicate(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter cpp {
+  flag custom.PointerAddOverflow on binop {
+    op "+"
+    operand {
+      path "alignPointer"
+    }
+    flows to op ">"
+    not flows to op "<"
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse ast flow flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.h:1",
+		"callee_path": "analysis.module.context",
+		"method":      "context",
+		"str_args":    "lang=cpp",
+	}})
+	store.AddNode(usg.Node{ID: "add", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:10", "op": "+", "callee_path": "__binop.add", "arg0": "a0", "arg1": "a1",
+	}})
+	store.AddNode(usg.Node{ID: "a0", Type: "code.Arg", Props: map[string]string{"loc": "sample.h:10"}})
+	store.AddNode(usg.Node{ID: "a1", Type: "code.Arg", Props: map[string]string{"loc": "sample.h:10"}})
+	store.AddNode(usg.Node{ID: "align", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.h:9", "callee_path": "alignPointer", "method": "alignPointer",
+	}})
+	store.AddNode(usg.Node{ID: "upper", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:12", "op": ">", "callee_path": "__binop.gt",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "align", Dst: "a0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a0", Dst: "add"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "a1", Dst: "add"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "upper"})
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "add" || got[0].Concept != "custom.PointerAddOverflow" {
+		t.Fatalf("AST flow flag did not label vulnerable add: %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "wrap", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.h:12", "op": "<", "callee_path": "__binop.lt",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "add", Dst: "wrap"})
+	got = spec.flagAdapter().Apply(store)
+	if len(got) != 0 {
+		t.Fatalf("AST flow flag should skip add with downstream wraparound check: %+v", got)
+	}
+}
+
+func TestAstFlagCallOperandMatchesTransitiveFlow(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.RemoteUrlDebugLog on call {
+    path "logger.debug"
+    operand {
+      identifier contains_any ["url", "uri"]
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse param flow flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "url-param", Type: "code.Param", Props: map[string]string{
+		"loc": "file.js:10", "name": "url",
+	}})
+	store.AddNode(usg.Node{ID: "elem", Type: "code.CollectionElement", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "obj", Type: "code.Seq", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "__object_literal",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "debug", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "logger.debug", "method": "debug", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "url-param", Dst: "elem"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "elem", Dst: "obj"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "obj", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "debug"})
+
+	debug, ok, err := store.GetNode("debug")
+	if err != nil || !ok {
+		t.Fatalf("missing debug node: ok=%v err=%v", ok, err)
+	}
+	if !flagNodeKindAllows(spec.Flags[0], debug) {
+		t.Fatalf("debug node kind was not allowed by flag: %+v", spec.Flags[0])
+	}
+	if !flagMatchesNode(store, &flowTokenIndex{}, spec.Flags[0], debug, "javascript", false, nil) {
+		t.Fatalf("call operand flag did not match transitive URL flow into debug call")
+	}
+
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "debug" || got[0].Concept != "custom.RemoteUrlDebugLog" {
+		t.Fatalf("call operand flag did not label debug log call: %+v", got)
+	}
+}
+
+func TestAstFlagCallOperandFallsBackToIncomingArgFlow(t *testing.T) {
+	decls, err := parser.Parse(`
+adapter javascript {
+  flag custom.ZipCompressedSizeRead on call {
+    path "tokenizer.readToken"
+    operand {
+      path "Token.StringType"
+      path "zipHeader.compressedSize"
+    }
+  }
+}
+`)
+	if err != nil {
+		t.Fatalf("parse call operand flag: %v", err)
+	}
+	spec := specFromDecl(decls[0].(*parser.AdapterDecl))
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "size", Type: "code.Attr", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "zipHeader.compressedSize",
+	}})
+	store.AddNode(usg.Node{ID: "size-arg", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "string-type", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "Token.StringType", "method": "StringType",
+	}})
+	store.AddNode(usg.Node{ID: "read-arg", Type: "code.Arg", Props: map[string]string{
+		"loc": "file.js:20",
+	}})
+	store.AddNode(usg.Node{ID: "read-token", Type: "code.Call", Props: map[string]string{
+		"loc": "file.js:20", "callee_path": "tokenizer.readToken", "method": "readToken",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "size", Dst: "size-arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "size-arg", Dst: "string-type"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "string-type", Dst: "read-arg"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "read-arg", Dst: "read-token"})
+
+	got := spec.flagAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "read-token" || got[0].Concept != "custom.ZipCompressedSizeRead" {
+		t.Fatalf("call operand flag did not use incoming arg flow fallback: %+v", got)
+	}
+}
+
 func TestCollectionFirstSinkTargetsIndexedElement(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
@@ -467,6 +1729,29 @@ func TestValueMatchedSourceUsesDirectStringTokensOnly(t *testing.T) {
 	}
 }
 
+func TestJSDomValueInputAdapterUsesFlowIndex(t *testing.T) {
+	want := singleOntologyRoleConcept(ontology.AnalysisRoleDomInput)
+	if want == "" {
+		t.Fatal("DomInput analysis role did not resolve")
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "lookup", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.js:1", "callee_path": "document.getElementById",
+	}})
+	store.AddNode(usg.Node{ID: "value", Type: "code.Attr", Props: map[string]string{
+		"loc": "sample.js:2", "callee_path": "source.value",
+	}})
+	store.AddNode(usg.Node{ID: "plain", Type: "code.Attr", Props: map[string]string{
+		"loc": "sample.js:3", "callee_path": "model.value",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "lookup", Dst: "value"})
+
+	got := jsDomValueInputAdapter().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "value" || got[0].Concept != want {
+		t.Fatalf("DOM value source mapping wrong: %+v want concept %s", got, want)
+	}
+}
+
 func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
@@ -518,7 +1803,7 @@ func TestInputAdapterVisitsCallablePropertyNodeTypes(t *testing.T) {
 	}
 }
 
-func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockSourceRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -536,7 +1821,7 @@ func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated source fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block source fired without evidence: %+v", got)
 	}
 
 	withPkg := usg.NewInMemStore()
@@ -547,11 +1832,11 @@ func TestPackageGatedSourceRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.source.value", "method": "value",
 	}})
 	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "src" || got[0].Concept != "custom.Source" {
-		t.Fatalf("package-gated source did not fire with package evidence: %+v", got)
+		t.Fatalf("explicit package-block source did not fire with package evidence: %+v", got)
 	}
 }
 
-func TestPackageGatedReceiverSourceUsesResolvedType(t *testing.T) {
+func TestExplicitPackageBlockReceiverSourceUsesResolvedType(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -588,7 +1873,7 @@ func TestPackageGatedReceiverSourceUsesResolvedType(t *testing.T) {
 	}
 }
 
-func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
+func TestExplicitPackageBlockControlRequiresPackageEvidence(t *testing.T) {
 	spec := adapterSpec{
 		Name:       "neutral",
 		Technology: "neutral",
@@ -606,7 +1891,7 @@ func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 	if got := adapter.Apply(withoutPkg); len(got) != 0 {
-		t.Fatalf("package-gated control fired without evidence: %+v", got)
+		t.Fatalf("explicit package-block control fired without evidence: %+v", got)
 	}
 
 	withPkg := usg.NewInMemStore()
@@ -617,7 +1902,7 @@ func TestPackageGatedControlRequiresPackageEvidence(t *testing.T) {
 		"loc": "sample.x:2", "callee_path": "samplepkg.normalize", "method": "normalize",
 	}})
 	if got := adapter.Apply(withPkg); len(got) != 1 || got[0].NodeID != "call" || got[0].Concept != "custom.Control" {
-		t.Fatalf("package-gated control did not fire with package evidence: %+v", got)
+		t.Fatalf("explicit package-block control did not fire with package evidence: %+v", got)
 	}
 }
 

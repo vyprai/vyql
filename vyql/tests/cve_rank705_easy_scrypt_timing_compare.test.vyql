@@ -1,0 +1,56 @@
+test "rank705: scrypt verifier uses bytes.Equal for derived key comparison"
+  lang go
+  expect VYQL-CRY-006
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  package scrypt
+
+  import (
+      "bytes"
+      "crypto/sha256"
+      "code.google.com/p/go.crypto/scrypt"
+  )
+
+  func VerifyPassphrase(passphrase string, keylenBytes int, targetKey []byte) bool {
+      target_master_key := targetKey[:keylenBytes]
+      salt := targetKey[keylenBytes:48]
+      source_master_key, _ := scrypt.Key([]byte(passphrase), salt, 16384, 8, 1, keylenBytes)
+      target_hash := targetKey[60:]
+      digest := sha256.New()
+      digest.Write(targetKey[:60])
+      source_hash := digest.Sum(nil)
+
+      return bytes.Equal(source_master_key, target_master_key) &&
+          bytes.Equal(target_hash, source_hash)
+  }
+  ```
+
+test "rank705: scrypt verifier uses constant-time comparison"
+  lang go
+  reject VYQL-CRY-006
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  package scrypt
+
+  import (
+      "crypto/sha256"
+      "crypto/subtle"
+      "code.google.com/p/go.crypto/scrypt"
+  )
+
+  func VerifyPassphrase(passphrase string, keylenBytes int, targetKey []byte) bool {
+      target_master_key := targetKey[:keylenBytes]
+      salt := targetKey[keylenBytes:48]
+      source_master_key, _ := scrypt.Key([]byte(passphrase), salt, 16384, 8, 1, keylenBytes)
+      target_hash := targetKey[60:]
+      digest := sha256.New()
+      digest.Write(targetKey[:60])
+      source_hash := digest.Sum(nil)
+
+      keyComp := subtle.ConstantTimeCompare(source_master_key, target_master_key) != 0
+      hashComp := subtle.ConstantTimeCompare(target_hash, source_hash) != 0
+      return keyComp && hashComp
+  }
+  ```

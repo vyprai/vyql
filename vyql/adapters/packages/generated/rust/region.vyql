@@ -1,8 +1,16 @@
 adapter rust {
   package "region" {
-    mark method "alloc_pages" -> code.PrivilegedOp
-    mark method "protect" -> code.PrivilegedOp
-    mark method "lock" -> code.PrivilegedOp
-    mark method "unlock" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "alloc_pages"
+    }
+    flag code.PrivilegedOp on any {
+      method "protect"
+    }
+    flag code.PrivilegedOp on any {
+      method "lock"
+    }
+    flag code.PrivilegedOp on any {
+      method "unlock"
+    }
   }
 }

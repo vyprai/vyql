@@ -59,3 +59,53 @@ rule RequestSelectedDeserializationFormat {
   meta { id: "VYQL-DESER-010", severity: high, cwe: [CWE_502], confidence_floor: medium }
   match code.RequestSelectedDeserializationFormat as deserialization
 }
+
+rule CheckstyleExternalParameterEntitiesXxe {
+  meta { id: "VYQL-DESER-011", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CheckstyleExternalParameterEntitiesXxe as parser
+}
+
+rule CinderUnsafeMinidomXmlDeserializer {
+  meta { id: "VYQL-DESER-012", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CinderUnsafeMinidomXmlDeserializer as parser
+}
+
+rule CodeceptionRunProcessDeserializationGadget {
+  meta { id: "VYQL-DESER-013", severity: critical, cwe: [CWE_502], confidence_floor: high }
+  match code.CodeceptionRunProcessDeserializationGadget as gadget
+}
+
+rule CodeIgniterRestserverXmlEntityLoaderXxe {
+  meta { id: "VYQL-DESER-014", severity: high, cwe: [CWE_611], confidence_floor: high }
+  match code.CodeIgniterRestserverXmlEntityLoaderXxe as parser
+}
+
+rule PhpSimplexmlEntityLoaderXxe {
+  meta { id: "VYQL-DESER-015", severity: high, cwe: [CWE_611], confidence_floor: medium }
+  match code.PhpSimplexmlEntityLoaderXxe as parser
+}
+
+rule UnsafeYamlLoad {
+  meta { id: "VYQL-DESER-016", severity: high, cwe: [CWE_502], confidence_floor: medium }
+  match code.UnsafeYamlLoad as loader
+}
+
+rule PickleUnsafeImportBlocklistGap {
+  meta { id: "VYQL-DESER-017", severity: high, cwe: [CWE_184, CWE_502], confidence_floor: high }
+  match code.PickleUnsafeImportBlocklistGap as analyzer
+}
+
+rule PickleLoadsJoblibModelLoader {
+  meta { id: "VYQL-DESER-018", severity: high, cwe: [CWE_502], confidence_floor: high }
+  match code.PickleLoadsJoblibModelLoader as loader
+}
+
+rule ConfigurableCacheUnserializeWrapper {
+  meta { id: "VYQL-DESER-019", severity: high, cwe: [CWE_502, CWE_248], confidence_floor: high }
+  match code.ConfigurableCacheUnserializeWrapper as wrapper
+}
+
+rule PhpSimplexmlUnscopedEntityLoaderXxe {
+  meta { id: "VYQL-DESER-020", severity: high, cwe: [CWE_611], confidence_floor: medium }
+  match code.PhpSimplexmlUnscopedEntityLoaderXxe as parser
+}

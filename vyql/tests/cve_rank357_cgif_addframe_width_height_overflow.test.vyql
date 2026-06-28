@@ -1,0 +1,68 @@
+test "rank357: CGIF cgif_addframe multiplies width and height in signed loop bound"
+  lang c
+  expect VYQL-NUM-010
+  expect_review code.CgifAddframeSignedFrameCountOverflow
+  code
+  ```
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef struct { int attrFlags; uint8_t *pImageData; } CGIF_FrameConfig;
+  typedef struct { CGIF_FrameConfig config; } CGIF_Frame;
+  typedef struct { uint16_t width; uint16_t height; int genFlags; } CGIF_Config;
+  typedef struct { CGIF_Frame *aFrames[3]; int iHEAD; CGIF_Config config; } CGIF;
+
+  int cmpPixel(CGIF *pGIF, CGIF_FrameConfig *pCur, CGIF_FrameConfig *pBef, uint8_t cur, uint8_t bef);
+
+  int cgif_addframe(CGIF *pGIF, CGIF_FrameConfig *pConfig) {
+    int i;
+    int sameFrame = 1;
+    if (memcmp(pConfig->pImageData, pGIF->aFrames[pGIF->iHEAD]->config.pImageData, MULU16(pGIF->config.width, pGIF->config.height))) {
+      sameFrame = 0;
+    } else {
+      for(i = 0; i < pGIF->config.width * pGIF->config.height; i++) {
+        if(cmpPixel(pGIF, pConfig, &pGIF->aFrames[pGIF->iHEAD]->config,
+                    pConfig->pImageData[i],
+                    pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])) {
+          sameFrame = 0;
+        }
+      }
+    }
+    return sameFrame;
+  }
+  ```
+
+test "rank357: CGIF cgif_addframe widens width-height multiplication before loop"
+  lang c
+  reject VYQL-NUM-010
+  reject_review code.CgifAddframeSignedFrameCountOverflow
+  code
+  ```
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef struct { int attrFlags; uint8_t *pImageData; } CGIF_FrameConfig;
+  typedef struct { CGIF_FrameConfig config; } CGIF_Frame;
+  typedef struct { uint16_t width; uint16_t height; int genFlags; } CGIF_Config;
+  typedef struct { CGIF_Frame *aFrames[3]; int iHEAD; CGIF_Config config; } CGIF;
+  #define MULU16(a, b) (((uint32_t)a) * ((uint32_t)b))
+
+  int cmpPixel(CGIF *pGIF, CGIF_FrameConfig *pCur, CGIF_FrameConfig *pBef, uint8_t cur, uint8_t bef);
+
+  int cgif_addframe(CGIF *pGIF, CGIF_FrameConfig *pConfig) {
+    uint32_t i;
+    int sameFrame = 1;
+    if (memcmp(pConfig->pImageData, pGIF->aFrames[pGIF->iHEAD]->config.pImageData, MULU16(pGIF->config.width, pGIF->config.height))) {
+      sameFrame = 0;
+    } else {
+      for(i = 0; i < MULU16(pGIF->config.width, pGIF->config.height); i++) {
+        if(cmpPixel(pGIF, pConfig, &pGIF->aFrames[pGIF->iHEAD]->config,
+                    pConfig->pImageData[i],
+                    pGIF->aFrames[pGIF->iHEAD]->config.pImageData[i])) {
+          sameFrame = 0;
+        }
+      }
+    }
+    return sameFrame;
+  }
+  ```

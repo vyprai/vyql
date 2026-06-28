@@ -44,10 +44,26 @@ adapter perl {
   sink path "getprint" -> code.UrlFetch
   sink path "mirror" -> code.UrlFetch
   sink method "request" -> code.UrlFetch
-  mark "getstore" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "getprint" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "mirror" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "request" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "getstore"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "getprint"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "mirror"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "request"
+    has "http://"
+    lacks "127.0"
+  }
 
   // XSS (CWE-79) — print to the response filehandle / CGI writers
   sink path "print" arg all -> code.HtmlRender
@@ -67,41 +83,103 @@ adapter perl {
   sink method "find_by_id" -> code.ObjectLookupByUserInput
   sink method "get_user" -> code.ObjectLookupByUserInput
   sink method "get_account" -> code.ObjectLookupByUserInput
-  mark "change_password" -> code.AuthenticationRequiredOp
-  mark "update_password" -> code.AuthenticationRequiredOp
-  mark "reset_password" -> code.AuthenticationRequiredOp
-  mark "change_email" -> code.AuthenticationRequiredOp
-  mark "transfer_funds" -> code.AuthenticationRequiredOp
-  mark "delete_account" -> code.AuthenticationRequiredOp
-  mark "grant_role" -> code.AuthenticationRequiredOp
-  mark "make_admin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "change_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "update_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "reset_password"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "change_email"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transfer_funds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "delete_account"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grant_role"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "make_admin"
+  }
 
   // insecure cookie (CWE-614) — cookie secure/httponly setter turned off
-  mark "secure" val "false" -> code.InsecureCookie
-  mark "httponly" val "false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "secure"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "httponly"
+    has "false"
+  }
 
   // weak hash (CWE-328/327) — Digest::MD5 / Digest::SHA1 (`::` normalized to `.`)
-  mark "md5_hex" -> code.WeakHash
-  mark "md5_base64" -> code.WeakHash
-  mark "Digest.MD5" -> code.WeakHash
-  mark "sha1_hex" -> code.WeakHash
-  mark "Digest.SHA1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "md5_hex"
+  }
+  flag code.WeakHash on any {
+    path "md5_base64"
+  }
+  flag code.WeakHash on any {
+    path "Digest.MD5"
+  }
+  flag code.WeakHash on any {
+    path "sha1_hex"
+  }
+  flag code.WeakHash on any {
+    path "Digest.SHA1"
+  }
 
   // weak cipher (CWE-327) — Crypt::CBC / Crypt::DES with a broken algorithm.
-  mark "Crypt.CBC.new" val "DES" -> code.WeakCipher
-  mark "Crypt.CBC.new" val "RC4" -> code.WeakCipher
-  mark "Crypt.CBC.new" val "Blowfish" -> code.WeakCipher
-  mark "Crypt.CBC.new" val "0000000000000000" -> code.StaticIv
-  mark "Crypt.DES" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "Crypt.CBC.new"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Crypt.CBC.new"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "Crypt.CBC.new"
+    has "Blowfish"
+  }
+  flag code.StaticIv on any {
+    path "Crypt.CBC.new"
+    has "0000000000000000"
+  }
+  flag code.WeakCipher on any {
+    path "Crypt.DES"
+  }
 
   // insecure randomness (CWE-330) — perl builtin rand() (Crypt::URandom is safe)
-  mark "rand" -> code.WeakRandomValue
-  mark "chmod" val "0777" -> code.InsecurePermission
-  mark "chmod" val "0666" -> code.InsecurePermission
-  mark "tmpnam" -> code.InsecureTempFile
-  mark "POSIX.tmpnam" -> code.InsecureTempFile
-  mark "open" -> code.ResourceHandle
-  mark "IO.Socket.INET.new" -> code.ResourceHandle
+  flag code.WeakRandomValue on any {
+    path "rand"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0777"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "0666"
+  }
+  flag code.InsecureTempFile on any {
+    path "tmpnam"
+  }
+  flag code.InsecureTempFile on any {
+    path "POSIX.tmpnam"
+  }
+  flag code.ResourceHandle on any {
+    path "open"
+  }
+  flag code.ResourceHandle on any {
+    path "IO.Socket.INET.new"
+  }
   control "close" -> core.ResourceRelease
 
   // deserialization (CWE-502) — Storable

@@ -51,89 +51,6 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	return e.applyConfidenceFloor(cr, dedup(fs)), nil
 }
 
-// PossibilityFindings emits opt-in, low-confidence review findings for labelled target
-// sites that confirmed rules did not already report. Concept-specific review text lives in
-// ontology data; the fallback here is deliberately generic.
-func (e *Engine) PossibilityFindings(confirmed []*findings.Finding) []*findings.Finding {
-	covered := map[string]bool{}
-	for _, f := range confirmed {
-		for _, b := range f.Bindings {
-			covered[b.NodeID] = true
-		}
-	}
-	var out []*findings.Finding
-	seen := map[string]bool{}
-	for _, c := range e.Onto.AllConcepts() {
-		if c.Kind != "sink" || len(c.VulnerableTo) == 0 {
-			continue
-		}
-		qn := c.QualifiedName()
-		if c.Possibility == "exclude" {
-			continue
-		}
-		nodes, _ := e.Store.NodesWithConcept(qn)
-		for _, id := range nodes {
-			key := e.possibilityKey(qn, id)
-			if covered[id] || seen[key] {
-				continue
-			}
-			seen[key] = true
-			rc := possibilityReview(c)
-			out = append(out, &findings.Finding{
-				RuleID:      "VYQL-POSS-" + c.Name,
-				Severity:    "info",
-				Confidence:  "possibility",
-				WitnessKind: "possibility",
-				Bindings:    []findings.Binding{{Name: "sink", NodeID: id, Concept: qn, Loc: e.loc(id)}},
-				ReviewConditions: []findings.ReviewCondition{{
-					Category:   rc.Category,
-					Condition:  rc.Condition,
-					Evidence:   rc.Evidence,
-					Assumption: rc.Assumption,
-					Confidence: rc.Confidence,
-				}},
-			})
-		}
-	}
-	return out
-}
-
-func (e *Engine) possibilityKey(concept, nodeID string) string {
-	n, ok, _ := e.Store.GetNode(nodeID)
-	if !ok {
-		return concept + "\x00" + nodeID
-	}
-	loc := n.Prop("loc")
-	if loc == "" {
-		loc = nodeID
-	}
-	return concept + "\x00" + loc + "\x00" + n.Prop("path") + "\x00" + n.Prop("method")
-}
-
-func possibilityReview(c ontology.Concept) findings.ReviewCondition {
-	qn := c.QualifiedName()
-	category := firstNonEmpty(c.ReviewCategory, firstString(c.VulnerableTo), qn)
-	condition := c.ReviewCondition
-	if condition == "" {
-		condition = "review " + qn + " because this labelled site was not covered by a confirmed rule finding"
-	}
-	evidence := c.ReviewEvidence
-	if evidence == "" {
-		evidence = "concept label " + qn + " is present"
-	}
-	assumption := c.ReviewAssumption
-	if assumption == "" {
-		assumption = "the data and control conditions represented by this concept hold for the reviewed site"
-	}
-	return findings.ReviewCondition{
-		Category:   category,
-		Condition:  condition,
-		Evidence:   evidence,
-		Assumption: assumption,
-		Confidence: firstNonEmpty(c.ReviewConfidence, "possibility"),
-	}
-}
-
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 	switch body := cr.Rule.Body.(type) {
 	case *parser.FlowStmt:
@@ -167,7 +84,7 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 			}
 			out = append(out, &findings.Finding{
 				RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "order",
-				Confidence:       e.conf(a),
+				Confidence:       e.confBindings(bindingRef{nodeID: a, concept: body.First.Concept}, bindingRef{nodeID: b, concept: body.Second.Concept}),
 				ReviewConditions: append(e.reviewConditions(a, body.First.Concept), e.reviewConditions(b, body.Second.Concept)...),
 				Bindings: []findings.Binding{
 					{Name: "first", NodeID: a, Concept: body.First.Concept, Loc: e.loc(a), LabelProvenance: e.prov(a, body.First.Concept)},
@@ -204,7 +121,7 @@ func (e *Engine) evalReach(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "reach", Witness: w,
-			Confidence: e.conf(p.TargetID),
+			Confidence: e.confConcept(p.TargetID, body.Dst.Concept),
 			Bindings: []findings.Binding{
 				{Name: "source", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
 				{Name: "target", NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID), LabelProvenance: e.prov(p.TargetID, body.Dst.Concept)},
@@ -230,7 +147,7 @@ func (e *Engine) evalAssume(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		out = append(out, &findings.Finding{
 			RuleID: e.ruleID(cr), Severity: cr.Severity, WitnessKind: "assume", Witness: w,
-			Confidence: e.conf(p.SourceID),
+			Confidence: e.confConcept(p.SourceID, body.Src.Concept),
 			Bindings: []findings.Binding{
 				{Name: "principal", NodeID: p.SourceID, Concept: body.Src.Concept, Loc: e.loc(p.SourceID)},
 				{Name: "target", NodeID: p.TargetID, Concept: body.Dst.Concept, Loc: e.loc(p.TargetID)},
@@ -667,7 +584,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		}
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
-		conf := e.conf(fl.SourceID, fl.SinkID)
+		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
 		review := e.reviewConditions(fl.SinkID, snkC)
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourcePolicy == "caller_conditional" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
@@ -868,41 +785,75 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-func firstString(vals []string) string {
-	if len(vals) == 0 {
-		return ""
-	}
-	return vals[0]
-}
-
 // fidelityCeil caps confidence by match fidelity (docs/07): a syntactic match
 // (substring / bare method name, no receiver type) can be no better than medium;
 // resolved/semantic matches may be high.
 var fidelityCeil = map[string]int{"syntactic": 2, "resolved": 3, "semantic": 3}
 
-func (e *Engine) conf(nodeIDs ...string) string {
+type bindingRef struct {
+	nodeID  string
+	concept string
+}
+
+func (e *Engine) confBindings(refs ...bindingRef) string {
 	best := 3
-	for _, id := range nodeIDs {
-		for _, l := range e.labels(id) {
-			c := l.Provenance.Confidence
-			if c == "" {
-				c = "high"
-			}
-			eff := confOrder[c]
-			if eff == 0 {
-				eff = 3
-			}
-			// a label is only as trustworthy as the fidelity of the match that
-			// produced it
-			if ceil, ok := fidelityCeil[l.Provenance.Fidelity]; ok && ceil < eff {
-				eff = ceil
-			}
-			if eff < best {
-				best = eff
-			}
+	for _, ref := range refs {
+		eff := e.confConceptRank(ref.nodeID, ref.concept)
+		if eff < best {
+			best = eff
 		}
 	}
-	switch best {
+	return confidenceName(best)
+}
+
+func (e *Engine) confConcept(nodeID, concept string) string {
+	return confidenceName(e.confConceptRank(nodeID, concept))
+}
+
+func (e *Engine) confConceptRank(nodeID, concept string) int {
+	best := 3
+	matched := false
+	for _, l := range e.labels(nodeID) {
+		if concept != "" && l.Concept != concept {
+			continue
+		}
+		matched = true
+		eff := labelConfidenceRank(l)
+		if eff < best {
+			best = eff
+		}
+	}
+	if matched || concept == "" {
+		return best
+	}
+	for _, l := range e.labels(nodeID) {
+		eff := labelConfidenceRank(l)
+		if eff < best {
+			best = eff
+		}
+	}
+	return best
+}
+
+func labelConfidenceRank(l usg.Label) int {
+	c := l.Provenance.Confidence
+	if c == "" {
+		c = "high"
+	}
+	eff := confOrder[c]
+	if eff == 0 {
+		eff = 3
+	}
+	// a label is only as trustworthy as the fidelity of the match that
+	// produced it
+	if ceil, ok := fidelityCeil[l.Provenance.Fidelity]; ok && ceil < eff {
+		eff = ceil
+	}
+	return eff
+}
+
+func confidenceName(rank int) string {
+	switch rank {
 	case 1:
 		return "low"
 	case 2:
@@ -943,8 +894,13 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
+	guards, _ := e.Store.NodesWithConcept(control)
+	for _, gid := range guards {
+		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) {
+			return true
+		}
+	}
 	if sinkCFG {
-		guards, _ := e.Store.NodesWithConcept(control)
 		for _, gid := range guards {
 			if gid != sinkID && e.hasCFG(gid) && solvers.Dominates(e.Store, gid, sinkID) {
 				return true
@@ -954,6 +910,97 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 			if gid != sinkID && e.preflightLoopGuarded(gid, sinkID) {
 				return true
 			}
+		}
+	}
+	if e.sameReceiverGuarded(sinkID, control) {
+		return true
+	}
+	return false
+}
+
+func (e *Engine) sameFunctionContextGuarded(guardID, sinkID string) bool {
+	guard, ok1, _ := e.Store.GetNode(guardID)
+	sink, ok2, _ := e.Store.GetNode(sinkID)
+	if !ok1 || !ok2 {
+		return false
+	}
+	if guard.Prop("callee_path") != "analysis.function.context" {
+		return false
+	}
+	return functionScopeKey(guard) != "" && functionScopeKey(guard) == functionScopeKey(sink)
+}
+
+func functionScopeKey(n usg.Node) string {
+	scope := n.Scope
+	if scope == "" {
+		scope = n.Prop("region")
+	}
+	if at := strings.IndexByte(scope, '@'); at >= 0 {
+		scope = scope[:at]
+	}
+	parts := strings.Split(scope, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, "fn") {
+			return strings.Join(parts[:i+1], "/")
+		}
+	}
+	return ""
+}
+
+func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
+	sink, ok, _ := e.Store.GetNode(sinkID)
+	if !ok {
+		return false
+	}
+	targets := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverTarget)
+	if len(targets) == 0 || !nodeHasAnyConcept(e.labels(sinkID), targets) {
+		return false
+	}
+	guards := e.conceptsWithAnalysisRole(ontology.AnalysisRoleSameReceiverGuard)
+	if len(guards) == 0 || !guards[control] {
+		return false
+	}
+	sinkRecv := receiverPrefix(sink.Prop("callee_path"))
+	if sinkRecv == "" {
+		return false
+	}
+	guardNodes, _ := e.Store.NodesWithConcept(control)
+	for _, gid := range guardNodes {
+		if gid == sinkID {
+			continue
+		}
+		guard, ok, _ := e.Store.GetNode(gid)
+		if !ok {
+			continue
+		}
+		if receiverPrefix(guard.Prop("callee_path")) == sinkRecv {
+			return true
+		}
+	}
+	return false
+}
+
+func nodeHasAnyConcept(labels []usg.Label, concepts map[string]bool) bool {
+	for _, l := range labels {
+		if concepts[l.Concept] {
+			return true
+		}
+	}
+	return false
+}
+
+func receiverPrefix(path string) string {
+	i := strings.LastIndexByte(path, '.')
+	if i <= 0 {
+		return ""
+	}
+	return path[:i]
+}
+
+func nodeHasConcept(labels []usg.Label, concept string) bool {
+	for _, l := range labels {
+		if l.Concept == concept {
+			return true
 		}
 	}
 	return false
@@ -974,6 +1021,9 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 		return false
 	}
 	for i, pid := range path {
+		if i < len(path)-1 && e.nodeHasConcept(pid, control) {
+			return true
+		}
 		for _, gid := range e.flowGuardCandidates(pid, control) {
 			if gid == pid || !e.hasCFG(gid) {
 				continue

@@ -21,7 +21,9 @@ adapter objc {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
-  mark "addScriptMessageHandler" -> code.WebViewJsInterface
+  flag code.WebViewJsInterface on any {
+    path "addScriptMessageHandler"
+  }
 
   // command execution
   sink path "system" -> code.CommandExecution
@@ -44,10 +46,18 @@ adapter objc {
   sink path "strcat" arg 1 -> code.UnboundedCopy
   sink path "sprintf" arg all -> code.UnboundedCopy
   sink path "vsprintf" arg all -> code.UnboundedCopy
-  mark "strcpy" -> code.UnboundedCopySmell
-  mark "strcat" -> code.UnboundedCopySmell
-  mark "sprintf" -> code.UnboundedCopySmell
-  mark "vsprintf" -> code.UnboundedCopySmell
+  flag code.UnboundedCopySmell on any {
+    path "strcpy"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "strcat"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "sprintf"
+  }
+  flag code.UnboundedCopySmell on any {
+    path "vsprintf"
+  }
   sink path "memcpy" arg 2 -> code.RawMemoryCopySize
   sink path "memmove" arg 2 -> code.RawMemoryCopySize
   sink path "strncpy" arg 2 -> code.RawMemoryCopySize
@@ -56,42 +66,98 @@ adapter objc {
   sink path "calloc" arg all -> code.SizeComputation
   sink path "realloc" arg 1 -> code.SizeComputation
   sink path "reallocarray" arg 1 -> code.SizeComputation
-  mark "realloc" -> code.ZeroSizeReallocation
-  mark "reallocarray" -> code.ZeroSizeReallocation
-  mark "alloca" -> code.StackAllocationSmell
-  mark "__subscript" -> code.IndexAccess
-  mark "analysis.index.access" val "index_kind=field_derived" val "guard=missing_upper_bound" -> code.FieldDerivedIndexAccess
-  mark "analysis.field.clear_null" -> code.OwnerFieldClear
-  mark "xmlFreeDoc" -> code.OwnerFree
-  mark "__deref" -> code.PointerUse
-  mark "__deref" -> code.NullableDeref
-  mark "free" -> code.PointerFree
+  flag code.ZeroSizeReallocation on any {
+    path "realloc"
+  }
+  flag code.ZeroSizeReallocation on any {
+    path "reallocarray"
+  }
+  flag code.StackAllocationSmell on any {
+    path "alloca"
+  }
+  flag code.IndexAccess on any {
+    path "__subscript"
+  }
+  flag code.FieldDerivedIndexAccess on any {
+    path "analysis.index.access"
+    fact index_kind "field_derived"
+    fact guard "missing_upper_bound"
+  }
+  flag code.OwnerFieldClear on any {
+    path "analysis.field.clear_null"
+  }
+  flag code.OwnerFree on any {
+    path "xmlFreeDoc"
+  }
+  flag code.PointerUse on any {
+    path "__deref"
+  }
+  flag code.NullableDeref on any {
+    path "__deref"
+  }
+  flag code.PointerFree on any {
+    path "free"
+  }
   sink path "__binop.div" arg 1 -> code.DivisionDenominator
   sink path "__binop.mod" arg 1 -> code.DivisionDenominator
-  mark "__binop.add" -> code.IntegerSizeArithmetic
-  mark "__binop.sub" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.add"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.sub"
+  }
   source "__binop.mul" -> code.ComputedSizeValue
-  mark "__binop.mul" -> code.IntegerSizeArithmetic
-  mark "__binop.shl" -> code.IntegerSizeArithmetic
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.mul"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.shl"
+  }
   control "analysis.guard.value_exclusion" val "value=0" -> core.ZeroValueExclusion
 
   // TOCTOU / race (CWE-367)
-  mark "access" -> code.FileCheck
-  mark "stat" -> code.FileCheck
-  mark "lstat" -> code.FileCheck
-  mark "fileExistsAtPath" -> code.FileCheck
-  mark "fopen" -> code.FileUse
-  mark "open" -> code.FileUse
-  mark "unlink" -> code.FileUse
-  mark "remove" -> code.FileUse
-  mark "rename" -> code.FileUse
-  mark "chmod" -> code.FileUse
-  mark "chown" -> code.FileUse
+  flag code.FileCheck on any {
+    path "access"
+  }
+  flag code.FileCheck on any {
+    path "stat"
+  }
+  flag code.FileCheck on any {
+    path "lstat"
+  }
+  flag code.FileCheck on any {
+    path "fileExistsAtPath"
+  }
+  flag code.FileUse on any {
+    path "fopen"
+  }
+  flag code.FileUse on any {
+    path "open"
+  }
+  flag code.FileUse on any {
+    path "unlink"
+  }
+  flag code.FileUse on any {
+    path "remove"
+  }
+  flag code.FileUse on any {
+    path "rename"
+  }
+  flag code.FileUse on any {
+    path "chmod"
+  }
+  flag code.FileUse on any {
+    path "chown"
+  }
 
   // lifecycle / concurrency
-  mark "pthread_mutex_lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    path "pthread_mutex_lock"
+  }
   control "pthread_mutex_unlock" -> core.LockRelease
-  mark "dispatch_async" -> code.LocklessSharedMutation
+  flag code.LocklessSharedMutation on any {
+    path "dispatch_async"
+  }
 
   // XSS (CWE-79) — writing untrusted HTML to an output stream (arg0 is the text)
   sink path "fputs" -> code.HtmlRender
@@ -120,25 +186,64 @@ adapter objc {
   sink method "regularExpressionWithPattern" -> code.RegexCompile
 
   // weak hash (CWE-328) — CommonCrypto CC_MD5 / CC_SHA1 (presence); CC_SHA256 is safe
-  mark "CC_MD5" -> code.WeakHash
-  mark "CC_MD2" -> code.WeakHash
-  mark "CC_SHA1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "CC_MD5"
+  }
+  flag code.WeakHash on any {
+    path "CC_MD2"
+  }
+  flag code.WeakHash on any {
+    path "CC_SHA1"
+  }
 
   // weak cipher (CWE-327) — CommonCrypto CCCrypt with a broken algorithm (val-matched)
-  mark "CCCrypt" val "DES" -> code.WeakCipher
-  mark "CCCrypt" val "RC4" -> code.WeakCipher
-  mark "CCCrypt" val "Blowfish" -> code.WeakCipher
-  mark "CCCrypt" val "0000000000000000" -> code.StaticIv
-  mark "CCCryptorCreate" val "DES" -> code.WeakCipher
-  mark "CCCryptorCreate" val "0000000000000000" -> code.StaticIv
-  mark "NSURL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark method "setAllowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
+  flag code.WeakCipher on any {
+    path "CCCrypt"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "CCCrypt"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "CCCrypt"
+    has "Blowfish"
+  }
+  flag code.StaticIv on any {
+    path "CCCrypt"
+    has "0000000000000000"
+  }
+  flag code.WeakCipher on any {
+    path "CCCryptorCreate"
+    has "DES"
+  }
+  flag code.StaticIv on any {
+    path "CCCryptorCreate"
+    has "0000000000000000"
+  }
+  flag code.CleartextChannel on any {
+    path "NSURL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CertValidationDisabled on any {
+    method "setAllowsAnyHTTPSCertificate"
+    has "true"
+  }
 
   // insecure randomness (CWE-330) — arc4random/rand/random (presence); SecRandomCopyBytes safe
-  mark "arc4random" -> code.WeakRandomValue
-  mark "arc4random_uniform" -> code.WeakRandomValue
-  mark "rand" -> code.WeakRandomValue
-  mark "random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "arc4random"
+  }
+  flag code.WeakRandomValue on any {
+    path "arc4random_uniform"
+  }
+  flag code.WeakRandomValue on any {
+    path "rand"
+  }
+  flag code.WeakRandomValue on any {
+    path "random"
+  }
 
   // controls (sanitizers) — defined in each generated case's preamble
   control "realpath" -> core.PathCanonicalization

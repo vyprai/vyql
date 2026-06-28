@@ -1,4 +1,4 @@
-// Cross-language audit-review labeling for the POSSIBILITY tier (VYQL_POSSIBILITY=1).
+// Cross-language audit-review labeling for scan flags.
 //
 // Marks privileged/state-changing operations (code.SensitiveOperation) and resource
 // acquisitions (code.ResourceReview). No CONFIRMED rule consumes these concepts, so they
@@ -14,45 +14,121 @@ adapter auditreview {
   // --- privileged / destructive operations (authz review) ---
   // NOTE: bare delete/remove/destroy/drop omitted — too generic (match every collection
   // method AND the JS `delete` operator). Keep specific destructive + privileged verbs.
-  mark method "deleteById" -> code.SensitiveOperation
-  mark method "deleteAll" -> code.SensitiveOperation
-  mark method "dropTable" -> code.SensitiveOperation
-  mark method "truncateTable" -> code.SensitiveOperation
-  mark method "deleteUser" -> code.SensitiveOperation
-  mark method "grant" -> code.SensitiveOperation
-  mark method "revoke" -> code.SensitiveOperation
-  mark method "setRole" -> code.SensitiveOperation
-  mark method "addRole" -> code.SensitiveOperation
-  mark method "setPermission" -> code.SensitiveOperation
-  mark method "setPermissions" -> code.SensitiveOperation
-  mark method "makeAdmin" -> code.SensitiveOperation
-  mark method "setAdmin" -> code.SensitiveOperation
-  mark method "update" val "password" -> code.SensitiveOperation
-  mark method "update!" val "password" -> code.SensitiveOperation
-  mark method "elevate" -> code.SensitiveOperation
-  mark method "impersonate" -> code.SensitiveOperation
-  mark method "assumeRole" -> code.SensitiveOperation
-  mark method "promote" -> code.SensitiveOperation
-  mark method "run_post_create" -> code.SensitiveOperation
-  mark method "obtainLDAPServer" -> code.SensitiveOperation
-  mark method "loadUserByUsername" -> code.SensitiveOperation
+  flag code.SensitiveOperation on any {
+    method "deleteById"
+  }
+  flag code.SensitiveOperation on any {
+    method "deleteAll"
+  }
+  flag code.SensitiveOperation on any {
+    method "dropTable"
+  }
+  flag code.SensitiveOperation on any {
+    method "truncateTable"
+  }
+  flag code.SensitiveOperation on any {
+    method "deleteUser"
+  }
+  flag code.SensitiveOperation on any {
+    method "grant"
+  }
+  flag code.SensitiveOperation on any {
+    method "revoke"
+  }
+  flag code.SensitiveOperation on any {
+    method "setRole"
+  }
+  flag code.SensitiveOperation on any {
+    method "addRole"
+  }
+  flag code.SensitiveOperation on any {
+    method "setPermission"
+  }
+  flag code.SensitiveOperation on any {
+    method "setPermissions"
+  }
+  flag code.SensitiveOperation on any {
+    method "makeAdmin"
+  }
+  flag code.SensitiveOperation on any {
+    method "setAdmin"
+  }
+  flag code.SensitiveOperation on any {
+    method "update"
+    has "password"
+  }
+  flag code.SensitiveOperation on any {
+    method "update!"
+    has "password"
+  }
+  flag code.SensitiveOperation on any {
+    method "elevate"
+  }
+  flag code.SensitiveOperation on any {
+    method "impersonate"
+  }
+  flag code.SensitiveOperation on any {
+    method "assumeRole"
+  }
+  flag code.SensitiveOperation on any {
+    method "promote"
+  }
+  flag code.SensitiveOperation on any {
+    method "run_post_create"
+  }
+  flag code.SensitiveOperation on any {
+    method "obtainLDAPServer"
+  }
+  flag code.SensitiveOperation on any {
+    method "loadUserByUsername"
+  }
 
   // --- resource acquisition / unbounded reads (resource-DoS review) ---
-  mark method "ReadAll" -> code.ResourceReview
-  mark method "readAll" -> code.ResourceReview
-  mark method "read_to_end" -> code.ResourceReview
-  mark method "read_to_string" -> code.ResourceReview
-  mark method "Accept" -> code.ResourceReview
-  mark "net.Dial" -> code.ResourceReview
-  mark "net.Listen" -> code.ResourceReview
-  mark "exec.Command" -> code.ResourceReview
-  mark method "spawn" -> code.ResourceReview
-  mark method "fork" -> code.ResourceReview
-  mark "fopen" -> code.ResourceReview
-  mark "opendir" -> code.ResourceReview
-  mark "socket" -> code.ResourceReview
+  flag code.ResourceReview on any {
+    method "ReadAll"
+  }
+  flag code.ResourceReview on any {
+    method "readAll"
+  }
+  flag code.ResourceReview on any {
+    method "read_to_end"
+  }
+  flag code.ResourceReview on any {
+    method "read_to_string"
+  }
+  flag code.ResourceReview on any {
+    method "Accept"
+  }
+  flag code.ResourceReview on any {
+    path "net.Dial"
+  }
+  flag code.ResourceReview on any {
+    path "net.Listen"
+  }
+  flag code.ResourceReview on any {
+    path "exec.Command"
+  }
+  flag code.ResourceReview on any {
+    method "spawn"
+  }
+  flag code.ResourceReview on any {
+    method "fork"
+  }
+  flag code.ResourceReview on any {
+    path "fopen"
+  }
+  flag code.ResourceReview on any {
+    path "opendir"
+  }
+  flag code.ResourceReview on any {
+    path "socket"
+  }
 
   // --- structured input decoders (format-validation review) ---
-  mark method "parseOctetString" -> code.StructuredInputDecode
-  mark method "parseBitString" -> code.StructuredInputDecode
+  flag code.StructuredInputDecode on any {
+    method "parseOctetString"
+  }
+  flag code.StructuredInputDecode on any {
+    method "parseBitString"
+  }
 }

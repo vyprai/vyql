@@ -6,6 +6,8 @@ adapter python {
     control method "authenticate" -> core.AuthenticationCheck
     sink method "decode" -> code.Deserialization
     control method "check_blacklist" -> core.AuthenticationCheck
-    mark method "blacklist" -> code.StateChangingOp
+    flag code.StateChangingOp on any {
+      method "blacklist"
+    }
   }
 }

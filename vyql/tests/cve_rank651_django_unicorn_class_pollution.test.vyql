@@ -1,0 +1,45 @@
+# Rank 651 / CVE-2025-24370: django-unicorn allowed component requests to
+# traverse dotted property paths such as __class__ and mutate Python runtime state.
+
+test "rank651: dotted property setter lacks dunder segment guard"
+  lang python
+  expect VYQL-INJ-143
+  code
+  ```
+  def set_property_value(component, property_name, property_value, data=None):
+      property_name_parts = property_name.split(".")
+      component_or_field = component
+      data_or_dict = data or {}
+
+      for idx, property_name_part in enumerate(property_name_parts):
+          if hasattr(component_or_field, property_name_part):
+              if idx == len(property_name_parts) - 1:
+                  setattr(component_or_field, property_name_part, property_value)
+                  data_or_dict[property_name_part] = property_value
+              else:
+                  component_or_field = getattr(component_or_field, property_name_part)
+                  data_or_dict = data_or_dict.get(property_name_part, {})
+  ```
+
+test "rank651: dotted property setter rejects dunder segments"
+  lang python
+  reject VYQL-INJ-143
+  code
+  ```
+  def set_property_value(component, property_name, property_value, data=None):
+      property_name_parts = property_name.split(".")
+      for part in property_name_parts:
+          if part.startswith("__") and part.endswith("__"):
+              raise AssertionError("Invalid property name")
+
+      component_or_field = component
+      data_or_dict = data or {}
+      for idx, property_name_part in enumerate(property_name_parts):
+          if hasattr(component_or_field, property_name_part):
+              if idx == len(property_name_parts) - 1:
+                  setattr(component_or_field, property_name_part, property_value)
+                  data_or_dict[property_name_part] = property_value
+              else:
+                  component_or_field = getattr(component_or_field, property_name_part)
+                  data_or_dict = data_or_dict.get(property_name_part, {})
+  ```

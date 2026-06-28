@@ -1,0 +1,60 @@
+test "c scp remote listing filename is rejected after slash and dotdot only"
+  lang c
+  file scp.c
+  expect VYQL-PATH-006
+  code
+  ```
+  #include <fcntl.h>
+  #include <string.h>
+  #include <unistd.h>
+
+  int atomicio(int (*f)(int, void *, int), int fd, char *buf, int n);
+  int read(int fd, void *buf, int n);
+
+  void sink(int argc, char **argv) {
+      char *targ = argv[1];
+      char *cp = argv[2];
+      char namebuf[4096];
+      char *np = namebuf;
+      int remin = 1;
+      int mode = 0644;
+      int need = 4096;
+
+      atomicio(read, remin, cp, 1);
+      if (strchr(cp, '/') != NULL || strcmp(cp, "..") == 0)
+          return;
+      snprintf(namebuf, need, "%s%s%s", targ, "/", cp);
+      open(np, O_WRONLY | O_CREAT, mode);
+  }
+  ```
+
+test "c scp remote listing filename rejects dot and empty names"
+  lang c
+  file scp.c
+  reject VYQL-PATH-006
+  code
+  ```
+  #include <fcntl.h>
+  #include <string.h>
+  #include <unistd.h>
+
+  int atomicio(int (*f)(int, void *, int), int fd, char *buf, int n);
+  int read(int fd, void *buf, int n);
+
+  void sink(int argc, char **argv) {
+      char *targ = argv[1];
+      char *cp = argv[2];
+      char namebuf[4096];
+      char *np = namebuf;
+      int remin = 1;
+      int mode = 0644;
+      int need = 4096;
+
+      atomicio(read, remin, cp, 1);
+      if (strchr(cp, '/') != NULL || strcmp(cp, "..") == 0 ||
+          strcmp(cp, ".") == 0 || *cp == '\0')
+          return;
+      snprintf(namebuf, need, "%s%s%s", targ, "/", cp);
+      open(np, O_WRONLY | O_CREAT, mode);
+  }
+  ```

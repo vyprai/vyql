@@ -81,6 +81,9 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 		add("attr:repr(" + arg + ")")
 		add("repr:" + arg)
 	}
+	for _, tok := range rsDeriveTokens(rawItem) {
+		add(tok)
+	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
@@ -127,7 +130,9 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return c.decls(field(n, "body"))
 	case "enum_item":
 		return c.rsEnumMetadata(n, attrs)
-	case "struct_item", "use_declaration", "const_item", "static_item":
+	case "struct_item":
+		return c.rsStructFieldMetadata(n, attrs)
+	case "use_declaration", "const_item", "static_item":
 		return nil
 	case "let_declaration":
 		val := field(n, "value")
@@ -156,8 +161,31 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "block":
 		return c.block(n)
 	}
+	if meta := c.rsUninitializedMetadata(n); meta != nil {
+		return append(meta, nir.ExprStmt{Value: c.expr(n)})
+	}
 	// a bare tail expression (block value) still matters for taint
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
+}
+
+func (c *rsConv) rsUninitializedMetadata(n *tree_sitter.Node) []nir.Stmt {
+	text := c.text(n)
+	compact := rustCompactText(text)
+	if !strings.Contains(compact, "mem::uninitialized") {
+		return nil
+	}
+	loc := c.loc(n)
+	path := "analysis.rust.uninitialized"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "lang=rust"},
+			nir.Const{Loc: loc, Value: "mem::uninitialized"},
+		},
+		Path:   path,
+		Method: "uninitialized",
+		Loc:    loc,
+	}}}
 }
 
 func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
@@ -185,6 +213,172 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 	}}}
 }
 
+func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
+	name := c.text(field(n, "name"))
+	if name == "" {
+		return nil
+	}
+	structTokens := []string{"lang=rust", "struct_name:" + name}
+	structTokens = append(structTokens, attrs...)
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil {
+			return
+		}
+		if m.Kind() == "field_declaration_list" {
+			var pendingAttrs []string
+			for _, ch := range namedChildren(m) {
+				if ch.Kind() == "attribute_item" {
+					pendingAttrs = append(pendingAttrs, c.rsAttrTokens(ch)...)
+					pendingAttrs = append(pendingAttrs, rsSerdeTokens(c.text(ch))...)
+					continue
+				}
+				if ch.Kind() == "field_declaration" {
+					if stmt, ok := c.rsStructFieldMetadataCall(ch, structTokens, pendingAttrs); ok {
+						out = append(out, stmt)
+					}
+					pendingAttrs = nil
+					continue
+				}
+				pendingAttrs = nil
+				walk(ch)
+			}
+			return
+		}
+		if m.Kind() == "field_declaration" {
+			if stmt, ok := c.rsStructFieldMetadataCall(m, structTokens, nil); ok {
+				out = append(out, stmt)
+			}
+			return
+		}
+		for _, ch := range namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pendingAttrs []string) (nir.Stmt, bool) {
+	name := c.text(field(n, "name"))
+	if name == "" {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "field_identifier" || ch.Kind() == "identifier" {
+				name = c.text(ch)
+				break
+			}
+		}
+	}
+	if name == "" {
+		return nil, false
+	}
+	typ := c.text(field(n, "type"))
+	fieldAttrs := append([]string{}, pendingAttrs...)
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() == "attribute_item" {
+			fieldAttrs = append(fieldAttrs, c.rsAttrTokens(ch)...)
+			fieldAttrs = append(fieldAttrs, rsSerdeTokens(c.text(ch))...)
+		}
+	}
+	tokens := append([]string{}, structTokens...)
+	tokens = append(tokens, "field:"+name)
+	if typ != "" {
+		tokens = append(tokens, "field_type:"+rustCompactText(typ))
+	}
+	tokens = append(tokens, fieldAttrs...)
+	if rsDependencyMapField(name, typ) {
+		tokens = append(tokens, "semantic:dependency_map")
+	}
+	args := make([]nir.Expr, 0, len(tokens))
+	loc := c.loc(n)
+	for _, tok := range dedupeStrings(tokens) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	path := "analysis.rust.serde_field"
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: "serde_field",
+		Loc:    loc,
+	}}, true
+}
+
+func rsDeriveTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	start := strings.Index(compact, "#[derive(")
+	if start < 0 {
+		return nil
+	}
+	rest := compact[start+len("#[derive("):]
+	end := strings.Index(rest, ")]")
+	if end < 0 {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(rest[:end], ",") {
+		if part != "" {
+			out = append(out, "derive:"+part)
+		}
+	}
+	return out
+}
+
+func rsSerdeTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	if !strings.HasPrefix(compact, "#[serde(") || !strings.HasSuffix(compact, ")]") {
+		return nil
+	}
+	body := strings.TrimSuffix(strings.TrimPrefix(compact, "#[serde("), ")]")
+	var out []string
+	for _, part := range strings.Split(body, ",") {
+		if part == "" {
+			continue
+		}
+		key, val, hasVal := strings.Cut(part, "=")
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out = append(out, "serde_attr:"+key)
+		if hasVal {
+			val = strings.Trim(val, "\"")
+			switch key {
+			case "alias":
+				out = append(out, "serde_alias:"+val)
+			case "serialize_with":
+				out = append(out, "serde_serialize_with:"+val)
+			case "deserialize_with":
+				out = append(out, "serde_deserialize_with:"+val)
+			}
+		}
+	}
+	return out
+}
+
+func rsDependencyMapField(name, typ string) bool {
+	n := strings.ToLower(name)
+	if !strings.Contains(n, "depend") && !strings.Contains(n, "package") && !strings.Contains(n, "plugin") {
+		return false
+	}
+	t := strings.ToLower(typ)
+	return strings.Contains(t, "map") || strings.Contains(t, "dependencies") || strings.Contains(t, "packages") || strings.Contains(t, "plugins")
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
+}
+
 func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	text := c.text(n)
 	compact := rustCompactText(text)
@@ -203,8 +397,10 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.loc(n)
 	tokens := []string{"lang=rust", "kind:unsafe_impl", "trait:" + trait}
-	if strings.Contains(compact, "+"+trait) || strings.Contains(compact, ":"+trait) {
-		tokens = append(tokens, "bound:"+trait)
+	for _, bound := range []string{"Send", "Sync"} {
+		if strings.Contains(compact, "+"+bound) || strings.Contains(compact, ":"+bound) {
+			tokens = append(tokens, "bound:"+bound)
+		}
 	}
 	args := make([]nir.Expr, 0, len(tokens))
 	for _, tok := range tokens {
@@ -241,18 +437,95 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(fn)
 	text := c.text(body)
 	path := "analysis.function.context"
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=rust"},
+		nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: rustCompactText(text)},
+	}
+	for _, tok := range c.rsStructuredContextTokens(body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=rust"},
-			nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: rustCompactText(text)},
-		},
+		Args:   args,
 		Path:   path,
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	atom := func(n *tree_sitter.Node) string {
+		if n == nil {
+			return ""
+		}
+		if p := c.dotted(n); p != "" && p != "?" {
+			return p
+		}
+		return rustCompactText(c.text(n))
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment_expression":
+			left := atom(field(n, "left"))
+			right := atom(field(n, "right"))
+			if left != "" && right != "" {
+				add("assign:" + left + "=" + right)
+			}
+		case "call_expression":
+			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+				add("call_path:" + path)
+				add("call:" + lastSeg(path))
+				for _, arg := range namedChildren(field(n, "arguments")) {
+					if a := atom(arg); a != "" {
+						add("call_arg:" + path + ":" + a)
+					}
+				}
+			}
+		case "field_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "match_arm":
+			if pat := rustMatchArmPattern(n); pat != nil {
+				if label := atom(pat); label != "" {
+					add("match_arm:" + label)
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
+	if p := field(n, "pattern"); p != nil {
+		return p
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "identifier", "scoped_identifier", "match_pattern", "tuple_struct_pattern", "literal_pattern":
+			return ch
+		}
+	}
+	return nil
 }
 
 func rustCompactText(s string) string {

@@ -1,0 +1,37 @@
+# Rank 823 / CVE-2020-5203: Fat-Free Framework clear($key) compiled a caller
+# controlled hive path into an eval unset expression before stripping code-like suffixes.
+
+test "rank823: clear key reaches eval compile without code-execution validation"
+  lang php
+  file base.php
+  expect VYQL-INJ-003
+  code
+  ```
+  <?php
+  final class Base {
+    function compile($expr) { return $expr; }
+    function clear($key) {
+      eval('unset('.$this->compile('@this->hive.'.$key).');');
+    }
+  }
+  $fw = new Base();
+  $fw->clear($_GET['key']);
+  ```
+
+test "rank823: clear key strips eval-breaking suffix before compile"
+  lang php
+  file base.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+  final class Base {
+    function compile($expr) { return $expr; }
+    function clear($key) {
+      $key = preg_replace('/(\)\W*\w+.*$)/', '', $key);
+      eval('unset('.$this->compile('@this->hive.'.$key).');');
+    }
+  }
+  $fw = new Base();
+  $fw->clear($_GET['key']);
+  ```

@@ -1,0 +1,51 @@
+# Rank 967 / CVE-2019-10776: git-diff-apply interpolated a caller-supplied
+# remote URL into a git clone shell command. The fix uses spawn/argv execution.
+
+test "rank967: caller remote URL is interpolated into git clone command wrapper"
+  lang javascript
+  profile library
+  file src/index.js
+  expect VYQL-INJ-119
+  expect_review code.CommandStringWrapperExecution
+  code
+  ```
+  const utils = require('./utils');
+  const tmpDir = require('tmp').dir;
+
+  module.exports = async function gitDiffApply({
+    cwd = process.cwd(),
+    remoteUrl,
+    startTag,
+    endTag
+  }) {
+    let _tmpDir = await tmpDir();
+    await utils.run(`git clone ${remoteUrl} ${_tmpDir}`);
+    await utils.run(`git checkout ${startTag}`, { cwd: _tmpDir });
+    return endTag;
+  };
+  ```
+
+test "rank967: git clone uses argv array execution"
+  lang javascript
+  profile library
+  file src/index.js
+  reject VYQL-INJ-119
+  reject_review code.CommandStringWrapperExecution
+  code
+  ```
+  const utils = require('./utils');
+  const { runWithSpawn } = require('./run');
+  const tmpDir = require('tmp').dir;
+
+  module.exports = async function gitDiffApply({
+    cwd = process.cwd(),
+    remoteUrl,
+    startTag,
+    endTag
+  }) {
+    let _tmpDir = await tmpDir();
+    await runWithSpawn('git', ['clone', remoteUrl, _tmpDir]);
+    await utils.run(`git checkout ${startTag}`, { cwd: _tmpDir });
+    return endTag;
+  };
+  ```

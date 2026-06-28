@@ -1,7 +1,13 @@
 adapter php {
   package "hoa/ustring" {
-    mark method "match" -> code.RegexCompile
-    mark method "replace" -> code.RegexCompile
-    mark method "split" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "match"
+    }
+    flag code.RegexCompile on any {
+      method "replace"
+    }
+    flag code.RegexCompile on any {
+      method "split"
+    }
   }
 }

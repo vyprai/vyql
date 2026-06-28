@@ -1,0 +1,49 @@
+# Rank 277 / CVE-2022-39389: btcd v0.23.3 raised the per-input witness
+# item count bound to match the post-taproot block/weight limit. The previous
+# 500000 limit could reject valid witness blocks and degrade dependent lnd nodes.
+
+test "rank277: btcd witness count parser limit is underbounded"
+  lang go
+  expect VYQL-DOS-011
+  expect_review code.UnderboundedProtocolCountLimit
+  code
+  ```
+  package wire
+
+  const maxWitnessItemsPerInput = 500000
+
+  func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+      witCount, err := ReadVarInt(r, pver)
+      if err != nil {
+          return err
+      }
+      if witCount > maxWitnessItemsPerInput {
+          return messageError("MsgTx.BtcDecode", "too many witness items")
+      }
+      txin.Witness = make([][]byte, witCount)
+      return nil
+  }
+  ```
+
+test "rank277: btcd witness count parser limit matches consensus maximum"
+  lang go
+  reject VYQL-DOS-011
+  reject_review code.UnderboundedProtocolCountLimit
+  code
+  ```
+  package wire
+
+  const maxWitnessItemsPerInput = 4_000_000
+
+  func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+      witCount, err := ReadVarInt(r, pver)
+      if err != nil {
+          return err
+      }
+      if witCount > maxWitnessItemsPerInput {
+          return messageError("MsgTx.BtcDecode", "too many witness items")
+      }
+      txin.Witness = make([][]byte, witCount)
+      return nil
+  }
+  ```

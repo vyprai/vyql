@@ -21,6 +21,19 @@ test "js: a constant NoSQL query is clean"
   }
   ```
 
+test "js: schema parsed NoSQL query fields are input validated"
+  lang javascript
+  reject VYQL-INJ-007
+  code
+  ```
+  const BodySchema = { parse(x) { return x; } };
+
+  function handler(req, res) {
+    const { appId } = BodySchema.parse(req.body);
+    collection.find({ appId });
+  }
+  ```
+
 test "php: GET -> include is file inclusion (LFI/RFI)"
   lang php
   expect VYQL-PATH-002

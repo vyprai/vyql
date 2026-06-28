@@ -1,0 +1,40 @@
+# Rank 383 / CVE-2026-42144: CImg get_load_pnm multiplied attacker-controlled
+# dimensions as W*H*D before comparing the result with the PNM file size.
+
+test "rank383: CImg PNM dimension product is checked before widening"
+  lang cpp
+  expect VYQL-NUM-012
+  expect_review code.CimgPnmDimensionProductOverflow
+  code
+  ```
+  using cimg_int64 = long long;
+  namespace cimg { cimg_int64 fsize(const char *); }
+  struct CImgIOException {};
+
+  void get_load_pnm(const char *filename, unsigned int W, unsigned int H, unsigned int D) {
+    if (filename) {
+      const cimg_int64 siz = cimg::fsize(filename);
+      if (W*H*D>siz)
+        throw CImgIOException();
+    }
+  }
+  ```
+
+test "rank383: CImg PNM dimension product is widened before the file-size check"
+  lang cpp
+  reject VYQL-NUM-012
+  reject_review code.CimgPnmDimensionProductOverflow
+  code
+  ```
+  using cimg_int64 = long long;
+  namespace cimg { cimg_int64 fsize(const char *); }
+  struct CImgIOException {};
+
+  void get_load_pnm(const char *filename, unsigned int W, unsigned int H, unsigned int D) {
+    if (filename) {
+      const cimg_int64 siz = cimg::fsize(filename);
+      if ((cimg_int64)W*H*D>siz)
+        throw CImgIOException();
+    }
+  }
+  ```

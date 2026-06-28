@@ -683,6 +683,21 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.expect(tArrow, "->")
 		ctl.Concept = p.parseConceptRef()
 		return []AdapterMapping{ctl}
+	case p.atWord("flag"):
+		p.next()
+		mk := AdapterMapping{Kind: "flag", Concept: p.parseConceptRef(), Flag: &AdapterFlag{}}
+		switch {
+		case p.atWord("on"):
+			p.next()
+			mk.Flag.NodeKind = p.expect(tWord, "flag node kind").val
+		case p.atWord("in"):
+			p.next()
+			mk.Flag.Scope = p.expect(tWord, "flag scope").val
+		default:
+			p.fail("expected on/in after flag concept, got %q at %d", p.peek().val, p.peek().pos)
+		}
+		p.parseAdapterFlagBody(mk.Flag)
+		return []AdapterMapping{mk}
 	case p.atWord("mark"):
 		// `mark "fn" [val "x"] -> concept` labels the matching CALL node with a
 		// presence concept (for `match`-style rules — no taint flow).
@@ -762,6 +777,212 @@ func (p *parser) parseAdapterMember() []AdapterMapping {
 		p.fail("bad adapter member %q at %d", p.peek().val, p.peek().pos)
 		return nil
 	}
+}
+
+func (p *parser) parseAdapterFlagBody(f *AdapterFlag) {
+	p.expect(tLBrace, "{")
+	for !p.at(tRBrace) {
+		p.parseAdapterFlagItem(f)
+		p.consumeAdapterItemSep()
+	}
+	p.expect(tRBrace, "}")
+}
+
+func (p *parser) parseAdapterFlagItem(f *AdapterFlag) {
+	switch {
+	case p.atWord("operand"):
+		p.next()
+		var op AdapterFlagOperand
+		p.expect(tLBrace, "{")
+		for !p.at(tRBrace) {
+			op.Predicates = append(op.Predicates, p.parseAdapterFlagPredicate("operand"))
+			p.consumeAdapterItemSep()
+		}
+		p.expect(tRBrace, "}")
+		f.Operands = append(f.Operands, op)
+	default:
+		f.Predicates = append(f.Predicates, p.parseAdapterFlagPredicate("node"))
+	}
+}
+
+func (p *parser) parseAdapterFlagPredicate(subject string) AdapterFlagPredicate {
+	if p.atWord("not") {
+		p.next()
+		if !p.atWord("has") && !p.atWord("lacks") && !p.atWord("flows") {
+			return p.parseAdapterFlagStructuredPredicate(subject, true)
+		}
+		pred := p.parseAdapterFlagPredicate(subject)
+		pred.Negative = !pred.Negative
+		return pred
+	}
+	if p.atWord("lacks") {
+		p.next()
+		if p.at(tString) {
+			return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: "contains", Values: []string{p.parsePattern()}, Negative: true}
+		}
+		pred := p.parseAdapterFlagStructuredPredicate(subject, true)
+		return pred
+	}
+	if p.atWord("has") {
+		p.next()
+		return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: "contains", Values: []string{p.parsePattern()}}
+	}
+	if p.atWord("flows") {
+		p.next()
+		if p.atWord("to") {
+			p.next()
+		}
+		return p.parseAdapterFlagStructuredPredicate("flow_to", false)
+	}
+	return p.parseAdapterFlagStructuredPredicate(subject, false)
+}
+
+func (p *parser) parseAdapterFlagStructuredPredicate(subject string, neg bool) AdapterFlagPredicate {
+	key := p.expect(tWord, "flag predicate").val
+	switch key {
+	case "path":
+		exact := false
+		if p.atWord("exact") {
+			p.next()
+			exact = true
+		}
+		return AdapterFlagPredicate{Subject: subject, Property: "path", Op: "match", Values: []string{p.parsePattern()}, Exact: exact, Negative: neg}
+	case "method":
+		if p.atWord("name") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "method:", neg)
+		}
+		return AdapterFlagPredicate{Subject: subject, Property: "method", Op: "equals", Values: []string{p.parsePattern()}, Negative: neg}
+	case "op":
+		return p.parseAdapterFlagValuePredicate(subject, "op", neg)
+	case "prop":
+		prop := p.parsePattern()
+		return p.parseAdapterFlagValuePredicate(subject, prop, neg)
+	case "identifier", "key":
+		return p.parseAdapterFlagValuePredicate(subject, key, neg)
+	case "lang":
+		return p.parseAdapterFlagContextTokenPredicate(subject, "lang=", neg)
+	case "name":
+		return p.parseAdapterFlagContextTokenPredicate(subject, "name=", neg)
+	case "function":
+		return p.parseAdapterFlagContextTokenPredicate(subject, "function_name:", neg)
+	case "class":
+		if p.atWord("bases") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "class_bases=", neg)
+		}
+		if p.atWord("base") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "class_base:", neg)
+		}
+		if p.atWord("name") {
+			p.next()
+		}
+		return p.parseAdapterFlagContextTokenPredicate(subject, "class_name:", neg)
+	case "attr":
+		if p.atWord("path") {
+			p.next()
+		}
+		return p.parseAdapterFlagContextTokenPredicate(subject, "attr_path:", neg)
+	case "call":
+		if p.atWord("path") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "call_path:", neg)
+		}
+		if p.atWord("order") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "call_order:", neg)
+		}
+		if p.atWord("arg") {
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "call_arg:", neg)
+		}
+		if neg {
+			return p.parseAdapterFlagValuePredicate("scope_call", "any", neg)
+		}
+		return p.parseAdapterFlagContextTokenPredicate(subject, "call:", neg)
+	case "selector", "literal", "annotation", "expr", "binary", "assign", "field", "slice", "index", "trait", "bound", "var":
+		prefix := key + ":"
+		if key == "var" {
+			prefix = "var_name:"
+		}
+		return p.parseAdapterFlagContextTokenPredicate(subject, prefix, neg)
+	case "fact":
+		name := p.expect(tWord, "fact name").val
+		return p.parseAdapterFlagContextTokenPredicate(subject, name+"=", neg)
+	case "token":
+		name := p.expect(tWord, "token name").val
+		return p.parseAdapterFlagContextTokenPredicate(subject, name+":", neg)
+	case "decorator":
+		return p.parseAdapterFlagContextTokenPredicate(subject, "decorator_path:", neg)
+	case "param":
+		switch {
+		case p.atWord("name"):
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "param_name:", neg)
+		case p.atWord("type"):
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "param_type:", neg)
+		case p.atWord("index"):
+			p.next()
+			return p.parseAdapterFlagContextTokenPredicate(subject, "param_index:", neg)
+		default:
+			p.fail("expected param name/type/index at %d", p.peek().pos)
+			return AdapterFlagPredicate{}
+		}
+	default:
+		p.fail("unknown flag predicate %q at %d", key, p.peek().pos)
+		return AdapterFlagPredicate{}
+	}
+}
+
+func (p *parser) parseAdapterFlagContextTokenPredicate(subject, prefix string, neg bool) AdapterFlagPredicate {
+	op := "contains"
+	if p.atWord("contains") || p.atWord("contains_any") || p.atWord("equals") || p.atWord("any") {
+		op = p.next().val
+	}
+	values := p.parsePatternList()
+	for i, v := range values {
+		values[i] = prefix + v
+	}
+	if op == "any" {
+		op = "contains_any"
+	}
+	return AdapterFlagPredicate{Subject: subject, Property: "tokens", Op: op, Values: values, Negative: neg}
+}
+
+func (p *parser) parseAdapterFlagValuePredicate(subject, property string, neg bool) AdapterFlagPredicate {
+	op := "contains"
+	if p.atWord("contains") || p.atWord("contains_any") || p.atWord("equals") || p.atWord("any") {
+		op = p.next().val
+	}
+	values := p.parsePatternList()
+	if op == "any" {
+		op = "equals_any"
+	}
+	return AdapterFlagPredicate{Subject: subject, Property: property, Op: op, Values: values, Negative: neg}
+}
+
+func (p *parser) consumeAdapterItemSep() {
+	for p.at(tComma) || p.at(tSemi) {
+		p.next()
+	}
+}
+
+func (p *parser) parsePatternList() []string {
+	if !p.at(tLBrack) {
+		return []string{p.parsePattern()}
+	}
+	p.next()
+	var out []string
+	for !p.at(tRBrack) {
+		out = append(out, p.parsePattern())
+		if p.at(tComma) || p.at(tSemi) {
+			p.next()
+		}
+	}
+	p.expect(tRBrack, "]")
+	return out
 }
 
 func (p *parser) parseAdapterPackageGroup() []AdapterMapping {

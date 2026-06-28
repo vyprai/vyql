@@ -24,6 +24,14 @@ adapter bash {
   // code eval via language interpreters (-c/-e/-r take the script)
   sink path "python" arg 1 -> code.CodeEval
   sink path "python3" arg 1 -> code.CodeEval
+  flag code.PythonTripleQuoteShellInterpolation in module {
+    lang "bash"
+    has "input=$(cat)"
+    has "python3-c\""
+    has "json.loads('''$input''')"
+    lacks "<<'PYEOF'"
+    lacks "os.environ.get('CC_INPUT')"
+  }
   sink path "perl" arg 1 -> code.CodeEval
   sink path "php" arg 1 -> code.CodeEval
   sink path "node" arg 1 -> code.CodeEval
@@ -33,8 +41,16 @@ adapter bash {
   sink path "wget" -> code.UrlFetch
   sink path "grep" arg all -> code.RegexCompile
   sink path "egrep" arg all -> code.RegexCompile
-  mark "curl" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "wget" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "curl"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "wget"
+    has "http://"
+    lacks "127.0"
+  }
 
   // file inclusion (sourcing an untrusted path)
   sink path "source" -> code.FileInclude
@@ -53,14 +69,30 @@ adapter bash {
   sink path "tar" arg all -> code.FilePathAccess
 
   // weak hash — md5sum / sha1sum utilities.
-  mark "md5sum" -> code.WeakHash
-  mark "sha1sum" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "md5sum"
+  }
+  flag code.WeakHash on any {
+    path "sha1sum"
+  }
 
   // unsafe permission/temp-file idioms.
-  mark "chmod" val "777" -> code.InsecurePermission
-  mark "chmod" val "666" -> code.InsecurePermission
-  mark "chmod" val "a+w" -> code.InsecurePermission
-  mark "mktemp" val "-u" -> code.InsecureTempFile
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "777"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "666"
+  }
+  flag code.InsecurePermission on any {
+    path "chmod"
+    has "a+w"
+  }
+  flag code.InsecureTempFile on any {
+    path "mktemp"
+    has "-u"
+  }
 
   // SQL via CLI clients (-e/-c queries)
   sink path "mysql" arg all -> code.SqlExecution

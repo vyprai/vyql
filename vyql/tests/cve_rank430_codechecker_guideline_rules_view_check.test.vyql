@@ -1,0 +1,78 @@
+# Rank 430 / CVE-2026-25660: CodeChecker getGuidelineRules omitted the
+# report-server VIEW permission check before returning guideline/checker data.
+
+test "rank430: CodeChecker guideline rules API lacks VIEW permission check"
+  lang python
+  file report_server.py
+  expect VYQL-AUTH-023
+  expect_review code.CodeCheckerGuidelineRulesMissingViewCheck
+  code
+  ```
+  from collections import defaultdict
+
+  class ThriftRequestHandler:
+      @exc_to_thrift_reqfail
+      @timeit
+      def getGuidelineRules(self, guidelines):
+          """Return the list of rules to each guideline that given."""
+          guideline_rules = defaultdict(list)
+          for guideline in guidelines:
+              rules = self._context.guideline.rules_of_guideline(
+                  guideline.guidelineName)
+              if not rules:
+                  guideline_rules[guideline.guidelineName] = []
+                  continue
+              for rule in rules:
+                  checkers = self._context.checker_labels.checkers_by_labels(
+                      [f"{guideline.guidelineName}:{rule}"])
+
+                  guideline_rules[guideline.guidelineName].append(
+                      Rule(
+                          ruleId=rule.lower(),
+                          title=rules[rule].get("title", ""),
+                          url=rules[rule].get("rule_url", ""),
+                          checkers=checkers
+                      )
+                  )
+
+          return guideline_rules
+  ```
+
+test "rank430: CodeChecker guideline rules API requires VIEW permission"
+  lang python
+  file report_server.py
+  reject VYQL-AUTH-023
+  reject_review code.CodeCheckerGuidelineRulesMissingViewCheck
+  code
+  ```
+  from collections import defaultdict
+
+  class ThriftRequestHandler:
+      @exc_to_thrift_reqfail
+      @timeit
+      def getGuidelineRules(self, guidelines):
+          """Return the list of rules to each guideline that given."""
+          self.__require_view()
+
+          guideline_rules = defaultdict(list)
+          for guideline in guidelines:
+              rules = self._context.guideline.rules_of_guideline(
+                  guideline.guidelineName)
+              if not rules:
+                  guideline_rules[guideline.guidelineName] = []
+                  continue
+              for rule in rules:
+                  checkers = self._context.checker_labels.checkers_by_labels(
+                      [f"{guideline.guidelineName}:{rule}"])
+
+                  guideline_rules[guideline.guidelineName].append(
+                      Rule(
+                          ruleId=rule.lower(),
+                          title=rules[rule].get("title", ""),
+                          url=rules[rule].get("rule_url", ""),
+                          checkers=checkers
+                      )
+                  )
+
+          return guideline_rules
+  ```

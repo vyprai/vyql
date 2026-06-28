@@ -2,7 +2,9 @@ import core.{AuthenticationCheck}
 adapter elixir {
   package "phoenix_live_view" {
     control method "authenticate" -> core.AuthenticationCheck
-    mark method "live_file_input" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "live_file_input"
+    }
     source method "handle_event" -> core.UserControlledData
     sink method "live_render" -> code.HtmlRender
   }

@@ -1,13 +1,25 @@
 import code.{WeakHash}
 adapter cpp {
   package "hash-library" {
-    mark method "MD5.add" -> code.WeakHash
-    mark method "MD5.getHash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "MD5.add"
+    }
+    flag code.WeakHash on any {
+      method "MD5.getHash"
+    }
 
-    mark method "SHA1.add" -> code.WeakHash
-    mark method "SHA1.getHash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "SHA1.add"
+    }
+    flag code.WeakHash on any {
+      method "SHA1.getHash"
+    }
 
-    mark method "CRC32.add" -> code.WeakHash
-    mark method "CRC32.getHash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "CRC32.add"
+    }
+    flag code.WeakHash on any {
+      method "CRC32.getHash"
+    }
   }
 }

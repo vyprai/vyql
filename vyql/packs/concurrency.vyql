@@ -16,3 +16,23 @@ rule UnsafeAutoTraitImplementation {
   meta { id: "VYQL-RACE-003", severity: medium, cwe: [CWE_362, CWE_119], confidence_floor: medium }
   match code.UnsafeAutoTraitImpl as m
 }
+
+rule ThreadLocalScopeOverwriteWithoutCleanup {
+  meta { id: "VYQL-RACE-004", severity: high, cwe: [CWE_362], confidence_floor: high }
+  match code.ThreadLocalScopeOverwriteWithoutCleanup as m
+}
+
+rule ReconfirmationDirtyTrackingRace {
+  meta { id: "VYQL-RACE-005", severity: high, cwe: [CWE_362, CWE_287], confidence_floor: high }
+  match code.ReconfirmationDirtyTrackingRace as m
+}
+
+rule PortRequestResponseCorrelationMissing {
+  meta { id: "VYQL-RACE-006", severity: high, cwe: [CWE_362, CWE_200], confidence_floor: high }
+  match code.PortRequestResponseCorrelationMissing as m
+}
+
+rule OcppEvccIdSharedMapRace {
+  meta { id: "VYQL-RACE-007", severity: high, cwe: [CWE_362, CWE_416], confidence_floor: high }
+  match code.OcppEvccIdSharedMapRace as m
+}

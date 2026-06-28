@@ -1,0 +1,43 @@
+# Rank 499 / CVE-2026-25577: Emmett Core parsed each Cookie header
+# fragment with SimpleCookie.load without handling parser exceptions.
+
+test "rank499: Emmett cookies property lets malformed Cookie headers raise"
+  lang python
+  file wrappers.py
+  expect VYQL-DOS-020
+  expect_review code.EmmettUnhandledCookieParseException
+  code
+  ```
+  from http.cookies import SimpleCookie
+  from emmett_core.utils import cachedprop
+
+  class IngressWrapper:
+      @cachedprop
+      def cookies(self) -> SimpleCookie:
+          cookies: SimpleCookie = SimpleCookie()
+          for cookie in self.headers.get("cookie", "").split(";"):
+              cookies.load(cookie)
+          return cookies
+  ```
+
+test "rank499: Emmett cookies property ignores malformed cookie fragments"
+  lang python
+  file wrappers.py
+  reject VYQL-DOS-020
+  reject_review code.EmmettUnhandledCookieParseException
+  code
+  ```
+  from http.cookies import SimpleCookie
+  from emmett_core.utils import cachedprop
+
+  class IngressWrapper:
+      @cachedprop
+      def cookies(self) -> SimpleCookie:
+          cookies: SimpleCookie = SimpleCookie()
+          for cookie in self.headers.get("cookie", "").split(";"):
+              try:
+                  cookies.load(cookie)
+              except Exception:
+                  continue
+          return cookies
+  ```

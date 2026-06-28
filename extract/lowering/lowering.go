@@ -108,6 +108,8 @@ type lowerer struct {
 	// parseCache, when set (incremental path), lets bodyOf decode a stub module's full NIR on
 	// demand from the parse cache. nil on the full path.
 	parseCache DeltaCache
+
+	tryExceptionTargets []string
 }
 
 type containerInfo struct {
@@ -542,9 +544,13 @@ func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
 }
 
 // containerRead resolves an element-sensitive read of recv[key] into result. Returns false
-// when it can't (non-constant key, or recv was never written as a container) so the caller
-// falls back to the conservative whole-container flow. A constant key that was never written
-// (and no dynamic write happened) reads CLEAN — this is the precision win.
+// when it can't (recv was never written as a container, or a dirty container is read with a
+// dynamic key) so the caller falls back to conservative whole-container/key flow.
+//
+// A constant key that was never written (and no dynamic write happened) reads CLEAN. A dynamic
+// key on a clean tracked container reads "one of the known slots": route all slot taint, but do
+// not taint the selected value merely because the selector is user-controlled. This preserves
+// whitelist maps such as `$files[$request_key]` whose values are compile-time constants.
 func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope) bool {
 	ci := l.containers[recv]
 	if ci == nil {
@@ -552,7 +558,13 @@ func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope
 	}
 	key, ok := l.constKey(keyExpr, sc)
 	if !ok {
-		return false // dynamic key — any slot could be read
+		if ci.dirty {
+			return false // unknown write plus dynamic key — any value may be present
+		}
+		for _, elem := range ci.elems {
+			l.flow(elem, result)
+		}
+		return true
 	}
 	switch {
 	case ci.dirty:
@@ -1672,6 +1684,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					}
 				}
 			}
+			if argsParam := info.params[nir.JSArgumentsParam]; argsParam != "" {
+				inner.node["arguments"] = argsParam
+			}
 			inner.node["__ret__"] = info.ret
 		}
 		if info != nil {
@@ -1712,7 +1727,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if info != nil {
 			l.curFunc = info.funcID
 		}
-		l.functionContextAnalysisEvent(st.Loc, st.ContextTokens)
+		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
 		l.block(st.Body, inner)
 		l.curFunc = saveFunc
 		l.curDecorators = saveDecorators
@@ -2002,8 +2017,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
+		exn := l.node("Exception", st.Loc, map[string]string{"callee_path": "analysis.exception", "method": "exception"})
+		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
+		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
+			if i < len(st.HandlerParams) {
+				if name := strings.TrimSpace(st.HandlerParams[i]); name != "" {
+					sc.node[name] = exn
+					delete(sc.cnst, name)
+				}
+			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
@@ -2047,7 +2071,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		return l.node("Name", ex.Loc, props)
 	case nir.Const:
-		return l.node("Const", ex.Loc, nil)
+		props := map[string]string{}
+		if v := unquoteLit(ex.Value); v != "" {
+			props["str_args"] = v
+		}
+		return l.node("Const", ex.Loc, props)
 	case nir.Thru:
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:
@@ -2077,9 +2105,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Subscript", ex.Loc, props)
-		l.flow(key, n)
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
+			l.flow(key, n)
 			l.flow(base, n)
 		}
 		return n
@@ -2088,6 +2116,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Format:
 		props := map[string]string{}
 		var valToks []string
+		if ex.Text != "" {
+			valToks = append(valToks, ex.Text)
+		}
 		collectValTokens(ex, "", &valToks)
 		if len(valToks) > 0 {
 			props["str_args"] = strings.Join(valToks, "\x00")
@@ -2184,6 +2215,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
 		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
+		saveRegion := l.region
+		l.region = l.curNS + "/fn" + l.nextBranch()
 		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
@@ -2212,6 +2245,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		l.block(ex.Body, inner)
+		l.region = saveRegion
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
 		return fn
@@ -2540,6 +2574,9 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 			collectValTokens(p, key, out) // inherit key so list elements pair with it
 		}
 	case nir.Format:
+		if ex.Text != "" {
+			*out = append(*out, ex.Text)
+		}
 		for _, p := range ex.Parts {
 			collectValTokens(p, key, out)
 		}
@@ -2719,6 +2756,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// stamp recv_type so type-constrained sink adapters can reason about it.
 	var recvNode string
 	if attr, ok := call.Callee.(nir.Attr); ok {
+		if mutatorMethods[call.Method] {
+			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
+				sc.node[nm.ID] = l.node("Name", nm.Loc, map[string]string{
+					"callee_path": nm.ID,
+					"method":      nm.ID,
+				})
+			}
+		}
 		recvNode = l.eval(attr.Base, sc)
 		if recvNode != "" {
 			props["recv"] = recvNode
@@ -2834,6 +2879,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				mapped[i] = true
 			}
 		}
+		if argsParam := target.params[nir.JSArgumentsParam]; argsParam != "" {
+			for _, a := range args {
+				l.flow(a, argsParam)
+			}
+		}
 		l.flow(target.ret, result)
 		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
 		// mutations performed via `this` inside the method reach the receiver object (and reads
@@ -2853,6 +2903,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(a, result)
 		}
 	}
+	l.captureTryExceptionTaint(result, args, recvNode)
 	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
 	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
 	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
@@ -2864,6 +2915,23 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	l.applyCallEffects(call, argVals, result, sc)
 	return result
+}
+
+func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNode string) {
+	if len(l.tryExceptionTargets) == 0 {
+		return
+	}
+	for _, exn := range l.tryExceptionTargets {
+		if recvNode != "" {
+			l.flow(recvNode, exn)
+		}
+		for _, arg := range args {
+			l.flow(arg, exn)
+		}
+		if result != "" {
+			l.flow(result, exn)
+		}
+	}
 }
 
 func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *scope) {

@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "regjsgen" {
-    mark method "generate" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "generate"
+    }
   }
 }

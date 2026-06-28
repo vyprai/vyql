@@ -2,10 +2,18 @@ adapter perl {
   package "Catalyst-Plugin-Authentication-Store-RDBO" {
     source method "password" -> code.SecretValue
     source method "user_object" -> core.UserControlledData
-    mark method "hash_algorithm" -> code.WeakHash
-    mark method "password_pre_salt" -> code.WeakHash
-    mark method "password_post_salt" -> code.WeakHash
-    mark method "password_salt_len" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "hash_algorithm"
+    }
+    flag code.WeakHash on any {
+      method "password_pre_salt"
+    }
+    flag code.WeakHash on any {
+      method "password_post_salt"
+    }
+    flag code.WeakHash on any {
+      method "password_salt_len"
+    }
     control method "check_roles" -> core.AuthorizationCheck
     control method "roles" -> core.AuthorizationCheck
   }

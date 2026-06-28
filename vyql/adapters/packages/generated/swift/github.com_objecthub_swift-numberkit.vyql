@@ -1,6 +1,10 @@
 adapter swift {
   package "github.com/objecthub/swift-numberkit" {
-    mark method "random" -> code.WeakRandomValue
-    mark method "hash" -> code.WeakHash
+    flag code.WeakRandomValue on any {
+      method "random"
+    }
+    flag code.WeakHash on any {
+      method "hash"
+    }
   }
 }

@@ -1,8 +1,14 @@
 import code.{WeakHash}
 adapter elixir {
   package "murmur" {
-    mark method "hash_x64_128" -> code.WeakHash
-    mark method "hash_x86_128" -> code.WeakHash
-    mark method "hash_x86_32" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "hash_x64_128"
+    }
+    flag code.WeakHash on any {
+      method "hash_x86_128"
+    }
+    flag code.WeakHash on any {
+      method "hash_x86_32"
+    }
   }
 }

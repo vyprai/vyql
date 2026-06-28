@@ -1,0 +1,58 @@
+# Rank 771 / CVE-2025-59341: esm.sh rejected only leading dot
+# path segments, allowing nested '/.' segments to reach file-backed routes.
+
+test "rank771: route filter rejects only leading dot segments"
+  lang go
+  file router.go
+  expect VYQL-PATH-041
+  expect_review code.LeadingDotSegmentOnlyRouteFilter
+  code
+  ```
+  package server
+
+  import (
+      "net/http"
+      "strings"
+  )
+
+  type Context struct { R *http.Request }
+  type Handle func(*Context) any
+
+  func esmRouter() Handle {
+      return func(ctx *Context) any {
+          pathname := ctx.R.URL.Path
+          if strings.HasPrefix(pathname, "/.") || strings.HasSuffix(pathname, ".env") || strings.HasSuffix(pathname, ".php") {
+              return 404
+          }
+          return pathname
+      }
+  }
+  ```
+
+test "rank771: route filter rejects nested dot segments"
+  lang go
+  file router.go
+  reject VYQL-PATH-041
+  reject_review code.LeadingDotSegmentOnlyRouteFilter
+  code
+  ```
+  package server
+
+  import (
+      "net/http"
+      "strings"
+  )
+
+  type Context struct { R *http.Request }
+  type Handle func(*Context) any
+
+  func esmRouter() Handle {
+      return func(ctx *Context) any {
+          pathname := ctx.R.URL.Path
+          if strings.HasSuffix(pathname, ".env") || strings.HasSuffix(pathname, ".php") || strings.Contains(pathname, "/.") {
+              return 404
+          }
+          return pathname
+      }
+  }
+  ```

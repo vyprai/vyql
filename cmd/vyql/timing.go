@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// timingOn enables per-phase wall-clock logging to stderr when $VYQL_TIMING is set. A
-// diagnostic for the incremental fast path — off by default, zero cost.
-var timingOn = os.Getenv("VYQL_TIMING") != ""
+// timingOn enables per-phase wall-clock logging to stderr. It is intentionally
+// not wired to an environment variable.
+var timingOn = false
 
 type timer struct {
 	last  time.Time

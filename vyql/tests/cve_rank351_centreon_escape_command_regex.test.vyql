@@ -1,0 +1,29 @@
+test "rank351: Centreon escape_command regex leaves pipe metacharacters"
+  lang php
+  expect VYQL-INJ-056
+  expect_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  <?php
+  function escape_command($command) {
+      return preg_replace("/(\\\$|`)/", "", $command);
+  }
+  $command_line = "/usr/bin/rrdtool graph DEF:v1=/var/lib/perfmon-" . $_GET["ns_id"] . "/stats.rrd";
+  $command_line = escape_command($command_line);
+  $fp = popen($command_line, "r");
+  ```
+
+test "rank351: Centreon escape_command regex strips pipe with character class"
+  lang php
+  reject VYQL-INJ-056
+  reject_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  <?php
+  function escape_command($command) {
+      return preg_replace("/[\\\$|`]/", "", $command);
+  }
+  $command_line = "/usr/bin/rrdtool graph DEF:v1=/var/lib/perfmon-" . $_GET["ns_id"] . "/stats.rrd";
+  $command_line = escape_command($command_line);
+  $fp = popen($command_line, "r");
+  ```

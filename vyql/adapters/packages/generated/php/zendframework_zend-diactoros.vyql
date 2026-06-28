@@ -14,6 +14,8 @@ adapter php {
     sink method "Stream::write" -> code.FilePathAccess
     sink method "CallbackStream::write" -> code.FilePathAccess
     sink method "RelativeStream::write" -> code.FilePathAccess
-    mark method "RequestTrait::withUri" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "RequestTrait::withUri"
+    }
   }
 }

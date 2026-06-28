@@ -3,7 +3,9 @@ import core.{UserControlledData}
 
 adapter python {
   package "spotipy" {
-    mark method "get_authorize_url" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "get_authorize_url"
+    }
     source method "parse_response_code" -> core.UserControlledData
     source method "parse_auth_response_url" -> core.UserControlledData
     source method "get_auth_response" -> code.HttpInput

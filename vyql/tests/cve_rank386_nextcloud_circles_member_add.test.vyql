@@ -1,0 +1,87 @@
+# Rank 386 / CVE-2026-45155: Nextcloud Circles accepted a caller-supplied
+# circle member id and generated a federated member before checking whether
+# the referenced circle was visible to the caller.
+
+test "rank386: Nextcloud Circles single member add lacks circle visibility check"
+  lang php
+  expect VYQL-AUTH-019
+  expect_review code.NextcloudCircleMemberAddMissingCircleCheck
+  code
+  ```
+  <?php
+  class Member {
+      public const TYPE_CONTACT = 1;
+      public const TYPE_CIRCLE = 2;
+  }
+
+  class LocalController {
+      public function memberAdd(string $circleId, string $userId, int $type): DataResponse {
+          if ($type === Member::TYPE_CONTACT) {
+              $currentUser = $this->federatedUserService->getCurrentUser();
+              $userId = $currentUser->getUserId() . '/' . $userId;
+          }
+
+          $federatedUser = $this->federatedUserService->generateFederatedUser($userId, $type);
+          $result = $this->memberService->addMember($circleId, $federatedUser);
+
+          return new DataResponse($result);
+      }
+  }
+  ```
+
+test "rank386: Nextcloud Circles bulk member add lacks circle visibility check"
+  lang php
+  expect VYQL-AUTH-019
+  expect_review code.NextcloudCircleMemberAddMissingCircleCheck
+  code
+  ```
+  <?php
+  class LocalController {
+      public function membersAdd(string $circleId, array $members): DataResponse {
+          $federatedUsers = [];
+          foreach ($members as $member) {
+              try {
+                  $federatedUsers[] = $this->federatedUserService->generateFederatedUser(
+                      $this->get('id', $member),
+                      $this->getInt('type', $member)
+                  );
+              } catch (MemberNotFoundException) {
+              }
+          }
+
+          $result = $this->memberService->addMembers($circleId, $federatedUsers);
+          return new DataResponse($result);
+      }
+  }
+  ```
+
+test "rank386: Nextcloud Circles checks circle visibility before member add"
+  lang php
+  reject VYQL-AUTH-019
+  reject_review code.NextcloudCircleMemberAddMissingCircleCheck
+  code
+  ```
+  <?php
+  class Member {
+      public const TYPE_CONTACT = 1;
+      public const TYPE_CIRCLE = 2;
+  }
+
+  class LocalController {
+      public function memberAdd(string $circleId, string $userId, int $type): DataResponse {
+          if ($type === Member::TYPE_CONTACT) {
+              $currentUser = $this->federatedUserService->getCurrentUser();
+              $userId = $currentUser->getUserId() . '/' . $userId;
+          }
+
+          if ($type === Member::TYPE_CIRCLE) {
+              $this->circleService->getCircle($userId);
+          }
+
+          $federatedUser = $this->federatedUserService->generateFederatedUser($userId, $type);
+          $result = $this->memberService->addMember($circleId, $federatedUser);
+
+          return new DataResponse($result);
+      }
+  }
+  ```

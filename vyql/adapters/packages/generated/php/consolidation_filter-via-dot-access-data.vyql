@@ -1,6 +1,8 @@
 import code.{RegexCompile}
 adapter php {
   package "consolidation/filter-via-dot-access-data" {
-    mark method "Consolidation\Filter\Operators\RegexOp::test" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "Consolidation\Filter\Operators\RegexOp::test"
+    }
   }
 }

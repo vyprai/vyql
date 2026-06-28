@@ -4,7 +4,9 @@ import core.{HtmlEscape}
 adapter php {
   package "knplabs/knp-menu" {
     control method "Knp\Menu\Renderer\Renderer::escape" -> core.HtmlEscape
-    mark method "Knp\Menu\MenuItem::setUri" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "Knp\Menu\MenuItem::setUri"
+    }
     control method "Knp\Menu\MenuItem::setLabel" -> core.HtmlEscape
   }
 }

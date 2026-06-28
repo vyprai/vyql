@@ -1,0 +1,48 @@
+# Rank 623 / CVE-2013-7448: didiwiki used request-supplied wiki page names
+# as filesystem paths before validating traversal components.
+test "rank623: C web request page flows to wiki file helpers"
+  lang c
+  file wiki.c
+  expect VYQL-PATH-029
+  code
+  ```
+  char *http_request_param_get(HttpRequest *req, char *name);
+  char *http_request_get_query_string(HttpRequest *req);
+  char *file_read(char *filename);
+  void file_write(char *filename, char *data);
+
+  void wiki_handle_rest_call(HttpRequest *req, HttpResponse *res, char *func) {
+    char *page = http_request_param_get(req, "page");
+    if (page == 0)
+      page = http_request_get_query_string(req);
+    if (page && access(page, R_OK) == 0)
+      http_response_printf(res, "%s", file_read(page));
+    file_write(page, "body");
+    unlink(page);
+  }
+  ```
+
+test "rank623: C web request page is guarded before wiki file helpers"
+  lang c
+  file wiki.c
+  reject VYQL-PATH-029
+  code
+  ```
+  char *http_request_param_get(HttpRequest *req, char *name);
+  char *http_request_get_query_string(HttpRequest *req);
+  int page_name_is_good(char *page_name);
+  char *file_read(char *filename);
+  void file_write(char *filename, char *data);
+
+  void wiki_handle_rest_call(HttpRequest *req, HttpResponse *res, char *func) {
+    char *page = http_request_param_get(req, "page");
+    if (page == 0)
+      page = http_request_get_query_string(req);
+    if (page && page_name_is_good(page) && access(page, R_OK) == 0)
+      http_response_printf(res, "%s", file_read(page));
+    if (page_name_is_good(page))
+      file_write(page, "body");
+    if (page_name_is_good(page))
+      unlink(page);
+  }
+  ```

@@ -4,7 +4,9 @@ import core.{AuthenticationCheck}
 adapter go {
   package "contrib.go.opencensus.io/exporter/ocagent" {
     sink method "WithHeaders" -> code.NetworkSend
-    mark method "WithInsecure" -> code.CleartextChannel
+    flag code.CleartextChannel on any {
+      method "WithInsecure"
+    }
     control method "WithTLSCredentials" -> core.AuthenticationCheck
   }
 }

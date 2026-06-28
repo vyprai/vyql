@@ -1,5 +1,7 @@
 adapter swift {
   package "github.com/bitmark-inc/tweetnacl-swiftwrap" {
-    mark method "secureRandomData" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "secureRandomData"
+    }
   }
 }

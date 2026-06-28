@@ -1,0 +1,55 @@
+# Rank 620 / CVE-2022-21189: Dexie setByKeyPath reused inherited path
+# properties when creating nested objects.
+test "rank620: Dexie nested key-path setter lacks own-property guard"
+  lang javascript
+  file utils.ts
+  expect VYQL-INJ-134
+  code
+  ```
+  export function setByKeyPath(obj, keyPath, value) {
+    if (!obj || keyPath === undefined) return;
+    var period = keyPath.indexOf('.');
+    if (period !== -1) {
+      var currentKeyPath = keyPath.substr(0, period);
+      var remainingKeyPath = keyPath.substr(period + 1);
+      if (remainingKeyPath === "")
+        obj[currentKeyPath] = value;
+      else {
+        var innerObj = obj[currentKeyPath];
+        if (!innerObj) innerObj = (obj[currentKeyPath] = {});
+        setByKeyPath(innerObj, remainingKeyPath, value);
+      }
+    } else {
+      obj[keyPath] = value;
+    }
+  }
+  ```
+
+test "rank620: Dexie nested key-path setter checks own property before reuse"
+  lang javascript
+  file utils.ts
+  reject VYQL-INJ-134
+  code
+  ```
+  export function hasOwn(obj, prop) {
+    return Object.prototype.hasOwnProperty.call(obj, prop);
+  }
+
+  export function setByKeyPath(obj, keyPath, value) {
+    if (!obj || keyPath === undefined) return;
+    var period = keyPath.indexOf('.');
+    if (period !== -1) {
+      var currentKeyPath = keyPath.substr(0, period);
+      var remainingKeyPath = keyPath.substr(period + 1);
+      if (remainingKeyPath === "")
+        obj[currentKeyPath] = value;
+      else {
+        var innerObj = obj[currentKeyPath];
+        if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
+        setByKeyPath(innerObj, remainingKeyPath, value);
+      }
+    } else {
+      obj[keyPath] = value;
+    }
+  }
+  ```

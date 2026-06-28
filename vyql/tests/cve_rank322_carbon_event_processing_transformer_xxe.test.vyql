@@ -1,0 +1,35 @@
+# Rank 322 / CVE-2023-6836: WSO2 carbon-event-processing hardened
+# TransformerFactory before creating a Transformer.
+
+test "rank322: TransformerFactory.newTransformer without secure processing is structural XXE"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import javax.xml.transform.Transformer;
+  import javax.xml.transform.TransformerFactory;
+
+  class StormTopologyManager {
+    Transformer getStringQueryPlan() throws Exception {
+      return TransformerFactory.newInstance().newTransformer();
+    }
+  }
+  ```
+
+test "rank322: FEATURE_SECURE_PROCESSING suppresses TransformerFactory XXE"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.XMLConstants;
+  import javax.xml.transform.Transformer;
+  import javax.xml.transform.TransformerFactory;
+
+  class StormTopologyManager {
+    Transformer getStringQueryPlan() throws Exception {
+      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      return transformerFactory.newTransformer();
+    }
+  }
+  ```

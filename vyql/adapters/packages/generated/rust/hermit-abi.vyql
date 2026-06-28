@@ -11,7 +11,9 @@ adapter rust {
     source method "readv" -> core.UserControlledData
     source method "recv" -> code.NetworkData
     source method "recvfrom" -> code.NetworkData
-    mark method "read_entropy" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "read_entropy"
+    }
     sink method "write" -> code.FileUse
     sink method "writev" -> code.FileUse
     sink method "send" -> code.NetworkSend
@@ -19,7 +21,11 @@ adapter rust {
     sink method "connect" -> code.NetworkConnect
     sink method "bind" -> code.NetworkBind
     sink method "listen" -> code.NetworkBind
-    mark method "ioctl" -> code.PrivilegedOp
-    mark method "fcntl" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "ioctl"
+    }
+    flag code.PrivilegedOp on any {
+      method "fcntl"
+    }
   }
 }

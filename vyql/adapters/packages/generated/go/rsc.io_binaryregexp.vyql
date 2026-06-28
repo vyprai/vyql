@@ -2,9 +2,17 @@ import code.{RegexCompile}
 
 adapter go {
   package "rsc.io/binaryregexp" {
-    mark method "Compile" -> code.RegexCompile
-    mark method "CompilePOSIX" -> code.RegexCompile
-    mark method "MustCompile" -> code.RegexCompile
-    mark method "MustCompilePOSIX" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "Compile"
+    }
+    flag code.RegexCompile on any {
+      method "CompilePOSIX"
+    }
+    flag code.RegexCompile on any {
+      method "MustCompile"
+    }
+    flag code.RegexCompile on any {
+      method "MustCompilePOSIX"
+    }
   }
 }

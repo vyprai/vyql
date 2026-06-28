@@ -2,9 +2,17 @@ import code.{WeakRandomValue}
 
 adapter elixir {
   package "misc_random" {
-    mark path "Misc.Random.seed" -> code.WeakRandomValue
-    mark path "Misc.Random.seed_random" -> code.WeakRandomValue
-    mark path "Misc.Random.string" -> code.WeakRandomValue
-    mark path "Misc.Random.number" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      path "Misc.Random.seed"
+    }
+    flag code.WeakRandomValue on any {
+      path "Misc.Random.seed_random"
+    }
+    flag code.WeakRandomValue on any {
+      path "Misc.Random.string"
+    }
+    flag code.WeakRandomValue on any {
+      path "Misc.Random.number"
+    }
   }
 }

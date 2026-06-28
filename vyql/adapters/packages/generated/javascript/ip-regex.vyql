@@ -2,6 +2,8 @@ import code.{RegexCompile}
 
 adapter javascript {
   package "ip-regex" {
-    mark method "ipRegex" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "ipRegex"
+    }
   }
 }

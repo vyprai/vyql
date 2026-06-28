@@ -1,6 +1,8 @@
 import code.{RegexCompile}
 adapter javascript {
   package "@babel/helper-create-regexp-features-plugin" {
-    mark method "createRegExpFeaturePlugin" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "createRegExpFeaturePlugin"
+    }
   }
 }

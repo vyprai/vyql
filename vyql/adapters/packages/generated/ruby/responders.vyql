@@ -3,6 +3,8 @@ import code.{HtmlRender, RedirectTarget}
 adapter ruby {
   package "responders" {
     sink method "respond_with" -> code.HtmlRender
-    mark method "respond_with" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "respond_with"
+    }
   }
 }

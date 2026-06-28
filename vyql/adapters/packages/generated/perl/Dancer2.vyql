@@ -5,7 +5,9 @@ adapter perl {
     source method "request" -> code.HttpInput
     source method "params" -> core.UserControlledData
     source method "body" -> code.HttpInput
-    mark method "uploads" -> code.FileUpload
+    flag code.FileUpload on any {
+      method "uploads"
+    }
     source method "cookie" -> code.Cookie
     sink method "response" -> ResponseHeaderWrite
   }

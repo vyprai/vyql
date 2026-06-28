@@ -3,7 +3,9 @@ import core.{InputValidation, UserControlledData}
 
 adapter objc {
   package "SwiftValidator" {
-    mark method "RegexRule.init" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "RegexRule.init"
+    }
     control method "RegexRule.validate" -> core.InputValidation
     source method "Validator.validateField" -> core.UserControlledData
   }

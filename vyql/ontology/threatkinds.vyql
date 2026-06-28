@@ -3,6 +3,7 @@
 
 module access_control;
 threat PermissiveCors { cwe: [CWE_942], desc: "Permissive CORS — Access-Control-Allow-Origin set to '*'" }
+threat OriginValidationError { cwe: [CWE_346], desc: "Improper origin validation for cross-origin or cross-protocol trust decisions" }
 threat CsrfDisabled { cwe: [CWE_352], desc: "CSRF protection explicitly disabled / exempted" }
 threat BrokenAccess { cwe: [CWE_284], desc: "Improper access control" }
 threat Idor { cwe: [CWE_639], desc: "Insecure direct object reference" }
@@ -41,6 +42,7 @@ threat MissingEncryption { cwe: [CWE_311], desc: "Missing encryption of sensitiv
 threat WeakCrypto { cwe: [CWE_327], desc: "Use of a broken/risky cryptographic algorithm" }
 threat ImproperCertValidation { cwe: [CWE_295], desc: "Improper certificate validation (verification disabled)" }
 threat ImproperSignatureCheck { cwe: [CWE_347], desc: "Improper verification of cryptographic signature (e.g. JWT alg none)" }
+threat MissingIntegrityProtection { cwe: [CWE_665], desc: "Cryptographic configuration omits required integrity/authentication initialization" }
 threat IncompleteSecurityIdentifier { cwe: [CWE_358], desc: "Security-sensitive identity check uses a shortened or ambiguous identifier" }
 threat ObservableDiscrepancy { cwe: [CWE_203, CWE_208], desc: "Secret-dependent comparison may expose observable or timing differences" }
 
@@ -53,11 +55,13 @@ threat XxeUnhardened { cwe: [CWE_611], desc: "XML parser created without entity 
 module dos;
 threat ReDoS { cwe: [CWE_1333], desc: "Untrusted data compiled as a regular expression (catastrophic backtracking)" }
 threat UncontrolledResourceConsumption { cwe: [CWE_400], desc: "Uncontrolled resource consumption (DoS)" }
+threat StackExhaustion { cwe: [CWE_674], desc: "Recursive or nested processing can exhaust the call stack" }
 
 module injection;
 threat ArgumentInjection { cwe: [CWE_88], desc: "Untrusted data injected as command arguments" }
 threat CodeInjection { cwe: [CWE_94], desc: "Untrusted data evaluated as code" }
 threat CommandInjection { cwe: [CWE_78], desc: "Untrusted data in an OS command" }
+threat ConfigurationInjection { cwe: [CWE_74], desc: "Untrusted data injected into generated configuration syntax" }
 threat MassAssignment { cwe: [CWE_915], desc: "Untrusted request body bulk-bound to object attributes (mass assignment)" }
 threat CsvInjection { cwe: [CWE_1236], desc: "Untrusted data written to a spreadsheet/CSV cell (formula injection)" }
 threat UnsafeDynamicLoading { cwe: [CWE_829], desc: "Untrusted data selecting a module, package, or native library to load dynamically" }
@@ -97,6 +101,7 @@ threat FileInclusion { cwe: [CWE_98], desc: "Untrusted data controlling an inclu
 threat LinkFollowing { cwe: [CWE_59], desc: "Improper link resolution before file access" }
 threat PathTraversal { cwe: [CWE_22], desc: "Untrusted data in a filesystem path" }
 threat InsecureTempFile { cwe: [CWE_377], desc: "Insecure temporary file (predictable name / race)" }
+threat UncontrolledSearchPath { cwe: [CWE_427], desc: "Executable or plugin discovery includes a lower-trust search path" }
 
 module request_forgery;
 threat Csrf { cwe: [CWE_352], desc: "Cross-site request forgery" }

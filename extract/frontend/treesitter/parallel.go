@@ -35,6 +35,16 @@ func parseModules(
 	newParser func() *tree_sitter.Parser,
 	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
 ) []nir.Module {
+	return parseModulesPreprocess(files, root, newParser, nil, build)
+}
+
+func parseModulesPreprocess(
+	files []string,
+	root string,
+	newParser func() *tree_sitter.Parser,
+	preprocess func([]byte) []byte,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
 	n := len(files)
 	if n == 0 {
 		return nil
@@ -48,7 +58,10 @@ func parseModules(
 	if workers < 1 {
 		workers = 1
 	}
-	cache := parsecache.Shared() // nil unless $VYQL_CACHE is set; all methods are nil-safe
+	cache := parsecache.Shared() // nil unless an explicit cache owner is wired in; all methods are nil-safe
+	if preprocess != nil {
+		cache = nil
+	}
 	// Prefetch stubs for unchanged files (one batched transaction): an unchanged module resolves
 	// to a STUB (identity only, no body) without being read or decoded — the lowerer decodes the
 	// body on demand only if it actually needs it. This skips the dominant cost of a warm re-scan
@@ -80,6 +93,9 @@ func parseModules(
 				src, err := readFile(files[i])
 				if err != nil {
 					continue
+				}
+				if preprocess != nil {
+					src = preprocess(src)
 				}
 				// content-addressed cache: a re-scan of an unchanged file (whose mtime moved, so
 				// the stat path missed) still skips the expensive tree-sitter parse. The key

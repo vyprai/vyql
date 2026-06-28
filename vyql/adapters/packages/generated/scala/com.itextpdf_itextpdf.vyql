@@ -1,6 +1,8 @@
 import code.{RedirectTarget}
 adapter scala {
   package "com.itextpdf:itextpdf" {
-    mark method "setRemoteGoto" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "setRemoteGoto"
+    }
   }
 }

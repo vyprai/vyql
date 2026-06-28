@@ -1,0 +1,77 @@
+# Rank 815 / CVE-2025-56647: Farm's HMR WebSocket server accepted browser
+# upgrades that matched the HMR path/protocol without validating Origin.
+
+test "rank815: HMR websocket upgrade lacks origin validation"
+  lang javascript
+  file ws.ts
+  expect VYQL-RF-031
+  expect_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  import type { IncomingMessage } from 'node:http';
+  import type { Duplex } from 'node:stream';
+  import { WebSocketServer as WebSocketServerRaw } from 'ws';
+
+  const HMR_HEADER = 'farm_hmr';
+
+  export default class WsServer {
+    public wss: WebSocketServerRaw;
+    constructor(private httpServer: any, private config: any) {
+      this.wss = new WebSocketServerRaw({ noServer: true });
+      this.httpServer.on('upgrade', this.upgradeWsServer.bind(this));
+    }
+
+    private upgradeWsServer(request: IncomingMessage, socket: Duplex, head: Buffer) {
+      if (this.isHMRRequest(request)) {
+        this.wss.handleUpgrade(request, socket, head, (ws: any) => {
+          this.wss.emit('connection', ws, request);
+        });
+      }
+    }
+
+    private isHMRRequest(request: IncomingMessage): boolean {
+      return request.url === this.config.hmr.path &&
+        request.headers['sec-websocket-protocol'] === HMR_HEADER;
+    }
+  }
+  ```
+
+test "rank815: HMR websocket upgrade checks trusted origins"
+  lang javascript
+  file ws.ts
+  reject VYQL-RF-031
+  reject_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  import type { IncomingMessage } from 'node:http';
+  import type { Duplex } from 'node:stream';
+  import { WebSocketServer as WebSocketServerRaw } from 'ws';
+
+  const HMR_HEADER = 'farm_hmr';
+
+  export default class WsServer {
+    public wss: WebSocketServerRaw;
+    private hmrOrigins: string[];
+    constructor(private httpServer: any, private config: any) {
+      this.hmrOrigins = ['http://localhost:9000'];
+      this.wss = new WebSocketServerRaw({ noServer: true });
+      this.httpServer.on('upgrade', this.upgradeWsServer.bind(this));
+    }
+
+    private upgradeWsServer(request: IncomingMessage, socket: Duplex, head: Buffer) {
+      if (this.isHMRRequest(request)) {
+        this.wss.handleUpgrade(request, socket, head, (ws: any) => {
+          this.wss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    }
+
+    private isHMRRequest(request: IncomingMessage): boolean {
+      return request.url === this.config.hmr.path &&
+        request.headers['sec-websocket-protocol'] === HMR_HEADER &&
+        this.hmrOrigins.includes(request.headers['origin']);
+    }
+  }
+  ```

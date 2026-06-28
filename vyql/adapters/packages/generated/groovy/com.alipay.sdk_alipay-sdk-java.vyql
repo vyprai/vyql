@@ -2,8 +2,12 @@ import core.{AuthenticationCheck, AuthorizationCheck}
 
 adapter groovy {
   package "com.alipay.sdk:alipay-sdk-java" {
-    mark method "setNotifyUrl" -> code.RedirectTarget
-    mark method "setReturnUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "setNotifyUrl"
+    }
+    flag code.RedirectTarget on any {
+      method "setReturnUrl"
+    }
     source method "getTextParams" -> core.UserControlledData
     source method "getBody" -> core.UserControlledData
     source method "getParams" -> core.UserControlledData

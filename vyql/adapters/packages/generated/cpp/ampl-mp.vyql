@@ -2,6 +2,8 @@ adapter cpp {
   package "ampl-mp" {
     source path "Parser.parse" -> code.CliArgument
     sink method "file" -> code.FilePathAccess
-    mark method "Hash" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "Hash"
+    }
   }
 }

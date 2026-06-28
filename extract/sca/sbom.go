@@ -26,8 +26,10 @@ type PkgKey struct {
 }
 
 // ParseRequirements is a minimal requirements.txt reader. Lines like
-// "name==1.2.3" produce (name, "1.2.3"); other non-comment lines produce
-// (name, "*"). Comments (#...) and option lines (-...) are skipped.
+// "name==1.2.3" produce (name, "==1.2.3"); other non-comment lines produce
+// (name, "*"). Comments (#...) and option lines (-...) are skipped. The
+// operator is intentionally preserved so advisory matching can distinguish an
+// exact pin from an open range that can resolve to a known-bad release.
 func ParseRequirements(content string) []Dep {
 	var out []Dep
 	for _, raw := range strings.Split(content, "\n") {
@@ -40,7 +42,7 @@ func ParseRequirements(content string) []Dep {
 			continue
 		}
 		if name, ver, ok := splitRequirement(line); ok {
-			out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
+			out = append(out, Dep{NormalizePackageName(name), ver})
 		} else {
 			out = append(out, Dep{NormalizePackageName(line), "*"})
 		}
@@ -79,13 +81,122 @@ func ParseSetupPy(content string) []Dep {
 		off = end
 		for _, lit := range quotedLiterals(body) {
 			if name, ver, ok := splitRequirement(lit); ok {
-				out = append(out, Dep{NormalizePackageName(name), normalizeVersion(ver)})
+				out = append(out, Dep{NormalizePackageName(name), ver})
 			} else if lit = strings.TrimSpace(lit); lit != "" {
 				out = append(out, Dep{NormalizePackageName(lit), "*"})
 			}
 		}
 	}
 	return out
+}
+
+// ParseSetupCfg reads static setup.cfg install_requires blocks. It handles the
+// common setuptools INI form:
+//
+// [options]
+// install_requires =
+//
+//	package>=1.0
+func ParseSetupCfg(content string) []Dep {
+	var out []Dep
+	inOptions := false
+	inRequires := false
+	for _, raw := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			inOptions = strings.EqualFold(trimmed, "[options]")
+			inRequires = false
+			continue
+		}
+		if !inOptions {
+			continue
+		}
+		if key, value, ok := strings.Cut(trimmed, "="); ok && strings.EqualFold(strings.TrimSpace(key), "install_requires") {
+			inRequires = true
+			if strings.TrimSpace(value) != "" {
+				if name, ver, ok := splitRequirement(value); ok {
+					out = append(out, Dep{NormalizePackageName(name), ver})
+				}
+			}
+			continue
+		}
+		if strings.HasPrefix(raw, " ") || strings.HasPrefix(raw, "\t") {
+			if inRequires {
+				if name, ver, ok := splitRequirement(trimmed); ok {
+					out = append(out, Dep{NormalizePackageName(name), ver})
+				} else {
+					out = append(out, Dep{NormalizePackageName(trimmed), "*"})
+				}
+			}
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		inRequires = ok && strings.EqualFold(strings.TrimSpace(key), "install_requires")
+		if inRequires && strings.TrimSpace(value) != "" {
+			if name, ver, ok := splitRequirement(value); ok {
+				out = append(out, Dep{NormalizePackageName(name), ver})
+			}
+		}
+	}
+	return out
+}
+
+// ParseGoMod reads direct and block-form require directives from go.mod.
+// It deliberately ignores replace/exclude directives: the required module/version
+// is the dependency identity scanned by the SCA advisory feed.
+func ParseGoMod(content string) []Dep {
+	var out []Dep
+	inRequireBlock := false
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(stripLineComment(raw))
+		if line == "" {
+			continue
+		}
+		if inRequireBlock {
+			if line == ")" {
+				inRequireBlock = false
+				continue
+			}
+			if dep, ok := parseGoRequireLine(line); ok {
+				out = append(out, dep)
+			}
+			continue
+		}
+		if line == "require (" {
+			inRequireBlock = true
+			continue
+		}
+		if strings.HasPrefix(line, "require ") {
+			rest := strings.TrimSpace(strings.TrimPrefix(line, "require "))
+			if dep, ok := parseGoRequireLine(rest); ok {
+				out = append(out, dep)
+			}
+		}
+	}
+	return out
+}
+
+func stripLineComment(line string) string {
+	if i := strings.Index(line, "//"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
+func parseGoRequireLine(line string) (Dep, bool) {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return Dep{}, false
+	}
+	name := strings.Trim(fields[0], `"`)
+	version := strings.Trim(fields[1], `"`)
+	if name == "" || version == "" || strings.Contains(name, "=>") || strings.Contains(version, "=>") {
+		return Dep{}, false
+	}
+	return Dep{NormalizePackageName(name), version}, true
 }
 
 func identifierBoundary(s string, start, end int) bool {
@@ -183,7 +294,7 @@ func splitRequirement(line string) (name, version string, ok bool) {
 	for _, op := range []string{"==", ">=", "<=", "~=", "!=", ">", "<", "="} {
 		if i := strings.Index(line, op); i >= 0 {
 			name = strings.TrimSpace(line[:i])
-			version = strings.TrimSpace(line[i+len(op):])
+			version = op + strings.TrimSpace(line[i+len(op):])
 			return name, version, true
 		}
 	}
@@ -320,12 +431,22 @@ func BuildSBOM(g usg.Store, eco string, deps []Dep, manifest string) error {
 			Props: map[string]string{"loc": manifest + ":" + name, "name": name,
 				"version": version, "eco": eco, "package": root, "root": root,
 				"purl":        "pkg:" + eco + "/" + name + "@" + version,
+				"specifier":   normalizeSpecifier(d.Version),
 				"callee_path": scaPackageEvent, "method": "package",
 				"str_args": "kind=package"}}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func normalizeSpecifier(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	v = strings.Join(strings.Fields(v), "")
+	if v == "" {
+		return "*"
+	}
+	return v
 }
 
 // LinkReachability marks each package whose symbols are actually called (any

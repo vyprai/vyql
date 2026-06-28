@@ -1,9 +1,17 @@
 import code.{RegexCompile}
 adapter swift {
   package "github.com/getGuaka/StringScanner" {
-    mark method "peek(untilPattern:)" -> code.RegexCompile
-    mark method "scan(untilPattern:)" -> code.RegexCompile
-    mark method "matches(_:options:)" -> code.RegexCompile
-    mark method "groups(_:options:)" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "peek(untilPattern:)"
+    }
+    flag code.RegexCompile on any {
+      method "scan(untilPattern:)"
+    }
+    flag code.RegexCompile on any {
+      method "matches(_:options:)"
+    }
+    flag code.RegexCompile on any {
+      method "groups(_:options:)"
+    }
   }
 }

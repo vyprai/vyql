@@ -3,7 +3,9 @@ import core.{InputValidation}
 
 adapter dart {
   package "url_launcher_ios" {
-    mark method "open" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "open"
+    }
     control method "canOpenURL" -> core.InputValidation
   }
 }

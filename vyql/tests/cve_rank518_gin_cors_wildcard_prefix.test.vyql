@@ -1,0 +1,87 @@
+test "rank518: CORS trailing wildcard parser truncates trusted prefix"
+  lang go
+  expect VYQL-CFG-018
+  code
+  ```
+  package cors
+
+  import (
+      "errors"
+      "strings"
+  )
+
+  type Config struct {
+      AllowOrigins []string
+      AllowWildcard bool
+  }
+
+  func (c Config) parseWildcardRules() [][]string {
+      var wRules [][]string
+      if !c.AllowWildcard {
+          return wRules
+      }
+      for _, o := range c.AllowOrigins {
+          if !strings.Contains(o, "*") {
+              continue
+          }
+          if c := strings.Count(o, "*"); c > 1 {
+              panic(errors.New("only one * is allowed").Error())
+          }
+          i := strings.Index(o, "*")
+          if i == 0 {
+              wRules = append(wRules, []string{"*", o[1:]})
+              continue
+          }
+          if i == (len(o) - 1) {
+              wRules = append(wRules, []string{o[:i-1], "*"})
+              continue
+          }
+          wRules = append(wRules, []string{o[:i], o[i+1:]})
+      }
+      return wRules
+  }
+  ```
+
+test "rank518: CORS trailing wildcard parser keeps full trusted prefix"
+  lang go
+  reject VYQL-CFG-018
+  code
+  ```
+  package cors
+
+  import (
+      "errors"
+      "strings"
+  )
+
+  type Config struct {
+      AllowOrigins []string
+      AllowWildcard bool
+  }
+
+  func (c Config) parseWildcardRules() [][]string {
+      var wRules [][]string
+      if !c.AllowWildcard {
+          return wRules
+      }
+      for _, o := range c.AllowOrigins {
+          if !strings.Contains(o, "*") {
+              continue
+          }
+          if c := strings.Count(o, "*"); c > 1 {
+              panic(errors.New("only one * is allowed").Error())
+          }
+          i := strings.Index(o, "*")
+          if i == 0 {
+              wRules = append(wRules, []string{"*", o[1:]})
+              continue
+          }
+          if i == (len(o) - 1) {
+              wRules = append(wRules, []string{o[:i], "*"})
+              continue
+          }
+          wRules = append(wRules, []string{o[:i], o[i+1:]})
+      }
+      return wRules
+  }
+  ```

@@ -1,0 +1,34 @@
+test "rank336: Cassandra FQL accepts nodetool archive command without privileged opt-in"
+  lang java
+  expect VYQL-AUTH-014
+  expect_review code.NodetoolArchiveCommandPrivilegeEscalation
+  code
+  ```
+  class StorageService {
+      public void enableFullQueryLogger(String path, String rollCycle, Boolean blocking, int maxQueueWeight, long maxLogSize, String archiveCommand, int maxArchiveRetries) {
+          FullQueryLoggerOptions fqlOptions = DatabaseDescriptor.getFullQueryLogOptions();
+          path = path != null ? path : fqlOptions.log_dir;
+          archiveCommand = archiveCommand != null ? archiveCommand : fqlOptions.archive_command;
+          FullQueryLogger.instance.enableWithoutClean(Paths.get(path), rollCycle, blocking, maxQueueWeight, maxLogSize, archiveCommand, maxArchiveRetries);
+      }
+  }
+  ```
+
+test "rank336: Cassandra FQL rejects nodetool archive command unless config opts in"
+  lang java
+  reject VYQL-AUTH-014
+  reject_review code.NodetoolArchiveCommandPrivilegeEscalation
+  code
+  ```
+  class StorageService {
+      public void enableFullQueryLogger(String path, String rollCycle, Boolean blocking, int maxQueueWeight, long maxLogSize, String archiveCommand, int maxArchiveRetries) {
+          FullQueryLoggerOptions fqlOptions = DatabaseDescriptor.getFullQueryLogOptions();
+          path = path != null ? path : fqlOptions.log_dir;
+          if (archiveCommand != null && !fqlOptions.allow_nodetool_archive_command) {
+              throw new ConfigurationException("Can't enable full query log archiving via nodetool");
+          }
+          archiveCommand = archiveCommand != null ? archiveCommand : fqlOptions.archive_command;
+          FullQueryLogger.instance.enableWithoutClean(Paths.get(path), rollCycle, blocking, maxQueueWeight, maxLogSize, archiveCommand, maxArchiveRetries);
+      }
+  }
+  ```

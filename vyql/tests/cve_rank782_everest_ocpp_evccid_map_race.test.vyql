@@ -1,0 +1,50 @@
+# Rank 782 / CVE-2026-26071: EVerest OCPP 2.0.1 stored EVCCID
+# strings in a raw shared map that callbacks and transaction handlers could
+# read/write concurrently.
+test "rank782: OCPP EVCCID raw shared map is racy"
+  lang cpp
+  expect VYQL-RACE-007
+  code
+  ```
+  #include <map>
+  #include <string>
+
+  class OCPP201 {
+      std::map<int32_t, std::string> evse_evcc_id;
+
+      void subscribe_ev_info(int evse_id, const std::string& evcc_id) {
+          this->evse_evcc_id[evse_id] = evcc_id;
+      }
+
+      void process_transaction_started(int evse_id, IdToken& id_token) {
+          if (!this->evse_evcc_id[evse_id].empty()) {
+              update_evcc_id_token(id_token, this->evse_evcc_id[evse_id], ocpp_protocol_version);
+          }
+      }
+  };
+  ```
+
+test "rank782: OCPP EVCCID map is guarded by monitor handles"
+  lang cpp
+  reject VYQL-RACE-007
+  code
+  ```
+  #include <map>
+  #include <string>
+  #include <everest/util/async/monitor.hpp>
+
+  class OCPP201 {
+      everest::lib::util::monitor<std::map<int32_t, std::string>> evse_evcc_id;
+
+      void subscribe_ev_info(int evse_id, const std::string& evcc_id) {
+          this->evse_evcc_id.handle()->at(evse_id) = evcc_id;
+      }
+
+      void process_transaction_started(int evse_id, IdToken& id_token) {
+          auto evse_evcc_id_handle = this->evse_evcc_id.handle();
+          if (!evse_evcc_id_handle->at(evse_id).empty()) {
+              update_evcc_id_token(id_token, evse_evcc_id_handle->at(evse_id), ocpp_protocol_version);
+          }
+      }
+  };
+  ```

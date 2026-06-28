@@ -5,7 +5,11 @@ adapter dart {
     sink method "parse" -> code.Deserialization
     sink method "list" -> code.FilePathAccess
     sink method "listSync" -> code.FilePathAccess
-    mark method "matchAsPrefix" -> code.RegexCompile
-    mark method "matches" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "matchAsPrefix"
+    }
+    flag code.RegexCompile on any {
+      method "matches"
+    }
   }
 }

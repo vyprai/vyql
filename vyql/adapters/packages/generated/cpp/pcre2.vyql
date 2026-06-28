@@ -1,6 +1,8 @@
 import code.{RegexCompile}
 adapter cpp {
   package "pcre2" {
-    mark method "pcre2_compile" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "pcre2_compile"
+    }
   }
 }

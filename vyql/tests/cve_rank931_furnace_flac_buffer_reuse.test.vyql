@@ -1,0 +1,74 @@
+# Rank 931 / CVE-2026-4732: the FLAC decoder reused a cached callback buffer
+# while checking frame->header.blocksize only against FLAC__MAX_BLOCK_SIZE, not
+# against the actual size of the callback buffer being reused.
+
+test "rank931: FLAC callback buffer reuse lacks actual blocksize guard"
+  lang c
+  file flac.c
+  expect VYQL-MEM-048
+  expect_review code.FlacDecoderBufferReuseWithoutBlocksizeCheck
+  code
+  ```
+  typedef struct {
+      const int32_t * const * wbuffer;
+      int32_t *rbuffer[8];
+      const FLAC__Frame *frame;
+      void *ptr;
+  } FLAC_PRIVATE;
+
+  static sf_count_t
+  flac_buffer_copy(SF_PRIVATE *psf)
+  {
+      FLAC_PRIVATE *pflac = (FLAC_PRIVATE*) psf->codec_data;
+      const FLAC__Frame *frame = pflac->frame;
+      const int32_t * const *buffer = pflac->wbuffer;
+
+      if (frame->header.blocksize > FLAC__MAX_BLOCK_SIZE)
+          return 0;
+
+      if (pflac->ptr == NULL) {
+          for (unsigned i = 0; i < frame->header.channels; i++)
+              memcpy(pflac->rbuffer[i], buffer[i], frame->header.blocksize * sizeof(int32_t));
+          pflac->wbuffer = (const int32_t* const*) pflac->rbuffer;
+      }
+
+      return 0;
+  }
+  ```
+
+test "rank931: FLAC callback buffer reuse checks actual callback blocksize"
+  lang c
+  file flac.c
+  reject VYQL-MEM-048
+  reject_review code.FlacDecoderBufferReuseWithoutBlocksizeCheck
+  code
+  ```
+  typedef struct {
+      const int32_t * const * wbuffer;
+      unsigned wbuffer_size;
+      int32_t *rbuffer[8];
+      const FLAC__Frame *frame;
+      void *ptr;
+  } FLAC_PRIVATE;
+
+  static sf_count_t
+  flac_buffer_copy(SF_PRIVATE *psf)
+  {
+      FLAC_PRIVATE *pflac = (FLAC_PRIVATE*) psf->codec_data;
+      const FLAC__Frame *frame = pflac->frame;
+      const int32_t * const *buffer = pflac->wbuffer;
+
+      if (frame->header.blocksize > FLAC__MAX_BLOCK_SIZE)
+          return 0;
+      if (frame->header.blocksize > pflac->wbuffer_size)
+          return 0;
+
+      if (pflac->ptr == NULL) {
+          for (unsigned i = 0; i < frame->header.channels; i++)
+              memcpy(pflac->rbuffer[i], buffer[i], frame->header.blocksize * sizeof(int32_t));
+          pflac->wbuffer = (const int32_t* const*) pflac->rbuffer;
+      }
+
+      return 0;
+  }
+  ```

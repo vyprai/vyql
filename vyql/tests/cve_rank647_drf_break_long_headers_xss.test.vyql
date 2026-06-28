@@ -1,0 +1,38 @@
+# Rank 647 / CVE-2024-21520: Django REST Framework's break_long_headers
+# filter marked caller-controlled header text safe before escaping it.
+test "rank647: break_long_headers marks split header HTML safe before escaping"
+  lang python
+  file rest_framework.py
+  expect VYQL-INJ-004
+  code
+  ```
+  from django import template
+  from django.utils.safestring import mark_safe
+
+  register = template.Library()
+
+  @register.filter()
+  def break_long_headers(header):
+      if len(header) > 160 and ',' in header:
+          header = mark_safe('<br> ' + ', <br>'.join(header.split(',')))
+      return header
+  ```
+
+test "rank647: break_long_headers escapes header before marking HTML safe"
+  lang python
+  file rest_framework.py
+  reject VYQL-INJ-004
+  code
+  ```
+  from django import template
+  from django.utils.html import escape
+  from django.utils.safestring import mark_safe
+
+  register = template.Library()
+
+  @register.filter()
+  def break_long_headers(header):
+      if len(header) > 160 and ',' in header:
+          header = mark_safe('<br> ' + ', <br>'.join(escape(header).split(',')))
+      return header
+  ```

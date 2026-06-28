@@ -1,0 +1,84 @@
+# Rank 360 / CVE-2026-31941: Chamilo Social Wall URL previews fetched
+# user-influenced URLs server-side before rejecting internal/private targets.
+
+test "rank360: chamilo verifyUrl performs a Guzzle GET without URL safety checks"
+  lang php
+  expect VYQL-RF-014
+  expect_review code.ChamiloUnsafeGuzzleUrlFetch
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+
+  class SocialManager {
+      public static function verifyUrl(string $uri): bool
+      {
+          $client = new Client();
+          try {
+              $response = $client->request('GET', $uri, [
+                  'timeout' => 15,
+                  'verify' => false,
+                  'headers' => [
+                      'User-Agent' => $_SERVER['HTTP_USER_AGENT'],
+                  ],
+              ]);
+              return 200 === $response->getStatusCode();
+          } catch (Exception $e) {
+              return false;
+          }
+      }
+  }
+  ```
+
+test "rank360: chamilo verifyUrl rejects unsafe hosts before Guzzle fetch"
+  lang php
+  reject VYQL-RF-014
+  reject_review code.ChamiloUnsafeGuzzleUrlFetch
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+
+  class SocialManager {
+      public static function isUrlSafe(string $url): bool
+      {
+          $parsed = parse_url($url);
+          if (!isset($parsed['scheme']) || !in_array($parsed['scheme'], ['http', 'https'], true)) {
+              return false;
+          }
+          $host = $parsed['host'] ?? '';
+          if (empty($host)) {
+              return false;
+          }
+          $ip = gethostbyname($host);
+          if ($ip === $host) {
+              return false;
+          }
+          if (false === filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+              return false;
+          }
+          return true;
+      }
+
+      public static function verifyUrl(string $uri): bool
+      {
+          if (!self::isUrlSafe($uri)) {
+              return false;
+          }
+          $client = new Client();
+          try {
+              $response = $client->request('GET', $uri, [
+                  'timeout' => 10,
+                  'verify' => false,
+                  'allow_redirects' => ['max' => 3],
+                  'headers' => [
+                      'User-Agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Chamilo',
+                  ],
+              ]);
+              return 200 === $response->getStatusCode();
+          } catch (Exception $e) {
+              return false;
+          }
+      }
+  }
+  ```

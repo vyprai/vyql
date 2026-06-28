@@ -1,6 +1,8 @@
 import code.{WeakRandomValue}
 adapter scala {
   package "org.jasypt:jasypt" {
-    mark method "nextRandomInt" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "nextRandomInt"
+    }
   }
 }

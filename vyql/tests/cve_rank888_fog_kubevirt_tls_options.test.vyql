@@ -1,0 +1,59 @@
+test "rank888: fog-kubevirt token client overwrites TLS verification options"
+  lang ruby
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  class Real
+    def initialize(options = {})
+      @kubevirt_token = options[:kubevirt_token]
+      @opts = {
+        :ssl_options => obtain_ssl_options(options),
+        :auth_options => {
+          :bearer_token => @kubevirt_token
+        }
+      }
+    end
+
+    def create_client_from_token(url)
+      @opts = {
+        :ssl_options => {
+          :verify_ssl => OpenSSL::SSL::VERIFY_NONE,
+        },
+        :auth_options => {
+          :bearer_token => @kubevirt_token
+        }
+      }
+      version = detect_version(url.to_s, @opts[:ssl_options])
+      key = url.path + '/' + version
+      client = Kubeclient::Client.new(url.to_s, version, **@opts)
+      wrap_client(client, version, key)
+    end
+  end
+  ```
+
+test "rank888: fog-kubevirt token client reuses initialized TLS options"
+  lang ruby
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  class Real
+    def initialize(options = {})
+      @kubevirt_token = options[:kubevirt_token]
+      @opts = {
+        :ssl_options => obtain_ssl_options(options),
+        :auth_options => {
+          :bearer_token => @kubevirt_token
+        }
+      }
+    end
+
+    def create_client_from_token(url)
+      version = detect_version(url.to_s, @opts[:ssl_options])
+      key = url.path + '/' + version
+      client = Kubeclient::Client.new(url.to_s, version, **@opts)
+      wrap_client(client, version, key)
+    end
+  end
+  ```

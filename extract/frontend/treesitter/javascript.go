@@ -39,12 +39,14 @@ func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
 // matching grammar by extension (.ts → typescript, .tsx → tsx, else javascript); all
 // share the jsConv walker.
 func ExtractJavaScript(files []string, root string) (nir.Program, error) {
-	var js, ts, tsx, vue []string
+	var js, ts, tsx, vue, html []string
 	for _, f := range files {
 		l := strings.ToLower(f)
 		switch {
 		case strings.HasSuffix(l, ".vue"):
 			vue = append(vue, f)
+		case isHTMLFile(l):
+			html = append(html, f)
 		case strings.HasSuffix(l, ".tsx"):
 			tsx = append(tsx, f)
 		case strings.HasSuffix(l, ".ts") || strings.HasSuffix(l, ".mts") || strings.HasSuffix(l, ".cts"):
@@ -65,6 +67,7 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 	mods = append(mods, parseModules(ts, root, jsParserFor(tstypescript.LanguageTypescript()), build)...)
 	mods = append(mods, parseModules(tsx, root, jsParserFor(tstypescript.LanguageTSX()), build)...)
 	mods = append(mods, parseVueModules(vue, root, build)...)
+	mods = append(mods, parseHTMLScriptModules(html, root, build)...)
 	return nir.Program{SelfName: "this", Modules: mods}, nil
 }
 
@@ -147,6 +150,162 @@ func vueScriptSource(src []byte) ([]byte, string, bool) {
 	}
 }
 
+func parseHTMLScriptModules(
+	files []string,
+	root string,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]nir.Module, 0, len(files))
+	for _, f := range files {
+		src, err := readFile(f)
+		if err != nil {
+			continue
+		}
+		script, ok := htmlScriptSource(src)
+		if !ok {
+			continue
+		}
+		parser := jsParserFor(tsjs.Language())()
+		tree := parser.Parse(script, nil)
+		if tree == nil {
+			parser.Close()
+			continue
+		}
+		m, good := build(script, f, relPath(root, f), tree)
+		tree.Close()
+		parser.Close()
+		if good {
+			m.Hash = contentHash(src)
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func htmlScriptSource(src []byte) ([]byte, bool) {
+	lower := strings.ToLower(string(src))
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	commentRanges := htmlCommentRanges(lower)
+	found := false
+	searchAt := 0
+	for {
+		startRel := strings.Index(lower[searchAt:], "<script")
+		if startRel < 0 {
+			break
+		}
+		start := searchAt + startRel
+		tagEndRel := strings.IndexByte(lower[start:], '>')
+		if tagEndRel < 0 {
+			break
+		}
+		tagEnd := start + tagEndRel
+		codeStart := tagEnd + 1
+		endRel := strings.Index(lower[codeStart:], "</script>")
+		if endRel < 0 {
+			break
+		}
+		codeEnd := codeStart + endRel
+		searchAt = codeEnd + len("</script>")
+		if inAnyRange(start, commentRanges) || !isJavaScriptScriptTag(lower[start:tagEnd]) {
+			continue
+		}
+		copy(out[codeStart:codeEnd], src[codeStart:codeEnd])
+		found = true
+	}
+	return out, found
+}
+
+func htmlCommentRanges(lower string) [][2]int {
+	var out [][2]int
+	searchAt := 0
+	for {
+		startRel := strings.Index(lower[searchAt:], "<!--")
+		if startRel < 0 {
+			return out
+		}
+		start := searchAt + startRel
+		endRel := strings.Index(lower[start+4:], "-->")
+		if endRel < 0 {
+			return append(out, [2]int{start, len(lower)})
+		}
+		end := start + 4 + endRel + len("-->")
+		out = append(out, [2]int{start, end})
+		searchAt = end
+	}
+}
+
+func inAnyRange(pos int, ranges [][2]int) bool {
+	for _, r := range ranges {
+		if pos >= r[0] && pos < r[1] {
+			return true
+		}
+	}
+	return false
+}
+
+func isJavaScriptScriptTag(tag string) bool {
+	if strings.Contains(tag, " src=") || strings.Contains(tag, "\tsrc=") || strings.Contains(tag, "\nsrc=") || strings.Contains(tag, "\rsrc=") {
+		return false
+	}
+	for _, attr := range []string{"type", "language"} {
+		val, ok := htmlTagAttr(tag, attr)
+		if !ok {
+			continue
+		}
+		val = strings.TrimSpace(strings.ToLower(val))
+		if attr == "language" {
+			return val == "javascript" || val == "js" || val == "ecmascript"
+		}
+		switch val {
+		case "", "text/javascript", "application/javascript", "application/ecmascript", "text/ecmascript", "module":
+			return true
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func htmlTagAttr(tag, name string) (string, bool) {
+	needle := name + "="
+	i := strings.Index(tag, needle)
+	if i < 0 {
+		return "", false
+	}
+	i += len(needle)
+	if i >= len(tag) {
+		return "", true
+	}
+	quote := tag[i]
+	if quote == '"' || quote == '\'' {
+		j := strings.IndexByte(tag[i+1:], quote)
+		if j < 0 {
+			return tag[i+1:], true
+		}
+		return tag[i+1 : i+1+j], true
+	}
+	j := i
+	for j < len(tag) && tag[j] != ' ' && tag[j] != '\t' && tag[j] != '\n' && tag[j] != '\r' && tag[j] != '>' {
+		j++
+	}
+	return tag[i:j], true
+}
+
+func isHTMLFile(path string) bool {
+	return strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".htm")
+}
+
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	out := map[string]bool{}
 	var markObjectExports func(*tree_sitter.Node)
@@ -182,7 +341,15 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 					if name := c.text(field(ch, "name")); name != "" {
 						out[name] = true
 					}
+				} else if ch.Kind() == "class_declaration" || ch.Kind() == "abstract_class_declaration" {
+					if name := c.text(field(ch, "name")); name != "" {
+						out[name] = true
+					}
 				}
+			}
+		case "class_declaration", "abstract_class_declaration":
+			if name := c.text(field(n, "name")); name != "" && out[name] {
+				c.markThisAssignedHelpers(field(n, "body"), out)
 			}
 		case "assignment_expression":
 			left, rhs := field(n, "left"), field(n, "right")
@@ -208,6 +375,32 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	return out
 }
 
+func (c *jsConv) markThisAssignedHelpers(body *tree_sitter.Node, out map[string]bool) {
+	if body == nil {
+		return
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "assignment_expression" {
+			left, rhs := field(n, "left"), field(n, "right")
+			if left != nil && left.Kind() == "member_expression" && rhs != nil && rhs.Kind() == "identifier" {
+				if c.text(field(left, "object")) == "this" {
+					if prop := c.text(field(left, "property")); prop != "" && !strings.HasPrefix(prop, "_") {
+						out[c.text(rhs)] = true
+					}
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+}
+
 func jsModuleKey(root, f string) string {
 	for _, ext := range []string{".jsx", ".tsx", ".ts", ".js"} {
 		if strings.HasSuffix(strings.ToLower(f), ext) {
@@ -218,6 +411,9 @@ func jsModuleKey(root, f string) string {
 }
 
 func (c *jsConv) loc(n *tree_sitter.Node) string {
+	if isHTMLFile(strings.ToLower(c.file)) {
+		return c.file + "#script.js:" + itoa(int(n.StartPosition().Row)+1)
+	}
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
 }
 
@@ -242,17 +438,605 @@ func (c *jsConv) jsModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.file + ":1"
 	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=javascript"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.jsStructuredContextTokens(root) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=javascript"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	secretConfigVars := c.jsSecretConfigObjectVars(root)
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] || len(out) >= 512 {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= 512 {
+			return
+		}
+		switch n.Kind() {
+		case "assignment_expression":
+			left, right := field(n, "left"), field(n, "right")
+			if lhs := c.jsContextPath(left); lhs != "" {
+				if rhs := jsContextValue(c.text(right)); rhs != "" {
+					add("assign:" + lhs + "=" + rhs)
+				}
+				if c.isJsPublicRuntimeConfigPath(lhs) {
+					if ok, name := c.jsCallArgsContainSecretConfig(right, secretConfigVars); ok {
+						add("public_runtime_secret_config")
+						if name != "" {
+							add("public_runtime_secret_config_var:" + name)
+						}
+					}
+				}
+			}
+		case "array":
+			for _, tok := range c.jsGitCloneArgvTokens(n) {
+				add(tok)
+			}
+		case "binary_expression":
+			if expr := jsContextCompact(c.text(n)); expr != "" {
+				add("expr:" + expr)
+			}
+		case "pair":
+			if key := jsContextCompact(c.keyName(field(n, "key"))); key != "" {
+				if val := jsContextValue(c.text(field(n, "value"))); val != "" {
+					add("prop:" + key + "=" + val)
+				}
+			}
+		case "member_expression":
+			if sel := c.dotted(n); sel != "" && sel != "?" {
+				add("selector:" + sel)
+			}
+		case "identifier":
+			if ident := jsContextCompact(c.text(n)); ident != "" {
+				add("identifier:" + ident)
+			}
+		case "subscript_expression":
+			if idx := c.dotted(n); idx != "" && idx != "?" {
+				add("index:" + idx)
+			}
+			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
+				add("index_base:" + base)
+			}
+			if key := c.jsContextPath(field(n, "index")); key != "" {
+				add("index_key:" + key)
+			}
+			if sub := jsContextCompact(c.text(n)); sub != "" {
+				add("subscript:" + sub)
+			}
+		case "call_expression", "new_expression":
+			fn := field(n, "function")
+			if n.Kind() == "new_expression" {
+				fn = field(n, "constructor")
+			}
+			if path := c.dotted(fn); path != "" && path != "?" {
+				add("call_path:" + path)
+				if m := lastSeg(path); m != "" {
+					add("call:" + m)
+				}
+			}
+		case "string", "template_string":
+			if lit := jsContextValue(c.text(n)); lit != "" {
+				add("literal:" + lit)
+			}
+		case "regex":
+			if lit := jsContextRegex(c.text(n)); lit != "" {
+				add("regex:" + lit)
+				add("literal:" + lit)
+				if jsPrototypeNameGuard(lit) {
+					add("prototype_name_guard=true")
+				}
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *jsConv) jsGitCloneArgvTokens(n *tree_sitter.Node) []string {
+	if n == nil || n.Kind() != "array" {
+		return nil
+	}
+	var elems []string
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "string", "template_string":
+			if v := jsContextValue(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		case "identifier":
+			if v := jsContextCompact(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		default:
+			if v := jsContextCompact(c.text(ch)); v != "" {
+				elems = append(elems, v)
+			}
+		}
+	}
+	cloneIndex := -1
+	for i, elem := range elems {
+		if elem == "clone" {
+			cloneIndex = i
+			break
+		}
+	}
+	if cloneIndex < 0 {
+		return nil
+	}
+	remoteIndex := -1
+	for i := cloneIndex + 1; i < len(elems); i++ {
+		if jsGitRemoteArgName(elems[i]) {
+			remoteIndex = i
+			break
+		}
+	}
+	if remoteIndex < 0 {
+		return nil
+	}
+	hasDelimiter := false
+	for i := cloneIndex + 1; i < remoteIndex; i++ {
+		if elems[i] == "--" {
+			hasDelimiter = true
+			break
+		}
+	}
+	seq := jsContextCompact(strings.Join(elems, " "))
+	out := []string{"git_clone_argv_sequence=" + seq}
+	if hasDelimiter {
+		out = append(out, "git_clone_argv_delimited=true")
+	} else {
+		out = append(out, "git_clone_argv_missing_delimiter=true")
+	}
+	return out
+}
+
+func jsGitRemoteArgName(s string) bool {
+	s = strings.ToLower(jsContextCompact(s))
+	if s == "" || strings.HasPrefix(s, "--") {
+		return false
+	}
+	for _, part := range []string{"url", "uri", "repo", "repository", "remote", "origin", "giturl", "git"} {
+		if strings.Contains(s, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]bool {
+	out := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "variable_declarator" {
+			name := field(n, "name")
+			val := c.unwrapJsTransparentExpr(field(n, "value"))
+			if name != nil && name.Kind() == "identifier" && c.jsObjectHasSecretConfigPair(val) {
+				out[c.text(name)] = true
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func (c *jsConv) jsObjectHasSecretConfigPair(n *tree_sitter.Node) bool {
+	n = c.unwrapJsTransparentExpr(n)
+	if n == nil || n.Kind() != "object" {
+		return false
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "pair":
+			key := strings.ToLower(c.keyName(field(ch, "key")))
+			val := strings.ToLower(c.text(field(ch, "value")))
+			if jsSecretConfigKey(key) && jsSecretConfigValue(val) {
+				return true
+			}
+		case "object":
+			if c.jsObjectHasSecretConfigPair(ch) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsSecretConfigKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for _, part := range []string{"token", "secret", "password", "passwd", "credential", "apikey", "api_key", "accesskey"} {
+		if strings.Contains(key, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsSecretConfigValue(val string) bool {
+	if val == "" || val == "undefined" || val == "null" {
+		return false
+	}
+	return strings.Contains(val, "process.env") ||
+		strings.Contains(val, "token") ||
+		strings.Contains(val, "secret") ||
+		strings.Contains(val, "password") ||
+		strings.Contains(val, "credential") ||
+		strings.Contains(val, "key")
+}
+
+func (c *jsConv) isJsPublicRuntimeConfigPath(path string) bool {
+	return strings.Contains(path, "runtimeConfig.public")
+}
+
+func (c *jsConv) jsCallArgsContainSecretConfig(n *tree_sitter.Node, secretVars map[string]bool) (bool, string) {
+	n = c.unwrapJsTransparentExpr(n)
+	if n == nil || n.Kind() != "call_expression" {
+		return false, ""
+	}
+	fn := c.dotted(field(n, "function"))
+	if fn != "defu" && !strings.HasSuffix(fn, ".defu") && fn != "Object.assign" {
+		return false, ""
+	}
+	args := field(n, "arguments")
+	if args == nil {
+		return false, ""
+	}
+	for _, a := range namedChildren(args) {
+		a = c.unwrapJsTransparentExpr(a)
+		if a == nil {
+			continue
+		}
+		if a.Kind() == "identifier" {
+			name := c.text(a)
+			if secretVars[name] {
+				return true, name
+			}
+		}
+		if c.jsObjectHasSecretConfigPair(a) {
+			return true, ""
+		}
+	}
+	return false, ""
+}
+
+func (c *jsConv) jsContextPath(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if p := c.dotted(n); p != "" && p != "?" {
+		return p
+	}
+	return jsContextCompact(c.text(n))
+}
+
+func jsContextValue(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 2 {
+		if q := s[0]; (q == '\'' || q == '"' || q == '`') && s[len(s)-1] == q {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return jsContextCompact(s)
+}
+
+func jsContextRegex(raw string) string {
+	s := strings.TrimSpace(raw)
+	if strings.HasPrefix(s, "/") {
+		if i := strings.LastIndex(s[1:], "/"); i >= 0 {
+			s = s[1 : i+1]
+		}
+	}
+	return jsContextCompact(s)
+}
+
+func jsRegexMayBacktrack(raw string) bool {
+	pat := jsRegexPattern(raw)
+	if pat == "" {
+		return false
+	}
+	return hasNestedBacktrackingQuantifier(pat) || hasAmbiguousAdjacentRegexQuantifiers(pat)
+}
+
+func jsRegexPattern(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '/' {
+		return raw
+	}
+	for i := len(raw) - 1; i > 0; i-- {
+		if raw[i] != '/' || isEscaped(raw, i) {
+			continue
+		}
+		return raw[1:i]
+	}
+	return strings.Trim(raw, "/")
+}
+
+type jsRegexAtom struct {
+	key   string
+	quant byte
+	group bool
+}
+
+func hasAmbiguousAdjacentRegexQuantifiers(pat string) bool {
+	for _, branch := range splitTopLevelRegexBranches(pat) {
+		if hasAmbiguousAdjacentRegexQuantifiersInSeq(branch) {
+			return true
+		}
+	}
+	for _, inner := range regexGroupBodies(pat) {
+		if hasAmbiguousAdjacentRegexQuantifiers(inner) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string) bool {
+	atoms := jsRegexAtoms(pat)
+	for i := 0; i+1 < len(atoms); i++ {
+		if isBacktrackingRepeat(atoms[i].quant) &&
+			isBacktrackingRepeat(atoms[i+1].quant) &&
+			regexAtomsOverlap(atoms[i].key, atoms[i+1].key) {
+			return true
+		}
+	}
+	for i := 0; i+2 < len(atoms); i++ {
+		if isBacktrackingRepeat(atoms[i].quant) &&
+			atoms[i+1].quant == '?' &&
+			!atoms[i+1].group &&
+			isBacktrackingRepeat(atoms[i+2].quant) &&
+			regexAtomsOverlap(atoms[i].key, atoms[i+2].key) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsRegexAtoms(pat string) []jsRegexAtom {
+	var out []jsRegexAtom
+	for i := 0; i < len(pat); {
+		if isEscaped(pat, i) {
+			i++
+			continue
+		}
+		switch pat[i] {
+		case '^', '$':
+			i++
+			continue
+		case '|':
+			i++
+			continue
+		case '[':
+			end := regexCharClassEnd(pat, i)
+			if end <= i {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : end+1])
+			quant, next := jsRegexQuantifier(pat, end+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+			continue
+		case '(':
+			end := regexGroupEnd(pat, i)
+			if end <= i {
+				i++
+				continue
+			}
+			quant, next := jsRegexQuantifier(pat, end+1)
+			out = append(out, jsRegexAtom{key: "group", quant: quant, group: true})
+			i = next
+			continue
+		case '\\':
+			if i+1 >= len(pat) {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : i+2])
+			quant, next := jsRegexQuantifier(pat, i+2)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+			continue
+		default:
+			if strings.ContainsRune(".*+?{}]", rune(pat[i])) {
+				i++
+				continue
+			}
+			key := regexAtomKey(pat[i : i+1])
+			quant, next := jsRegexQuantifier(pat, i+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant})
+			i = next
+		}
+	}
+	return out
+}
+
+func splitTopLevelRegexBranches(pat string) []string {
+	var out []string
+	start := 0
+	depth := 0
+	inClass := false
+	for i := 0; i < len(pat); i++ {
+		if isEscaped(pat, i) {
+			continue
+		}
+		switch pat[i] {
+		case '[':
+			if !inClass {
+				inClass = true
+			}
+		case ']':
+			inClass = false
+		case '(':
+			if !inClass {
+				depth++
+			}
+		case ')':
+			if !inClass && depth > 0 {
+				depth--
+			}
+		case '|':
+			if !inClass && depth == 0 {
+				out = append(out, pat[start:i])
+				start = i + 1
+			}
+		}
+	}
+	out = append(out, pat[start:])
+	return out
+}
+
+func regexGroupBodies(pat string) []string {
+	var out []string
+	for i := 0; i < len(pat); i++ {
+		if pat[i] != '(' || isEscaped(pat, i) {
+			continue
+		}
+		end := regexGroupEnd(pat, i)
+		if end <= i {
+			continue
+		}
+		body := pat[i+1 : end]
+		if strings.HasPrefix(body, "?:") || strings.HasPrefix(body, "?=") || strings.HasPrefix(body, "?!") {
+			body = body[2:]
+		} else if strings.HasPrefix(body, "?<=") || strings.HasPrefix(body, "?<!") {
+			body = body[3:]
+		} else if strings.HasPrefix(body, "?<") {
+			if close := strings.IndexByte(body, '>'); close >= 0 {
+				body = body[close+1:]
+			}
+		}
+		out = append(out, body)
+		i = end
+	}
+	return out
+}
+
+func regexCharClassEnd(pat string, start int) int {
+	for i := start + 1; i < len(pat); i++ {
+		if pat[i] == ']' && !isEscaped(pat, i) {
+			return i
+		}
+	}
+	return -1
+}
+
+func regexGroupEnd(pat string, start int) int {
+	depth := 0
+	inClass := false
+	for i := start; i < len(pat); i++ {
+		if isEscaped(pat, i) {
+			continue
+		}
+		switch pat[i] {
+		case '[':
+			if !inClass {
+				inClass = true
+			}
+		case ']':
+			inClass = false
+		case '(':
+			if !inClass {
+				depth++
+			}
+		case ')':
+			if !inClass {
+				depth--
+				if depth == 0 {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
+func jsRegexQuantifier(pat string, start int) (byte, int) {
+	if start >= len(pat) {
+		return 0, start
+	}
+	switch pat[start] {
+	case '*', '+', '?':
+		return pat[start], start + 1
+	case '{':
+		end := strings.IndexByte(pat[start:], '}')
+		if end < 0 {
+			return 0, start
+		}
+		body := strings.ReplaceAll(strings.TrimSpace(pat[start+1:start+end]), " ", "")
+		next := start + end + 1
+		switch body {
+		case "1":
+			return 0, next
+		case "0,1":
+			return '?', next
+		default:
+			return '*', next
+		}
+	default:
+		return 0, start
+	}
+}
+
+func isBacktrackingRepeat(q byte) bool {
+	return q == '*' || q == '+'
+}
+
+func regexAtomKey(atom string) string {
+	switch atom {
+	case "\\d", "[0-9]", "[\\d]":
+		return "digit"
+	case ".":
+		return "any"
+	}
+	return atom
+}
+
+func regexAtomsOverlap(a, b string) bool {
+	return a == b || a == "any" || b == "any"
+}
+
+func jsPrototypeNameGuard(pattern string) bool {
+	return strings.Contains(pattern, "__proto__") &&
+		strings.Contains(pattern, "prototype") &&
+		strings.Contains(pattern, "constructor")
+}
+
+func jsContextCompact(raw string) string {
+	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	if len(s) > 160 {
+		return ""
+	}
+	return s
 }
 
 func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
@@ -302,17 +1086,28 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 			}
 		case "variable_declarator":
 			// const x = require('m')
+			// const x = require('m').member
 			val := field(n, "value")
-			if val != nil && val.Kind() == "call_expression" {
-				fn := field(val, "function")
+			requireCall := val
+			member := ""
+			if val != nil && val.Kind() == "member_expression" {
+				requireCall = field(val, "object")
+				member = c.text(field(val, "property"))
+			}
+			if requireCall != nil && requireCall.Kind() == "call_expression" {
+				fn := field(requireCall, "function")
 				if fn != nil && c.text(fn) == "require" {
-					if args := field(val, "arguments"); args != nil {
+					if args := field(requireCall, "arguments"); args != nil {
 						for _, a := range namedChildren(args) {
 							if a.Kind() == "string" {
 								mod := c.resolveRequire(strings.Trim(c.text(a), "'\"`"))
 								name := field(n, "name")
 								if name != nil && name.Kind() == "identifier" {
-									out = append(out, nir.Import{Local: c.text(name), Module: mod, IsModule: true})
+									if member != "" {
+										out = append(out, nir.Import{Local: c.text(name), Module: mod, Symbol: member})
+									} else {
+										out = append(out, nir.Import{Local: c.text(name), Module: mod, IsModule: true})
+									}
 								}
 							}
 						}
@@ -341,11 +1136,12 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "function_declaration", "generator_function_declaration", "method_definition":
 		name := c.text(field(n, "name"))
-		params := c.funcParams(n)
+		exported := c.exported[name]
+		params := c.exportedFuncParams(n, exported, c.funcParams(n))
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: c.exported[name]}}
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(n), ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "lexical_declaration", "variable_declaration":
@@ -361,8 +1157,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(d)
 					}
+					params = c.exportedFuncParams(val, c.exported[fnName], params)
 					body := c.funcBody(val)
-					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(val), ContextTokens: c.jsFunctionContext(fnName, val), Exported: c.exported[fnName]})
+					out = append(out, nir.FuncDef{Name: fnName, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, EndLoc: c.endloc(val), ContextTokens: c.jsFunctionContext(fnName, val), ParamEntries: c.jsParamEntries(fnName, params, nil), Exported: c.exported[fnName]})
 					continue
 				}
 				var v nir.Expr = nir.Const{Loc: L}
@@ -373,6 +1170,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
 					if val != nil && val.Kind() == "object" {
 						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					}
+					if val != nil {
+						out = append(out, c.classExpressionFuncDefs(val)...)
 					}
 				} else if targets := c.bindingNames(name); len(targets) > 0 {
 					for _, target := range targets {
@@ -400,10 +1200,22 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// separate Then/Else branches so the join-merge keeps a value tainted on the live
 		// path even when the other arm overwrites it, and a constant condition prunes.
 		var cond nir.Expr
-		if cn := field(n, "condition"); cn != nil {
+		cn := field(n, "condition")
+		if cn != nil {
 			cond = c.expr(cn)
 		}
-		return []nir.Stmt{nir.If{Cond: cond, Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
+		thenBody := c.branchBody(field(n, "consequence"))
+		out := make([]nir.Stmt, 0, 2)
+		if jsRejectingCommandRegexGuard(c, cn) && jsBranchReturns(thenBody) {
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "analysis.javascript.command_argument_regex_guard", Loc: L},
+				Path:   "analysis.javascript.command_argument_regex_guard",
+				Method: "command_argument_regex_guard",
+				Loc:    L,
+			}})
+		}
+		out = append(out, nir.If{Cond: cond, Then: thenBody, Else: c.branchBody(field(n, "alternative"))})
+		return out
 	case "while_statement", "for_statement":
 		var cond nir.Expr
 		body := c.collectStatementBlocks(n)
@@ -434,8 +1246,26 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// declaration inside is analyzed (Next.js route handlers are all exports).
 		var out []nir.Stmt
 		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "call_expression" {
+				out = append(out, c.exprStmt(ch, L)...)
+				continue
+			}
 			if ch.Kind() == "object" {
 				out = append(out, c.objectMethodFuncDefs(ch, true)...)
+				continue
+			}
+			if isJsFuncNode(ch) {
+				name := c.text(field(ch, "name"))
+				if name == "" {
+					name = "__default_export__"
+				}
+				params := c.funcParams(ch)
+				paramTypes := c.funcParamTypes(ch)
+				if len(params) == 0 {
+					params = c.paramsFromFunctionText(n)
+				}
+				params = c.exportedFuncParams(ch, true, params)
+				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(ch), Loc: L, ContextTokens: c.jsFunctionContext(name, ch), Exported: true})
 				continue
 			}
 			out = append(out, c.stmt(ch)...)
@@ -446,9 +1276,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
-	for n != nil && n.Kind() == "parenthesized_expression" {
+	for n != nil && isJsTransparentExpr(n.Kind()) {
 		kids := namedChildren(n)
-		if len(kids) != 1 {
+		if len(kids) == 0 {
 			return "", nil, false
 		}
 		n = kids[0]
@@ -467,6 +1297,72 @@ func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) 
 	return c.text(left), c.expr(right), true
 }
 
+func jsBranchReturns(stmts []nir.Stmt) bool {
+	for _, st := range stmts {
+		switch v := st.(type) {
+		case nir.Return:
+			return true
+		case nir.Block:
+			if jsBranchReturns(v.Stmts) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsRejectingCommandRegexGuard(c *jsConv, n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind() == "parenthesized_expression" {
+		kids := namedChildren(n)
+		if len(kids) == 1 {
+			return jsRejectingCommandRegexGuard(c, kids[0])
+		}
+	}
+	if n.Kind() == "binary_expression" {
+		text := c.text(field(n, "operator"))
+		if text == "||" || text == "&&" {
+			return jsRejectingCommandRegexGuard(c, field(n, "left")) ||
+				jsRejectingCommandRegexGuard(c, field(n, "right"))
+		}
+	}
+	if n.Kind() != "call_expression" {
+		return false
+	}
+	fn := field(n, "function")
+	if fn == nil || fn.Kind() != "member_expression" || c.text(field(fn, "property")) != "test" {
+		return false
+	}
+	if args := field(n, "arguments"); args == nil || len(namedChildren(args)) == 0 {
+		return false
+	}
+	return safeJSCommandRejectRegex(c.text(field(fn, "object")))
+}
+
+func safeJSCommandRejectRegex(lit string) bool {
+	inner := jsRegexPattern(lit)
+	if inner == "" {
+		return false
+	}
+	start := strings.Index(inner, "[")
+	end := strings.LastIndex(inner, "]")
+	if start < 0 || end <= start+1 {
+		return false
+	}
+	body := inner[start+1 : end]
+	if strings.HasPrefix(body, "^") {
+		return false
+	}
+	for _, required := range []rune{'`', '$', '&', ';', '|'} {
+		if !strings.ContainsRune(body, required) {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {
 	if obj == nil || obj.Kind() != "object" {
 		return nil
@@ -476,8 +1372,9 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 		switch pr.Kind() {
 		case "method_definition":
 			name := c.text(field(pr, "name"))
-			out = append(out, nir.FuncDef{Name: name, Params: c.funcParams(pr),
-				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), EndLoc: c.endloc(pr), ContextTokens: c.jsFunctionContext(name, pr), Exported: exported})
+			params := c.exportedFuncParams(pr, exported, c.funcParams(pr))
+			out = append(out, nir.FuncDef{Name: name, Params: params,
+				ParamTypes: c.funcParamTypes(pr), Body: c.funcBody(pr), Loc: c.loc(pr), EndLoc: c.endloc(pr), ContextTokens: c.jsFunctionContext(name, pr), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported})
 			out = append(out, c.returnedObjectMethodFuncDefs(pr, exported)...)
 		case "pair":
 			v := field(pr, "value")
@@ -488,8 +1385,9 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(pr)
 				}
+				params = c.exportedFuncParams(v, exported, params)
 				out = append(out, nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes,
-					Body: c.funcBody(v), Loc: c.loc(pr), EndLoc: c.endloc(v), ContextTokens: c.jsFunctionContext(name, v), Exported: exported})
+					Body: c.funcBody(v), Loc: c.loc(pr), EndLoc: c.endloc(v), ContextTokens: c.jsFunctionContext(name, v), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported})
 				out = append(out, c.returnedObjectMethodFuncDefs(v, exported)...)
 			}
 			out = append(out, c.objectMethodFuncDefs(v, exported)...)
@@ -530,6 +1428,26 @@ func (c *jsConv) returnedObjectMethodFuncDefs(fn *tree_sitter.Node, exported boo
 		}
 	}
 	walk(body)
+	return out
+}
+
+func (c *jsConv) classExpressionFuncDefs(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "class", "class_declaration", "abstract_class_declaration":
+			out = append(out, c.body(field(n, "body"))...)
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
 	return out
 }
 
@@ -635,7 +1553,8 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			if len(params) == 0 {
 				params = c.paramsFromFunctionText(inner)
 			}
-			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+			params = c.exportedFuncParams(rhs, true, params)
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: true}}
 		}
 		if left != nil && left.Kind() == "member_expression" && isJsFuncNode(rhs) {
 			if name := c.exportFuncName(left); name != "" {
@@ -644,7 +1563,8 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				if len(params) == 0 {
 					params = c.paramsFromFunctionText(inner)
 				}
-				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: true}}
+				params = c.exportedFuncParams(rhs, true, params)
+				return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: true}}
 			}
 			// `Ctor.prototype.method = function` / `Ctor.method = function` on an EXPORTED
 			// constructor/class. Always emit a FuncDef so the method is REGISTERED (calls to
@@ -659,7 +1579,9 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 					if len(params) == 0 {
 						params = c.paramsFromFunctionText(inner)
 					}
-					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), Exported: !strings.HasPrefix(name, "_")}}
+					exported := !strings.HasPrefix(name, "_")
+					params = c.exportedFuncParams(rhs, exported, params)
+					return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, EndLoc: c.endloc(rhs), ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil), Exported: exported}}
 				}
 			}
 		}
@@ -669,15 +1591,20 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				return out
 			}
 		}
-		right := c.expr(rhs)
-		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		var prefix []nir.Stmt
+		if rhs != nil && rhs.Kind() == "assignment_expression" {
+			prefix = append(prefix, c.exprStmt(rhs, L)...)
 		}
+		if target, val, ok := c.jsAssignmentExpr(inner); ok {
+			return append(prefix, nir.Assign{Targets: []string{target}, Value: val})
+		}
+		right := c.expr(rhs)
 		// member-property write (e.g. obj.prop = x): model as a path call so adapter
 		// mappings can reason about the assigned value.
 		// Method is empty so it can never collide with method-name mappings.
 		if left != nil && left.Kind() == "member_expression" {
 			p := c.dotted(left)
+			right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
 		// subscript write (obj[key] = v): model as a write to the base's path so the
@@ -685,6 +1612,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if left != nil && left.Kind() == "subscript_expression" {
 			base := field(left, "object")
 			key := field(left, "index")
+			right = c.markBrowserGlobalAssignmentParamEntries(left, right, L)
 			return []nir.Stmt{
 				// Preserve dynamic property-name flow separately from value flow.
 				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
@@ -692,13 +1620,26 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 			}
 		}
 		// other assignment: still evaluate RHS for effect
-		return []nir.Stmt{nir.ExprStmt{Value: right}}
+		return append(prefix, nir.ExprStmt{Value: right})
 	case "augmented_assignment_expression":
 		left := field(inner, "left")
-		if left != nil && left.Kind() == "identifier" {
-			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(field(inner, "right")), Loc: L}}
+		right := c.expr(field(inner, "right"))
+		if left != nil && left.Kind() == "member_expression" {
+			p := c.dotted(left)
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right}, Path: p, Method: "", Loc: L}}}
 		}
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(inner, "right"))}}
+		if left != nil && left.Kind() == "subscript_expression" {
+			base := field(left, "object")
+			key := field(left, "index")
+			return []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{c.expr(key)}, Path: "__js_dynamic_property_write", Method: "", Loc: L}},
+				nir.ExprStmt{Value: nir.Call{Callee: c.expr(base), Args: []nir.Expr{right}, Path: c.dotted(base), Method: "", Loc: L}},
+			}
+		}
+		if left != nil && left.Kind() == "identifier" {
+			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: right, Loc: L}}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 }
@@ -928,6 +1869,53 @@ func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
 	return c.body(body)
 }
 
+func (c *jsConv) exportedFuncParams(fn *tree_sitter.Node, exported bool, params []string) []string {
+	if !exported || !c.functionUsesArguments(fn) {
+		return params
+	}
+	for _, p := range params {
+		if p == nir.JSArgumentsParam {
+			return params
+		}
+	}
+	out := append([]string{}, params...)
+	return append(out, nir.JSArgumentsParam)
+}
+
+func (c *jsConv) functionUsesArguments(fn *tree_sitter.Node) bool {
+	if fn == nil {
+		return false
+	}
+	body := field(fn, "body")
+	if body == nil {
+		for _, ch := range namedChildren(fn) {
+			if ch.Kind() == "statement_block" {
+				body = ch
+				break
+			}
+		}
+	}
+	var walk func(*tree_sitter.Node) bool
+	walk = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		if n != body && isJsFuncNode(n) {
+			return false
+		}
+		if n.Kind() == "identifier" && c.text(n) == "arguments" {
+			return true
+		}
+		for _, ch := range namedChildren(n) {
+			if walk(ch) {
+				return true
+			}
+		}
+		return false
+	}
+	return walk(body)
+}
+
 func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 	if n == nil {
 		return nil
@@ -945,11 +1933,15 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 		return nil
 	}
 	bodyText := c.text(body)
-	return []string{
+	tokens := []string{
 		"lang=javascript\x00name=" + name,
 		bodyText,
 		strings.Join(strings.Fields(bodyText), ""),
 	}
+	for _, tok := range c.jsStructuredContextTokens(body) {
+		tokens = append(tokens, tok)
+	}
+	return tokens
 }
 
 func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {
@@ -1069,6 +2061,12 @@ func isJSIdent(s string) bool {
 
 func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir.Lambda {
 	method := lastSeg(path)
+	lam.ContextTokens = append(lam.ContextTokens,
+		"call_path:"+path,
+		"call:"+method,
+		"call_method:"+method,
+		"param_count:"+itoa(len(lam.Params)),
+	)
 	for i, p := range lam.Params {
 		if p == "" || p == "_" {
 			continue
@@ -1084,6 +2082,59 @@ func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir
 		lam.ParamEntries = append(lam.ParamEntries, nir.ParamEntry{Param: p, Tokens: tokens})
 	}
 	return lam
+}
+
+func (c *jsConv) markBrowserGlobalAssignmentParamEntries(left *tree_sitter.Node, right nir.Expr, L string) nir.Expr {
+	lam, ok := right.(nir.Lambda)
+	if !ok {
+		return right
+	}
+	root, target, ok := c.browserGlobalAssignmentTarget(left)
+	if !ok {
+		return right
+	}
+	for i, p := range lam.Params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := []string{
+			"entry_kind:global_function_assignment",
+			"global_object:" + root,
+			"global_target:" + target,
+			"param_count:" + itoa(len(lam.Params)),
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}
+		lam.ParamEntries = append(lam.ParamEntries, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return lam
+}
+
+func (c *jsConv) browserGlobalAssignmentTarget(left *tree_sitter.Node) (string, string, bool) {
+	switch {
+	case left == nil:
+		return "", "", false
+	case left.Kind() == "member_expression":
+		base := c.unwrapJsTransparentExpr(field(left, "object"))
+		root := c.dotted(base)
+		if !isBrowserGlobalObject(root) {
+			return "", "", false
+		}
+		return root, c.dotted(left), true
+	case left.Kind() == "subscript_expression":
+		base := c.unwrapJsTransparentExpr(field(left, "object"))
+		root := c.dotted(base)
+		if !isBrowserGlobalObject(root) {
+			return "", "", false
+		}
+		key := c.keyName(c.unwrapJsTransparentExpr(field(left, "index")))
+		target := root + "[]"
+		if key != "" {
+			target = root + "." + key
+		}
+		return root, target, true
+	}
+	return "", "", false
 }
 
 func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
@@ -1113,7 +2164,11 @@ func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
 
 func (c *jsConv) jsParamEntries(name string, params []string, base []string) []nir.ParamEntry {
 	if len(base) == 0 {
-		return nil
+		if strings.EqualFold(name, "resolve") || strings.Contains(strings.ToLower(name), "resolver") {
+			base = []string{"entry_kind:function_param"}
+		} else {
+			return nil
+		}
 	}
 	var out []nir.ParamEntry
 	for i, p := range params {
@@ -1276,6 +2331,15 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "number":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "regex":
+		if jsRegexMayBacktrack(c.text(n)) {
+			return nir.Call{
+				Callee: nir.Name{ID: "__regex.match", Loc: L},
+				Args:   []nir.Expr{nir.Const{Loc: L, Value: c.text(n)}},
+				Path:   "__regex.match",
+				Method: "match",
+				Loc:    L,
+			}
+		}
 		// carry the literal `/pattern/flags` so a `filter` directive can analyze the
 		// output alphabet of x.replace(/…/g, repl).
 		return nir.Const{Loc: L, Value: c.text(n)}
@@ -1333,7 +2397,22 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			method = path[i+1:]
 		}
 		return nir.Call{Callee: c.expr(ctor), Args: arglist, Path: path, Method: method, Loc: L}
-	case "await_expression", "parenthesized_expression", "non_null_expression":
+	case "jsx_attribute":
+		name := c.jsxAttributeName(n)
+		if name == "dangerouslySetInnerHTML" {
+			arg := c.jsxDangerouslySetInnerHTMLArg(c.jsxAttributeValue(n))
+			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
+		}
+		if val := c.jsxAttributeValue(n); val != nil {
+			return c.expr(val)
+		}
+		return nir.Name{ID: name, Loc: L}
+	case "jsx_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return nir.Thru{Inner: c.expr(kids[0])}
+		}
+		return nir.Const{Loc: L}
+	case "await_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
@@ -1370,7 +2449,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		if len(parts) > 0 {
-			return nir.Format{Parts: parts, Loc: L}
+			return nir.Format{Parts: parts, Text: jsContextValue(c.text(n)), Loc: L}
 		}
 		return nir.Const{Loc: L}
 	case "string":
@@ -1404,6 +2483,73 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
+}
+
+func (c *jsConv) jsxAttributeName(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if name := field(n, "name"); name != nil {
+		return c.text(name)
+	}
+	for _, ch := range namedChildren(n) {
+		switch ch.Kind() {
+		case "property_identifier", "identifier", "jsx_identifier":
+			return c.text(ch)
+		}
+	}
+	return ""
+}
+
+func (c *jsConv) jsxAttributeValue(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if val := field(n, "value"); val != nil {
+		return val
+	}
+	name := c.jsxAttributeName(n)
+	for _, ch := range namedChildren(n) {
+		if c.text(ch) == name {
+			continue
+		}
+		switch ch.Kind() {
+		case "jsx_expression", "string", "object", "member_expression", "identifier", "call_expression":
+			return ch
+		}
+	}
+	return nil
+}
+
+func (c *jsConv) jsxDangerouslySetInnerHTMLArg(n *tree_sitter.Node) nir.Expr {
+	n = c.unwrapJSXExpression(n)
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	if n.Kind() == "object" {
+		for _, ch := range namedChildren(n) {
+			if ch.Kind() == "pair" && c.keyName(field(ch, "key")) == "__html" {
+				return c.expr(field(ch, "value"))
+			}
+		}
+	}
+	return c.expr(n)
+}
+
+func (c *jsConv) unwrapJSXExpression(n *tree_sitter.Node) *tree_sitter.Node {
+	for n != nil {
+		switch n.Kind() {
+		case "jsx_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
+			kids := namedChildren(n)
+			if len(kids) == 0 {
+				return n
+			}
+			n = kids[0]
+		default:
+			return n
+		}
+	}
+	return nil
 }
 
 var jsExpressRouteMethods = map[string]bool{
@@ -1492,8 +2638,12 @@ func (c *jsConv) expressRouteFuncs(call *tree_sitter.Node, L string) []nir.Stmt 
 			Body:       lam.Body,
 			Loc:        c.loc(h),
 			EndLoc:     c.endloc(h),
-			HTTPMethod: method,
-			HTTPPath:   httpPath,
+			// Preserve the body-derived function-context tokens that the inline handler carried
+			// when it stayed a Lambda (jsFunctionContext("<lambda>", n)), so `in function` flags
+			// that match on the handler's calls/selectors/assigns/literals still fire.
+			ContextTokens: c.jsFunctionContext("<lambda>", h),
+			HTTPMethod:    method,
+			HTTPPath:      httpPath,
 		})
 	}
 	return out
@@ -1558,10 +2708,38 @@ func (c *jsConv) keyName(n *tree_sitter.Node) string {
 	return t
 }
 
+func isJsTransparentExpr(kind string) bool {
+	switch kind {
+	case "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
+		return true
+	}
+	return false
+}
+
+func (c *jsConv) unwrapJsTransparentExpr(n *tree_sitter.Node) *tree_sitter.Node {
+	for n != nil && isJsTransparentExpr(n.Kind()) {
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return n
+		}
+		n = kids[0]
+	}
+	return n
+}
+
+func isBrowserGlobalObject(path string) bool {
+	switch path {
+	case "window", "globalThis", "self":
+		return true
+	}
+	return false
+}
+
 func (c *jsConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
+	n = c.unwrapJsTransparentExpr(n)
 	switch n.Kind() {
 	case "identifier", "property_identifier":
 		return c.text(n)
@@ -1571,10 +2749,6 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":
 		return c.dotted(field(n, "object")) + "[]"
-	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
-			return c.dotted(kids[0])
-		}
 	}
 	return "?"
 }

@@ -2,8 +2,14 @@ import code.{WeakRandomValue}
 
 adapter swift {
   package "github.com/leif-ibsen/BigInt" {
-    mark method "randomLessThan" -> code.WeakRandomValue
-    mark method "randomFrom" -> code.WeakRandomValue
-    mark method "randomTo" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "randomLessThan"
+    }
+    flag code.WeakRandomValue on any {
+      method "randomFrom"
+    }
+    flag code.WeakRandomValue on any {
+      method "randomTo"
+    }
   }
 }

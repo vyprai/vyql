@@ -2,6 +2,8 @@ import code.{UrlFetch, RedirectTarget}
 adapter swift {
   package "github.com/SvenTiigi/YouTubePlayerKit" {
     sink method "youTubePlayerIframeAPISourceURL" -> code.UrlFetch
-    mark method "youTubePlayerEventCallbackURLScheme" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "youTubePlayerEventCallbackURLScheme"
+    }
   }
 }

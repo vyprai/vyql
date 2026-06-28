@@ -4,10 +4,16 @@ import core.{InputValidation}
 adapter javascript {
   package "sockjs" {
     control method "escape_selected" -> core.InputValidation
-    mark method "md5_hex" -> code.WeakHash
-    mark method "sha1_base64" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "md5_hex"
+    }
+    flag code.WeakHash on any {
+      method "sha1_base64"
+    }
     source method "parseCookie" -> code.Cookie
-    mark method "random32" -> code.WeakRandomValue
+    flag code.WeakRandomValue on any {
+      method "random32"
+    }
     sink method "htmlfile" -> code.HtmlRender
   }
 }

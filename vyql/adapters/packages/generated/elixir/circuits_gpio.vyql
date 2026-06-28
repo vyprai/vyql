@@ -4,7 +4,11 @@ import core.{UserControlledData}
 adapter elixir {
   package "circuits_gpio" {
     source method "read_gpio" -> core.UserControlledData
-    mark method "write_gpio" -> code.PrivilegedOp
-    mark method "open_gpio" -> code.PrivilegedOp
+    flag code.PrivilegedOp on any {
+      method "write_gpio"
+    }
+    flag code.PrivilegedOp on any {
+      method "open_gpio"
+    }
   }
 }

@@ -55,9 +55,16 @@ adapter dart {
   sink path "extractArchiveToDisk" arg all -> code.ArchiveEntryWrite
 
   // weak hash (CWE-328) — package:crypto md5/sha1.
-  mark "md5.convert" -> code.WeakHash
-  mark "sha1.convert" -> code.WeakHash
-  mark "ParametersWithIV" val "0000000000000000" -> code.StaticIv
+  flag code.WeakHash on any {
+    path "md5.convert"
+  }
+  flag code.WeakHash on any {
+    path "sha1.convert"
+  }
+  flag code.StaticIv on any {
+    path "ParametersWithIV"
+    has "0000000000000000"
+  }
 
   // XSS (CWE-79) — shelf/HTML response writers (the rendered body is the arg)
   sink method "write" arg all -> code.HtmlRender
@@ -75,41 +82,109 @@ adapter dart {
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
 
   // regex compile (ReDoS)
   sink path "RegExp" -> code.RegexCompile
 
   // insecure cookie (CWE-614) — dart:io Cookie configured insecurely
-  mark "setSecure" val "false" -> code.InsecureCookie
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "http.get" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.post" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.put" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.head" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.read" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "http.delete" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "badCertificateCallback" val "true" -> code.CertValidationDisabled
-  mark "Socket.connect" -> code.ResourceHandle
-  mark "File.open" -> code.ResourceHandle
-  mark "File.openRead" -> code.ResourceHandle
-  mark "File.openWrite" -> code.ResourceHandle
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.CleartextChannel on any {
+    path "http.get"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.post"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.put"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.head"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.read"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "http.delete"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CertValidationDisabled on any {
+    path "badCertificateCallback"
+    has "true"
+  }
+  flag code.ResourceHandle on any {
+    path "Socket.connect"
+  }
+  flag code.ResourceHandle on any {
+    path "File.open"
+  }
+  flag code.ResourceHandle on any {
+    path "File.openRead"
+  }
+  flag code.ResourceHandle on any {
+    path "File.openWrite"
+  }
   control method "close" -> core.ResourceRelease
 
   // weak cipher (CWE-327) — pointycastle BlockCipher with a broken algorithm
-  mark "BlockCipher" val "DES" -> code.WeakCipher
-  mark "BlockCipher" val "RC4" -> code.WeakCipher
-  mark "BlockCipher" val "Blowfish" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "BlockCipher"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "BlockCipher"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "BlockCipher"
+    has "Blowfish"
+  }
 
   // insecure randomness (CWE-330) — dart:math Random() (Random.secure() is safe)
-  mark exact "Random" -> code.WeakRandomValue
+  flag code.WeakRandomValue on call {
+    path exact "Random"
+  }
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape

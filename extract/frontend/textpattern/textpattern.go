@@ -227,7 +227,7 @@ func loadProfile() textPatternProfile {
 			if minLen == 0 {
 				minLen = 1
 			}
-			profile.Assignment = regexp.MustCompile(`(?i)(` + strings.Join(names, "|") + `)\s*[:=]\s*["'` + "`" + `]([^"'` + "`" + `\s]{` + strconv.Itoa(minLen) + `,})["'` + "`" + `]`)
+			profile.Assignment = regexp.MustCompile(`(?i)(["']?(?:` + strings.Join(names, "|") + `)["']?)\s*[:=]\s*["'` + "`" + `]([^"'` + "`" + `\s]{` + strconv.Itoa(minLen) + `,})["'` + "`" + `]`)
 		}
 	})
 	return profile

@@ -1,0 +1,51 @@
+test "rank346: cdr read_vec exposes uninitialized Vec capacity to Read"
+  lang rust
+  expect VYQL-MEM-015
+  expect_review code.UninitializedBufferExposure
+  code
+  ```
+  use std::io::Read;
+
+  struct Deserializer<R> {
+      reader: R,
+  }
+
+  impl<R> Deserializer<R>
+  where
+      R: Read,
+  {
+      fn read_vec(&mut self) -> Result<Vec<u8>, std::io::Error> {
+          let len: u32 = 16;
+          let mut buf = Vec::with_capacity(len as usize);
+          unsafe { buf.set_len(len as usize) }
+          self.reader.read_exact(&mut buf[..])?;
+          Ok(buf)
+      }
+  }
+  ```
+
+test "rank346: cdr read_vec initializes buffer before Read"
+  lang rust
+  reject VYQL-MEM-015
+  reject_review code.UninitializedBufferExposure
+  code
+  ```
+  use std::io::Read;
+
+  struct Deserializer<R> {
+      reader: R,
+  }
+
+  impl<R> Deserializer<R>
+  where
+      R: Read,
+  {
+      fn read_vec(&mut self) -> Result<Vec<u8>, std::io::Error> {
+          let len: u32 = 16;
+          let mut buf = Vec::with_capacity(len as usize);
+          buf.resize(len as usize, 0);
+          self.reader.read_exact(&mut buf[..])?;
+          Ok(buf)
+      }
+  }
+  ```

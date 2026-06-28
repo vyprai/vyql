@@ -95,17 +95,16 @@ what financial-services customers already do manually in design reviews.
 Positioning: "encode your workflow invariants once; Vypr continuously checks
 code, config, and runtime against them."
 
-### Mode 2 — Assisted extraction (AI-drafted models; near-term research)
+### Mode 2 — Assisted extraction (externally drafted models; near-term research)
 
-LLMs draft Mode 1 declarations from evidence the graph already holds: route
-names, handler names, OpenAPI specs, ORM models, state-enum definitions,
-audit-log schemas. A human confirms the draft (same trust pipeline as AI
-adapters, [18](18-ai-integration.md)). The bet: business models are *small*
+External assistants can draft Mode 1 declarations from evidence the graph
+already holds: route names, handler names, OpenAPI specs, ORM models,
+state-enum definitions, audit-log schemas. A human confirms the draft (same
+trust pipeline as generated adapters, [18](18-ai-integration.md)). The bet:
+business models are *small*
 (dozens of actions, not thousands), so human confirmation scales where it
-wouldn't for code adapters. This is a product-defining application of the AI
-layer and is plausible within the program's horizon — but it ships behind
-review gates, with extraction quality measured against Mode-1
-ground truth from design partners.
+wouldn't for code adapters. This remains behind review gates, with extraction
+quality measured against Mode-1 ground truth from design partners.
 
 ### Mode 3 — Behavioral inference (long-term research)
 
@@ -142,7 +141,7 @@ Because the graph and ontology make the *declared* version cheap, and the
 declared version alone is differentiating: no SAST/CSPM competitor can check
 "refund requires ownership" across code, API gateway config, and runtime
 behavior simultaneously. The research modes then have a well-defined target
-representation to extract *into* — which is precisely how the AI strategy
+representation to extract *into* — which is precisely how the external-tooling strategy
 de-risks: generation is always into a reviewable, testable, declarative
 artifact.
 
@@ -152,6 +151,6 @@ artifact.
 |---|---|
 | `business.*` schema + state machines + Mode 1 declared models | committed (post-Tier-2) |
 | Ownership/authz-check recognition adapters for top frameworks | committed, scoped to recognizable idioms |
-| Mode 2 AI-drafted models with human review | research with design partners; no GA date |
+| Mode 2 externally drafted models with human review | research with design partners; no GA date |
 | Mode 3 behavioral inference | research; signals-only if it ships |
 | "Automatic business logic vulnerability discovery in arbitrary code" | **explicit non-claim** — not in any roadmap or marketing material |

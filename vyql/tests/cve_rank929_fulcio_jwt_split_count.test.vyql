@@ -1,0 +1,60 @@
+# Rank 929 / CVE-2025-66506: Fulcio split attacker-supplied JWTs on every
+# dot before checking there were exactly three parts.
+
+test "rank929: JWT issuer extraction fully splits untrusted token"
+  lang go
+  file issuerpool.go
+  expect VYQL-DOS-007
+  expect_review code.UnboundedDelimiterSplitCount
+  code
+  ```
+  package identity
+
+  import (
+      "encoding/base64"
+      "fmt"
+      "strings"
+  )
+
+  func extractIssuerURL(token string) (string, error) {
+      parts := strings.Split(token, ".")
+      if len(parts) != 3 {
+          return "", fmt.Errorf("oidc: malformed jwt, expected 3 parts got %d", len(parts))
+      }
+
+      raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+      if err != nil {
+          return "", err
+      }
+      return string(raw), nil
+  }
+  ```
+
+test "rank929: JWT issuer extraction counts delimiters before bounded split"
+  lang go
+  file issuerpool.go
+  reject VYQL-DOS-007
+  reject_review code.UnboundedDelimiterSplitCount
+  code
+  ```
+  package identity
+
+  import (
+      "encoding/base64"
+      "fmt"
+      "strings"
+  )
+
+  func extractIssuerURL(token string) (string, error) {
+      if strings.Count(token, ".") != 2 {
+          return "", fmt.Errorf("oidc: malformed jwt, token must have 3 parts")
+      }
+
+      parts := strings.SplitN(token, ".", 3)
+      raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+      if err != nil {
+          return "", err
+      }
+      return string(raw), nil
+  }
+  ```

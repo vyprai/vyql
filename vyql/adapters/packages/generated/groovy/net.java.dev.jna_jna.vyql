@@ -2,7 +2,11 @@ import code.{CommandExecution, RawMemoryCopySize}
 
 adapter groovy {
   package "net.java.dev.jna:jna" {
-    mark method "read" -> code.RawMemoryCopySize
-    mark method "write" -> code.RawMemoryCopySize
+    flag code.RawMemoryCopySize on any {
+      method "read"
+    }
+    flag code.RawMemoryCopySize on any {
+      method "write"
+    }
   }
 }

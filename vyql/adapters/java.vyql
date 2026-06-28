@@ -53,6 +53,11 @@ adapter java {
   source ".getQueryParameter" -> code.IntentInput
   source ".getQueryParameters" -> code.IntentInput
   source ".getLastPathSegment" -> code.IntentInput
+  // Secret material exposed by credential/key APIs. These are only findings when they
+  // flow to a sink such as a log write or persistence target.
+  source method "getKeyMaterial" -> code.SecretValue
+  source method "getKeyPassword" -> code.SecretValue
+  source method "getPrivateKey" -> code.SecretValue
 
   // receiver-type tracking — a variable assigned `new FileWriter(...)` carries that type so
   // its `.write()` is recognised as a FILE write (not the response-writer XSS sink above).
@@ -68,13 +73,275 @@ adapter java {
 
   // Offset/length range checks must avoid additive overflow before a native or buffer
   // operation consumes the range. The patched idiom checks `offset > len - length`.
-  mark exact "analysis.function.context" val "expr:offset+length>b.length" val "call_path:write" nval "expr:offset>b.length-length" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:crypt_raw" val "expr:1<<log_rounds" nval "call:roundsForLogRounds" -> code.IntegerSizeArithmetic
-  mark "__binop.shl" val "log_rounds" val "1" nval "1L" -> code.IntegerSizeArithmetic
-  mark exact "analysis.function.context" val "function_name:safeDecryptPreMasterSecret" val "call:doFinal" val "call:createSecret" val "M[0]" nval "expr:m.length==48" -> code.PremasterSecretLengthReview
-  mark exact "analysis.function.context" val "call:getServerName" val "call:getHost" val "call:equals" nval "call:contains" -> code.RequestHostUrlValidationBypass
-  mark exact "analysis.function.context" val "call:setAuthentication" val "call:getSession" nval "call:invalidate" -> code.MissingSessionRotationAfterAuthentication
-  mark exact "analysis.function.context" val "function_name:correctlySpends" val "call:fromPublicOnly" val "call:verify" val "hashFor" nval "call:sha256hash160" -> code.PublicKeyHashBindingReview
+  flag code.IntegerSizeArithmetic in function {
+    expr "offset+length>b.length"
+    call path "write"
+    not expr "offset>b.length-length"
+  }
+  flag code.IntegerSizeArithmetic in function {
+    function "crypt_raw"
+    expr "1<<log_rounds"
+    not call "roundsForLogRounds"
+  }
+  flag code.UnvalidatedRatingRange in function {
+    function "rateTopic"
+    call path "registry.rateResource"
+    call path "genericArtifact.getPath"
+    lacks "MAX_RATE"
+    lacks "MIN_RATE"
+  }
+  flag code.WorldCoordinateSafeRangeMissing in function {
+    param type "BlockVector3"
+    call contains_any [
+      "getBlockAt", "setBlock", "getBlock", "getFullBlock",
+      "getBiome", "setBiome", "generateTree", "canPlaceAt",
+      "applySideEffects", "simulateItemUse", "checkLoadedChunk"
+    ]
+    not call contains_any ["testCoords", "checkCoords", "validateCoords"]
+    not literal "30000000"
+  }
+  flag code.FrameworkRequestBeforeSessionValidation in function {
+    function "doFilter"
+    call path "Meteor.build"
+    call path "httpReq.getParameter"
+    call path "pushContext.getSessionManager.getPushSession"
+    call path "httpResp.sendError"
+    call "RequestImpl"
+    call order "Meteor.build>Collections.emptyList"
+    call order "Collections.emptyList>httpReq.getParameter"
+    not call order "httpResp.setContentType>Meteor.build"
+  }
+  flag code.UnvalidatedModelSelection in function {
+    function "addResults"
+    call path "request.getParameter"
+    literal "classifier"
+    call path "response.addHeader"
+    call path "ners.get.classifyToString"
+    not token identifier "nerModel"
+  }
+  flag code.IntegerSizeArithmetic on any {
+    path "__binop.shl"
+    has "log_rounds"
+    has "1"
+    lacks "1L"
+  }
+  flag code.PremasterSecretLengthReview in function {
+    function "safeDecryptPreMasterSecret"
+    call "doFinal"
+    call "createSecret"
+    has "M[0]"
+    not expr "m.length==48"
+  }
+  flag code.EcdsaSignatureScalarBoundsMissing in function {
+    function "verify"
+    selector "signature.r"
+    selector "signature.s"
+    selector "publicKey.point"
+    call path "Math.inv"
+    call path "Math.multiply"
+    not expr "r.compareTo(curve.N)>=0"
+    not expr "s.compareTo(curve.N)>=0"
+  }
+  flag code.VerboseHttpClientAuthorizationLog in function {
+    call path "RestAdapter.Builder"
+    call "setLogLevel"
+    call "setLog"
+    selector "RestAdapter.LogLevel.FULL"
+    not selector "RestAdapter.LogLevel.BASIC"
+    not selector "RestAdapter.LogLevel.NONE"
+  }
+  flag code.RequestHostUrlValidationBypass in function {
+    call "getServerName"
+    call "getHost"
+    call "equals"
+    not call "contains"
+  }
+  flag code.MultiOptionUrlValidationBypass in function {
+    function "isValidURL"
+    call path "isURLRelative"
+    call path "buildAbsoluteURL"
+    not call path "validateCallbackURL"
+  }
+  flag code.ResponseWriterScriptWindowIdXss in function {
+    function "encodeBegin"
+    call path "writer.write"
+    has "dswh.init"
+    has "windowId"
+    not call path "writer.writeText"
+  }
+  flag code.MissingSessionRotationAfterAuthentication in function {
+    call "setAuthentication"
+    call "getSession"
+    not call "invalidate"
+  }
+  flag code.MissingSessionRotationAfterAuthentication in function {
+    function contains_any ["doFinishLogin", "finishLogin", "doLogin", "login"]
+    call "setAuthentication"
+    not call "invalidate"
+  }
+  flag code.ExpiredCachedAuthTokenReuse in function {
+    call path "accessTokenCache.timeout.isBefore"
+    call path "ZonedDateTime.now"
+    selector "accessTokenCache.resource"
+    call path "accessToken.getExpiresAtAsInstant"
+    call path "expiresAt.minus"
+    not call path "accessTokenCache.timeout.isAfter"
+  }
+  flag code.PublicKeyHashBindingReview in function {
+    function "correctlySpends"
+    call "fromPublicOnly"
+    call "verify"
+    has "hashFor"
+    not call "sha256hash160"
+  }
+  flag code.PublicWeakChecksumUtility in class {
+    class name "Checksum"
+    token class_modifier "public"
+    literal "SHA-1"
+    literal "CRC32"
+    call path "MessageDigest.getInstance"
+    call path "res.setHash"
+    call path "res.setCrc"
+  }
+  flag code.LdapCrlCredentialReuse in function {
+    function "prepareConnectionFactory"
+    call path "ConnectionConfig.copy"
+    call path "cc.setLdapUrl"
+    call "DefaultConnectionFactory"
+    not call path "cc.setConnectionInitializers"
+  }
+  flag code.SessionStoredRedirectTarget in function {
+    function "determineTargetUrl"
+    has "SimpleUrlAuthenticationSuccessHandler"
+    has "session.getAttribute"
+    has "targetUrlSessionAttribute"
+    has "targetUrl.substring"
+    lacks "Util.isSafeToRedirectTo"
+  }
+  flag code.ProtocolRelativeSavedRequestRedirect in function {
+    function contains_any ["savedRequestURL", "savedRequestUrl", "getSavedRequestURL", "getSavedRequestUrl"]
+    call path contains_any ["saved.getRequestURI", "saved.getRequestURL", "saved.getQueryString"]
+    call path "StringBuilder"
+    call path contains_any ["sb.append", "url.append", "redirect.append"]
+    token return_call_path contains_any ["sb.toString", "url.toString", "redirect.toString"]
+    not call path contains_any ["deleteCharAt", "stripLeading", "normalize", "isSafeToRedirectTo"]
+    not expr contains_any ["charAt(1)=='/'", "charAt(1)==\"/\""]
+  }
+  flag code.JmxRmiRegistryExposure in function {
+    function "createJMXServer"
+    has "RMIExporter.EXPORTER_ATTRIBUTE"
+    has "configureRMIRegistry"
+    has "JMXConnectorServerFactory.newJMXConnectorServer"
+    lacks "LocateRegistry.createRegistry"
+    lacks "RMIJRMPServerImpl"
+  }
+  flag code.NodetoolArchiveCommandPrivilegeEscalation in function {
+    function "enableFullQueryLogger"
+    has "archiveCommand"
+    has "fqlOptions.archive_command"
+    has "FullQueryLogger.instance.enableWithoutClean"
+    lacks "allow_nodetool_archive_command"
+  }
+  flag code.CommandStringWrapperExecution in function {
+    literal "/bin/sh"
+    literal "-c"
+    token identifier "scriptPath"
+    expr "scriptPath+ALERT_TITLE_OPTION"
+    call path "ProcessUtils.executeScript"
+    not call path "File"
+    not call "exists"
+    not call "isFile"
+  }
+  flag code.CommonsCompressBzip2FallbackSortMissing in function {
+    function "blockSort"
+    call "mainSort"
+    call "randomiseBlock"
+    expr "this.workDone>this.workLimit"
+    not call "fallbackSort"
+  }
+  flag code.CordysRequestParamXssFilterDisabled in function {
+    function "jackson2ObjectMapperBuilderCustomizer"
+    call path "jacksonObjectMapperBuilder.deserializerByType"
+    call path "StringUtils.trim"
+    call path "jsonParser.getValueAsString"
+    call path "HtmlUtils.htmlEscape"
+    token identifier "escape"
+    not call "shouldEscapeXss"
+    not token identifier "xssFilterUrlList"
+  }
+  flag code.DotcmsSqlUtilBlacklistBypass in function {
+    function "sanitizeParameter"
+    call path "StringEscapeUtils.escapeSql"
+    token identifier "EVIL_SQL_WORDS"
+    call "isValidSQLCharacter"
+    not call "sanitizeSQL"
+    not token identifier "EVIL_SQL_CONDITION_WORDS"
+  }
+  flag code.DotcmsFormsOrderBySqlInjection in function {
+    class name "ViewFormHandlerAction"
+    function "_loadStructures"
+    call path "req.getParameter"
+    call path "StructureFactory.getStructuresByUser"
+    not call path "SQLUtil.sanitizeSortBy"
+  }
+  flag code.UnescapedExceptionMessageMarkup in function {
+    function "parseURL"
+    call path "CssFouffa"
+    not call "getMessage"
+  }
+  flag code.UnescapedDiagnosticHtml in function {
+    call path "IOUtils.toString"
+    literal "text/html"
+    call path "Fault"
+    not call path "MessageUtils.isRequestor"
+    not call path "StringEscapeUtils.escapeHtml"
+    not call path "HtmlUtils.htmlEscape"
+  }
+  flag code.SvgOnclickWindowOpenLinkXss in function {
+    token identifier "link"
+    has "window.open"
+    has "cursor: pointer"
+    call "escapeHtml"
+    call "replace"
+    call "getBytes"
+    not call "getProtocol"
+    lacks "&quot;"
+  }
+  flag code.JavaScriptTemplateHtmlEscapeMismatch in function {
+    function "renderContent"
+    call path "request.getParameter"
+    call path "vars.put"
+    call path "Encode.forHtmlContent"
+    not call path "Encode.forJavaScript"
+  }
+  flag code.RepositorySourceMetadataExposure in function {
+    token metadata_export_after_sensitive_key "repoSource"
+    token metadata_export_writer "metadata"
+  }
+  flag code.JenkinsProjectDisplayNameXss in function {
+    function "getName"
+    call path "project.getFullDisplayName"
+    not call path "StringEscapeUtils.escapeHtml"
+    not call path "Util.escape"
+  }
+  flag code.JenkinsTestResultNameXss in function {
+    function "getName"
+    class base "TestResult"
+    token return_identifier "name"
+    not token return_call_path contains_any [
+      "hudson.Util.escape",
+      "Util.escape",
+      "StringEscapeUtils.escapeHtml",
+      "StringEscapeUtils.escapeHtml4"
+    ]
+  }
+  flag code.JenkinsPluginForkedDirectoryBrowserWithoutCsp on any {
+    path exact "DirectoryBrowserSupport"
+    has "Compare Html Report"
+    has "graph.gif"
+  }
+  sink path "analysis.function.return" val "function_name:determineTargetUrl" val "SimpleUrlAuthenticationSuccessHandler" -> code.RedirectTarget
+  control "Util.isSafeToRedirectTo" -> core.RedirectAllowlist
 
   // SQL — JDBC Statement / Connection / JPA / Spring JdbcTemplate + Android SQLite
   sink method "executeQuery" -> code.SqlExecution
@@ -94,7 +361,9 @@ adapter java {
   // redirect sink (go/ruby/js do), so request-derived redirect targets were never flagged.
   sink method "sendRedirect" -> code.RedirectTarget
   // exposing a native bridge to WebView content (presence)
-  mark "addJavascriptInterface" -> code.WebViewJsInterface
+  flag code.WebViewJsInterface on any {
+    path "addJavascriptInterface"
+  }
   sink method "executeLargeUpdate" -> code.SqlExecution
   sink method "prepareStatement" -> code.SqlExecution
   sink method "prepareCall" -> code.SqlExecution
@@ -112,9 +381,21 @@ adapter java {
   sink method "batchUpdate" -> code.SqlExecution
   // Driver/parser helpers that return hand-built SQL literal casts instead of
   // routing text through the shared quoting routine.
-  mark exact "analysis.function.return" val "function_name:toString" val "::uuid" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.return" val "function_name:toString" val "::point" -> code.UnparameterizedSqlQueryParser
-  mark exact "analysis.function.return" val "function_name:toString" val "::box" -> code.UnparameterizedSqlQueryParser
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    function "toString"
+    has "::uuid"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    function "toString"
+    has "::point"
+  }
+  flag code.UnparameterizedSqlQueryParser on any {
+    path exact "analysis.function.return"
+    function "toString"
+    has "::box"
+  }
 
   // Command execution. arg all: the tainted value can be the command, an argument, or the
   // environment array — Runtime.exec(cmd) / exec(cmdarray, envp), ProcessBuilder(a, b, …),
@@ -133,21 +414,82 @@ adapter java {
   sink method "readValue" -> code.Deserialization
   sink path "yaml.load" -> code.Deserialization
   sink path "Yaml.load" -> code.Deserialization
-  mark exact "analysis.class.context" val "class_base:InvocationHandler" val "call:getMethod" val "call:invokeMethod" nval "function_name:readResolve" nval "function_name:readObject" nval "call:NotSerializableException" -> code.DeserializableInvocationHandler
+  flag code.DeserializableInvocationHandler in class {
+    class base "InvocationHandler"
+    call "getMethod"
+    call "invokeMethod"
+    not function "readResolve"
+    not function "readObject"
+    not call "NotSerializableException"
+  }
+  flag code.GsonObjectTypeAdapterRecursiveRead in function {
+    selector "ObjectTypeAdapter.FACTORY"
+    token identifier "read"
+    call "read"
+    call path "list.add"
+    call path "map.put"
+    not call "tryBeginNesting"
+    not call "readTerminal"
+  }
+  flag code.UnrestrictedRequestParamDeserialization in function {
+    function "createXStream"
+    call path "XStream"
+    call "registerConverter"
+    not call "addDefaultPermissions"
+    not call "addPermissions"
+    not call "addPermission"
+    not call "denyPermission"
+  }
   package "org.yaml.snakeyaml" {
-    mark exact "analysis.class.context" val "class_base:Constructor" -> code.UnsafeYamlConstructor
-    mark exact "org.yaml.snakeyaml.constructor.Constructor" -> code.UnsafeYamlConstructor
+    flag code.UnsafeYamlConstructor in class {
+      class base "Constructor"
+    }
+    flag code.UnsafeYamlConstructor on any {
+      path exact "org.yaml.snakeyaml.constructor.Constructor"
+    }
   }
 
   // XXE
   sink method "parse" -> code.XmlParse
   sink method "newDocumentBuilder" -> code.XmlParse
   // structural XXE — precise parser-factory construction, flagged unless hardened
-  mark method "newSAXParser" -> code.XmlParserCreate
-  mark method "newDocumentBuilder" -> code.XmlParserCreate
-  mark method "createXMLReader" -> code.XmlParserCreate
-  mark method "createXMLStreamReader" -> code.XmlParserCreate
-  mark method "createXMLEventReader" -> code.XmlParserCreate
+  flag code.XmlParserCreate on any {
+    method "newSAXParser"
+  }
+  flag code.XmlParserCreate on any {
+    method "newDocumentBuilder"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLStreamReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "createXMLEventReader"
+  }
+  flag code.XmlParserCreate on any {
+    method "newTransformer"
+  }
+  flag code.XmlParserCreate in function {
+    call path "SAXReader"
+    call path "reader.read"
+    not literal "http://apache.org/xml/features/nonvalidating/load-external-dtd"
+    not literal "http://xml.org/sax/features/external-general-entities"
+    not literal "http://xml.org/sax/features/external-parameter-entities"
+  }
+  flag code.XmlParserCreate in function {
+    call path "getTaskUnmarshaller.unmarshal"
+    not call path "getXMLStreamReader"
+  }
+  flag code.CheckstyleExternalParameterEntitiesXxe in function {
+    function "setFeaturesBySystemProperty"
+    class name "LoadExternalDtdFeatureProvider"
+    call path "factory.setFeature"
+    token identifier "LOAD_EXTERNAL_DTD"
+    token identifier "EXTERNAL_GENERAL_ENTITIES"
+    not token identifier "EXTERNAL_PARAMETER_ENTITIES"
+  }
 
   // Path / file. `new File(parent, child)` puts the tainted child path at arg 1, and
   // Paths.get(first, …more) / Files.write(path, …) likewise vary the path position — arg all.
@@ -180,14 +522,30 @@ adapter java {
   sink method "getReferenceById" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
   sink method "getOrder" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
 
   // Code eval / scripting
   sink method "eval" -> code.CodeEval
@@ -215,33 +573,345 @@ adapter java {
   control method "hasAuthority" -> core.AuthorizationCheck
   control method "hasRole" -> core.AuthorizationCheck
   control method "checkPermission" -> core.AuthorizationCheck
-  mark "Login.accurevLoginFromGlobalConfig" -> code.SensitiveOperation
+  control "analysis.function.context" val "annotation:RequiresPermissions" -> core.AuthorizationCheck
+  control "analysis.function.context" val "annotation:PreAuthorize" -> core.AuthorizationCheck
+  flag code.SensitiveOperation on any {
+    path "Login.accurevLoginFromGlobalConfig"
+  }
   // Accumulo-style permission gates: a bare can* call is not a guard unless its false
   // result stops the operation. Surface ignored results for review; treat throw-on-false
   // contexts as authorization checks.
-  mark exact "analysis.function.context" val "call:canFlush" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canPerformSystemActions" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canAlterNamespace" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canAlterTable" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
-  mark exact "analysis.function.context" val "call:canObtainDelegationToken" nval "call:ThriftSecurityException" -> code.IgnoredAuthorizationResult
+  flag code.IgnoredAuthorizationResult in function {
+    call "canFlush"
+    not call "ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    call "canPerformSystemActions"
+    not call "ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    call "canAlterNamespace"
+    not call "ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    call "canAlterTable"
+    not call "ThriftSecurityException"
+  }
+  flag code.IgnoredAuthorizationResult in function {
+    call "canObtainDelegationToken"
+    not call "ThriftSecurityException"
+  }
   control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canAlterNamespace" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canAlterTable" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canObtainDelegationToken" val "call:ThriftSecurityException" -> core.AuthorizationCheck
-  mark exact "analysis.function.context" val "function_name:doTest" val "call:setCredentialsId" val "call:accurevLoginFromGlobalConfig" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.function.context" val "function_name:doFill" val "call:getBzmUtils" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.function.context" val "function_name:doFillCredentialsIdItems" val "call:lookupCredentials" nval "call:hasPermission" nval "call:checkPermission" -> code.CredentialedEndpointReview
-  mark exact "analysis.parameter.entry" val "param_name:awsSecretKey" val "param_type:Secret" -> code.SecretDatabindingReview
-  mark exact "analysis.function.context" val "function_name:setAkid" nval "call:fromString" -> code.SecretDatabindingReview
-  mark exact "analysis.function.context" val "function_name:setSkid" nval "call:fromString" -> code.SecretDatabindingReview
-  mark exact "analysis.function.context" val "function_name:doConfigure" val "call:configure" val "call:save" nval "call:checkPermission" -> code.SensitiveOperation
-  mark exact "analysis.function.context" val "function_name:doAttachPublicIP" val "call:getNode" val "call:attachPublicIP" nval "call:checkPermission" -> code.SensitiveOperation
-  mark exact "analysis.function.context" val "function_name:doFill" nval "call:checkPermission" nval "annotation:POST" nval "annotation:RequirePOST" -> code.StateChangingOp
-  mark exact "analysis.function.context" val "selector:Constants.MC_REALPATH" val "selector:Constants.MC_RELATIVE_PATH" val "call:FileReader" nval "call:FileNotFoundException" -> code.AbsolutePathDisclosure
+  flag code.CredentialedEndpointReview in function {
+    function "doTest"
+    call "setCredentialsId"
+    call "accurevLoginFromGlobalConfig"
+    not call "hasPermission"
+    not call "checkPermission"
+  }
+  flag code.CredentialedEndpointReview in function {
+    function "doFill"
+    call "getBzmUtils"
+    not call "checkPermission"
+  }
+  flag code.CredentialedEndpointReview in function {
+    function "doFillCredentialsIdItems"
+    call "lookupCredentials"
+    not call "hasPermission"
+    not call "checkPermission"
+  }
+  flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
+    function "doFillConnectionIdItems"
+    call "getHostConnections"
+    not call "hasPermission"
+    not call "checkPermission"
+  }
+  flag code.JenkinsDescriptorConfigEnumerationMissingPermission in function {
+    function "doFillCredentialsIdItems"
+    call "lookupCredentials"
+    not call "hasPermission"
+    not call "checkPermission"
+  }
+  flag code.JenkinsCredentialEndpointMissingPostPermission in function {
+    function contains_any ["doCreateApiToken", "doCheckRepoAccess", "doTestGithubAccess"]
+    call path contains_any ["createToken", "getRepository", "getMyself"]
+    not call path contains_any ["checkPermission", "hasPermission"]
+    not annotation contains_any ["POST", "RequirePOST"]
+  }
+  flag code.JenkinsBuildScheduleMissingPermission in function {
+    function "doBuild"
+    call path "Jenkins.get.getQueue.schedule"
+    token identifier "project"
+    not call "hasPermission"
+    not call "checkPermission"
+    not selector "Item.BUILD"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    function "doCheckUrl"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    function "doCheckSelfSignedCertificateFingerprint"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
+  }
+  flag code.CodeDxJenkinsRemoteValidationMissingPostPermission in function {
+    function "doFillProjectIdItems"
+    call "buildClient"
+    call "getProjects"
+    not annotation "POST"
+    not call "checkPermissionForRemoteRequests"
+  }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    function "doTestDynatraceConnection"
+    annotation "RequirePOST"
+    call "DynatraceClient"
+    call "getSystemProfiles"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    function "doCheck"
+    annotation "RequirePOST"
+    call "DynatraceClient"
+    call "getSystemProfiles"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    function "doTestConnection"
+    call "testConnection"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPermission in function {
+    function "doTestConnection"
+    call path contains_any ["getClient", "buildClient", "testConnection"]
+    call path contains_any ["getCurrentUser", "getProjects", "getSystemProfiles", "testConnection"]
+    token identifier contains_any ["url", "host", "endpoint", "apiTokenId", "credentialsId", "clientBuilderId", "ignoreCertificateErrors"]
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPostPermission in function {
+    function "doTest"
+    call "testConnection"
+    call "CrowdConfigurationService"
+    not annotation "POST"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsRemoteValidationMissingPostPermission in function {
+    function "doCheck"
+    call "testConnection"
+    call "CrowdConfigurationService"
+    not annotation "POST"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
+    class base "ParameterDescriptor"
+    function "doCheckPropertyFile"
+    token identifier "QueryParameter"
+    call "Property"
+    call "File"
+    call "URL"
+    call "execute"
+    not annotation "POST"
+    not annotation "RequirePOST"
+  }
+  flag code.JenkinsDescriptorPropertyFileValidationMissingPost in function {
+    class base "ParameterDescriptor"
+    function contains_any ["doCheckPropertyKey", "doCheckDefaultPropertyFile", "doCheckDefaultPropertyKey"]
+    token identifier "QueryParameter"
+    call path "doCheckPropertyFile"
+    not annotation "POST"
+    not annotation "RequirePOST"
+  }
+  flag code.CallerControlledFilenameComponentPathTraversal in function {
+    function contains_any ["buildFilename", "buildFileName", "makeFilename", "makeFileName"]
+    token identifier "appName"
+    token identifier "appVersion"
+    token identifier contains_any ["filename", "fileName"]
+    not call path contains_any ["Util.rawEncode", "URLEncoder.encode", "encodeURIComponent", "FilenameUtils.getName", "Paths.get"]
+  }
+  flag code.UnencodedUrlQueryParameter in function {
+    function contains_any ["generateURL", "getRenderer"]
+    call path "StringBuilder"
+    call path "append"
+    literal contains_any ["?jobFilter=", "&nodeFilter=", "&launcherFilter="]
+    call path contains_any ["getJobFilter", "getNodeFilter", "getLauncherFilter"]
+    not call path contains_any ["URLEncoder.encode", "Util.rawEncode", "encodeURIComponent"]
+  }
+  flag code.EmbeddedDotSegmentFilenameWrite in function {
+    call path contains_any ["getFilename", "getOriginalFilename"]
+    call path contains_any ["Files.copy", "Files.write", "FileUtils.copyInputStreamToFile", "MultipartFile.transferTo"]
+    call path contains_any ["createTempFile", "resolve", "new File"]
+    call path contains_any ["getCanonicalPath", "normalize", "toRealPath"]
+    call arg contains_any ["filename.equals:..", "fileName.equals:.."]
+    not call arg contains_any ["filename.contains:..", "fileName.contains:.."]
+  }
+  flag code.ClusterDeployFunctionMissingPermission in class {
+    class base "Function"
+    class name contains_any ["DeployFunction", "InstallFunction", "UploadFunction"]
+    call path contains_any ["getJarDeployer.deploy", "ClassPathLoader.getLatest.getJarDeployer.deploy"]
+    call path contains_any ["stageJarContent", "RemoteInputStreamClient.wrap", "IOUtils.copyLarge"]
+    not function "getRequiredPermissions"
+    not class base "InternalFunction"
+  }
+  flag code.JenkinsStaplerStateChangeMissingPost in function {
+    function contains_any ["doSave", "doSubmit", "doConfigure"]
+    call contains_any ["bindJSON", "save", "configure"]
+    call "checkPermission"
+    not annotation "RequirePOST"
+    not annotation "POST"
+  }
+  flag code.JenkinsStaplerStateChangeMissingPost in function {
+    function contains_any ["doRemove", "doDelete"]
+    call contains_any ["removeTemplateById", "delete", "remove"]
+    call "checkPermission"
+    not annotation "RequirePOST"
+    not annotation "POST"
+  }
+  flag code.JenkinsRemotingCallableSystemPropertiesLeak in class {
+    class base "Callable"
+    function "call"
+    function "checkRoles"
+    call path "System.getProperties"
+    not class base "MasterToSlaveCallable"
+    not call "Roles.SLAVE"
+  }
+  flag code.SecretDatabindingReview on any {
+    path exact "analysis.parameter.entry"
+    param name "awsSecretKey"
+    param type "Secret"
+  }
+  flag code.SecretDatabindingReview in function {
+    function "setAkid"
+    not call "fromString"
+  }
+  flag code.SecretDatabindingReview in function {
+    function "setSkid"
+    not call "fromString"
+  }
+  flag code.JenkinsPlaintextDataboundCredential on any {
+    path exact "analysis.parameter.entry"
+    annotation "DataBoundConstructor"
+    param name "apilogin"
+    param type "String"
+    not param type "Secret"
+  }
+  flag code.JenkinsPlaintextDataboundCredential on any {
+    path exact "analysis.parameter.entry"
+    annotation "DataBoundConstructor"
+    param name "apitoken"
+    param type "String"
+    not param type "Secret"
+  }
+  flag code.JenkinsPlaintextDataboundCredential in function {
+    has "@DataBoundConstructor"
+    has "StringrepoPassword"
+    has "this.repoPassword=repoPassword;"
+    lacks "Secret.fromString(repoPassword)"
+    lacks "SecretrepoPassword"
+  }
+  flag code.JenkinsPlaintextDataboundCredential in function {
+    has "@DataBoundConstructor"
+    has "Stringpassword"
+    has "this.password=password;"
+    lacks "Secret.fromString(password)"
+    lacks "Secretpassword"
+  }
+  flag code.JenkinsPlaintextDataboundCredential in function {
+    function "configure"
+    call path "formData.getString"
+    call path "save"
+    token identifier contains_any ["privateToken", "apiToken", "accessToken", "secret", "password", "credential"]
+    literal contains_any ["privateToken", "apiToken", "accessToken", "secret", "password", "credential"]
+    not call path "Secret.fromString"
+  }
+  flag code.JenkinsCredentialsStartupLoadContextExposure in class {
+    class name "SystemCredentialsProvider"
+    function "SystemCredentialsProvider"
+    call path "xml.unmarshal"
+    call path "DomainCredentials.migrateListToMap"
+    function "getInstance"
+    not annotation "Initializer"
+    not function "forceLoadDuringStartup"
+  }
+  flag code.JdbcCredentialAttributeExposure in function {
+    function "connect"
+    call "tokenizeDatabase"
+    call "tokenizeURLProperties"
+    call "NetConnection"
+    not call "appendDatabaseAttributes"
+  }
+  flag code.SensitiveOperation in function {
+    function "doConfigure"
+    call "configure"
+    call "save"
+    not call "checkPermission"
+  }
+  flag code.SensitiveOperation in function {
+    function "doAttachPublicIP"
+    call "getNode"
+    call "attachPublicIP"
+    not call "checkPermission"
+  }
+  flag code.PluginManagementMissingAuthorization in function {
+    annotation "PostMapping"
+    call path "pluginService.localInstall"
+    not annotation "RequiresPermissions"
+    not annotation "PreAuthorize"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.PluginManagementMissingAuthorization in function {
+    annotation "PostMapping"
+    call path "pluginService.uninstall"
+    not annotation "RequiresPermissions"
+    not annotation "PreAuthorize"
+    not call "checkPermission"
+    not call "hasPermission"
+  }
+  flag code.StateChangingOp in function {
+    function "doFill"
+    not call "checkPermission"
+    not annotation "POST"
+    not annotation "RequirePOST"
+  }
+  flag code.AbsolutePathDisclosure in function {
+    selector "Constants.MC_REALPATH"
+    selector "Constants.MC_RELATIVE_PATH"
+    call "FileReader"
+    not call "FileNotFoundException"
+  }
+  flag code.CanonicalPathStringPrefixContainment in function {
+    function "getValidDirectoryPath"
+    call "getCanonicalPath"
+    call "startsWith"
+    not call "toPath"
+  }
+  flag code.UrlDecodedTraversalCheckExceptionBypass in function {
+    call path "URLDecoder.decode"
+    call path "PARENT_DIRECTORY_REGEX.matcher"
+    call path "PARENT_DIRECTORY_REGEX.matcher.find"
+    token catch_type "UnsupportedEncodingException"
+    not token catch_type "IllegalArgumentException"
+  }
   // Jenkins project workspace access requires an explicit item permission check in
   // descriptor/form-validation paths.
-  mark method "getSomeWorkspace" -> code.SensitiveOperation
+  flag code.SensitiveOperation on any {
+    method "getSomeWorkspace"
+  }
   control method "requireAuth" -> core.AuthenticationCheck
   control method "ensureAuthenticated" -> core.AuthenticationCheck
   control method "isAuthenticated" -> core.AuthenticationCheck
@@ -249,26 +919,83 @@ adapter java {
   control method "checkOwnership" -> core.OwnershipCheck
   control method "requireOwner" -> core.OwnershipCheck
   control method "isOwner" -> core.OwnershipCheck
-  mark method "lock" -> code.LockAcquire
+  flag code.LockAcquire on any {
+    method "lock"
+  }
   control method "unlock" -> core.LockRelease
   control "validateRole" -> core.InputValidation
   // XXE hardening — a parser factory configured to disallow DOCTYPE / external entities,
   // dominating the parse (value-matched feature flag).
   control "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
   control "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
+  control "setFeature" val "FEATURE_SECURE_PROCESSING" val "true" -> core.XmlHardening
   control "setExpandEntityReferences" val "false" -> core.XmlHardening
+  control method "getSecuredDocumentBuilder" -> core.XmlHardening
+  control method "getSecureDocumentBuilderFactory" -> core.XmlHardening
+  control method "setFeaturesBySystemProperty" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
   control "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
+  control "setProperty" val "IS_SUPPORTING_EXTERNAL_ENTITIES" nval "true" -> core.XmlHardening
+  control "setProperty" val "SUPPORT_DTD" nval "true" -> core.XmlHardening
   // materialize hardening as a node mark for the structural XXE rule's guarded_by
-  mark "setFeature" val "disallow-doctype-decl" -> core.XmlHardening
-  mark "setFeature" val "external-general-entities" nval "true" -> core.XmlHardening
-  mark "setExpandEntityReferences" val "false" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_SCHEMA" -> core.XmlHardening
-  mark "setAttribute" val "ACCESS_EXTERNAL_STYLESHEET" -> core.XmlHardening
-  mark "setProperty" val "ACCESS_EXTERNAL_DTD" -> core.XmlHardening
-  mark "setXIncludeAware" val "false" -> core.XmlHardening
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "disallow-doctype-decl"
+  }
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "external-general-entities"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setFeature"
+    has "FEATURE_SECURE_PROCESSING"
+    has "true"
+  }
+  flag core.XmlHardening on any {
+    path "setExpandEntityReferences"
+    has "false"
+  }
+  flag core.XmlHardening on any {
+    method "getSecuredDocumentBuilder"
+  }
+  flag core.XmlHardening on any {
+    method "getSecureDocumentBuilderFactory"
+  }
+  flag core.XmlHardening on any {
+    method "setFeaturesBySystemProperty"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_DTD"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_SCHEMA"
+  }
+  flag core.XmlHardening on any {
+    path "setAttribute"
+    has "ACCESS_EXTERNAL_STYLESHEET"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "IS_SUPPORTING_EXTERNAL_ENTITIES"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "SUPPORT_DTD"
+    lacks "true"
+  }
+  flag core.XmlHardening on any {
+    path "setProperty"
+    has "ACCESS_EXTERNAL_DTD"
+  }
+  flag core.XmlHardening on any {
+    path "setXIncludeAware"
+    has "false"
+  }
   // trust boundary (CWE-501) — untrusted data stored into the HTTP session. The injectable
   // position is the attribute key/value (arg 0).
   // trust-boundary (CWE-501): user input stored into the HTTP SESSION (a trusted store).
@@ -306,6 +1033,8 @@ adapter java {
   control method "escapeHtml4" -> core.HtmlEscape
   control method "escapeHtml3" -> core.HtmlEscape
   control method "htmlEscape" -> core.HtmlEscape
+  control "hudson.Util.escape" -> core.HtmlEscape
+  control "Util.escape" -> core.HtmlEscape
 
   // format string (CWE-134) — tainted FORMAT argument
   sink path "String.format" arg 0 -> code.FormatString
@@ -315,21 +1044,102 @@ adapter java {
   sink path "Pattern.compile" -> code.RegexCompile
 
   // csrf disabled (CWE-352) — presence marker
-  mark "csrf.disable" -> code.CsrfDisabled
-  mark "setHostnameVerifier" val "true" -> code.CertValidationDisabled
-  mark "setDefaultHostnameVerifier" val "true" -> code.CertValidationDisabled
-  mark "NoopHostnameVerifier" -> code.CertValidationDisabled
-  mark "Algorithm.none" -> code.JwtUnverified
-  mark "setWritable" val "true" val "false" -> code.InsecurePermission
-  mark "Files.setPosixFilePermissions" val "OTHERS_WRITE" -> code.InsecurePermission
-  mark "Files.createFile" val "/tmp/" -> code.InsecureTempFile
-  mark exact "analysis.function.context" val "call:setContent" val "call:toJson" val "call:saveDocument" nval "call:setHidden" -> code.InternalContentExposureReview
-  mark exact "analysis.function.context" val "call:getType" val "selector:FEDERATION_DOWNSTREAM_CONNECT" val "call:deploy" nval "call:getSubject" -> code.ProtocolStateReview
-  mark "Socket" -> code.ResourceHandle
-  mark "Files.newInputStream" -> code.ResourceHandle
-  mark "Files.newOutputStream" -> code.ResourceHandle
-  mark "Files.newBufferedReader" -> code.ResourceHandle
-  mark "Files.newBufferedWriter" -> code.ResourceHandle
+  flag code.CsrfDisabled on any {
+    path "csrf.disable"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setHostnameVerifier"
+    has "true"
+  }
+  flag code.CertValidationDisabled on any {
+    path "setDefaultHostnameVerifier"
+    has "true"
+  }
+  flag code.CertValidationDisabled on any {
+    path "NoopHostnameVerifier"
+  }
+  flag code.JavaMailSmtpSslIdentityVerificationMissing in function {
+    function "createSession"
+    call path "props.put"
+    literal "mail.smtp.socketFactory.class"
+    literal "javax.net.ssl.SSLSocketFactory"
+    literal "mail.smtp.socketFactory.fallback"
+    lacks literal "mail.smtp.ssl.checkserveridentity"
+  }
+  flag code.JwtUnverified on any {
+    path "Algorithm.none"
+  }
+  flag code.InsecurePermission on any {
+    path "setWritable"
+    has "true"
+    has "false"
+  }
+  flag code.InsecurePermission on any {
+    path "Files.setPosixFilePermissions"
+    has "OTHERS_WRITE"
+  }
+  flag code.InsecurePermission in function {
+    function "createTempFile"
+    call path "File.createTempFile"
+    not call path "setReadable"
+    not call path "Files.setPosixFilePermissions"
+  }
+  flag code.InsecurePermission in function {
+    function "createTempFile"
+    call path "File.createTempFile"
+    not call path "setWritable"
+    not call path "Files.setPosixFilePermissions"
+  }
+  flag code.SensitiveTempFileDefaultPermission in function {
+    call path "File.createTempFile"
+    call path contains_any ["java.io.PrintWriter", "PrintWriter"]
+    call path contains_any ["Secret.toString", "getPrivateKeys"]
+    not call path contains_any ["Files.createTempFile", "setReadable", "setWritable", "Files.setPosixFilePermissions", "PosixFilePermissions.asFileAttribute"]
+  }
+  flag code.TempFileDirectoryCreationRace in function {
+    call path "File.createTempFile"
+    call path "delete"
+    call path contains_any ["mkdir", "mkdirs"]
+    not call path "Files.createTempDirectory"
+  }
+  flag code.InsecureTempFile on any {
+    path "Files.createFile"
+    has "/tmp/"
+  }
+  flag code.ThreadLocalScopeOverwriteWithoutCleanup in function {
+    class name "RequestScopedCache"
+    function "beginRequest"
+    call path "CACHE.set"
+    not call "endRequest"
+    not call path "CACHE.remove"
+  }
+  flag code.InternalContentExposureReview in function {
+    call "setContent"
+    call "toJson"
+    call "saveDocument"
+    not call "setHidden"
+  }
+  flag code.ProtocolStateReview in function {
+    call "getType"
+    selector "FEDERATION_DOWNSTREAM_CONNECT"
+    call "deploy"
+    not call "getSubject"
+  }
+  flag code.ResourceHandle on any {
+    path "Socket"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newInputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newOutputStream"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newBufferedReader"
+  }
+  flag code.ResourceHandle on any {
+    path "Files.newBufferedWriter"
+  }
   control method "close" -> core.ResourceRelease
 
   // expression-language injection (CWE-917)
@@ -362,27 +1172,112 @@ adapter java {
 
   // weak crypto (CWE-327) — named-value on the algorithm-spec string argument.
   // Weak cipher: DES/DESede(3DES)/RC4(ARCFOUR)/RC2/Blowfish, or ECB mode (any cipher).
-  mark "Cipher.getInstance" val "DES" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC4" -> code.WeakCipher
-  mark "Cipher.getInstance" val "ARCFOUR" -> code.WeakCipher
-  mark "Cipher.getInstance" val "RC2" -> code.WeakCipher
-  mark "Cipher.getInstance" val "Blowfish" -> code.WeakCipher
-  mark "Cipher.getInstance" val "ECB" -> code.WeakCipher
-  mark "IvParameterSpec" val "0000000000000000" -> code.StaticIv
-  mark "GCMParameterSpec" val "000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "ARCFOUR"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "RC2"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "Blowfish"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher.getInstance"
+    has "ECB"
+  }
+  flag code.StaticIv on any {
+    path "IvParameterSpec"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "GCMParameterSpec"
+    has "000000000000"
+  }
   // NullCipher (CWE-327) — a "cipher" that performs no encryption at all.
-  mark "NullCipher" -> code.WeakCipher
+  flag code.WeakCipher on any {
+    path "NullCipher"
+  }
   // weak randomness (CWE-330) — java.util.Random / Math.random (presence). SecureRandom is
   // the CSPRNG and is deliberately NOT marked.
-  mark "java.util.Random" -> code.WeakRandomValue
-  mark "Random" -> code.WeakRandomValue
-  mark "Math.random" -> code.WeakRandomValue
-  mark "ThreadLocalRandom.current" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "java.util.Random"
+  }
+  flag code.WeakRandomValue on any {
+    path "Random"
+  }
+  flag code.WeakRandomValue on any {
+    path "Math.random"
+  }
+  flag code.WeakRandomValue on any {
+    path "ThreadLocalRandom.current"
+  }
   // Weak hash: MD2/MD5/SHA-1 via MessageDigest.getInstance("MD5") etc.
-  mark "MessageDigest.getInstance" val "MD2" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "MD5" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA-1" -> code.WeakHash
-  mark "MessageDigest.getInstance" val "SHA1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD2"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "MD5"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA-1"
+  }
+  flag code.WeakHash on any {
+    path "MessageDigest.getInstance"
+    has "SHA1"
+  }
+  flag code.SecretComparisonReview in function {
+    function "doIndex"
+    call "getReloadTokenProperty"
+    call "getRequestToken"
+    call path "token.equals"
+    not call path "MessageDigest.isEqual"
+  }
+  flag code.SecretComparisonReview in function {
+    function contains_any ["validate", "verify", "check", "authenticate"]
+    call path "computeSignature"
+    call path "signature.equals"
+    not call path "constantTimeEquals"
+    not call path "MessageDigest.isEqual"
+  }
+  flag code.SecretComparisonReview in function {
+    function contains_any ["matches", "validate", "verify", "check", "authenticate"]
+    call path contains_any ["StringUtils.equals", "Objects.equals"]
+    call path contains_any ["sha1", "sha256", "computeSignature", "computeDigest", "digest"]
+    call arg contains_any ["StringUtils.equals:computed", "StringUtils.equals:digest", "StringUtils.equals:signature", "Objects.equals:computed", "Objects.equals:digest", "Objects.equals:signature"]
+    not call path contains_any ["MessageDigest.isEqual", "constantTimeEquals", "isEqual"]
+  }
+  flag code.OptionalClientSignatureVerification in function {
+    function contains_any ["authenticate", "verify", "validate", "check"]
+    call "getSignature"
+    call path "Signature.getInstance"
+    call "initVerify"
+    call "verify"
+    expr contains_any ["signature!=null", "sigBytes!=null", "clientSignature!=null"]
+    not expr contains_any ["signature==null", "sigBytes==null", "clientSignature==null"]
+    not literal "Client signature required"
+    not literal "signature required"
+    not literal "missing signature"
+  }
+  flag code.UnsafeJXPathContextEvaluation in function {
+    call path contains_any ["JXPathContext.newContext", "JXPathContextFactory.newInstance.newContext"]
+    call path contains_any ["getValue", "selectNodes", "iterate"]
+    not call path "JXPathUtils.newSafeContext"
+    not call path "setFunctions"
+  }
 
   // server-side template injection (CWE-1336) — unambiguous engine entrypoints that
   // evaluate a STRING template (not load-by-name): Velocity static evaluate, Pebble
@@ -391,21 +1286,55 @@ adapter java {
   sink method "getLiteralTemplate" -> code.TemplateRender
 
   // permissive CORS (CWE-942) — setHeader("Access-Control-Allow-Origin", "*")
-  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "addHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
+  flag code.PermissiveCors on any {
+    path "setHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.PermissiveCors on any {
+    path "addHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
 
   // clickjacking (CWE-1021) — X-Frame-Options EXPLICITLY set to ALLOWALL (omission not flagged)
-  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "addHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
+  flag code.MissingFrameProtection on any {
+    path "setHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.MissingFrameProtection on any {
+    path "addHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
 
   // insecure cookie (CWE-614) — a flag EXPLICITLY disabled: cookie.setHttpOnly(false)
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "setSecure" val "false" -> code.InsecureCookie
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
 
   // cleartext channel (CWE-319) — http:// URL to a client/connection (loopback excluded; low sev)
-  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "HttpGet" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "getForObject" val "http://" nval "127.0" -> code.CleartextChannel
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "HttpGet"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "getForObject"
+    has "http://"
+    lacks "127.0"
+  }
 
   // unsafe reflection (CWE-470) — tainted class/method name dynamically invoked
   sink path "Class.forName" -> code.ReflectionInvoke
@@ -434,16 +1363,60 @@ adapter java {
   sink path "log.error" arg all -> code.LogOutput
   sink path "log.debug" arg all -> code.LogOutput
   sink path "LOG.info" arg all -> code.LogOutput
+  sink path "LOGGER.info" arg all -> code.LogOutput
   sink path "LOG.error" arg all -> code.LogOutput
   sink path "System.out.println" arg all -> code.LogOutput
-  mark "logger.info" -> code.LogWrite
-  mark "logger.warn" -> code.LogWrite
-  mark "logger.error" -> code.LogWrite
-  mark "logger.debug" -> code.LogWrite
-  mark "log.info" -> code.LogWrite
-  mark "log.error" -> code.LogWrite
-  mark "LOG.info" -> code.LogWrite
-  mark "System.out.println" -> code.LogWrite
+  sink method "logInfo" arg all -> code.LogOutput
+  sink method "logWarning" arg all -> code.LogOutput
+  sink method "logException" arg all -> code.LogOutput
+  sink path "logger.info" arg all -> code.LogWrite
+  sink path "logger.warn" arg all -> code.LogWrite
+  sink path "logger.error" arg all -> code.LogWrite
+  sink path "logger.debug" arg all -> code.LogWrite
+  sink path "log.info" arg all -> code.LogWrite
+  sink path "log.warn" arg all -> code.LogWrite
+  sink path "log.error" arg all -> code.LogWrite
+  sink path "log.debug" arg all -> code.LogWrite
+  sink path "LOG.info" arg all -> code.LogWrite
+  sink path "LOGGER.info" arg all -> code.LogWrite
+  sink path "LOG.error" arg all -> code.LogWrite
+  sink path "System.out.println" arg all -> code.LogWrite
+  sink method "logInfo" arg all -> code.LogWrite
+  sink method "logWarning" arg all -> code.LogWrite
+  sink method "logException" arg all -> code.LogWrite
+  flag code.LogWrite on any {
+    path "logger.info"
+  }
+  flag code.LogWrite on any {
+    path "logger.warn"
+  }
+  flag code.LogWrite on any {
+    path "logger.error"
+  }
+  flag code.LogWrite on any {
+    path "logger.debug"
+  }
+  flag code.LogWrite on any {
+    path "log.info"
+  }
+  flag code.LogWrite on any {
+    path "log.error"
+  }
+  flag code.LogWrite on any {
+    path "LOG.info"
+  }
+  flag code.LogWrite on any {
+    path "System.out.println"
+  }
+  flag code.LogWrite on any {
+    path "logInfo"
+  }
+  flag code.LogWrite on any {
+    path "logWarning"
+  }
+  flag code.LogWrite on any {
+    path "logException"
+  }
 
   // character-filter: String.replaceAll(regex, repl) is always global.
   filter method "replaceAll" global

@@ -6,6 +6,6 @@ profile web {
   priority: "80"
   detect: ["dep:flask", "dep:django", "dep:rails", "dep:express", "dep:laravel",
            "dep:spring-boot-starter-web", "file:config/routes.rb"]
-  entrypoints: [HttpInput, HttpHeader, Cookie, FileUpload, SecretValue, DatabaseRead, DomInput,
+  entrypoints: [HttpInput, HttpHeader, Cookie, FileUpload, PatternOptionInput, SecretValue, DatabaseRead, DomInput,
                 ComputedSizeValue, ArchiveEntryName]
 }

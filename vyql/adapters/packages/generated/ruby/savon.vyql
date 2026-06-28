@@ -8,7 +8,9 @@ adapter ruby {
     source method "ssl_cert_key_password" -> code.SecretValue
     source method "ssl_cert_file" -> code.SecretValue
     source method "ssl_ca_cert_file" -> code.SecretValue
-    mark method "ssl_ciphers" -> code.WeakCipher
+    flag code.WeakCipher on any {
+      method "ssl_ciphers"
+    }
     source method "basic_auth" -> code.SecretValue
     source method "digest_auth" -> code.SecretValue
     source method "ntlm" -> code.SecretValue

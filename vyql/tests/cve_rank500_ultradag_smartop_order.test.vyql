@@ -1,0 +1,79 @@
+# Rank 500 / CVE-2026-40583: AI-assisted SAST regression for state mutation
+# before all operation-specific preconditions ran.
+
+test "rank500: UltraDAG SmartOp mutates fee and nonce before fallible operation preconditions"
+  lang rust
+  expect VYQL-LIFE-004
+  expect_review code.StateMutationBeforeOperationPreconditions
+  code
+  ```
+  impl StateEngine {
+      pub fn apply_smart_op_tx(&mut self, tx: &crate::tx::smart_account::SmartOpTx, current_round: u64) -> Result<(), CoinError> {
+          use crate::tx::smart_account::SmartOpType;
+
+          self.ensure_smart_account_at_round(&tx.from, current_round);
+
+          if tx.fee > 0 {
+              self.debit(&tx.from, tx.fee)?;
+          }
+          self.increment_nonce(&tx.from);
+
+          match &tx.operation {
+              SmartOpType::Stake { amount } => {
+                  if *amount < crate::tx::MIN_STAKE_SATS {
+                      return Err(CoinError::ValidationError("below minimum stake".into()));
+                  }
+                  self.debit(&tx.from, *amount)?;
+              }
+              SmartOpType::Unstake => {
+                  let stake = self.stake_accounts.get_mut(&tx.from)
+                      .ok_or_else(|| CoinError::ValidationError("no stake to unstake".into()))?;
+                  if stake.unlock_at_round.is_some() {
+                      return Err(CoinError::ValidationError("already unstaking".into()));
+                  }
+              }
+          }
+
+          Ok(())
+      }
+  }
+  ```
+
+test "rank500: UltraDAG SmartOp validates preconditions before fee and nonce mutation"
+  lang rust
+  reject VYQL-LIFE-004
+  reject_review code.StateMutationBeforeOperationPreconditions
+  code
+  ```
+  impl StateEngine {
+      pub fn apply_smart_op_tx(&mut self, tx: &crate::tx::smart_account::SmartOpTx, current_round: u64) -> Result<(), CoinError> {
+          use crate::tx::smart_account::SmartOpType;
+
+          match &tx.operation {
+              SmartOpType::Stake { amount } => {
+                  if *amount < crate::tx::MIN_STAKE_SATS {
+                      return Err(CoinError::ValidationError("below minimum stake".into()));
+                  }
+                  let balance = self.balance(&tx.from);
+                  if balance < tx.fee.saturating_add(*amount) {
+                      return Err(CoinError::ValidationError("insufficient balance for stake + fee".into()));
+                  }
+              }
+              SmartOpType::Unstake => {
+                  let stake = self.stake_accounts.get(&tx.from)
+                      .ok_or_else(|| CoinError::ValidationError("no stake to unstake".into()))?;
+                  if stake.unlock_at_round.is_some() {
+                      return Err(CoinError::ValidationError("already unstaking".into()));
+                  }
+              }
+          }
+
+          if tx.fee > 0 {
+              self.debit(&tx.from, tx.fee)?;
+          }
+          self.increment_nonce(&tx.from);
+
+          Ok(())
+      }
+  }
+  ```

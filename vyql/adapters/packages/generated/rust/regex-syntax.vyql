@@ -4,6 +4,8 @@ import code.{RegexCompile}
 adapter rust {
   package "regex-syntax" {
     control method "escape" -> core.InputValidation
-    mark method "parse" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "parse"
+    }
   }
 }

@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,9 +51,6 @@ func main() {
 	// deep in loading — recover into a clean message rather than a stack trace.
 	defer func() {
 		if r := recover(); r != nil {
-			if os.Getenv("VYQL_PANIC") != "" {
-				panic(r)
-			}
 			fmt.Fprintln(os.Stderr, "vyql: "+fmt.Sprint(r))
 			os.Exit(1)
 		}
@@ -65,8 +61,6 @@ func main() {
 	switch cmd {
 	case "scan":
 		err = cmdScan(args)
-	case "review":
-		err = cmdReview(args)
 	case "trace":
 		err = cmdTrace(args)
 	case "explain":
@@ -81,12 +75,12 @@ func main() {
 		err = cmdGraph(args)
 	case "adapters":
 		err = cmdAdapters(args)
+	case "definitions":
+		err = cmdDefinitions(args)
 	case "validate-adapter":
 		err = cmdValidateAdapter(args)
 	case "diff":
 		err = cmdDiff(args)
-	case "cache":
-		err = cmdCache(args)
 	default:
 		usage()
 		os.Exit(2)
@@ -104,8 +98,14 @@ func cmdScan(args []string) error {
 	format := fs.String("format", "text", "output format: text | sarif | json | graph-json")
 	profileName := fs.String("profile", "auto", "analysis profile: auto | "+profileNames())
 	stats := fs.Bool("stats", false, "print scan profile: per-phase timing, node/edge counts, taint-hub warnings")
+	allResults := fs.Bool("all", false, "include all result sections: findings and flags (json output becomes {findings, flags})")
+	flagsOnly := fs.Bool("flags", false, "print flags only; replaces the old review command")
+	flagCategory := fs.String("flag-category", "all", "flag category filter when flags are enabled")
+	flagKind := fs.String("flag-kind", "all", "flag kind filter when flags are enabled: all | attention | target | check")
+	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
+	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
 	_ = fs.Parse(args)
 	treesitter.SetExcludes(strings.Split(*exclude, ","))
 	paths := fs.Args()
@@ -115,19 +115,26 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
-	return run(paths, *rulesPath, *format, *profileName, *stats)
+	oldOverlay := scanAdapterOverlay
+	scanAdapterOverlay = strings.TrimSpace(*adapterOverlay)
+	defer func() { scanAdapterOverlay = oldOverlay }()
+	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
+		ShowStats:    *stats,
+		IncludeFlags: *allResults,
+		FlagsOnly:    *flagsOnly,
+		FlagCategory: *flagCategory,
+		FlagKind:     *flagKind,
+		FlagLoc:      *flagLoc,
+	})
 }
 
-// applyMaxRAM honors --max-ram (or $VYQL_MAX_RAM): set the soft heap limit and route the graph
+// applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
 // through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
 // to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
 // a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
 // value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
-	if v == "" {
-		v = os.Getenv("VYQL_MAX_RAM")
-	}
 	if v == "" {
 		return noop
 	}
@@ -253,23 +260,24 @@ func scanPathsFull(paths []string, rulesSrc string) ([]*findings.Finding, usg.St
 		}
 		all = append(all, got...)
 	}
-	// Possibility mode (opt-in, for the AI/triage pass): surface ontology sink
-	// sites the confirmed rules did not flag, as low-confidence "possibility"
-	// findings. OFF by default so the protected benchmarks are unaffected.
-	if os.Getenv("VYQL_POSSIBILITY") != "" {
-		all = append(all, eng.PossibilityFindings(all)...)
-	}
 	tk.mark("evaluate")
 	return all, g, meta, stats, nil
 }
 
-func run(paths []string, rulesPath, format, profileName string, showStats bool) error {
-	if cp := os.Getenv("VYQL_CPUPROFILE"); cp != "" {
-		f, _ := os.Create(cp)
-		_ = pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-	peakHeapPath = os.Getenv("VYQL_MEMPROFILE") // captured at peak (graph built) in buildGraphWith
+type scanRunOptions struct {
+	ShowStats    bool
+	IncludeFlags bool
+	FlagsOnly    bool
+	FlagCategory string
+	FlagKind     string
+	FlagLoc      string
+}
+
+func (o scanRunOptions) wantsFlags() bool {
+	return o.IncludeFlags || o.FlagsOnly || o.FlagCategory != "" && o.FlagCategory != "all" || o.FlagKind != "" && o.FlagKind != "all" || o.FlagLoc != ""
+}
+
+func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
 	prof := applyProfile(paths, profileName)
 	src, err := loadRules(rulesPath)
 	if err != nil {
@@ -279,6 +287,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	var stats scanStats
 	var graph usg.Store
 	var ruleMeta map[string]map[string]any
+	wantsFlags := opts.wantsFlags()
 
 	if format == "graph-json" {
 		// graph-json needs the live graph + per-rule meta; the whole-scan findings cache can't
@@ -291,7 +300,8 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		// whole-scan result cache (opt-in via $VYQL_CACHE): if nothing the output depends on
 		// changed — no source file edit and no vyql/ data change — replay the cached findings and
 		// skip the pipeline entirely. On a miss, the per-file parse cache still makes the rebuild
-		// reparse only the files that actually changed.
+		// reparse only the files that actually changed. Flags need the live graph, so they also
+		// bypass the findings cache.
 		cache := parsecache.Shared()
 		tk := newTimer()
 		// Graph-DB change-feed: when requested, build the per-module delta during the scan. Force
@@ -302,7 +312,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		}
 		var rkey string
 		hit := false
-		if cache != nil && syncCollector == nil {
+		if cache != nil && syncCollector == nil && !wantsFlags {
 			rkey = scanFingerprint(cache.Salt(), paths, src, prof.Name)
 			if cs, ok := loadCachedScan(cache, rkey); ok {
 				all, stats, hit = cs.Findings, scanStats{files: cs.Files, languages: cs.Languages}, true
@@ -314,7 +324,7 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 			if err != nil {
 				return err
 			}
-			if cache != nil && syncCollector == nil {
+			if cache != nil && syncCollector == nil && !wantsFlags {
 				storeCachedScan(cache, rkey, all, stats)
 			}
 		}
@@ -329,13 +339,26 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 	}
 
 	// output
+	var flags []reviewItem
+	if wantsFlags {
+		if format == "sarif" {
+			return fmt.Errorf("flags are supported with -format text or json")
+		}
+		flags = filterReviewItems(collectReviewItems(graph), opts.FlagCategory, opts.FlagKind, opts.FlagLoc)
+	}
 	switch format {
 	case "sarif":
 		doc := sarif.ToSARIF(all, version, nil)
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":
-		b, _ := json.MarshalIndent(findingsJSON(all), "", "  ")
+		var payload any = findingsJSON(all)
+		if opts.FlagsOnly {
+			payload = scanFlagsJSON{Flags: flags}
+		} else if wantsFlags {
+			payload = scanAllJSON{Findings: findingsJSON(all), Flags: flags}
+		}
+		b, _ := json.MarshalIndent(payload, "", "  ")
 		fmt.Println(string(b))
 	case "graph-json":
 		root := ""
@@ -352,10 +375,18 @@ func run(paths []string, rulesPath, format, profileName string, showStats bool) 
 		fmt.Println(string(b))
 	default:
 		fmt.Printf("analysis profile: %s (%s)\n\n", prof.Title, prof.Name)
-		printReport(all)
-		printSummary(stats, len(all))
+		if !opts.FlagsOnly {
+			printReport(all)
+			if wantsFlags {
+				fmt.Println()
+			}
+		}
+		if wantsFlags {
+			printScanFlags(flags)
+		}
+		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
 	}
-	if showStats {
+	if opts.ShowStats {
 		fmt.Printf("[stats] profile %s (%s)\n", prof.Name, prof.Title)
 		printScanStats(graph, stats)
 	}
@@ -418,8 +449,45 @@ func printReport(fs []*findings.Finding) {
 	}
 }
 
+type scanAllJSON struct {
+	Findings []jsonFinding `json:"findings"`
+	Flags    []reviewItem  `json:"flags"`
+}
+
+type scanFlagsJSON struct {
+	Flags []reviewItem `json:"flags"`
+}
+
+func printScanFlags(rows []reviewItem) {
+	if len(rows) == 0 {
+		fmt.Println("No flags.")
+		return
+	}
+	fmt.Printf("%d flag(s):\n", len(rows))
+	for _, r := range rows {
+		fmt.Printf("\nFLAG %-11s %s @ %s", r.Category, r.Concept, r.Loc)
+		if r.Call != "" {
+			fmt.Printf("  call=%s", r.Call)
+		}
+		if r.Provenance != "" {
+			fmt.Printf("  via=%s", r.Provenance)
+		}
+		fmt.Println()
+		if len(r.Expected) > 0 {
+			fmt.Printf("  expects: %s\n", strings.Join(r.Expected, ", "))
+		}
+		if r.Review != "" {
+			fmt.Printf("  review: %s\n", r.Review)
+		}
+	}
+}
+
 // printSummary reports what was scanned (languages + file counts) and the total.
 func printSummary(stats scanStats, n int) {
+	printSummaryWithFlags(stats, n, 0, false)
+}
+
+func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags bool) {
 	var parts []string
 	for _, lg := range stats.languages {
 		parts = append(parts, fmt.Sprintf("%s:%d", lg, stats.files[lg]))
@@ -428,7 +496,11 @@ func printSummary(stats scanStats, n int) {
 	if len(parts) > 0 {
 		scanned = strings.Join(parts, " ")
 	}
-	fmt.Printf("scanned %s — %d finding(s)\n", scanned, n)
+	if includeFlags {
+		fmt.Printf("scanned %s — %d finding(s), %d flag(s)\n", scanned, findingsN, flagsN)
+		return
+	}
+	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
 }
 
 func usage() {
@@ -437,8 +509,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings   [-rules -format text|sarif|json|graph-json -profile -stats -exclude]")
-	fmt.Fprintln(os.Stderr, "  review     list non-finding review targets and supporting checks for AI/manual review   [-format text|json]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json|graph-json -profile -stats -all -flags -exclude]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")
@@ -446,6 +517,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  resolve    report interprocedural call resolution (which calls are unresolved)")
 	fmt.Fprintln(os.Stderr, "  graph      dump the USG (nodes+edges), or -taint reachability")
 	fmt.Fprintln(os.Stderr, "  adapters   list an adapter's source/sink/control/mark/assume vocabulary   [-lang go]")
+	fmt.Fprintln(os.Stderr, "  definitions inspect loaded VyQL concepts/rules/adapters/reviews   [-kind all -query TEXT -format text|json]")
 	fmt.Fprintln(os.Stderr, "  validate-adapter parse and summarize a VyQL adapter file   [-file adapter.vyql]")
 	fmt.Fprintln(os.Stderr, "  diff       diff two `scan -format json` outputs by fingerprint")
 }

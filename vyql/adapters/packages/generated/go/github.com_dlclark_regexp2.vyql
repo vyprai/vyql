@@ -3,8 +3,12 @@ import core.{InputValidation}
 
 adapter go {
   package "github.com/dlclark/regexp2" {
-    mark method "Compile" -> code.RegexCompile
-    mark method "MustCompile" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "Compile"
+    }
+    flag code.RegexCompile on any {
+      method "MustCompile"
+    }
     control method "Escape" -> core.InputValidation
   }
 }

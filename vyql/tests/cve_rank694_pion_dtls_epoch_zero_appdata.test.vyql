@@ -1,0 +1,112 @@
+# Rank 694 / CVE-2019-20786: Pion DTLS accepted application data records
+# with epoch zero, allowing unauthenticated or unencrypted application bytes
+# to be delivered before the encrypted epoch was established.
+
+test "rank694: DTLS handler delivers application data without rejecting epoch zero"
+  lang go
+  file conn.go
+  expect VYQL-AUTH-044
+  code
+  ```
+  package dtls
+
+  import "fmt"
+
+  type recordLayerHeader struct { epoch uint16 }
+  func (h *recordLayerHeader) Unmarshal([]byte) error { return nil }
+  type cipherSuite struct{}
+  func (c *cipherSuite) decrypt(b []byte) ([]byte, error) { return b, nil }
+  func (c *cipherSuite) isInitialized() bool { return true }
+  type state struct { cipherSuite *cipherSuite }
+  type recordLayer struct { content interface{} }
+  func (r *recordLayer) Unmarshal([]byte) error { return nil }
+  type applicationData struct { data []byte }
+  type Conn struct {
+      state state
+      decrypted chan []byte
+  }
+
+  func (c *Conn) handleIncomingPacket(buf []byte) error {
+      h := &recordLayerHeader{}
+      if err := h.Unmarshal(buf); err != nil {
+          return err
+      }
+      if h.epoch != 0 {
+          if c.state.cipherSuite == nil || !c.state.cipherSuite.isInitialized() {
+              return nil
+          }
+          out, err := c.state.cipherSuite.decrypt(buf)
+          if err != nil {
+              return err
+          }
+          buf = out
+      }
+      r := &recordLayer{}
+      if err := r.Unmarshal(buf); err != nil {
+          return err
+      }
+      switch content := r.content.(type) {
+      case *applicationData:
+          c.decrypted <- content.data
+      default:
+          return fmt.Errorf("unexpected message")
+      }
+      return nil
+  }
+  ```
+
+test "rank694: DTLS handler rejects application data with epoch zero"
+  lang go
+  file conn.go
+  reject VYQL-AUTH-044
+  code
+  ```
+  package dtls
+
+  import "fmt"
+
+  type recordLayerHeader struct { epoch uint16 }
+  func (h *recordLayerHeader) Unmarshal([]byte) error { return nil }
+  type cipherSuite struct{}
+  func (c *cipherSuite) decrypt(b []byte) ([]byte, error) { return b, nil }
+  func (c *cipherSuite) isInitialized() bool { return true }
+  type state struct { cipherSuite *cipherSuite }
+  type recordLayer struct { content interface{} }
+  func (r *recordLayer) Unmarshal([]byte) error { return nil }
+  type applicationData struct { data []byte }
+  type Conn struct {
+      state state
+      decrypted chan []byte
+  }
+
+  func (c *Conn) handleIncomingPacket(buf []byte) error {
+      h := &recordLayerHeader{}
+      if err := h.Unmarshal(buf); err != nil {
+          return err
+      }
+      if h.epoch != 0 {
+          if c.state.cipherSuite == nil || !c.state.cipherSuite.isInitialized() {
+              return nil
+          }
+          out, err := c.state.cipherSuite.decrypt(buf)
+          if err != nil {
+              return err
+          }
+          buf = out
+      }
+      r := &recordLayer{}
+      if err := r.Unmarshal(buf); err != nil {
+          return err
+      }
+      switch content := r.content.(type) {
+      case *applicationData:
+          if h.epoch == 0 {
+              return fmt.Errorf("ApplicationData with epoch of 0")
+          }
+          c.decrypted <- content.data
+      default:
+          return fmt.Errorf("unexpected message")
+      }
+      return nil
+  }
+  ```

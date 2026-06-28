@@ -1,5 +1,7 @@
 adapter c {
   package "tre" {
-    mark method "regexp" -> code.RegexCompile
+    flag code.RegexCompile on any {
+      method "regexp"
+    }
   }
 }

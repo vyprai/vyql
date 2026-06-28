@@ -239,13 +239,15 @@ func batchPut(cache lowering.DeltaCache, kv map[string][]byte) {
 
 // adapterFingerprint hashes every global input the adapter phase depends on besides a module's
 // own nodes: the binary salt (a rebuilt scanner re-labels everything), the active source set,
-// the package-evidence set (which package-gated adapters fire), and a stat-hash of the loaded
+// the package-evidence set (which package-scoped adapters fire), and a stat-hash of the loaded
 // adapter data (static per-language adapters + the generated per-package files for present
 // deps). If this is unchanged, a module's adapter labels are reproducible from its content.
 func adapterFingerprint(deps map[string]bool) string {
 	h := sha256.New()
-	if salt := parsecache.Shared().Salt(); salt != nil {
-		h.Write(salt)
+	if cache := parsecache.Shared(); cache != nil {
+		if salt := cache.Salt(); salt != nil {
+			h.Write(salt)
+		}
 	}
 	io.WriteString(h, "\x00sources\x00")
 	io.WriteString(h, frontend.ActiveSourcesKey())

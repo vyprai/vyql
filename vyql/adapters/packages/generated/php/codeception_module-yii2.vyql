@@ -2,7 +2,9 @@ import code.{Cookie, RedirectTarget}
 
 adapter php {
   package "codeception/module-yii2" {
-    mark method "amOnRoute" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "amOnRoute"
+    }
     source method "setCookie" -> code.Cookie
   }
 }

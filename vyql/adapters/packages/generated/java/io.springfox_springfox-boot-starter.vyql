@@ -6,6 +6,8 @@ adapter java {
     sink method "addResourceHandlers" -> code.FilePathAccess
     sink method "addViewControllers" -> code.FilePathAccess
     source method "filter" -> core.UserControlledData
-    mark method "setBaseUrl" -> code.RedirectTarget
+    flag code.RedirectTarget on any {
+      method "setBaseUrl"
+    }
   }
 }

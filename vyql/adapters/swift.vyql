@@ -22,7 +22,9 @@ adapter swift {
   sink method "evaluateJavaScript" -> code.WebViewLoad
   sink method "loadHTMLString" -> code.WebViewLoad
   sink method "stringByEvaluatingJavaScriptFromString" -> code.WebViewLoad
-  mark "add.name" -> code.WebViewJsInterface
+  flag code.WebViewJsInterface on any {
+    path "add.name"
+  }
 
   // SQL — sqlite3 C API (query is arg1) + ORM execute (raw query is arg0)
   sink path "sqlite3_exec" arg 1 -> code.SqlExecution
@@ -46,6 +48,13 @@ adapter swift {
   // SSRF
   sink path "URL" -> code.UrlFetch
   sink path "URLRequest" -> code.UrlFetch
+  flag code.WebViewServerRedirectUrlValidationBypass in module {
+    lang "swift"
+    call path "RequestHandler.handle"
+    call path "decisionHandler"
+    selector "navigationAction.request"
+    not token param_label "didReceiveServerRedirectForProvisionalNavigation"
+  }
 
   // regex compile (ReDoS) — tainted PATTERN
   sink path "NSRegularExpression" -> code.RegexCompile
@@ -66,47 +75,130 @@ adapter swift {
   sink method "findById" -> code.ObjectLookupByUserInput
   sink method "getUser" -> code.ObjectLookupByUserInput
   sink method "getAccount" -> code.ObjectLookupByUserInput
-  mark "changePassword" -> code.AuthenticationRequiredOp
-  mark "updatePassword" -> code.AuthenticationRequiredOp
-  mark "resetPassword" -> code.AuthenticationRequiredOp
-  mark "changeEmail" -> code.AuthenticationRequiredOp
-  mark "transferFunds" -> code.AuthenticationRequiredOp
-  mark "deleteAccount" -> code.AuthenticationRequiredOp
-  mark "grantRole" -> code.AuthenticationRequiredOp
-  mark "makeAdmin" -> code.AuthenticationRequiredOp
+  flag code.AuthenticationRequiredOp on any {
+    path "changePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "updatePassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "resetPassword"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "changeEmail"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "transferFunds"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "deleteAccount"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "grantRole"
+  }
+  flag code.AuthenticationRequiredOp on any {
+    path "makeAdmin"
+  }
+  flag code.ClearanceKitPolicyApplyBeforeAdapterStart in module {
+    lang "swift"
+    has "server.applyPolicyToFilter()server.applyAllowlistToFilter()server.applyJailRulesToFilter()"
+    has "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})"
+    lacks "adapter.start(initialRules:initialRules,onXProtectChanged:{server.handleXProtectChange()})server.applyPolicyToFilter()"
+  }
 
   // weak hash (CWE-328) — CryptoKit Insecure.* + CommonCrypto CC_MD5/CC_SHA1
-  mark "Insecure.MD5" -> code.WeakHash
-  mark "Insecure.SHA1" -> code.WeakHash
-  mark "CC_MD5" -> code.WeakHash
-  mark "CC_SHA1" -> code.WeakHash
+  flag code.WeakHash on any {
+    path "Insecure.MD5"
+  }
+  flag code.WeakHash on any {
+    path "Insecure.SHA1"
+  }
+  flag code.WeakHash on any {
+    path "CC_MD5"
+  }
+  flag code.WeakHash on any {
+    path "CC_SHA1"
+  }
 
   // weak cipher (CWE-327) — broken block cipher selected by algorithm name
-  mark "Cipher" val "DES" -> code.WeakCipher
-  mark "Cipher" val "RC4" -> code.WeakCipher
-  mark "Cipher" val "Blowfish" -> code.WeakCipher
-  mark "Cipher" val "0000000000000000" -> code.StaticIv
-  mark "AES.GCM.Nonce" val "000000000000" -> code.StaticIv
+  flag code.WeakCipher on any {
+    path "Cipher"
+    has "DES"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher"
+    has "RC4"
+  }
+  flag code.WeakCipher on any {
+    path "Cipher"
+    has "Blowfish"
+  }
+  flag code.StaticIv on any {
+    path "Cipher"
+    has "0000000000000000"
+  }
+  flag code.StaticIv on any {
+    path "AES.GCM.Nonce"
+    has "000000000000"
+  }
 
   // insecure randomness (CWE-330) — arc4random / Int.random (SecRandomCopyBytes is safe)
-  mark "arc4random" -> code.WeakRandomValue
-  mark "arc4random_uniform" -> code.WeakRandomValue
+  flag code.WeakRandomValue on any {
+    path "arc4random"
+  }
+  flag code.WeakRandomValue on any {
+    path "arc4random_uniform"
+  }
 
   // insecure cookie (CWE-614) — cookie configured insecurely (setter-method idiom)
-  mark "setSecure" val "false" -> code.InsecureCookie
-  mark "setHttpOnly" val "false" -> code.InsecureCookie
-  mark "allowsAnyHTTPSCertificate" val "true" -> code.CertValidationDisabled
-  mark "serverTrustPolicy" val "disableEvaluation" -> code.CertValidationDisabled
-  mark "URL" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "URLRequest" val "http://" nval "127.0" -> code.CleartextChannel
-  mark "setHeader" val "Access-Control-Allow-Origin" val "*" -> code.PermissiveCors
-  mark "setHeader" val "X-Frame-Options" val "ALLOWALL" -> code.MissingFrameProtection
-  mark "FileHandle.forReadingAtPath" -> code.ResourceHandle
-  mark "FileHandle.forWritingAtPath" -> code.ResourceHandle
+  flag code.InsecureCookie on any {
+    path "setSecure"
+    has "false"
+  }
+  flag code.InsecureCookie on any {
+    path "setHttpOnly"
+    has "false"
+  }
+  flag code.CertValidationDisabled on any {
+    path "allowsAnyHTTPSCertificate"
+    has "true"
+  }
+  flag code.CertValidationDisabled on any {
+    path "serverTrustPolicy"
+    has "disableEvaluation"
+  }
+  flag code.CleartextChannel on any {
+    path "URL"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.CleartextChannel on any {
+    path "URLRequest"
+    has "http://"
+    lacks "127.0"
+  }
+  flag code.PermissiveCors on any {
+    path "setHeader"
+    has "Access-Control-Allow-Origin"
+    has "*"
+  }
+  flag code.MissingFrameProtection on any {
+    path "setHeader"
+    has "X-Frame-Options"
+    has "ALLOWALL"
+  }
+  flag code.ResourceHandle on any {
+    path "FileHandle.forReadingAtPath"
+  }
+  flag code.ResourceHandle on any {
+    path "FileHandle.forWritingAtPath"
+  }
   control method "closeFile" -> core.ResourceRelease
 
   // memory safety
-  mark "BIO_puts" -> code.UnboundedCopySmell
+  flag code.UnboundedCopySmell on any {
+    path "BIO_puts"
+  }
 
   // controls — sanitizers/validators defined in each generated case's preamble
   control "escapeHtml" -> core.HtmlEscape

@@ -1,17 +1,41 @@
 import code.{WeakHash}
 adapter go {
   package "github.com/spaolacci/murmur3" {
-    mark method "New32" -> code.WeakHash
-    mark method "New32WithSeed" -> code.WeakHash
-    mark method "Sum32" -> code.WeakHash
-    mark method "Sum32WithSeed" -> code.WeakHash
-    mark method "New64" -> code.WeakHash
-    mark method "New64WithSeed" -> code.WeakHash
-    mark method "Sum64" -> code.WeakHash
-    mark method "Sum64WithSeed" -> code.WeakHash
-    mark method "New128" -> code.WeakHash
-    mark method "New128WithSeed" -> code.WeakHash
-    mark method "Sum128" -> code.WeakHash
-    mark method "Sum128WithSeed" -> code.WeakHash
+    flag code.WeakHash on any {
+      method "New32"
+    }
+    flag code.WeakHash on any {
+      method "New32WithSeed"
+    }
+    flag code.WeakHash on any {
+      method "Sum32"
+    }
+    flag code.WeakHash on any {
+      method "Sum32WithSeed"
+    }
+    flag code.WeakHash on any {
+      method "New64"
+    }
+    flag code.WeakHash on any {
+      method "New64WithSeed"
+    }
+    flag code.WeakHash on any {
+      method "Sum64"
+    }
+    flag code.WeakHash on any {
+      method "Sum64WithSeed"
+    }
+    flag code.WeakHash on any {
+      method "New128"
+    }
+    flag code.WeakHash on any {
+      method "New128WithSeed"
+    }
+    flag code.WeakHash on any {
+      method "Sum128"
+    }
+    flag code.WeakHash on any {
+      method "Sum128WithSeed"
+    }
   }
 }

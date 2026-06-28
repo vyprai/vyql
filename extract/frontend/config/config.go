@@ -5,6 +5,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"os"
 	"path/filepath"
@@ -35,6 +36,7 @@ func Extract(files []string, root string) (nir.Program, error) {
 				k = "texttemplate:" + scope
 			}
 		}
+		fileSignatureBody := scanDotTemplate(src, rel)
 		switch {
 		case k == "android":
 			body = scanAndroidManifest(src, rel)
@@ -46,14 +48,28 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanYaml(src, rel)
 		case k == "terraform":
 			body = scanTerraform(src, rel)
+		case k == "setupcfg":
+			body = scanSetupCfg(src, rel)
+		case k == "npm_package":
+			body = scanNpmPackage(src, rel)
+		case k == "pest":
+			body = scanPest(src, rel)
+		case k == "schematron":
+			body = scanSchematron(src, rel)
+		case k == "concretephp":
+			body = scanConcretePHP(src, rel)
 		case k == "jelly":
 			body = scanJelly(src, rel)
 		case k == "jsp":
 			body = scanJSP(src, rel)
 		case k == "dottemplate":
-			body = scanDotTemplate(src, rel)
+			body = fileSignatureBody
 		case strings.HasPrefix(k, "texttemplate:"):
 			body = scanTextTemplate(src, rel, strings.TrimPrefix(k, "texttemplate:"))
+		}
+		body = append(body, scanHTMLReferrerLinks(src, rel)...)
+		if k != "dottemplate" && len(fileSignatureBody) > 0 {
+			body = append(body, fileSignatureBody...)
 		}
 		if len(body) == 0 {
 			continue
@@ -72,6 +88,9 @@ func kind(path string, src []byte) string {
 	if base == "androidmanifest.xml" {
 		return "android"
 	}
+	if base == "plugin.xml" && bytes.Contains(src, []byte("AndroidManifest.xml")) {
+		return "android"
+	}
 	if ext == ".plist" {
 		return "plist"
 	}
@@ -80,6 +99,12 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".tf" {
 		return "terraform"
+	}
+	if base == "setup.cfg" {
+		return "setupcfg"
+	}
+	if base == "package.json" {
+		return "npm_package"
 	}
 	if ext == ".jelly" {
 		return "jelly"
@@ -92,6 +117,18 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".yaml" || ext == ".yml" {
 		return "yaml"
+	}
+	if ext == ".pest" {
+		return "pest"
+	}
+	if ext == ".sch" {
+		return "schematron"
+	}
+	if ext == ".php" {
+		slashPath := filepath.ToSlash(strings.ToLower(path))
+		if strings.HasSuffix(slashPath, "concrete/config/concrete.php") {
+			return "concretephp"
+		}
 	}
 	// fall back to the root element for unconventionally-named files.
 	dec := xml.NewDecoder(bytes.NewReader(src))
@@ -119,11 +156,140 @@ var (
 )
 
 func scanJelly(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jelly")
+	cfg := loadProfile()
+	out := scanTemplateExpressions(src, file, "jelly")
+	out = append(out, scanJenkinsJellySecretTextboxes(src, file)...)
+	text := string(src)
+	out = append(out, scopedFileContainsAllEvents(cfg, "jelly", text, file)...)
+	for i, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "jelly", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanJenkinsJellySecretTextboxes(src []byte, file string) []nir.Stmt {
+	var out []nir.Stmt
+	inSecretEntry := false
+	entryLine := 0
+	for i, raw := range strings.Split(string(src), "\n") {
+		lineNo := i + 1
+		line := strings.TrimSpace(raw)
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "<f:entry") {
+			inSecretEntry = jellyEntryFieldLooksSecret(line)
+			entryLine = lineNo
+		}
+		if !inSecretEntry {
+			continue
+		}
+		if strings.Contains(lower, "<f:password") {
+			inSecretEntry = false
+			continue
+		}
+		if strings.Contains(lower, "<f:textbox") {
+			locLine := lineNo
+			if entryLine > 0 {
+				locLine = entryLine
+			}
+			out = append(out, nir.ExprStmt{Value: call("analysis.config.jenkins_jelly_secret_textbox", file, locLine)})
+			inSecretEntry = false
+			continue
+		}
+		if strings.Contains(lower, "</f:entry") {
+			inSecretEntry = false
+		}
+	}
+	return out
+}
+
+func jellyEntryFieldLooksSecret(line string) bool {
+	field := strings.ToLower(attributeValue(line, "field"))
+	if field == "" {
+		return false
+	}
+	for _, part := range []string{"secret", "password", "passwd", "token", "credential", "apikey", "api_key", "privatekey", "private_key"} {
+		if strings.Contains(field, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func attributeValue(line, name string) string {
+	for _, quote := range []byte{'"', '\''} {
+		prefix := name + "=" + string(quote)
+		start := strings.Index(line, prefix)
+		if start < 0 {
+			continue
+		}
+		start += len(prefix)
+		end := strings.IndexByte(line[start:], quote)
+		if end < 0 {
+			return line[start:]
+		}
+		return line[start : start+end]
+	}
+	return ""
+}
+
+func scanPest(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "pest", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanConcretePHP(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "concretephp", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanSchematron(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	text := string(src)
+	var out []nir.Stmt
+	out = append(out, scopedFileContainsAllEvents(cfg, "schematron", text, file)...)
+	for i, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "schematron", line, file, i+1)...)
+	}
+	return out
 }
 
 func scanJSP(src []byte, file string) []nir.Stmt {
-	return scanTemplateExpressions(src, file, "jsp")
+	cfg := loadProfile()
+	var out []nir.Stmt
+	out = append(out, scanTemplateExpressions(src, file, "jsp")...)
+	out = append(out, scanTemplateExpressions(src, file, "jsp_scriptlet")...)
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "jsp", line, file, i+1)...)
+	}
+	return out
 }
 
 func scanDotTemplate(src []byte, file string) []nir.Stmt {
@@ -217,17 +383,25 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	escapeActive := false
+	aliases := map[string]bool{}
 	for i, raw := range strings.Split(string(src), "\n") {
 		line := strings.TrimSpace(raw)
 		if containsAnyFold(line, profile.EscapeActiveContains) {
 			escapeActive = true
+		}
+		if varName := templateSetVarName(line); varName != "" {
+			for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
+				if profile.InputPattern.MatchString(expr) || aliases[expr] {
+					aliases[varName] = true
+				}
+			}
 		}
 		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
 			continue
 		}
 		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
 		for _, expr := range templateExpressions(line, profile.ExprStart, profile.ExprEnd) {
-			if expr == "" || !profile.InputPattern.MatchString(expr) {
+			if expr == "" || (!profile.InputPattern.MatchString(expr) && !aliases[expr]) {
 				continue
 			}
 			loc := file + ":" + itoa(i+1)
@@ -241,6 +415,26 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 		}
 	}
 	return out
+}
+
+func templateSetVarName(line string) string {
+	if !strings.Contains(line, "<j:set") {
+		return ""
+	}
+	for _, quote := range []byte{'"', '\''} {
+		prefix := "var=" + string(quote)
+		start := strings.Index(line, prefix)
+		if start < 0 {
+			continue
+		}
+		rest := line[start+len(prefix):]
+		end := strings.IndexByte(rest, quote)
+		if end <= 0 {
+			return ""
+		}
+		return strings.TrimSpace(rest[:end])
+	}
+	return ""
 }
 
 func templateExpressions(line, startDelim, endDelim string) []string {
@@ -473,8 +667,8 @@ func loadProfile() configProfile {
 				Event:     parts[4],
 			})
 		}
-		exprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
-		exprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
+		globalExprStart := firstNonEmpty(metaString(meta, "config_template_expr_start"), defaultExprStart)
+		globalExprEnd := firstNonEmpty(metaString(meta, "config_template_expr_end"), defaultExprEnd)
 		for _, scope := range metaList(meta, "config_template_scopes") {
 			pattern := metaString(meta, "config_template_input_pattern_"+scope)
 			inputEvent := metaString(meta, "config_template_input_event_"+scope)
@@ -483,8 +677,8 @@ func loadProfile() configProfile {
 				panic("config: malformed config template profile " + scope)
 			}
 			configProfileData.Templates[scope] = templateProfile{
-				ExprStart:            exprStart,
-				ExprEnd:              exprEnd,
+				ExprStart:            firstNonEmpty(metaString(meta, "config_template_expr_start_"+scope), globalExprStart),
+				ExprEnd:              firstNonEmpty(metaString(meta, "config_template_expr_end_"+scope), globalExprEnd),
 				InputPattern:         regexp.MustCompile(pattern),
 				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
 				InputEvent:           inputEvent,
@@ -686,6 +880,78 @@ func scanYaml(src []byte, file string) []nir.Stmt {
 	return out
 }
 
+func scanNpmPackage(src []byte, file string) []nir.Stmt {
+	var manifest map[string]any
+	if err := json.Unmarshal(src, &manifest); err != nil {
+		return nil
+	}
+	if !npmPackageUsesNodePreGypRemoteBinary(manifest) {
+		return nil
+	}
+	return []nir.Stmt{nir.ExprStmt{Value: call(
+		"analysis.config.npm.node_pre_gyp_remote_binary_install",
+		file,
+		firstLineContainingFold(string(src), "node-pre-gyp"),
+	)}}
+}
+
+func npmPackageUsesNodePreGypRemoteBinary(manifest map[string]any) bool {
+	return npmManifestHasNodePreGyp(manifest) &&
+		npmManifestHasInstallScript(manifest) &&
+		npmManifestHasBinaryHost(manifest)
+}
+
+func npmManifestHasNodePreGyp(manifest map[string]any) bool {
+	for _, field := range []string{"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"} {
+		if obj, ok := manifest[field].(map[string]any); ok {
+			for name := range obj {
+				if strings.EqualFold(name, "node-pre-gyp") {
+					return true
+				}
+			}
+		}
+	}
+	if arr, ok := manifest["bundledDependencies"].([]any); ok {
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.EqualFold(s, "node-pre-gyp") {
+				return true
+			}
+		}
+	}
+	if arr, ok := manifest["bundleDependencies"].([]any); ok {
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.EqualFold(s, "node-pre-gyp") {
+				return true
+			}
+		}
+	}
+	if scripts, ok := manifest["scripts"].(map[string]any); ok {
+		if v, ok := scripts["node-pre-gyp"].(string); ok && strings.Contains(strings.ToLower(v), "node-pre-gyp") {
+			return true
+		}
+	}
+	return false
+}
+
+func npmManifestHasInstallScript(manifest map[string]any) bool {
+	scripts, ok := manifest["scripts"].(map[string]any)
+	if !ok {
+		return false
+	}
+	install, ok := scripts["install"].(string)
+	return ok && strings.TrimSpace(install) != ""
+}
+
+func npmManifestHasBinaryHost(manifest map[string]any) bool {
+	binary, ok := manifest["binary"].(map[string]any)
+	if !ok {
+		return false
+	}
+	host, ok := binary["host"].(string)
+	host = strings.TrimSpace(host)
+	return ok && (strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") || strings.HasPrefix(host, "//"))
+}
+
 func scanTerraform(src []byte, file string) []nir.Stmt {
 	cfg := loadProfile()
 	var out []nir.Stmt
@@ -698,6 +964,57 @@ func scanTerraform(src []byte, file string) []nir.Stmt {
 		out = append(out, quotedStarFieldEvents(cfg, "terraform", line, file, i+1)...)
 	}
 	return out
+}
+
+func scanSetupCfg(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "setupcfg", line, file, i+1)...)
+	}
+	return out
+}
+
+func scanHTMLReferrerLinks(src []byte, file string) []nir.Stmt {
+	ext := strings.ToLower(filepath.Ext(file))
+	if ext != ".html" && ext != ".htm" {
+		return nil
+	}
+	var out []nir.Stmt
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		low := strings.ToLower(line)
+		if !strings.Contains(low, "<a ") || !strings.Contains(low, "href=") {
+			continue
+		}
+		if strings.Contains(low, "noreferrer") || !htmlLinkLooksExternal(low) {
+			continue
+		}
+		out = append(out, nir.ExprStmt{Value: call("analysis.config.html.external_link_missing_noreferrer", file, i+1)})
+	}
+	return out
+}
+
+func htmlLinkLooksExternal(low string) bool {
+	if strings.Contains(low, "http://") || strings.Contains(low, "https://") || strings.Contains(low, "//") {
+		return true
+	}
+	if !strings.Contains(low, "settings.platform_") {
+		return false
+	}
+	for _, marker := range []string{
+		"twitter", "facebook", "linkedin", "meetup", "google_plus", "googleplus",
+		"instagram", "youtube", "social",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func call(token, file string, line int) nir.Call {
