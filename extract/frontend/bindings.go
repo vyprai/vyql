@@ -262,12 +262,14 @@ type flowTokenIndex struct {
 // rebuild was hundreds of full RangeNodes scans and the dominant GC source. Keyed by store
 // identity so distinct in-process scans (e.g. parallel tests) never share an index.
 type sharedStoreIndexes struct {
-	flagOnce sync.Once
-	flag     *flagMatchIndex
-	flowOnce sync.Once
-	flow     *flowTokenIndex
-	techOnce sync.Once
-	fileTech map[string]string
+	flagOnce   sync.Once
+	flag       *flagMatchIndex
+	flowOnce   sync.Once
+	flow       *flowTokenIndex
+	techOnce   sync.Once
+	fileTech   map[string]string
+	corpusOnce sync.Once
+	corpus     string
 }
 
 var sharedStoreIndexCache sync.Map // structural epoch (uint64) -> *sharedStoreIndexes
@@ -307,11 +309,58 @@ func sharedFileContextTechs(s usg.Store) map[string]string {
 	return si.fileTech
 }
 
+// sharedTextCorpus returns a once-per-store, lowercased concatenation of every node's textual
+// content. It is a strict SUPERSET of every string a binding predicate can read, so a literal
+// absent from it is absent from the program. Used to evaluate the `content(...)` binding
+// requirement: a binding whose required code literal does not occur anywhere cannot match, so it
+// is gated off — the metadata-driven way CVE pattern bindings skip projects they do not target.
+// presenceGateMinNodes is the graph size above which the content() presence gate is worth its
+// one-time corpus build. Normal repos fall below it and run unchanged; only very large trees (the
+// Linux kernel and comparable monorepos) cross it, where skipping CVE pattern bindings that target
+// other projects saves far more than the gate costs.
+const presenceGateMinNodes = 2000000
+
+func storeNodeCount(s usg.Store) int {
+	if c, ok := s.(interface{ NodeCount() int }); ok {
+		return c.NodeCount()
+	}
+	return 0
+}
+
+func sharedTextCorpus(s usg.Store) string {
+	si := storeIndexes(s)
+	si.corpusOnce.Do(func() { si.corpus = buildTextCorpus(s) })
+	return si.corpus
+}
+
+func buildTextCorpus(s usg.Store) string {
+	var b strings.Builder
+	add := func(v string) {
+		if v != "" {
+			b.WriteString(strings.ToLower(v))
+			b.WriteByte('\n')
+		}
+	}
+	rangeNodes(s, func(n usg.Node) bool {
+		add(n.ID)
+		add(n.Type)
+		add(n.Loc)
+		add(n.Region)
+		add(n.Scope)
+		for _, v := range n.Props {
+			add(v)
+		}
+		return true
+	})
+	return b.String()
+}
+
 type flagMatchIndex struct {
 	built        bool
 	flow         flowTokenIndex
 	nodes        map[string]usg.Node
 	types        map[string][]usg.Node
+	typesByTech  map[string]map[string][]usg.Node // tech -> type -> nodes ("" tech = unknown, kept by every language)
 	typesByFile  map[string]map[string][]usg.Node
 	binopsByFile map[string]map[string][]usg.Node
 	paramsByLine map[string]map[int][]usg.Node
@@ -319,6 +368,41 @@ type flagMatchIndex struct {
 	lowerText    map[string]string
 	callArgText  map[string]string
 	predHitSets  map[string]scopedPredicateHitSet
+}
+
+// nodesOfTechType returns the nodes of nodeType that a binding of the given technology must
+// consider: only that technology's nodes (plus unknown-technology nodes, which every language
+// binding kept), or all nodes for a cross-language binding. This replaces scanning every node of
+// the type and skipping by technology per node — the cost that made a polyglot tree (the kernel
+// has a few .py/.php files) run every present language's bindings over all ~millions of nodes.
+// techNodes returns, across the given node types, the nodes a binding of the given technology must
+// consider (its own technology's nodes plus unknown-technology nodes, or all for cross-language).
+// Applicators iterate this instead of every node of the type followed by a per-node technology
+// skip, so a language with few files (a handful of .py in a C tree) costs a handful of nodes, not a
+// full-graph scan.
+func (idx *flagMatchIndex) techNodes(s usg.Store, tech string, crossLang bool, types ...string) []usg.Node {
+	idx.ensure(s)
+	var out []usg.Node
+	for _, t := range types {
+		out = append(out, idx.nodesOfTechType(s, tech, t, crossLang)...)
+	}
+	return out
+}
+
+func (idx *flagMatchIndex) nodesOfTechType(s usg.Store, tech, nodeType string, crossLang bool) []usg.Node {
+	idx.ensure(s)
+	if crossLang || tech == "" {
+		return idx.types[nodeType]
+	}
+	own := idx.typesByTech[tech][nodeType]
+	unknown := idx.typesByTech[""][nodeType]
+	if len(unknown) == 0 {
+		return own
+	}
+	out := make([]usg.Node, 0, len(own)+len(unknown))
+	out = append(out, own...)
+	out = append(out, unknown...)
+	return out
 }
 
 type scopeHitCount struct {
@@ -342,6 +426,7 @@ func (idx *flagMatchIndex) ensure(s usg.Store) {
 	idx.built = true
 	idx.nodes = map[string]usg.Node{}
 	idx.types = map[string][]usg.Node{}
+	idx.typesByTech = map[string]map[string][]usg.Node{}
 	idx.typesByFile = map[string]map[string][]usg.Node{}
 	idx.binopsByFile = map[string]map[string][]usg.Node{}
 	idx.paramsByLine = map[string]map[int][]usg.Node{}
@@ -349,9 +434,15 @@ func (idx *flagMatchIndex) ensure(s usg.Store) {
 	idx.lowerText = map[string]string{}
 	idx.callArgText = map[string]string{}
 	idx.predHitSets = map[string]scopedPredicateHitSet{}
+	fileTech := sharedFileContextTechs(s)
 	rangeNodes(s, func(n usg.Node) bool {
 		idx.nodes[n.ID] = n
 		idx.types[n.Type] = append(idx.types[n.Type], n)
+		tech := nodeTechFromNodeWithFileContext(n, fileTech)
+		if idx.typesByTech[tech] == nil {
+			idx.typesByTech[tech] = map[string][]usg.Node{}
+		}
+		idx.typesByTech[tech][n.Type] = append(idx.typesByTech[tech][n.Type], n)
 		if file := locFile(n.Prop("loc")); file != "" {
 			if idx.typesByFile[n.Type] == nil {
 				idx.typesByFile[n.Type] = map[string][]usg.Node{}
@@ -704,6 +795,17 @@ var callablePropTypes = []string{
 	"code.Function",
 	"code.Class",
 	"code.Import",
+}
+
+// rangeTechCallablePropNodes is rangeCallablePropNodes restricted to a binding's technology (plus
+// unknown-technology nodes), or all nodes for a cross-language binding — so a language applicator
+// visits only its own nodes instead of scanning every callable node and skipping by technology.
+func rangeTechCallablePropNodes(idx *flagMatchIndex, s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool) {
+	for _, n := range idx.techNodes(s, tech, crossLang, callablePropTypes...) {
+		if !fn(n) {
+			return
+		}
+	}
 }
 
 func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
@@ -1124,7 +1226,6 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 		Name: spec.Name + ".assumptions", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "syntactic", Origin: "human",
 		Apply: func(s usg.Store) []bindings.Mapping {
-			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			effects := make([]requirementEffect, len(spec.AdvisoryNeutralizers))
@@ -1133,11 +1234,8 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 			}
 			var out []bindings.Mapping
 			scopeIdx := sharedFlagIndex(s)
-			for _, id := range ids {
-				n, _, _ := s.GetNode(id)
-				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
-					continue
-				}
+			for _, n := range scopeIdx.techNodes(s, spec.Technology, spec.crossLang, "code.Call") {
+				id := n.ID
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				for ai, as := range spec.AdvisoryNeutralizers {
 					if !effects[ai].Allowed {
@@ -1188,7 +1286,6 @@ func (spec bindingSpec) filterApplicator() bindings.Applicator {
 			if concept == "" {
 				return nil
 			}
-			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			allowed := make([]bool, len(spec.Filters))
@@ -1196,11 +1293,8 @@ func (spec bindingSpec) filterApplicator() bindings.Applicator {
 				allowed[i] = reqGate.allowed(spec.Filters[i].Packages, spec.Filters[i].Requirement)
 			}
 			var out []bindings.Mapping
-			for _, id := range ids {
-				n, _, _ := s.GetNode(id)
-				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
-					continue
-				}
+			for _, n := range sharedFlagIndex(s).techNodes(s, spec.Technology, false, "code.Call") {
+				id := n.ID
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				matched, global := false, false
 				for fi, f := range spec.Filters {
@@ -1699,13 +1793,10 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 			}
 			var out []bindings.Mapping
 			scopeIdx := sharedFlagIndex(s)
-			rangeCallablePropNodes(s, func(n usg.Node) bool {
+			rangeTechCallablePropNodes(scopeIdx, s, spec.Technology, spec.crossLang, func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" && len(inIdx.loose) == 0 {
 					return true
-				}
-				if t := nodeTechFromNode(n); !spec.crossLang && t != "" && t != spec.Technology {
-					return true // only label this language's nodes (cross-language bindings skip this)
 				}
 				for _, ci := range inIdx.candidates(method, path) {
 					in := spec.Inputs[ci]
@@ -1770,11 +1861,6 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 		Name: spec.Name + ".sinks", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []bindings.Mapping {
-			ids, _ := s.NodesOfType("code.Call")
-			attrs, _ := s.NodesOfType("code.Attr")
-			ids = append(ids, attrs...)
-			binops, _ := s.NodesOfType("code.BinOp")
-			ids = append(ids, binops...)
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			sinkIdx := buildSpecIndex(len(spec.Sinks), func(i int) (methods, paths []string, loose bool) {
@@ -1791,11 +1877,8 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 			flowIdx := sharedFlowIndex(s)
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
-			for _, id := range ids {
-				n, _, _ := s.GetNode(id)
-				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
-					continue // only label this language's nodes
-				}
+			for _, n := range scopeIdx.techNodes(s, spec.Technology, false, "code.Call", "code.Attr", "code.BinOp") {
+				id := n.ID
 				isAttr := n.Type == "code.Attr"
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
 				cand := sinkIdx.candidates(method, path)
@@ -1979,7 +2062,6 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 		Name: spec.Name + ".controls", Technology: spec.Technology, Specificity: 2,
 		Fidelity: "resolved", Origin: "human",
 		Apply: func(s usg.Store) []bindings.Mapping {
-			ids, _ := s.NodesOfType("code.Call")
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			ctrlIdx := buildSpecIndex(len(spec.Controls), func(i int) (methods, paths []string, loose bool) {
@@ -1995,11 +2077,8 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 			var out []bindings.Mapping
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
-			for _, id := range ids {
-				n, _, _ := s.GetNode(id)
-				if t := nodeTechFromNode(n); t != "" && t != spec.Technology {
-					continue // only label this language's nodes
-				}
+			for _, n := range scopeIdx.techNodes(s, spec.Technology, false, "code.Call") {
+				id := n.ID
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				for _, ci := range ctrlIdx.candidates(method, path) {
 					c := spec.Controls[ci]
@@ -2401,6 +2480,23 @@ func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementE
 		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	case "import":
 		if g.importGate().inEvidence(req.Value) {
+			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
+		}
+		return requirementEffect{Allowed: false, State: requirementStateMissing}
+	case "content":
+		// A code-literal presence gate: the binding only applies when this literal occurs
+		// somewhere in the program. Absent ⇒ the binding's match (which requires the literal)
+		// is impossible, so it is gated off — letting a CVE pattern binding skip projects it
+		// does not target without scanning their nodes. Matched case-insensitively against the
+		// whole-program text corpus (a superset of all node text), consistent with how the
+		// predicate value itself is matched.
+		//
+		// This is a pure performance gate (running an un-gated binding just matches nothing), so it
+		// is only evaluated above a node-count threshold: building the corpus is not worth it on
+		// small/normal repos, where the binding scan is already cheap. Below the threshold the gate
+		// is treated as satisfied and the binding runs unchanged.
+		if req.Value == "" || storeNodeCount(g.store) < presenceGateMinNodes ||
+			strings.Contains(sharedTextCorpus(g.store), strings.ToLower(req.Value)) {
 			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
 		}
 		return requirementEffect{Allowed: false, State: requirementStateMissing}
@@ -2924,15 +3020,7 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 			}
 			nodeTypes := flagApplicatorNodeTypes(spec.Flags, spec.crossLang)
 			for _, nodeType := range nodeTypes {
-				ids, _ := s.NodesOfType(nodeType)
-				for _, id := range ids {
-					n, ok, err := s.GetNode(id)
-					if err != nil || !ok {
-						continue
-					}
-					if t := nodeTechFromNodeWithFileContext(n, fileTech); !spec.crossLang && t != "" && t != spec.Technology {
-						continue
-					}
+				for _, n := range matchIdx.nodesOfTechType(s, spec.Technology, nodeType, spec.crossLang) {
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
 						if !effects[i].Allowed {
 							continue
@@ -4338,12 +4426,7 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
 			for _, nodeType := range nodeTypes {
-				ids, _ := s.NodesOfType(nodeType)
-				for _, id := range ids {
-					n, _, _ := s.GetNode(id)
-					if t := nodeTechFromNode(n); !crossLang && t != "" && t != spec.Technology {
-						continue
-					}
+				for _, n := range scopeIdx.nodesOfTechType(s, spec.Technology, nodeType, crossLang) {
 					path := n.Prop("callee_path")
 					method := n.Prop("method")
 					seenMapping := map[string]bool{}

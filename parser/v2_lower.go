@@ -1283,6 +1283,16 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 	if err != nil {
 		return nil, true, fmt.Errorf("binding %s: %w", b.Name, err)
 	}
+	// Self-gate by content: when a presence binding declares no explicit requirement, derive a
+	// content() gate from its most distinctive necessary literal (a positive identifier-like
+	// predicate value that must occur for any match). The binding then skips whole programs that
+	// don't contain that literal — so a CVE pattern binding targeting one project doesn't scan
+	// every node of unrelated trees. Sound: the literal is required by the match either way.
+	if req == nil {
+		if lit := deriveV2ContentGate(fl); lit != "" {
+			req = &BindingRequirement{Op: "content", Value: lit}
+		}
+	}
 	var out []BindingAction
 	for _, action := range b.Outputs {
 		action.Concept = names.concept(action.Concept)
@@ -1319,6 +1329,59 @@ func lowerV2PresenceBinding(b *V2BindingDecl, names v2NameResolver, expr V2Expr,
 		}, b.Attrs)
 	}
 	return out, true, nil
+}
+
+// deriveV2ContentGate picks the most distinctive literal that MUST occur for a presence flag to
+// match: the longest identifier-like value of a positive, literal-matching predicate (its
+// structured prefix — call_path:/literal:/name=/… — stripped, since only the post-prefix part is
+// matched against real node text). Returns "" when no such literal exists, leaving the binding
+// ungated. Identifier-like (letters/digits/_/.-, reasonably long) guarantees the literal occurs
+// verbatim in node text, so a whole-program absence check against it is sound.
+func deriveV2ContentGate(fl *BindingPresence) string {
+	if fl == nil {
+		return ""
+	}
+	best := ""
+	for _, p := range fl.Predicates {
+		if p.Negative || !v2ContentGateableOp(p.Op) {
+			continue
+		}
+		for _, v := range p.Values {
+			needle := v
+			if i := strings.IndexAny(v, ":="); i > 0 {
+				needle = v[i+1:]
+			}
+			if v2IdentifierLikeLiteral(needle) && len(needle) > len(best) {
+				best = needle
+			}
+		}
+	}
+	return best
+}
+
+func v2ContentGateableOp(op string) bool {
+	switch op {
+	case "contains", "contains_any", "equals", "equals_any", "starts_with", "ends_with":
+		return true
+	default:
+		return false
+	}
+}
+
+func v2IdentifierLikeLiteral(s string) bool {
+	if len(s) < 6 { // short tokens are rarely distinctive enough to gate usefully
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '_' || c == '.' || c == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func v2PresenceOutputKind(actionKind string) string {
@@ -3069,7 +3132,7 @@ func lowerV2Requirement(req V2Requirement) (BindingRequirement, error) {
 			return BindingRequirement{}, err
 		}
 		return BindingRequirement{Op: req.Name, Args: []BindingRequirement{lowered}}, nil
-	case "dependency", "import", "language", "file", "framework", "schema", "project.has":
+	case "dependency", "import", "language", "file", "framework", "schema", "project.has", "content":
 		return lowerV2PrimitiveRequirement(req)
 	default:
 		return BindingRequirement{}, fmt.Errorf("requirement %s needs native v2 requirement evaluation", req.Name)

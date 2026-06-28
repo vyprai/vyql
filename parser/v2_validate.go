@@ -25,7 +25,7 @@ var (
 	}
 	v2RequirementPrimitives = map[string]bool{
 		"language": true, "dependency": true, "import": true, "file": true,
-		"framework": true, "schema": true, "project.has": true,
+		"framework": true, "schema": true, "project.has": true, "content": true,
 	}
 	v2RequirementCombinators   = map[string]bool{"all": true, "any": true, "not": true, "soft": true}
 	v2CoverageModes            = map[string]bool{"path": true, "endpoint": true, "sameReceiver": true, "sameScope": true, "dominates": true, "postDominates": true, "global": true}
