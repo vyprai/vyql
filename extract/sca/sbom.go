@@ -2,7 +2,7 @@
 // entrypoint projection (docs/20, docs/11), ported from poc/extract/sbom.py
 // and advisory.py. Dependency resolution is DECOUPLED from the AST extractor: a
 // manifest reader produces package nodes, package intelligence adds neutral
-// analysis tokens, and VyQL adapters map those tokens to concepts/rules.
+// analysis tokens, and VyQL binding applicators map those tokens to concepts/rules.
 package sca
 
 import (

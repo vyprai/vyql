@@ -28,7 +28,7 @@ func encodeLabels(recs []usg.LabelRec) []byte {
 		w.str(lr.Label.Concept)
 		p := lr.Label.Provenance
 		w.str(p.Extractor)
-		w.str(p.Adapter)
+		w.str(p.Applicator)
 		w.str(p.SourceRef)
 		w.str(p.Confidence)
 		w.str(p.Fidelity)
@@ -53,7 +53,7 @@ func decodeLabels(raw []byte) (recs []usg.LabelRec, ok bool) {
 		nodeID := r.str()
 		lbl := usg.Label{Concept: r.str()}
 		lbl.Provenance = usg.Provenance{
-			Extractor: r.str(), Adapter: r.str(), SourceRef: r.str(),
+			Extractor: r.str(), Applicator: r.str(), SourceRef: r.str(),
 			Confidence: r.str(), Fidelity: r.str(),
 		}
 		lbl.Detail = r.smap()

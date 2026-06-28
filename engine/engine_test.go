@@ -170,11 +170,11 @@ func TestLabelProvenancePrefersGenericPriority(t *testing.T) {
 	store.AddNode(usg.Node{ID: "target", Type: "code.Call", Props: map[string]string{"loc": "x:1"}})
 	store.AddLabel("target", usg.Label{
 		Concept:    "custom.Target",
-		Provenance: usg.Provenance{Adapter: "generic.adapter", Fidelity: "resolved"},
+		Provenance: usg.Provenance{Applicator: "generic.adapter", Fidelity: "resolved"},
 	})
 	store.AddLabel("target", usg.Label{
 		Concept:    "custom.Target",
-		Provenance: usg.Provenance{Adapter: "priority.adapter", Fidelity: "semantic"},
+		Provenance: usg.Provenance{Applicator: "priority.adapter", Fidelity: "semantic"},
 		Detail:     map[string]string{"provenance_priority": "100"},
 	})
 
@@ -186,12 +186,12 @@ func TestLabelProvenancePrefersGenericPriority(t *testing.T) {
 
 func TestLabelProvenancePriorityIgnoresAdapterName(t *testing.T) {
 	if got := labelProvenancePriority(usg.Label{
-		Provenance: usg.Provenance{Adapter: "priority.adapter"},
+		Provenance: usg.Provenance{Applicator: "priority.adapter"},
 	}); got != 0 {
 		t.Fatalf("adapter name influenced provenance priority: got %d", got)
 	}
 	if got := labelProvenancePriority(usg.Label{
-		Provenance: usg.Provenance{Adapter: "plain.adapter"},
+		Provenance: usg.Provenance{Applicator: "plain.adapter"},
 		Detail:     map[string]string{"provenance_priority": "7"},
 	}); got != 7 {
 		t.Fatalf("metadata provenance priority not honored: got %d", got)

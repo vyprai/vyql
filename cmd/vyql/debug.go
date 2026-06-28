@@ -214,7 +214,7 @@ func ontologyConceptKind(onto *ontology.Ontology, c string) string {
 }
 
 // ── vyql explain ────────────────────────────────────────────────────────────────────
-// Run the rules and print each finding's FULL proof: source/sink bindings (with the adapter
+// Run the rules and print each finding's FULL proof: source/sink bindings (with the applicator
 // that labelled them), the witness path, and every negation-evidence clause (sanitizer/guard/
 // advisory notes) — the "why did this fire, and what almost stopped it" view.
 
@@ -313,7 +313,7 @@ func cmdMatch(args []string) error {
 			case ontologyConceptKind(onto, l.Concept) == "sink":
 				role = "sink"
 			}
-			prov := l.Provenance.Adapter
+			prov := l.Provenance.Applicator
 			if prov == "" {
 				prov = "?"
 			}

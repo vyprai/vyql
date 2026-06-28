@@ -449,8 +449,8 @@ func labelsOfConcepts(g usg.Store, nodeID string, want map[string]bool) []usg.La
 
 func labelProvenance(l usg.Label) string {
 	var parts []string
-	if l.Provenance.Adapter != "" {
-		parts = append(parts, l.Provenance.Adapter)
+	if l.Provenance.Applicator != "" {
+		parts = append(parts, l.Provenance.Applicator)
 	}
 	if l.Provenance.Fidelity != "" {
 		parts = append(parts, l.Provenance.Fidelity)

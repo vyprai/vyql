@@ -1035,7 +1035,7 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 	switch ex := e.(type) {
 	case *ast.Ident:
 		if ex.Name == "true" || ex.Name == "false" {
-			// Boolean keywords are literal values, so adapter value-matching can
+			// Boolean keywords are literal values, so binding value-matching can
 			// inspect struct fields and call arguments consistently.
 			return nir.Const{Loc: c.loc(ex.Pos()), Value: ex.Name}
 		}
@@ -1080,7 +1080,7 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 			}
 		}
 		// A NAMED struct literal (T{...} / pkg.T{...}) is modeled as a constructor
-		// call so its field values are reachable by adapter value-matching. Slice,
+		// call so its field values are reachable by binding value-matching. Slice,
 		// map, and array literals (whose type is *ast.ArrayType/MapType, not a
 		// name) stay as Seq.
 		if p := c.path(ex.Type); p != "" {
@@ -1122,7 +1122,7 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos())}
 }
 
-// path builds a dotted callee path for adapter matching, e.g. r.URL.Query().Get
+// path builds a dotted callee path for binding matching, e.g. r.URL.Query().Get
 // -> "r.URL.Query.Get", svc.Run -> "svc.Run".
 func (c *conv) path(e ast.Expr) string {
 	switch ex := e.(type) {

@@ -1056,12 +1056,13 @@ func TestProductionDefinitionsDoNotUseLegacyV1ParserOrBridge(t *testing.T) {
 
 func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 	root := testRepoRoot(t)
-	docs := []string{"README.md", "go/README.md", "vyql/README.md", "CLAUDE.md"}
+	docs := []string{"README.md", "go/README.md", "vyql/README.md", "CLAUDE.md", "AGENTS.md"}
 	forbidden := []string{
 		"concepts, threat-kinds, adapters",
 		"pattern  →  concept  →  adapter",
 		"per-language **adapters**",
 		"framework/config/SCA/secret adapters",
+		"adapter DSL reference",
 		"adapter-content change",
 		"adapter precedence / conflict resolution / provenance",
 		"framework/config adapters",
@@ -1086,6 +1087,38 @@ func TestPublicDocsUseV2BindingTerminology(t *testing.T) {
 	if len(hits) > 0 {
 		sort.Strings(hits)
 		t.Fatalf("public docs must describe v2 authored content as bindings, not adapters:\n%s", strings.Join(hits, "\n"))
+	}
+}
+
+func TestProductionGoUsesV2BindingTerminology(t *testing.T) {
+	root := testRepoRoot(t)
+	legacyTerms := regexp.MustCompile(`\b[Aa]dapters?\b`)
+	var hits []string
+	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			if legacyTerms.MatchString(line) {
+				rel, _ := filepath.Rel(root, path)
+				hits = append(hits, fmt.Sprintf("%s:%d: %s", filepath.ToSlash(rel), i+1, strings.TrimSpace(line)))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan production Go sources: %v", err)
+	}
+	if len(hits) > 0 {
+		sort.Strings(hits)
+		t.Fatalf("production Go must use v2 binding/applicator terminology, not legacy adapter vocabulary:\n%s", strings.Join(hits, "\n"))
 	}
 }
 

@@ -46,12 +46,12 @@ type Name struct {
 type Const struct {
 	Loc string
 	// Value is the unquoted literal text for STRING constants, used by
-	// value-matching adapters (`val "..."`, e.g. option names or modes); empty otherwise.
+	// binding value matchers (`val "..."`, e.g. option names or modes); empty otherwise.
 	Value string
 }
 
 // Attr is an attribute access base.attr; Path is the dotted callee path for
-// adapter matching, e.g. "req.body".
+// binding matching, e.g. "req.body".
 type Attr struct {
 	Base Expr
 	Attr string
@@ -82,8 +82,8 @@ type Call struct {
 	IsCtor bool
 }
 
-// CallEffect is adapter-declared dataflow for calls with out-parameters or accumulator
-// arguments. It is intentionally generic: adapters name the API, while lowering only
+// CallEffect is binding-declared dataflow for calls with out-parameters or accumulator
+// arguments. It is intentionally generic: binding applicators name the API, while lowering only
 // applies "argument/result flows into destination argument".
 type CallEffect struct {
 	DestArg      int
@@ -205,18 +205,18 @@ type FuncDef struct {
 	Loc        string
 	// ContextTokens records syntax-level evidence attached to the enclosing function
 	// itself (for example its name or language-native annotations). Lowering preserves
-	// these on generic function-return events; adapters decide what any token means.
+	// these on generic function-return events; binding applicators decide what any token means.
 	ContextTokens []string
 	// Decorators records syntax-level annotation/decorator tokens attached to this function.
-	// Lowering preserves them on generic function-return events; adapters decide what any
+	// Lowering preserves them on generic function-return events; binding applicators decide what any
 	// specific decorator means for a domain.
 	Decorators []string
 	// ParamEntries records syntax-level evidence that a parameter is populated by an
 	// external caller or framework. Lowering emits generic parameter-entry events from this
-	// data; adapters decide which events are source concepts.
+	// data; binding applicators decide which events are source concepts.
 	ParamEntries []ParamEntry
 	// ResultEntries records syntax-level evidence attached to values returned by this
-	// function. Lowering emits generic result events; adapters decide which events are
+	// function. Lowering emits generic result events; binding applicators decide which events are
 	// controls, sinks, or other domain concepts.
 	ResultEntries []ResultEntry
 	// Exported marks a function/method as part of the PUBLIC API surface (per the

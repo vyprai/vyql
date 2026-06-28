@@ -6,9 +6,8 @@ import (
 	"time"
 )
 
-// timingOn enables per-phase wall-clock logging to stderr. It is intentionally
-// not wired to an environment variable.
-var timingOn = false
+// timingOn enables per-phase wall-clock logging to stderr for local performance work.
+var timingOn = os.Getenv("VYQL_TIMING") != ""
 
 type timer struct {
 	last  time.Time

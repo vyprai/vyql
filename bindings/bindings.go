@@ -13,7 +13,10 @@
 package bindings
 
 import (
+	"fmt"
+	"os"
 	"sort"
+	"time"
 
 	"github.com/vyprai/vyql/usg"
 )
@@ -21,6 +24,7 @@ import (
 // FidelityRank and OriginRank realise the precedence partial orders (docs/07).
 var FidelityRank = map[string]int{"syntactic": 1, "resolved": 2, "semantic": 3}
 var OriginRank = map[string]int{"community": 1, "ai_generated": 2, "ai_assisted": 3, "human": 4}
+var bindingTimingOn = os.Getenv("VYQL_BINDING_TIMING") != ""
 
 // Mapping is one node getting one concept label. A negative claim sets
 // Detail["negative"] to the concept it argues the node is NOT.
@@ -105,9 +109,14 @@ type key struct{ node, concept string }
 // Apply runs binding applicators, resolves precedence, and attaches the winning
 // labels to the store. Returns conflicts and suppressed mappings.
 func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]ConflictRecord, []Mapping, error) {
+	start := time.Now()
 	var proposals []proposal
 	for _, app := range apps {
+		appStart := time.Now()
 		mappings := app.Apply(store)
+		if bindingTimingOn {
+			fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d mapping(s)\n", app.Name, float64(time.Since(appStart))/1e6, len(mappings))
+		}
 		for _, m := range mappings {
 			proposals = append(proposals, proposal{app, m})
 		}
@@ -192,6 +201,9 @@ func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]Con
 			return nil, nil, err
 		}
 	}
+	if bindingTimingOn {
+		fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d proposal(s)\n", "precedence+attach", float64(time.Since(start))/1e6, len(proposals))
+	}
 	return conflicts, suppressed, nil
 }
 
@@ -211,7 +223,7 @@ func attach(store usg.Store, m Mapping, applicator, fidelity, confidence string)
 	return store.AddLabel(m.NodeID, usg.Label{
 		Concept: m.Concept,
 		Provenance: usg.Provenance{
-			Adapter: applicator, Fidelity: fidelity, Confidence: confidence,
+			Applicator: applicator, Fidelity: fidelity, Confidence: confidence,
 		},
 		Detail: m.Detail,
 	})

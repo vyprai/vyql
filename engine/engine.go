@@ -829,12 +829,12 @@ func (e *Engine) prov(nodeID, concept string) string {
 	var fallback string
 	bestPriority := -1
 	for _, l := range e.labels(nodeID) {
-		if l.Concept == concept && l.Provenance.Adapter != "" {
+		if l.Concept == concept && l.Provenance.Applicator != "" {
 			fid := l.Provenance.Fidelity
 			if fid == "" {
 				fid = "resolved"
 			}
-			s := concept + " by " + l.Provenance.Adapter + "@" + fid
+			s := concept + " by " + l.Provenance.Applicator + "@" + fid
 			priority := labelProvenancePriority(l)
 			if fallback == "" || priority > bestPriority {
 				fallback = s
@@ -990,8 +990,8 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 		}
 	}
 	// (2) B1: a guard-control-labelled node that DOMINATES the sink. This is what makes
-	// endpoint coveredBy work on real code: adapters label the check with the control concept,
-	// and the structured CFG lets us
+	// endpoint coveredBy work on real code: binding applicators label the check with the
+	// control concept, and the structured CFG lets us
 	// connect it to exactly the sinks it covers (path-sensitive: a check in one branch does
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
@@ -1330,8 +1330,8 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 // preflightLoopGuarded recognizes "validate every item, then run one bulk operation"
 // shapes. The guard itself does not dominate a post-loop sink because a loop body may
 // execute zero times, but for bulk APIs a guard in the loop body can still be the
-// program's preflight validation. Adapter data decides which calls are real guards;
-// this helper only models the structured-control relation.
+// program's preflight validation. Binding applicator data decides which calls are
+// real guards; this helper only models the structured-control relation.
 func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
 	gn, ok1, _ := e.Store.GetNode(guardID)
 	sn, ok2, _ := e.Store.GetNode(sinkID)

@@ -177,7 +177,7 @@ func encodeDelta(d *moduleDelta) []byte {
 		w.str(l.Label.Concept)
 		p := l.Label.Provenance
 		w.str(p.Extractor)
-		w.str(p.Adapter)
+		w.str(p.Applicator)
 		w.str(p.SourceRef)
 		w.str(p.Confidence)
 		w.str(p.Fidelity)
@@ -212,7 +212,7 @@ func decodeDelta(raw []byte) (d *moduleDelta, err error) {
 			nodeID := r.str()
 			lbl := usg.Label{Concept: r.str()}
 			lbl.Provenance = usg.Provenance{
-				Extractor: r.str(), Adapter: r.str(), SourceRef: r.str(),
+				Extractor: r.str(), Applicator: r.str(), SourceRef: r.str(),
 				Confidence: r.str(), Fidelity: r.str(),
 			}
 			lbl.Detail = r.smap()

@@ -85,6 +85,14 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
+		if props := propertiesFromEntries(entries); len(props) > 0 {
+			if prog.Properties == nil {
+				prog.Properties = map[string]string{}
+			}
+			for k, v := range props {
+				prog.Properties[k] = v
+			}
+		}
 		for _, lg := range languages {
 			files := filterEntriesForLanguage(entries, lg)
 			if len(files) == 0 {
@@ -113,11 +121,6 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 	}
 	if len(prog.Modules) > 0 {
 		bindingApps = append(bindingApps, frontend.AutoBindings()...)
-	}
-	// Bundled .properties config is resolved to a flat key->value map so frontends can
-	// preserve configuration constants through lowering.
-	if props := collectProperties(paths); len(props) > 0 {
-		prog.Properties = props
 	}
 	return prog, bindingApps, ctorTypes, stats, nil
 }
@@ -167,15 +170,17 @@ func headerLooksCPP(path string) bool {
 	return false
 }
 
-// collectProperties parses every `.properties` file reachable from the scan paths into a
-// flat key→value map. Last value wins on duplicate keys (a coarse but adequate model;
-// values are only used for const-folding config reads, not for precise per-file scoping).
-func collectProperties(paths []string) map[string]string {
+// propertiesFromEntries parses `.properties` files from the already-built source inventory.
+// Last value wins on duplicate keys (adequate for const-folding).
+func propertiesFromEntries(entries []treesitter.Entry) map[string]string {
 	out := map[string]string{}
-	parse := func(file string) {
-		b, err := os.ReadFile(file)
+	for _, e := range entries {
+		if e.Ext != ".properties" {
+			continue
+		}
+		b, err := os.ReadFile(e.Path)
 		if err != nil {
-			return
+			continue
 		}
 		for _, line := range strings.Split(string(b), "\n") {
 			line = strings.TrimSpace(line)
@@ -192,24 +197,6 @@ func collectProperties(paths []string) map[string]string {
 				out[k] = v
 			}
 		}
-	}
-	for _, p := range paths {
-		info, err := os.Stat(p)
-		if err != nil {
-			continue
-		}
-		if !info.IsDir() {
-			if strings.HasSuffix(p, ".properties") {
-				parse(p)
-			}
-			continue
-		}
-		filepath.WalkDir(p, func(path string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && strings.HasSuffix(path, ".properties") {
-				parse(path)
-			}
-			return nil
-		})
 	}
 	return out
 }

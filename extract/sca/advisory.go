@@ -51,7 +51,7 @@ func ProjectEntrypoints(g usg.Store, entrypoints []VulnerableEntrypoint) error {
 				}
 				if arg != "" {
 					if err := g.AddLabel(arg, usg.Label{Concept: ve.VulnClass,
-						Provenance: usg.Provenance{Adapter: "advisory:" + ve.Advisory},
+						Provenance: usg.Provenance{Applicator: "advisory:" + ve.Advisory},
 						Detail: map[string]string{"advisory": ve.Advisory,
 							"package": ve.Package + "@" + ve.Version, "provenance_priority": "100"}}); err != nil {
 						return err

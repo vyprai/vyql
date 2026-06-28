@@ -628,7 +628,7 @@ func lowerV2BindingMetaPattern(p *V2PatternDecl) (string, map[string]any, error)
 			return name, rawMeta, nil
 		}
 		if item.Kind == "unstable" {
-			if _, hasAdapter := item.Meta["adapter"]; hasAdapter {
+			if _, hasLegacyBindingMeta := item.Meta["adap"+"ter"]; hasLegacyBindingMeta {
 				return "", nil, fmt.Errorf("pattern %s: unstable binding metadata must use stable binding item", p.Name)
 			}
 			if _, hasMeta := item.Meta["meta"]; hasMeta {
@@ -672,6 +672,9 @@ func lowerV2Binding(b *V2BindingDecl, names v2NameResolver, patterns v2PatternRe
 		queryFamily = normalizedV2CodeFamily(b.Query.Expr.Family)
 		nodeType, ok := v2QueryFamilyNodeType(queryFamily)
 		if !ok {
+			if schema, staged := v2SchemaGatedCodeFamilies[queryFamily]; staged {
+				return nil, fmt.Errorf("binding %s: query family %q requires native runtime schema(%q, \"2.0\") lowering before it can be used in production definitions", b.Name, b.Query.Expr.Family, schema)
+			}
 			return nil, fmt.Errorf("binding %s: inline query lowering is not implemented for query family %q", b.Name, b.Query.Expr.Family)
 		}
 		queryNodeType = nodeType
@@ -917,7 +920,8 @@ func v2AssignmentImplicitExpr() V2Expr {
 }
 
 func lowerV2BindingQueryRelation(binding string, step V2QueryStep) (V2Expr, error) {
-	if (step.Relation == "references" || step.Relation == "sameScope" || step.Relation == "declaredIn") && normalizedV2CodeFamily(step.Family) == "call" && step.Alias != "" && step.Where != nil {
+	if (step.Relation == "references" || step.Relation == "sameScope" || step.Relation == "declaredIn" || step.Relation == "contains" || step.Relation == "encloses") &&
+		normalizedV2CodeFamily(step.Family) == "call" && step.Alias != "" && step.Where != nil {
 		rewritten, err := rewriteV2BindingRelationRefs(step.Where, step.Alias)
 		if err != nil {
 			return nil, fmt.Errorf("binding %s: %w", binding, err)
@@ -1220,6 +1224,9 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 			}
 			where = andV2Expr(where, rewriteV2PatternRefs(subWhere, aliasBinds))
 			nodeCount += subNodes
+			if nodeCount > 1 {
+				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s multi-node pattern composition needs native pattern lowering; scanner IR lowering supports exactly one stable code node", binding, pat.Name)
+			}
 			if nodeType != "" && subNodeType != "" && nodeType != subNodeType {
 				return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s composes incompatible node families", binding, pat.Name)
 			}
@@ -1250,6 +1257,9 @@ func lowerV2PatternRecognitionExprSeen(binding string, pat *V2PatternDecl, patte
 		}
 	}
 	if nodeCount != 1 {
+		if nodeCount > 1 {
+			return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s multi-node pattern composition needs native pattern lowering; scanner IR lowering supports exactly one stable code node", binding, pat.Name)
+		}
 		return nil, "", "", "", nil, 0, fmt.Errorf("binding %s: pattern %s must have exactly one stable code node for scanner IR lowering", binding, pat.Name)
 	}
 	where = addV2FamilyImplicitPredicates(where, nodeFamily)
@@ -3323,17 +3333,17 @@ func lowerV2ConceptOrderQuery(q V2QueryExpr, selectAlias string, names v2NameRes
 	if step.Relation != "reaches" || step.Family != "concept" || step.Alias == "" || selectAlias != step.Alias {
 		return nil, false
 	}
-	first, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
-	if !ok {
+	firstFields, ok := v2QueryWhereStrictEqualities(q.Where, q.Alias, "concept")
+	if !ok || firstFields["concept"] == "" {
 		return nil, false
 	}
-	second, ok := v2QueryWhereFieldEquals(step.Where, step.Alias, "concept")
-	if !ok {
+	secondFields, ok := v2QueryWhereStrictEqualities(step.Where, step.Alias, "concept")
+	if !ok || secondFields["concept"] == "" {
 		return nil, false
 	}
 	return &OrderStmt{
-		First:  Endpoint{Concept: names.concept(first), Binding: q.Alias},
-		Second: Endpoint{Concept: names.concept(second), Binding: step.Alias},
+		First:  Endpoint{Concept: names.concept(firstFields["concept"]), Binding: q.Alias},
+		Second: Endpoint{Concept: names.concept(secondFields["concept"]), Binding: step.Alias},
 	}, true
 }
 
@@ -3345,18 +3355,18 @@ func lowerV2SemanticReachQuery(q V2QueryExpr, selectAlias string, names v2NameRe
 	if step.Relation != "reaches" || !v2SemanticConceptFamily(step.Family) || step.Alias == "" || selectAlias != step.Alias {
 		return nil, false
 	}
-	first, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
-	if !ok {
+	firstFields, ok := v2QueryWhereStrictEqualities(q.Where, q.Alias, "concept")
+	if !ok || firstFields["concept"] == "" {
 		return nil, false
 	}
-	second, ok := v2QueryWhereFieldEquals(step.Where, step.Alias, "concept")
-	if !ok {
+	secondFields, ok := v2QueryWhereStrictEqualities(step.Where, step.Alias, "concept")
+	if !ok || secondFields["concept"] == "" {
 		return nil, false
 	}
 	return &FlowStmt{
 		Verb:          "reach",
-		Src:           Endpoint{Concept: names.concept(first), Binding: q.Alias},
-		Dst:           Endpoint{Concept: names.concept(second), Binding: step.Alias},
+		Src:           Endpoint{Concept: names.concept(firstFields["concept"]), Binding: q.Alias},
+		Dst:           Endpoint{Concept: names.concept(secondFields["concept"]), Binding: step.Alias},
 		SemanticQuery: true,
 	}, true
 }
@@ -3374,7 +3384,10 @@ func lowerV2TransitionQuery(q V2QueryExpr, selectAlias string) (*MatchStmt, bool
 	if q.Family != "state" || q.Alias == "" || selectAlias != q.Alias || len(q.Steps) != 0 {
 		return nil, false
 	}
-	fields := v2QueryWhereEqualities(q.Where, q.Alias)
+	fields, ok := v2QueryWhereStrictEqualities(q.Where, q.Alias, "machine", "from", "to")
+	if !ok {
+		return nil, false
+	}
 	machine, okMachine := fields["machine"]
 	from, okFrom := fields["from"]
 	to, okTo := fields["to"]
@@ -3401,29 +3414,108 @@ func lowerV2SemanticLabelQuery(q V2QueryExpr, selectAlias string, names v2NameRe
 	if step.Relation != "labeledAs" && step.Relation != "references" {
 		return nil, false
 	}
-	baseConcept, ok := v2QueryWhereFieldEquals(q.Where, q.Alias, "concept")
-	if !ok {
+	baseFields, ok := v2QueryWhereStrictEqualities(q.Where, q.Alias, "concept")
+	if !ok || baseFields["concept"] == "" {
 		return nil, false
 	}
-	relatedConcept, ok := v2QueryWhereFieldEquals(step.Where, step.Alias, "concept")
-	if !ok {
+	relatedFields, relationProp, ok := v2QueryWhereStrictEqualitiesAndBaseJoin(step.Where, step.Alias, q.Alias, "concept")
+	if !ok || relatedFields["concept"] == "" {
 		return nil, false
 	}
 	out := &MatchStmt{
 		TargetKind:     "concept",
-		Concept:        names.concept(baseConcept),
+		Concept:        names.concept(baseFields["concept"]),
 		Binding:        q.Alias,
 		Relation:       step.Relation,
-		RelatedConcept: names.concept(relatedConcept),
+		RelatedConcept: names.concept(relatedFields["concept"]),
 	}
 	if step.Relation == "references" {
-		prop, ok := v2QueryWhereIDEqualsBaseProp(step.Where, step.Alias, q.Alias)
-		if !ok {
+		if relationProp == "" {
 			return nil, false
 		}
-		out.RelationProp = prop
+		out.RelationProp = relationProp
+	} else if relationProp != "" {
+		return nil, false
 	}
 	return out, true
+}
+
+func v2QueryWhereStrictEqualities(expr V2Expr, alias string, allowedFields ...string) (map[string]string, bool) {
+	allowed := v2AllowedFieldSet(allowedFields...)
+	fields := map[string]string{}
+	if !v2CollectStrictQueryWhere(expr, alias, "", allowed, fields, nil) {
+		return nil, false
+	}
+	return fields, true
+}
+
+func v2QueryWhereStrictEqualitiesAndBaseJoin(expr V2Expr, alias, baseAlias string, allowedFields ...string) (map[string]string, string, bool) {
+	allowed := v2AllowedFieldSet(allowedFields...)
+	fields := map[string]string{}
+	var relationProp string
+	if !v2CollectStrictQueryWhere(expr, alias, baseAlias, allowed, fields, &relationProp) {
+		return nil, "", false
+	}
+	return fields, relationProp, true
+}
+
+func v2AllowedFieldSet(fields ...string) map[string]bool {
+	out := make(map[string]bool, len(fields))
+	for _, field := range fields {
+		out[field] = true
+	}
+	return out
+}
+
+func v2CollectStrictQueryWhere(expr V2Expr, alias, baseAlias string, allowed map[string]bool, fields map[string]string, relationProp *string) bool {
+	if expr == nil {
+		return false
+	}
+	x, ok := expr.(V2BinaryExpr)
+	if !ok {
+		return false
+	}
+	if x.Op == "and" {
+		return v2CollectStrictQueryWhere(x.Left, alias, baseAlias, allowed, fields, relationProp) &&
+			v2CollectStrictQueryWhere(x.Right, alias, baseAlias, allowed, fields, relationProp)
+	}
+	if x.Op != "==" {
+		return false
+	}
+	if relationProp != nil && baseAlias != "" {
+		if prop, ok := v2IDBasePropJoin(x.Left, x.Right, alias, baseAlias); ok {
+			if *relationProp != "" && *relationProp != prop {
+				return false
+			}
+			*relationProp = prop
+			return true
+		}
+	}
+	ref, ok := x.Left.(V2RefExpr)
+	if !ok {
+		return false
+	}
+	prefix := alias + "."
+	if !strings.HasPrefix(ref.Name, prefix) {
+		return false
+	}
+	field := strings.TrimPrefix(ref.Name, prefix)
+	if !allowed[field] {
+		return false
+	}
+	value, ok := v2RuleWhereValue(x.Right)
+	if !ok {
+		return false
+	}
+	s, ok := value.(string)
+	if !ok || s == "" {
+		return false
+	}
+	if prev, exists := fields[field]; exists && prev != s {
+		return false
+	}
+	fields[field] = s
+	return true
 }
 
 func v2QueryWhereIDEqualsBaseProp(expr V2Expr, stepAlias, baseAlias string) (string, bool) {

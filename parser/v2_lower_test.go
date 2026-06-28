@@ -1208,6 +1208,34 @@ binding secretIssue {
 	}
 }
 
+func TestV2ComposedMultiNodePatternNeedsNativeLowering(t *testing.T) {
+	_, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+pattern routeCall as call {
+  node: call
+  where callee.method == "get"
+}
+pattern handlerFunction as fn {
+  node: function
+  where name == "handler"
+}
+pattern routeHandler as route {
+  use routeCall as routeCall
+  use handlerFunction as handler
+}
+binding publicHandler {
+  query pattern routeHandler
+  emit fact code.PublicEndpoint at route
+}
+`)
+	if err == nil {
+		t.Fatal("ParseV2Definitions accepted multi-node pattern composition")
+	}
+	if !strings.Contains(err.Error(), "multi-node pattern composition needs native pattern lowering") {
+		t.Fatalf("ParseV2Definitions error = %v, want multi-node composition diagnostic", err)
+	}
+}
+
 func TestV2ComposedPatternCycleRejected(t *testing.T) {
 	_, err := parseV2DefinitionsForTest(`
 module bindings.javascript.bad;
@@ -1458,6 +1486,88 @@ binding dangerInHandler {
 	pred := got.ScopePredicates[0]
 	if pred.Subject != "scope_call" || pred.Property != "path" || !pred.Exact || len(pred.Values) != 1 || pred.Values[0] != "router.post" {
 		t.Fatalf("scope predicate wrong: %+v", pred)
+	}
+}
+
+func TestV2BindingQueryContainsCallLowersToScopePredicate(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+binding dangerousHandler {
+  query call as c where c.callee.method == "handler" contains call as inner where inner.callee.method == "danger"
+  emit issue code.DynamicCodeLoad at c
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	got := decls[0].(*BindingSet).Mappings[0]
+	if got.Kind != "issue_method" || got.Pattern != "handler" || len(got.ScopePredicates) != 1 {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	pred := got.ScopePredicates[0]
+	if pred.Subject != "scope_call" || pred.Property != "method" || pred.Negative || len(pred.Values) != 1 || pred.Values[0] != "danger" {
+		t.Fatalf("contains scope predicate wrong: %+v", pred)
+	}
+}
+
+func TestV2BindingQueryEnclosesCallLowersToScopePredicate(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.javascript.composed;
+binding handlerUnderRoute {
+  query call as c where c.callee.method == "handler" encloses call as outer where outer.callee.path == "router.post"
+  emit fact code.PublicEndpoint at c
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	got := decls[0].(*BindingSet).Mappings[0]
+	if got.Kind != "fact_method" || got.Pattern != "handler" || len(got.ScopePredicates) != 1 {
+		t.Fatalf("relation mapping wrong: %+v", got)
+	}
+	pred := got.ScopePredicates[0]
+	if pred.Subject != "scope_call" || pred.Property != "path" || !pred.Exact || pred.Negative || len(pred.Values) != 1 || pred.Values[0] != "router.post" {
+		t.Fatalf("encloses scope predicate wrong: %+v", pred)
+	}
+}
+
+func TestV2LoweringRejectsStagedRouteAndConfigFamiliesUntilRuntimeSchemaExists(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		family string
+		query  string
+	}{
+		{
+			name:   "route",
+			family: "route",
+			query:  `query route as r where r.public == true`,
+		},
+		{
+			name:   "config",
+			family: "config",
+			query:  `query config as c where c.key == "secret"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseV2DefinitionsForTest(`
+module bindings.javascript.staged;
+concept Input : source {}
+binding stagedInput {
+  requires {
+    schema("nir", "2.0")
+  }
+  ` + tc.query + `
+  emit source Input at node
+}
+`)
+			if err == nil {
+				t.Fatalf("ParseV2Definitions accepted staged %s query family", tc.family)
+			}
+			want := `query family "` + tc.family + `" requires native runtime schema("nir", "2.0") lowering`
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("ParseV2Definitions error = %v, want %q", err, want)
+			}
+		})
 	}
 }
 
@@ -2771,6 +2881,23 @@ rule CryptoMiningEgress {
 	reference := decls[5].(*Rule).Body.(*MatchStmt)
 	if reference.TargetKind != "concept" || reference.Concept != "runtime.Connection" || reference.Binding != "c" || reference.Relation != "references" || reference.RelationProp != "dst" || reference.RelatedConcept != "threat.MiningPool" {
 		t.Fatalf("references lowering wrong: %+v", reference)
+	}
+}
+
+func TestV2RawSemanticQueryRejectsUnsupportedWherePredicates(t *testing.T) {
+	_, err := parseV2DefinitionSourcesForTest(V2DefinitionSourcesFromText("test.vyql", `
+module rules.migrated;
+rule ExtraPredicateMustNotBeIgnored {
+  query concept as source where source.concept == code.HttpInput and source.kind == "request"
+    reaches concept as sink where sink.concept == code.SqlExecution
+    select sink
+}
+`))
+	if err == nil {
+		t.Fatal("ParseV2Definitions accepted raw semantic query with unsupported predicate")
+	}
+	if !strings.Contains(err.Error(), "unsupported semantic query shape") {
+		t.Fatalf("ParseV2Definitions error = %v, want unsupported semantic query diagnostic", err)
 	}
 }
 

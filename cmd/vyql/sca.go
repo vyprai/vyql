@@ -34,14 +34,10 @@ func applySCA(g usg.Store, paths []string) {
 		if err != nil {
 			continue
 		}
+		root := scanRootFor(p, info)
+		entries := entriesForSCAPath(p, info)
 		for _, mp := range manifestParsers {
-			var files []string
-			if info.IsDir() {
-				files, _ = treesitter.ListFiles(p, map[string]bool{mp.base: true})
-			} else if strings.EqualFold(filepath.Base(p), mp.base) {
-				files = []string{p}
-			}
-			for _, f := range files {
+			for _, f := range filesWithBase(entries, mp.base) {
 				b, err := os.ReadFile(f)
 				if err != nil {
 					continue
@@ -69,8 +65,7 @@ func applySCA(g usg.Store, paths []string) {
 				ecos["git"] = true
 			}
 		}
-		for _, f := range vendoredJSFiles(p, info) {
-			root := scanRootFor(p, info)
+		for _, f := range vendoredJSFiles(entries) {
 			loc := relFrom(root, f)
 			b, err := os.ReadFile(f)
 			if err != nil {
@@ -94,6 +89,28 @@ func applySCA(g usg.Store, paths []string) {
 	}
 }
 
+func entriesForSCAPath(p string, info os.FileInfo) []treesitter.Entry {
+	if info.IsDir() {
+		return treesitter.ListAllFiles(p)
+	}
+	return []treesitter.Entry{{
+		Path: p,
+		Ext:  strings.ToLower(filepath.Ext(p)),
+		Base: strings.ToLower(filepath.Base(p)),
+	}}
+}
+
+func filesWithBase(entries []treesitter.Entry, base string) []string {
+	base = strings.ToLower(base)
+	var out []string
+	for _, e := range entries {
+		if e.Base == base {
+			out = append(out, e.Path)
+		}
+	}
+	return out
+}
+
 func scaRoots(p string, info os.FileInfo) []string {
 	if info.IsDir() {
 		return []string{p}
@@ -104,34 +121,17 @@ func scaRoots(p string, info os.FileInfo) []string {
 	return nil
 }
 
-func vendoredJSFiles(p string, info os.FileInfo) []string {
+func vendoredJSFiles(entries []treesitter.Entry) []string {
 	const maxVendoredJSSize = 4 << 20
-	if !info.IsDir() {
-		if strings.EqualFold(filepath.Ext(p), ".js") && info.Size() <= maxVendoredJSSize {
-			return []string{p}
-		}
-		return nil
-	}
 	var out []string
-	_ = filepath.WalkDir(p, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	for _, e := range entries {
+		if e.Ext != ".js" {
+			continue
 		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "node_modules", ".venv", "venv":
-				return filepath.SkipDir
-			}
-			return nil
+		if info, err := os.Stat(e.Path); err == nil && info.Size() <= maxVendoredJSSize {
+			out = append(out, e.Path)
 		}
-		if !strings.EqualFold(filepath.Ext(path), ".js") {
-			return nil
-		}
-		if info, err := d.Info(); err == nil && info.Size() <= maxVendoredJSSize {
-			out = append(out, path)
-		}
-		return nil
-	})
+	}
 	return out
 }
 

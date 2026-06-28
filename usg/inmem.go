@@ -10,7 +10,11 @@ type InMemStore struct {
 	byConcpt   map[string][]string
 	conceptHas map[string]map[string]bool // concept -> set of node ids (O(1) dedup for byConcpt)
 	labels     map[string][]Label
+	epoch      uint64 // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
 }
+
+// StructEpoch reports the store's structural epoch. See usg/epoch.go.
+func (s *InMemStore) StructEpoch() uint64 { return s.epoch }
 
 func NewInMemStore() *InMemStore { return NewInMemStoreSized(0) }
 
@@ -41,6 +45,7 @@ func (s *InMemStore) AddNode(n Node) error {
 		s.byType[n.Type] = append(s.byType[n.Type], n.ID)
 	}
 	s.nodes[n.ID] = n
+	s.epoch = nextStructEpoch()
 	return nil
 }
 
@@ -54,6 +59,7 @@ func (s *InMemStore) AddEdge(e Edge) error {
 	if inIndexedTypes[e.Type] {
 		s.in[e.Dst] = append(s.in[e.Dst], e)
 	}
+	s.epoch = nextStructEpoch()
 	return nil
 }
 

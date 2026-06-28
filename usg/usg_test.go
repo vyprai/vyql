@@ -121,7 +121,7 @@ func TestBasicOps(t *testing.T) {
 	bdg.AddNode(Node{ID: "a", Type: "code.Call", Props: map[string]string{"loc": "x.go:1"}})
 	bdg.AddNode(Node{ID: "b", Type: "code.X"})
 	bdg.AddEdge(Edge{Type: "FLOWS", Src: "a", Dst: "b"})
-	bdg.AddLabel("a", Label{Concept: "HTTP_INPUT", Provenance: Provenance{Adapter: "flask"}})
+	bdg.AddLabel("a", Label{Concept: "HTTP_INPUT", Provenance: Provenance{Applicator: "flask"}})
 
 	n, ok, _ := bdg.GetNode("a")
 	if !ok || n.Prop("loc") != "x.go:1" {
@@ -135,7 +135,7 @@ func TestBasicOps(t *testing.T) {
 		t.Fatalf("InEdges failed: %+v", ins)
 	}
 	labels, _ := bdg.Labels("a")
-	if len(labels) != 1 || labels[0].Concept != "HTTP_INPUT" || labels[0].Provenance.Adapter != "flask" {
+	if len(labels) != 1 || labels[0].Concept != "HTTP_INPUT" || labels[0].Provenance.Applicator != "flask" {
 		t.Fatalf("Labels round-trip failed: %+v", labels)
 	}
 	ns, _ := bdg.NodesWithConcept("HTTP_INPUT")

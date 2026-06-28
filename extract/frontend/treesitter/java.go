@@ -574,7 +574,7 @@ func javaClassContextTokens(name string, bases []string) []string {
 }
 
 // jvAnnotationTokens extracts syntax-level annotation names without interpreting
-// framework/domain meaning. Adapters decide what each token means.
+// framework/domain meaning. Binding applicators decide what each token means.
 func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1031,7 +1031,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		// model `new T(args)` as a constructor call with callee path "T", so
-		// adapters can match constructor and type information.
+		// binding applicators can match constructor and type information.
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: arglist, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.text(field(n, "operator"))

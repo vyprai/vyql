@@ -114,7 +114,7 @@ func ReadVYQLDir(rel string) ([]Source, error) {
 
 // ReadVYQLDirExcept reads .vyql files under rel while skipping immediate child
 // directories by name. It is useful for split v2 trees where a small metadata
-// scan should include language adapters but not large generated subtrees.
+// scan should include language bindings but not large generated subtrees.
 func ReadVYQLDirExcept(rel string, excludedDirs ...string) ([]Source, error) {
 	dataRoot := Root()
 	rel = filepath.ToSlash(rel)

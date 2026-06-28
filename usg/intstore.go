@@ -23,10 +23,15 @@ type IntStore struct {
 	in  map[int32][]iedge // reverse edges, ONLY for inIndexedTypes (sparse)
 
 	byType     map[string][]int32
+	typeIDs    map[string][]string
 	byConcept  map[string][]int32
 	conceptHas map[string]map[int32]bool
 	labels     [][]Label // index -> labels
+	epoch      uint64    // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
 }
+
+// StructEpoch reports the store's structural epoch. See usg/epoch.go.
+func (s *IntStore) StructEpoch() uint64 { return s.epoch }
 
 type iedge struct {
 	typ   string
@@ -66,6 +71,7 @@ func NewIntStore(nodeHint int) *IntStore {
 		out:        make([][]iedge, 0, nodeHint),
 		in:         map[int32][]iedge{},
 		byType:     map[string][]int32{},
+		typeIDs:    map[string][]string{},
 		byConcept:  map[string][]int32{},
 		conceptHas: map[string]map[int32]bool{},
 		labels:     nil,
@@ -106,8 +112,10 @@ func (s *IntStore) AddNode(n Node) error {
 	if s.typ[i] != n.Type { // first set (or a retype) updates the type index
 		if existed && s.typ[i] != "" {
 			s.removeFromType(s.typ[i], i)
+			delete(s.typeIDs, s.typ[i])
 		}
 		s.byType[n.Type] = append(s.byType[n.Type], i)
+		delete(s.typeIDs, n.Type)
 	}
 	s.typ[i] = n.Type
 	s.loc[i] = n.Loc
@@ -116,6 +124,7 @@ func (s *IntStore) AddNode(n Node) error {
 	s.hasOrder[i] = n.HasOrder
 	s.scope[i] = n.Scope
 	s.props[i] = n.Props
+	s.epoch = nextStructEpoch()
 	return nil
 }
 
@@ -135,6 +144,7 @@ func (s *IntStore) AddEdge(e Edge) error {
 	if inIndexedTypes[e.Type] {
 		s.in[di] = append(s.in[di], iedge{typ: e.Type, dst: si, props: e.Props})
 	}
+	s.epoch = nextStructEpoch()
 	return nil
 }
 
@@ -203,11 +213,15 @@ func (s *IntStore) NodesWithConcept(concept string) ([]string, error) {
 }
 
 func (s *IntStore) NodesOfType(nodeType string) ([]string, error) {
+	if ids, ok := s.typeIDs[nodeType]; ok {
+		return ids, nil
+	}
 	idxs := s.byType[nodeType]
 	out := make([]string, len(idxs))
 	for k, i := range idxs {
 		out[k] = s.ids[i]
 	}
+	s.typeIDs[nodeType] = out
 	return out, nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,6 +55,20 @@ func main() {
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
+	}
+	// Opt-in CPU profile for local performance work (explicit env, no behavior change):
+	// VYQL_CPUPROFILE=/path/to/cpu.prof vyql scan ...
+	if p := os.Getenv("VYQL_CPUPROFILE"); p != "" {
+		f, err := os.Create(p)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
+			os.Exit(1)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintln(os.Stderr, "vyql: cpuprofile: "+err.Error())
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
 	}
 	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
 	// deep in loading — recover into a clean message rather than a stack trace.

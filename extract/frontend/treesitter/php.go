@@ -1099,7 +1099,7 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	switch n.Kind() {
 	case "variable_name", "name", "qualified_name":
 		// PHP global-namespace qualifier: `\file_get_contents` / `Foo\Bar\baz` — strip the
-		// leading `\` and map namespace separators to the dotted form adapters match against,
+		// leading `\` and map namespace separators to the dotted form binding applicators match against,
 		// else a fully-qualified builtin call (`\realpath`, `@\file_get_contents`) misses its sink.
 		return strings.ReplaceAll(strings.TrimPrefix(c.text(n), `\`), `\`, ".")
 	case "member_access_expression":

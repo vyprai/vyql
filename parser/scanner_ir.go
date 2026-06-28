@@ -104,7 +104,7 @@ type BindingAction struct {
 }
 
 // BindingRequirement is the compiled v2 project-prerequisite expression for a
-// binding. It is evaluated once per adapter application against indexed project
+// binding. It is evaluated once per binding application against indexed project
 // evidence, not once per candidate node.
 type BindingRequirement struct {
 	Op    string // dependency, import, language, file, framework, schema, all, any, not, soft

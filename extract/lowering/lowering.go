@@ -66,6 +66,9 @@ type lowerer struct {
 	derivedChildren map[string][]string // base short name -> child class quals
 	membersOfShort  map[string]map[string]bool
 	allMembersMemo  map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+	dynCallbackMemo map[string][]*funcInfo     // memoized dynamic-callback target set, keyed by current module tech
+	addrTaken       map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
+	addrTakenReady  bool                       // true once addrTaken has been collected for the whole program
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -1276,6 +1279,7 @@ func (l *lowerer) run() error {
 		}
 		l.register(m.Key, m.Body, "")
 	}
+	l.collectAddressTaken()
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS = m.Key, "", ModuleNS(m)
 		l.block(m.Body, l.moduleScope(m))
@@ -2871,12 +2875,144 @@ func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
 	return ok && n.Type == "code.Param"
 }
 
+// dynamicCallbackTargets returns the over-approximate target set for a call of a
+// function-valued parameter (a callback whose concrete target is unknown). A function can
+// only be bound to such a parameter if it is referenced as a VALUE somewhere (passed as an
+// argument, assigned, returned, stored, …) — i.e. its name is address-taken. Functions that
+// are only ever called directly can never be the dynamic target, so they are excluded. This
+// is sound (a real callback target is always address-taken) and collapses the fan-out from
+// "every function in the program" to the small address-taken set — the fix for superlinear
+// lowering of driver-heavy trees (the kernel), where function-pointer calls are pervasive.
+// The set is invariant per current tech, so it is memoized.
 func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
+	curTech := l.moduleTech[l.curModule]
+	if cached, ok := l.dynCallbackMemo[curTech]; ok {
+		return cached
+	}
 	var out []*funcInfo
-	for _, funcs := range l.funcShort {
+	for name, funcs := range l.funcShort {
+		if l.addrTakenReady && !l.addrTaken[name] {
+			continue // never referenced as a value → cannot be a dynamic callback target
+		}
 		out = append(out, l.sameTechFuncInfos(funcs)...)
 	}
-	return dedupeFuncInfos(out)
+	out = dedupeFuncInfos(out)
+	if l.dynCallbackMemo == nil {
+		l.dynCallbackMemo = map[string][]*funcInfo{}
+	}
+	l.dynCallbackMemo[curTech] = out
+	return out
+}
+
+// collectAddressTaken records every function-name candidate that is referenced as a value
+// (so could be bound to a callback parameter). It walks the program NIR directly — which is
+// fully present even on the incremental path (only lowered output is cached, not the input
+// NIR) — so the set is complete in both paths. The only position that does NOT take a
+// function's address is the direct callee of a call by name (an ordinary direct call).
+func (l *lowerer) collectAddressTaken() {
+	l.addrTaken = make(map[string]bool, 256)
+	for _, m := range l.prog.Modules {
+		l.addrTakenStmts(m.Body)
+	}
+	l.addrTakenReady = true
+}
+
+func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
+	for _, s := range stmts {
+		switch st := s.(type) {
+		case nir.ExprStmt:
+			l.addrTakenExpr(st.Value)
+		case nir.Assign:
+			l.addrTakenExpr(st.Value)
+		case nir.AugAssign:
+			l.addrTakenExpr(st.Value)
+		case nir.Return:
+			l.addrTakenExpr(st.Value)
+		case nir.FuncDef:
+			l.addrTakenStmts(st.Body)
+		case nir.ClassDef:
+			l.addrTakenStmts(st.Body)
+		case nir.Block:
+			l.addrTakenStmts(st.Stmts)
+		case nir.If:
+			l.addrTakenExpr(st.Cond)
+			l.addrTakenStmts(st.Then)
+			l.addrTakenStmts(st.Else)
+		case nir.Loop:
+			l.addrTakenExpr(st.Cond)
+			l.addrTakenExpr(st.Iter)
+			l.addrTakenStmts(st.Body)
+		case nir.Switch:
+			l.addrTakenExpr(st.Subject)
+			for _, c := range st.Cases {
+				l.addrTakenStmts(c)
+			}
+			for _, labels := range st.Labels {
+				for _, e := range labels {
+					l.addrTakenExpr(e)
+				}
+			}
+			l.addrTakenStmts(st.Default)
+		case nir.Try:
+			l.addrTakenStmts(st.Body)
+			for _, h := range st.Handlers {
+				l.addrTakenStmts(h)
+			}
+			l.addrTakenStmts(st.Finally)
+		}
+	}
+}
+
+func (l *lowerer) addrTakenExpr(e nir.Expr) {
+	switch x := e.(type) {
+	case nil:
+	case nir.Name:
+		l.addrTaken[x.ID] = true
+	case nir.Attr:
+		l.addrTaken[x.Attr] = true
+		l.addrTakenExpr(x.Base)
+	case nir.Index:
+		l.addrTakenExpr(x.Base)
+		l.addrTakenExpr(x.Key)
+	case nir.Call:
+		// A direct call by name does not take the callee's address; a method/computed
+		// callee's receiver IS a value, so recurse into it (but not the method name).
+		switch c := x.Callee.(type) {
+		case nir.Name:
+			// direct call: do not mark the callee
+		case nir.Attr:
+			l.addrTakenExpr(c.Base)
+		default:
+			l.addrTakenExpr(x.Callee)
+		}
+		for _, a := range x.Args {
+			l.addrTakenExpr(a)
+		}
+	case nir.Format:
+		for _, p := range x.Parts {
+			l.addrTakenExpr(p)
+		}
+	case nir.Seq:
+		for _, p := range x.Parts {
+			l.addrTakenExpr(p)
+		}
+	case nir.Pair:
+		l.addrTakenExpr(x.Value)
+	case nir.Lambda:
+		l.addrTakenStmts(x.Body)
+	case nir.Thru:
+		l.addrTakenExpr(x.Inner)
+	case nir.BinOp:
+		l.addrTakenExpr(x.Left)
+		l.addrTakenExpr(x.Right)
+	case nir.Unary:
+		l.addrTakenExpr(x.Operand)
+	case nir.Ternary:
+		l.addrTakenExpr(x.Cond)
+		l.addrTakenExpr(x.Then)
+		l.addrTakenExpr(x.Else)
+	case nir.Const:
+	}
 }
 
 func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
@@ -2976,9 +3112,8 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 				return []*funcInfo{f}
 			}
 		}
-		infos := l.sameTechFuncInfos(l.funcShort[nm])
-		if len(infos) == 1 { // guarded fallback
-			return infos
+		if f, ok := l.uniqueTechFuncInfo(l.funcShort[nm]); ok { // guarded fallback
+			return []*funcInfo{f}
 		}
 		return nil
 	case nir.Attr:
@@ -3042,8 +3177,8 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		// method name is UNIQUE across the whole program. Route through it so a tainted return
 		// value connects to the call result — the canonical interprocedural-across-files miss.
 		// The uniqueness guard avoids mis-resolving same-named methods on different types.
-		if infos := l.sameTechFuncInfos(l.funcShort[c.Attr]); len(infos) == 1 {
-			return infos
+		if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
+			return []*funcInfo{f}
 		}
 	}
 	return nil
@@ -3086,6 +3221,30 @@ func (l *lowerer) sameTechFuncInfos(in []*funcInfo) []*funcInfo {
 		}
 	}
 	return out
+}
+
+// uniqueTechFuncInfo returns the single tech-compatible info in `in`, if exactly
+// one exists. It short-circuits at the second match, so a short name shared by
+// thousands of definitions (e.g. `read`/`init`/`probe` across the kernel) costs
+// O(1) instead of allocating and scanning the whole slice — the dominant cost of
+// lowering a large single-language tree, where the guarded fallback callers below
+// only ever use the result when it is unambiguous.
+func (l *lowerer) uniqueTechFuncInfo(in []*funcInfo) (*funcInfo, bool) {
+	if len(in) == 0 {
+		return nil, false
+	}
+	curTech := l.moduleTech[l.curModule]
+	var found *funcInfo
+	for _, info := range in {
+		if info != nil && !compatibleTech(curTech, l.moduleTech[info.module]) {
+			continue
+		}
+		if found != nil {
+			return nil, false // ambiguous — second compatible match
+		}
+		found = info
+	}
+	return found, found != nil
 }
 
 func (l *lowerer) resolveDerivedMethods(class, method string) []*funcInfo {

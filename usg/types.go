@@ -10,7 +10,7 @@ import "strconv"
 // Provenance records where a fact or label came from (docs/04 §provenance).
 type Provenance struct {
 	Extractor  string `json:"extractor,omitempty"`
-	Adapter    string `json:"adapter,omitempty"`
+	Applicator string `json:"applicator,omitempty"`
 	SourceRef  string `json:"sourceRef,omitempty"`
 	Confidence string `json:"confidence,omitempty"` // high | medium | low
 	Fidelity   string `json:"fidelity,omitempty"`   // syntactic | resolved | semantic

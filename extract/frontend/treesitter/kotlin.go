@@ -407,7 +407,7 @@ func (c *ktConv) branchValue(n *tree_sitter.Node) nir.Expr {
 }
 
 // ktAnnotationTokens extracts syntax-level annotation names without interpreting
-// framework/domain meaning. Adapters decide what each token means.
+// framework/domain meaning. Binding applicators decide what each token means.
 func (c *ktConv) ktAnnotationTokens(n *tree_sitter.Node, prefix string) []string {
 	seen := map[string]bool{}
 	var out []string

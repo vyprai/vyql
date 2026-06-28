@@ -447,7 +447,7 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 			args = append(args, c.expr(ch))
 		}
 	}
-	// Command adapters inspect arg0; collapse all command elements into one
+	// Command binding applicators inspect arg0; collapse all command elements into one
 	// taint-carrying Format so no argument position is dropped.
 	var callArgs []nir.Expr
 	if len(args) > 0 {
