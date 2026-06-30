@@ -1349,6 +1349,127 @@ export default defineNuxtModule({
 	}
 }
 
+func TestTypeScriptEffectMixedSchedulerSharedRunnerObservation(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.ts")
+	fixed := filepath.Join(dir, "fixed.ts")
+	if err := os.WriteFile(vuln, []byte(`
+export type Task = () => void
+export interface Scheduler {
+  scheduleTask(task: Task, priority: number): void
+}
+export class PriorityBuckets<in out T = Task> {
+  public buckets: Array<[number, Array<T>]> = []
+  scheduleTask(task: T, priority: number) {
+    this.buckets.push([priority, [task]])
+  }
+}
+export class MixedScheduler implements Scheduler {
+  running = false
+  tasks = new PriorityBuckets()
+  constructor(readonly maxNextTickBeforeTimer: number) {}
+  private starveInternal(depth: number) {
+    const tasks = this.tasks.buckets
+    this.tasks.buckets = []
+    for (const [_, toRun] of tasks) {
+      for (let i = 0; i < toRun.length; i++) {
+        toRun[i]()
+      }
+    }
+    if (this.tasks.buckets.length === 0) {
+      this.running = false
+    } else {
+      this.starve(depth)
+    }
+  }
+  private starve(depth = 0) {
+    if (depth >= this.maxNextTickBeforeTimer) {
+      setTimeout(() => this.starveInternal(0), 0)
+    } else {
+      Promise.resolve(void 0).then(() => this.starveInternal(depth + 1))
+    }
+  }
+  scheduleTask(task: Task, priority: number) {
+    this.tasks.scheduleTask(task, priority)
+    if (!this.running) {
+      this.running = true
+      this.starve()
+    }
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`
+export type Task = () => void
+export interface Scheduler {
+  scheduleTask(task: Task, priority: number, fiber?: RuntimeFiber<unknown, unknown>): void
+}
+export class SchedulerRunner {
+  running = false
+  tasks = new PriorityBuckets()
+  constructor(readonly scheduleDrain: (depth: number, drain: (depth: number) => void) => void) {}
+  static cached(scheduleDrain: (depth: number, drain: (depth: number) => void) => void) {
+    const fallback = new SchedulerRunner(scheduleDrain)
+    const runners = new WeakMap<RuntimeFiber<unknown, unknown>, SchedulerRunner>()
+    return (fiber?: RuntimeFiber<unknown, unknown>) => {
+      if (fiber === undefined) return fallback
+      let runner = runners.get(fiber)
+      if (runner === undefined) {
+        runner = new SchedulerRunner(scheduleDrain)
+        runners.set(fiber, runner)
+      }
+      return runner
+    }
+  }
+}
+export class MixedScheduler implements Scheduler {
+  private readonly getRunner = SchedulerRunner.cached((depth, drain) => {
+    if (depth >= this.maxNextTickBeforeTimer) {
+      setTimeout(() => drain(0), 0)
+    } else {
+      Promise.resolve(void 0).then(() => drain(depth + 1))
+    }
+  })
+  constructor(readonly maxNextTickBeforeTimer: number) {}
+  scheduleTask(task: Task, priority: number, fiber?: RuntimeFiber<unknown, unknown>) {
+    this.getRunner(fiber).scheduleTask(task, priority)
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(n.Prop("loc"), "vuln.ts") && strings.Contains(tokens, "effect_mixed_scheduler_shared_runner=true") {
+			seen = true
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.ts") && strings.Contains(tokens, "effect_mixed_scheduler_shared_runner=true") {
+			t.Fatalf("fixed scheduler runner isolation should suppress shared-runner token: %s", tokens)
+		}
+	}
+	if !seen {
+		t.Fatalf("vulnerable MixedScheduler shared-runner token was not emitted; nodes=%#v", nodes)
+	}
+}
+
 func findFuncDef(prog nir.Program, name string) (nir.FuncDef, bool) {
 	for _, mod := range prog.Modules {
 		if fn, ok := findFuncDefInStmts(mod.Body, name); ok {

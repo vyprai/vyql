@@ -473,6 +473,9 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	if jsCryptoJSRandomFloatWordArrayRisk(c.text(root)) {
 		add("cryptojs_random_float_wordarray_risk=true")
 	}
+	if jsEffectMixedSchedulerSharedRunner(c.text(root)) {
+		add("effect_mixed_scheduler_shared_runner=true")
+	}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
 		if n == nil || len(out) >= 512 {
@@ -665,6 +668,26 @@ func jsCryptoJSRandomFloatWordArrayRisk(text string) bool {
 		strings.Contains(compact, ".readUIntLE(") ||
 		strings.Contains(compact, ".getRandomValues(")
 	return hasNativeRandom && hasFloatConversion && hasNativeRandomRead
+}
+
+func jsEffectMixedSchedulerSharedRunner(text string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(text)), "")
+	if strings.Contains(compact, "SchedulerRunner.cached(") ||
+		strings.Contains(compact, "getRunner(fiber).scheduleTask") ||
+		strings.Contains(compact, "newWeakMap<RuntimeFiber") {
+		return false
+	}
+	return strings.Contains(compact, "classMixedScheduler") &&
+		strings.Contains(compact, "implementsScheduler") &&
+		strings.Contains(compact, "running=false") &&
+		strings.Contains(compact, "tasks=newPriorityBuckets") &&
+		strings.Contains(compact, "starveInternal") &&
+		strings.Contains(compact, "this.tasks.buckets") &&
+		strings.Contains(compact, "Promise.resolve(void0).then") &&
+		strings.Contains(compact, "setTimeout(") &&
+		strings.Contains(compact, "scheduleTask(task:Task,priority:number)") &&
+		strings.Contains(compact, "this.tasks.scheduleTask(task,priority)") &&
+		strings.Contains(compact, "this.starve()")
 }
 
 func (c *jsConv) jsIncompleteGeneratedIdentifierReservedWords(root *tree_sitter.Node) bool {
