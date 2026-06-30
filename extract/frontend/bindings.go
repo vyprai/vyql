@@ -126,6 +126,7 @@ type flagSpec struct {
 // activeSources, when non-nil, restricts which source concepts the input bindings
 // emit for the active analysis profile. nil = every source active.
 var activeSources map[string]bool
+var activeBindingConcepts map[string]bool
 
 var (
 	autoBindingsCache sync.Map // map[string]cachedAutoBindings
@@ -139,6 +140,40 @@ type cachedAutoBindings struct {
 
 // SetActiveSources sets the active-profile filter for source labelling. Pass nil to disable.
 func SetActiveSources(s map[string]bool) { activeSources = s }
+
+// SetActiveBindingConcepts restricts graph labels to concepts the active rule set can consume.
+// Pass nil to disable pruning; the returned restore func is scoped for scan graph builds.
+func SetActiveBindingConcepts(concepts map[string]bool) func() {
+	prev := activeBindingConcepts
+	if len(concepts) == 0 {
+		activeBindingConcepts = nil
+	} else {
+		activeBindingConcepts = make(map[string]bool, len(concepts))
+		for c, ok := range concepts {
+			if ok {
+				activeBindingConcepts[c] = true
+			}
+		}
+	}
+	return func() { activeBindingConcepts = prev }
+}
+
+// ActiveBindingConceptsKey fingerprints the binding-demand filter for incremental labels.
+func ActiveBindingConceptsKey() string {
+	if activeBindingConcepts == nil {
+		return "*"
+	}
+	keys := make([]string, 0, len(activeBindingConcepts))
+	for k, on := range activeBindingConcepts {
+		if on {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
+}
+
+func BindingConceptPruningActive() bool { return activeBindingConcepts != nil }
 
 // ActiveSourcesKey returns a deterministic fingerprint of the active source set for the
 // incremental binding-label cache: changing the profile changes which
@@ -836,6 +871,26 @@ func rangeTechCallablePropNodes(idx *flagMatchIndex, s usg.Store, tech string, c
 	idx.rangeTechNodes(s, tech, crossLang, fn, callablePropTypes...)
 }
 
+func rangeTechNodesDirect(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
+	for _, typ := range types {
+		ids, _ := s.NodesOfType(typ)
+		for _, id := range ids {
+			n, ok, err := s.GetNode(id)
+			if err != nil || !ok {
+				continue
+			}
+			if !crossLang && tech != "" {
+				if nt := nodeTechFromNode(n); nt != "" && nt != tech {
+					continue
+				}
+			}
+			if !fn(n) {
+				return
+			}
+		}
+	}
+}
+
 func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
 	for _, typ := range callablePropTypes {
 		ids, _ := s.NodesOfType(typ)
@@ -1145,7 +1200,7 @@ type bindingSpec struct {
 // BindingsFor loads v2 bindings for a technology and builds the graph-labeling
 // applicators that apply those bindings to an extracted graph.
 func BindingsFor(tech string) []bindings.Applicator {
-	out := bindingApplicatorsFromSpec(loadSpec(tech))
+	out := bindingApplicatorsFromSpec(filterBindingSpecForActiveConcepts(loadSpec(tech)))
 	if tech == "javascript" {
 		out = append(out, jsDomValueInputApplicator())
 		out = append(out, jsPathRegexGuardApplicator())
@@ -1205,7 +1260,7 @@ func OverlayBindings(root string, techs []string) ([]bindings.Applicator, error)
 			if len(allowed) > 0 && !allowed[ad.Name] {
 				return nil, fmt.Errorf("overlay binding %s declares %q, which is not present in this scan", file, ad.Name)
 			}
-			spec := specFromBindingSet(ad)
+			spec := filterBindingSpecForActiveConcepts(specFromBindingSet(ad))
 			spec.Name = "overlay." + spec.Name
 			out = append(out, bindingApplicatorsFromSpec(spec)...)
 		}
@@ -1241,6 +1296,63 @@ func bindingApplicatorsFromSpec(spec bindingSpec) []bindings.Applicator {
 	}
 	if len(spec.AdvisoryNeutralizers) > 0 {
 		out = append(out, spec.advisoryNeutralizerApplicator())
+	}
+	return out
+}
+
+func bindingConceptActive(concept string) bool {
+	return activeBindingConcepts == nil || concept == "" || activeBindingConcepts[concept]
+}
+
+func filterBindingSpecForActiveConcepts(spec bindingSpec) bindingSpec {
+	if activeBindingConcepts == nil {
+		return spec
+	}
+	out := spec
+	out.Inputs = nil
+	for _, x := range spec.Inputs {
+		if bindingConceptActive(x.Concept) {
+			out.Inputs = append(out.Inputs, x)
+		}
+	}
+	out.Sinks = nil
+	for _, x := range spec.Sinks {
+		if bindingConceptActive(x.Concept) {
+			out.Sinks = append(out.Sinks, x)
+		}
+	}
+	out.Controls = nil
+	for _, x := range spec.Controls {
+		if bindingConceptActive(x.Concept) {
+			out.Controls = append(out.Controls, x)
+		}
+	}
+	out.Marks = nil
+	for _, x := range spec.Marks {
+		if bindingConceptActive(x.Concept) {
+			out.Marks = append(out.Marks, x)
+		}
+	}
+	out.Flags = nil
+	for _, x := range spec.Flags {
+		if bindingConceptActive(x.Concept) {
+			out.Flags = append(out.Flags, x)
+		}
+	}
+	// Filters emit an ontology-role concept selected at runtime, not a per-binding concept.
+	// Keep them when pruning is active so sanitizer semantics stay intact for taint rules.
+	out.Filters = spec.Filters
+	out.AdvisoryNeutralizers = nil
+	for _, x := range spec.AdvisoryNeutralizers {
+		if bindingConceptActive(x.About) {
+			out.AdvisoryNeutralizers = append(out.AdvisoryNeutralizers, x)
+		}
+	}
+	out.ParamSources = nil
+	for _, x := range spec.ParamSources {
+		if bindingConceptActive(x.Concept) {
+			out.ParamSources = append(out.ParamSources, x)
+		}
 	}
 	return out
 }
@@ -1822,8 +1934,19 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 				effects[i] = reqGate.effect(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
 			}
 			var out []bindings.Mapping
-			scopeIdx := sharedFlagIndex(s)
-			rangeTechCallablePropNodes(scopeIdx, s, spec.Technology, spec.crossLang, func(n usg.Node) bool {
+			needsScope := inputSpecsNeedScope(spec.Inputs)
+			var scopeIdx *flagMatchIndex
+			if needsScope {
+				scopeIdx = sharedFlagIndex(s)
+			}
+			rangeInputs := func(fn func(usg.Node) bool) {
+				if needsScope {
+					scopeIdx.rangeTechNodes(s, spec.Technology, spec.crossLang, fn, inputApplicatorNodeTypes(spec.Technology, spec.Inputs)...)
+					return
+				}
+				rangeTechNodesDirect(s, spec.Technology, spec.crossLang, fn, inputApplicatorNodeTypes(spec.Technology, spec.Inputs)...)
+			}
+			rangeInputs(func(n usg.Node) bool {
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				if path == "" && method == "" && len(inIdx.loose) == 0 {
 					return true
@@ -1853,7 +1976,7 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 							!valCondsDirectForNode(n, in.ValMatches, in.ValAbsents) {
 							continue
 						}
-						if !scopePredicatesMatch(s, scopeIdx, in.ScopePreds, n, spec.Technology, spec.crossLang) {
+						if len(in.ScopePreds) > 0 && !scopePredicatesMatch(s, scopeIdx, in.ScopePreds, n, spec.Technology, spec.crossLang) {
 							continue
 						}
 						// active-profile gating: a profile restricts which
@@ -1874,6 +1997,30 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 			return out
 		},
 	}
+}
+
+func inputSpecsNeedScope(inputs []inputSpec) bool {
+	for _, in := range inputs {
+		if len(in.ScopePreds) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func inputApplicatorNodeTypes(_ string, inputs []inputSpec) []string {
+	seen := map[string]bool{"code.Call": true}
+	out := append([]string{}, callablePropTypes...)
+	for _, typ := range out {
+		seen[typ] = true
+	}
+	for _, in := range inputs {
+		if in.NodeType != "" && !seen[in.NodeType] {
+			seen[in.NodeType] = true
+			out = append(out, in.NodeType)
+		}
+	}
+	return out
 }
 
 // sinkApplicator labels arg0 of matching calls with a PER-MAPPING fidelity:
@@ -1906,8 +2053,19 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 			var out []bindings.Mapping
 			flowIdx := sharedFlowIndex(s)
 			var collectionIdx collectionFlowIndex
-			scopeIdx := sharedFlagIndex(s)
-			scopeIdx.rangeTechNodes(s, spec.Technology, false, func(n usg.Node) bool {
+			needsScope := sinkSpecsNeedScope(spec.Sinks)
+			var scopeIdx *flagMatchIndex
+			if needsScope {
+				scopeIdx = sharedFlagIndex(s)
+			}
+			rangeSinks := func(fn func(usg.Node) bool) {
+				if needsScope {
+					scopeIdx.rangeTechNodes(s, spec.Technology, false, fn, "code.Call", "code.Attr", "code.BinOp")
+					return
+				}
+				rangeTechNodesDirect(s, spec.Technology, false, fn, "code.Call", "code.Attr", "code.BinOp")
+			}
+			rangeSinks(func(n usg.Node) bool {
 				id := n.ID
 				isAttr := n.Type == "code.Attr"
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
@@ -1937,7 +2095,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 					if hit && !callArgCountMatches(n, sk.ArgCountSet, sk.ArgCountMin, sk.ArgCountMax) {
 						hit = false
 					}
-					if hit && !scopePredicatesMatch(s, scopeIdx, sk.ScopePreds, n, spec.Technology, spec.crossLang) {
+					if hit && len(sk.ScopePreds) > 0 && !scopePredicatesMatch(s, scopeIdx, sk.ScopePreds, n, spec.Technology, spec.crossLang) {
 						hit = false
 					}
 					if !hit {
@@ -2072,7 +2230,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 					out = append(out, bindings.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
 				return true
-			}, "code.Call", "code.Attr", "code.BinOp")
+			})
 			return out
 		},
 	}
@@ -2084,6 +2242,24 @@ func sinkBestKey(sk sinkSpec) string {
 		strconv.FormatBool(sk.Collection) + "\x00" +
 		strconv.FormatBool(sk.CollectionFirst) + "\x00" +
 		strconv.Itoa(sk.CollectionIndex)
+}
+
+func sinkSpecsNeedScope(sinks []sinkSpec) bool {
+	for _, sk := range sinks {
+		if len(sk.ScopePreds) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func controlSpecsNeedScope(controls []controlSpec) bool {
+	for _, c := range controls {
+		if len(c.ScopePreds) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // checkApplicator labels control concepts (transforms/validators) on the calls that
@@ -2107,8 +2283,19 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 			}
 			var out []bindings.Mapping
 			var collectionIdx collectionFlowIndex
-			scopeIdx := sharedFlagIndex(s)
-			scopeIdx.rangeTechNodes(s, spec.Technology, false, func(n usg.Node) bool {
+			needsScope := controlSpecsNeedScope(spec.Controls)
+			var scopeIdx *flagMatchIndex
+			if needsScope {
+				scopeIdx = sharedFlagIndex(s)
+			}
+			rangeControls := func(fn func(usg.Node) bool) {
+				if needsScope {
+					scopeIdx.rangeTechNodes(s, spec.Technology, false, fn, "code.Call")
+					return
+				}
+				rangeTechNodesDirect(s, spec.Technology, false, fn, "code.Call")
+			}
+			rangeControls(func(n usg.Node) bool {
 				id := n.ID
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				for _, ci := range ctrlIdx.candidates(method, path) {
@@ -2126,7 +2313,7 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 						hit = false
 					}
 					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) &&
-						scopePredicatesMatch(s, scopeIdx, c.ScopePreds, n, spec.Technology, spec.crossLang) {
+						(len(c.ScopePreds) == 0 || scopePredicatesMatch(s, scopeIdx, c.ScopePreds, n, spec.Technology, spec.crossLang)) {
 						nodeID := id
 						if c.Receiver {
 							nodeID = n.Prop("recv")
@@ -2149,7 +2336,7 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 					}
 				}
 				return true
-			}, "code.Call")
+			})
 			return out
 		},
 	}
@@ -3045,14 +3232,25 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 				return methods, paths, len(methods) == 0 && len(paths) == 0
 			})
 			var out []bindings.Mapping
-			matchIdx := sharedFlagIndex(s)
+			needsFullIndex := flagSpecsNeedFullIndex(spec.Flags)
+			matchIdx := &flagMatchIndex{}
+			if needsFullIndex {
+				matchIdx = sharedFlagIndex(s)
+			}
 			var flagStats []presenceFlagTiming
 			if flagTimingOn {
 				flagStats = make([]presenceFlagTiming, len(spec.Flags))
 			}
 			nodeTypes := flagApplicatorNodeTypes(spec.Flags, spec.crossLang)
 			for _, nodeType := range nodeTypes {
-				matchIdx.rangeNodesOfTechType(s, spec.Technology, nodeType, spec.crossLang, func(n usg.Node) bool {
+				rangeFlagNodes := func(fn func(usg.Node) bool) {
+					if needsFullIndex {
+						matchIdx.rangeNodesOfTechType(s, spec.Technology, nodeType, spec.crossLang, fn)
+						return
+					}
+					rangeTechNodesDirect(s, spec.Technology, spec.crossLang, fn, nodeType)
+				}
+				rangeFlagNodes(func(n usg.Node) bool {
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
 						if !effects[i].Allowed {
 							continue
@@ -3096,6 +3294,53 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 			return out
 		},
 	}
+}
+
+func flagSpecsNeedFullIndex(flags []flagSpec) bool {
+	for _, fl := range flags {
+		if len(fl.Operands) > 0 {
+			return true
+		}
+		for _, pred := range fl.Predicates {
+			if flagPredicateNeedsFullIndex(fl, pred) {
+				return true
+			}
+		}
+		for _, operand := range fl.Operands {
+			for _, pred := range operand.Predicates {
+				if flagPredicateNeedsFullIndex(fl, pred) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func flagPredicateNeedsFullIndex(fl flagSpec, pred flagPredicate) bool {
+	if pred.Subject == "flow_to" || pred.Subject == "scope_call" {
+		return true
+	}
+	if fl.Scope == "" || pred.Property != "tokens" {
+		return false
+	}
+	for _, v := range pred.Values {
+		switch {
+		case strings.HasPrefix(v, "call_arg:"),
+			strings.HasPrefix(v, "call_path:"),
+			strings.HasPrefix(v, "call:"),
+			strings.HasPrefix(v, "literal:"),
+			strings.HasPrefix(v, "identifier:"),
+			strings.HasPrefix(v, "selector:"),
+			strings.HasPrefix(v, "attr_path:"),
+			strings.HasPrefix(v, "index:"),
+			strings.HasPrefix(v, "subscript:"),
+			strings.HasPrefix(v, "binary:"),
+			strings.HasPrefix(v, "expr:"):
+			return true
+		}
+	}
+	return false
 }
 
 type presenceFlagTiming struct {
@@ -4457,54 +4702,63 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
 			}
 			var collectionIdx collectionFlowIndex
-			scopeIdx := sharedFlagIndex(s)
-			for _, nodeType := range nodeTypes {
-				scopeIdx.rangeNodesOfTechType(s, spec.Technology, nodeType, crossLang, func(n usg.Node) bool {
-					path := n.Prop("callee_path")
-					method := n.Prop("method")
-					seenMapping := map[string]bool{}
-					for _, mi := range markIdx.candidates(method, path) {
-						m := spec.Marks[mi]
-						if !nodeTypeAllowed(m.NodeType, n.Type) {
-							continue
-						}
-						if !effects[mi].Allowed {
-							continue
-						}
-						hit := m.ByMethod && method == m.Pattern ||
-							!m.ByMethod && ((m.Pattern == "" && m.NodeType != "") || (m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
-						if !hit {
-							continue
-						}
-						if !callArgCountMatches(n, m.ArgCountSet, m.ArgCountMin, m.ArgCountMax) {
-							continue
-						}
-						if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {
-							continue
-						}
-						if !scopePredicatesMatch(s, scopeIdx, m.ScopePreds, n, spec.Technology, crossLang) {
-							continue
-						}
-						detail, conf := reviewDetail(m.Concept, m.Pattern)
-						detail = mergeMappingDetail(detail, m.Detail)
-						conf = mappingConfidence(m.Confidence, conf)
-						conf, detail = effects[mi].apply(conf, detail)
-						spec := 0
-						if len(m.Packages) > 0 {
-							spec = 3 // package-specific direct label supersedes native/general
-						}
-						for _, target := range markTargets(s, &collectionIdx, n, m) {
-							key := m.Concept + "\x00" + target
-							if seenMapping[key] {
-								continue
-							}
-							out = append(out, bindings.Mapping{NodeID: target, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
-							seenMapping[key] = true
-						}
-					}
-					return true
-				})
+			needsScope := controlSpecsNeedScope(spec.Marks)
+			var scopeIdx *flagMatchIndex
+			if needsScope {
+				scopeIdx = sharedFlagIndex(s)
 			}
+			rangeMarks := func(fn func(usg.Node) bool) {
+				if needsScope {
+					scopeIdx.rangeTechNodes(s, spec.Technology, crossLang, fn, nodeTypes...)
+					return
+				}
+				rangeTechNodesDirect(s, spec.Technology, crossLang, fn, nodeTypes...)
+			}
+			rangeMarks(func(n usg.Node) bool {
+				path := n.Prop("callee_path")
+				method := n.Prop("method")
+				seenMapping := map[string]bool{}
+				for _, mi := range markIdx.candidates(method, path) {
+					m := spec.Marks[mi]
+					if !nodeTypeAllowed(m.NodeType, n.Type) {
+						continue
+					}
+					if !effects[mi].Allowed {
+						continue
+					}
+					hit := m.ByMethod && method == m.Pattern ||
+						!m.ByMethod && ((m.Pattern == "" && m.NodeType != "") || (m.Exact && path == m.Pattern) || (!m.Exact && matchSinkPath(path, m.Pattern)))
+					if !hit {
+						continue
+					}
+					if !callArgCountMatches(n, m.ArgCountSet, m.ArgCountMin, m.ArgCountMax) {
+						continue
+					}
+					if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {
+						continue
+					}
+					if len(m.ScopePreds) > 0 && !scopePredicatesMatch(s, scopeIdx, m.ScopePreds, n, spec.Technology, crossLang) {
+						continue
+					}
+					detail, conf := reviewDetail(m.Concept, m.Pattern)
+					detail = mergeMappingDetail(detail, m.Detail)
+					conf = mappingConfidence(m.Confidence, conf)
+					conf, detail = effects[mi].apply(conf, detail)
+					spec := 0
+					if len(m.Packages) > 0 {
+						spec = 3 // package-specific direct label supersedes native/general
+					}
+					for _, target := range markTargets(s, &collectionIdx, n, m) {
+						key := m.Concept + "\x00" + target
+						if seenMapping[key] {
+							continue
+						}
+						out = append(out, bindings.Mapping{NodeID: target, Concept: m.Concept, Fidelity: mappingFidelity(m.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
+						seenMapping[key] = true
+					}
+				}
+				return true
+			})
 			return out
 		},
 	}
@@ -4731,7 +4985,7 @@ func TextPatternBindings() []bindings.Applicator { return BindingsFor("textpatte
 // AutoBindings returns v2 binding sets that opt into whole-graph application through
 // `meta { auto_apply: graph }`.
 func AutoBindings() []bindings.Applicator {
-	const key = "v2"
+	key := "v2\x00" + ActiveBindingConceptsKey()
 	if cached, ok := autoBindingsCache.Load(key); ok {
 		res := cached.(cachedAutoBindings)
 		if res.err != nil {
@@ -4780,7 +5034,7 @@ func loadAutoBindingApplicators() ([]bindings.Applicator, error) {
 	for _, name := range order {
 		ad := byName[name]
 		if mode, _ := ad.Meta["auto_apply"].(string); mode == "graph" {
-			out = append(out, bindingApplicatorsFromSpec(specFromBindingSet(ad))...)
+			out = append(out, bindingApplicatorsFromSpec(filterBindingSpecForActiveConcepts(specFromBindingSet(ad)))...)
 		}
 	}
 	return out, nil

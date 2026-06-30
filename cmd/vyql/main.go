@@ -282,16 +282,24 @@ func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*find
 }
 
 func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, scanStats, usg.Store, error) {
-	g, stats, err := buildGraph(paths)
+	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false)
+}
+
+func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool) ([]*findings.Finding, scanStats, usg.Store, error) {
+	rules, err := compiledRulesFor(ruleSources)
+	if err != nil {
+		return nil, scanStats{}, nil, err
+	}
+	var bindingConcepts map[string]bool
+	if pruneBindings {
+		bindingConcepts = activeRuleBindingConcepts(rules, profileName)
+	}
+	g, stats, err := buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{BindingConcepts: bindingConcepts})
 	if err != nil {
 		return nil, stats, nil, err
 	}
 	if g == nil {
 		return nil, stats, nil, nil // recognized files, but nothing to analyze
-	}
-	rules, err := compiledRulesFor(ruleSources)
-	if err != nil {
-		return nil, stats, g, err
 	}
 	eng := engine.New(rules.onto, g)
 	var all []*findings.Finding
@@ -308,6 +316,100 @@ func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSourc
 	}
 	tk.mark("evaluate")
 	return all, stats, g, nil
+}
+
+func activeRuleBindingConcepts(rules compiledRuleSet, profileName string) map[string]bool {
+	out := map[string]bool{}
+	add := func(concept string) {
+		if strings.TrimSpace(concept) == "" {
+			return
+		}
+		out[concept] = true
+		for c := range rules.onto.Descendants(concept) {
+			out[c] = true
+		}
+	}
+	var addExpr func(parser.Expr)
+	addException := func(ex parser.Exception) {
+		switch x := ex.(type) {
+		case parser.PathCoveredBy:
+			add(x.Concept)
+		case parser.EndpointCoveredBy:
+			add(x.Concept)
+		case parser.SameReceiverCoveredBy:
+			add(x.Concept)
+		case parser.SameScopeCoveredBy:
+			add(x.Concept)
+		case parser.GlobalCoveredBy:
+			add(x.Concept)
+		case parser.DominatesCoveredBy:
+			add(x.Concept)
+		case parser.PostDominatesCoveredBy:
+			add(x.Concept)
+		case parser.ExprException:
+			addExpr(x.Expr)
+		}
+	}
+	addExpr = func(expr parser.Expr) {
+		switch x := expr.(type) {
+		case parser.And:
+			for _, part := range x.Parts {
+				addExpr(part)
+			}
+		case parser.Or:
+			for _, part := range x.Parts {
+				addExpr(part)
+			}
+		case parser.Not:
+			addExpr(x.Inner)
+		case parser.SolverCall:
+			for _, arg := range x.Args {
+				add(arg.Ref.String())
+			}
+		case parser.HoldsAssetKind:
+			add(x.Ref.String())
+		case parser.Is:
+			add(x.Concept)
+			add(x.Ref.String())
+		}
+	}
+	for _, cr := range rules.compiled {
+		if !ruleActiveForProfile(cr, profileName) {
+			continue
+		}
+		switch body := cr.Rule.Body.(type) {
+		case *parser.FlowStmt:
+			add(body.Src.Concept)
+			add(body.Dst.Concept)
+			for c := range cr.SourceConcepts {
+				add(c)
+			}
+			for c := range cr.SinkConcepts {
+				add(c)
+			}
+			for c := range cr.KillControls {
+				add(c)
+			}
+		case *parser.MatchStmt:
+			add(body.Concept)
+			add(body.RelatedConcept)
+		case *parser.OrderStmt:
+			add(body.First.Concept)
+			add(body.Second.Concept)
+		}
+		for _, cl := range cr.Rule.Clauses {
+			if cl.Kind == "where" {
+				addExpr(cl.Where)
+			}
+			if cl.Kind == "unless" {
+				addException(cl.Unless)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func ruleActiveForProfile(cr *engine.CompiledRule, profileName string) bool {
@@ -424,10 +526,10 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 			func() {
 				restore := parsecache.SetShared(nil)
 				defer restore()
-				all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
+				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
 			}()
 		} else {
-			all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !wantsFlags)
 		}
 		if err != nil {
 			return err

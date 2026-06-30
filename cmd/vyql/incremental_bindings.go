@@ -252,6 +252,8 @@ func bindingFingerprint(deps map[string]bool) string {
 	}
 	io.WriteString(h, "\x00sources\x00")
 	io.WriteString(h, frontend.ActiveSourcesKey())
+	io.WriteString(h, "\x00concepts\x00")
+	io.WriteString(h, frontend.ActiveBindingConceptsKey())
 
 	io.WriteString(h, "\x00deps\x00")
 	keys := make([]string, 0, len(deps))

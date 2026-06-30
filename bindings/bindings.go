@@ -106,11 +106,32 @@ type proposal struct {
 
 type key struct{ node, concept string }
 
+type proposalGroup struct {
+	best proposal
+	all  []proposal // nil for singleton keys; populated only when precedence must resolve conflicts.
+}
+
+func (g proposalGroup) forEach(fn func(proposal)) {
+	if len(g.all) == 0 {
+		fn(g.best)
+		return
+	}
+	for _, p := range g.all {
+		fn(p)
+	}
+}
+
 // Apply runs binding applicators, resolves precedence, and attaches the winning
 // labels to the store. Returns conflicts and suppressed mappings.
 func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]ConflictRecord, []Mapping, error) {
 	start := time.Now()
-	var proposals []proposal
+	proposalCount := 0
+
+	// positive claims grouped by (node, concept); negative claims by the
+	// (node, concept) they argue against. Most claims are singletons on large
+	// repos, so keep only the winning proposal unless a key actually collides.
+	pos := map[key]proposalGroup{}
+	neg := map[key][]Applicator{}
 	for _, app := range apps {
 		appStart := time.Now()
 		mappings := app.Apply(store)
@@ -118,26 +139,33 @@ func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]Con
 			fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d mapping(s)\n", app.Name, float64(time.Since(appStart))/1e6, len(mappings))
 		}
 		for _, m := range mappings {
-			proposals = append(proposals, proposal{app, m})
+			proposalCount++
+			p := proposal{app, m}
+			if n := m.negative(); n != "" {
+				k := key{m.NodeID, n}
+				neg[k] = append(neg[k], app)
+				continue
+			}
+			k := key{m.NodeID, m.Concept}
+			group, ok := pos[k]
+			if !ok {
+				pos[k] = proposalGroup{best: p}
+				continue
+			}
+			if len(group.all) == 0 {
+				group.all = []proposal{group.best, p}
+			} else {
+				group.all = append(group.all, p)
+			}
+			if less(proposalKey(group.best), proposalKey(p)) {
+				group.best = p
+			}
+			pos[k] = group
 		}
 	}
 
 	var conflicts []ConflictRecord
 	var suppressed []Mapping
-
-	// positive claims grouped by (node, concept); negative claims by the
-	// (node, concept) they argue against.
-	pos := map[key][]proposal{}
-	neg := map[key][]Applicator{}
-	for _, p := range proposals {
-		if n := p.m.negative(); n != "" {
-			k := key{p.m.NodeID, n}
-			neg[k] = append(neg[k], p.ad)
-		} else {
-			k := key{p.m.NodeID, p.m.Concept}
-			pos[k] = append(pos[k], p)
-		}
-	}
 
 	// tenant overrides win outright.
 	overrideKeys := map[key]bool{}
@@ -158,32 +186,32 @@ func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]Con
 
 	// deterministic iteration over positive keys
 	for _, k := range sortedKeys(pos) {
-		plist := pos[k]
+		group := pos[k]
 		if overrideKeys[k] {
 			if tenantNeg[k] {
-				for _, p := range plist {
+				group.forEach(func(p proposal) {
 					suppressed = append(suppressed, p.m)
 					conflicts = append(conflicts, ConflictRecord{p.m.NodeID, p.m.Concept,
 						"tenant.override", p.ad.Name, "tenant override (negative)"})
-				}
+				})
 				continue
 			}
 		}
 
 		// the most-specific positive proposal wins (per-mapping tiering): a package
 		// match supersedes a native path match supersedes a general method match.
-		win := maxProposal(plist)
+		win := group.best
 
 		// resolve positive vs negative claims on the same (node, concept)
 		negAds := neg[k]
 		if len(negAds) > 0 {
 			bestNeg := maxNeg(negAds)
 			if less(proposalKey(win), bestNeg.precedenceKey()) {
-				for _, p := range plist {
+				group.forEach(func(p proposal) {
 					suppressed = append(suppressed, p.m)
 					conflicts = append(conflicts, ConflictRecord{p.m.NodeID, p.m.Concept,
 						bestNeg.Name, p.ad.Name, "negative claim higher precedence"})
-				}
+				})
 				continue
 			}
 			conflicts = append(conflicts, ConflictRecord{k.node, k.concept,
@@ -191,18 +219,18 @@ func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]Con
 		}
 
 		// attach the winner; note out-ranked losers (lower-tier matches superseded)
-		for _, p := range plist {
+		group.forEach(func(p proposal) {
 			if p.ad.Name != win.ad.Name {
 				conflicts = append(conflicts, ConflictRecord{p.m.NodeID, p.m.Concept,
 					win.ad.Name, p.ad.Name, "lower precedence (specificity/fidelity/origin)"})
 			}
-		}
+		})
 		if err := attach(store, win.m, win.ad.Name, win.ad.Fidelity, win.ad.Confidence); err != nil {
 			return nil, nil, err
 		}
 	}
 	if bindingTimingOn {
-		fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d proposal(s)\n", "precedence+attach", float64(time.Since(start))/1e6, len(proposals))
+		fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d proposal(s)\n", "precedence+attach", float64(time.Since(start))/1e6, proposalCount)
 	}
 	return conflicts, suppressed, nil
 }
@@ -253,7 +281,7 @@ func maxNeg(apps []Applicator) Applicator {
 	return best
 }
 
-func sortedKeys(m map[key][]proposal) []key {
+func sortedKeys(m map[key]proposalGroup) []key {
 	ks := make([]key, 0, len(m))
 	for k := range m {
 		ks = append(ks, k)

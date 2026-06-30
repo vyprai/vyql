@@ -94,6 +94,9 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 			}
 		}
 		for _, lg := range languages {
+			if lg.name == "textpattern" && frontend.BindingConceptPruningActive() && len(lg.bindings()) == 0 {
+				continue
+			}
 			files := filterEntriesForLanguage(entries, lg)
 			if len(files) == 0 {
 				continue

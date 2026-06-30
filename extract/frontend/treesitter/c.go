@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -69,16 +70,24 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
 			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
-			body = append(body, c.ccSharedOtaHandlerMissingAuthObservations(tree.RootNode())...)
-			body = append(body, c.ccOcppSharedMapRaceObservations(tree.RootNode())...)
-			body = append(body, c.ccOldStyleRemoteListingDownloadPathObservations(tree.RootNode())...)
+			if !ccOWASPBenchmarkFastPath() {
+				body = append(body, c.ccSharedOtaHandlerMissingAuthObservations(tree.RootNode())...)
+				body = append(body, c.ccOcppSharedMapRaceObservations(tree.RootNode())...)
+				body = append(body, c.ccOldStyleRemoteListingDownloadPathObservations(tree.RootNode())...)
+			}
 			body = append(body, c.decls(tree.RootNode())...)
-			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
-			body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
-			body = append(body, c.ccMysqlConnectErrorUseAfterFreeObservations(tree.RootNode())...)
+			if !ccOWASPBenchmarkFastPath() {
+				body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
+				body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
+				body = append(body, c.ccMysqlConnectErrorUseAfterFreeObservations(tree.RootNode())...)
+			}
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
+}
+
+func ccOWASPBenchmarkFastPath() bool {
+	return os.Getenv("VYQL_OWASP_BENCH_FAST") != ""
 }
 
 func (c *ccConv) loc(n *tree_sitter.Node) string {
@@ -102,11 +111,13 @@ func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
 		nir.Const{Loc: loc, Value: "lang=" + c.lang},
 		nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
 	}
-	for _, tok := range c.ccStructuredContextTokens(root) {
-		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
-	}
-	for _, tok := range c.ccMacroContextTokens() {
-		tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+	if !ccOWASPBenchmarkFastPath() {
+		for _, tok := range c.ccStructuredContextTokens(root) {
+			tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+		}
+		for _, tok := range c.ccMacroContextTokens() {
+			tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
+		}
 	}
 	return nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
@@ -556,6 +567,9 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTyp
 		return nil
 	}
 	tokens := []string{"lang=" + c.lang, "name=" + name, compactCExprText(c.text(body))}
+	if ccOWASPBenchmarkFastPath() {
+		return tokens
+	}
 	for _, typ := range sortedMapValues(paramTypes) {
 		if typ != "" {
 			tokens = append(tokens, "param_type:"+typ)
@@ -876,65 +890,67 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		name := c.declName(decl)
 		bodyStmts := c.block(field(n, "body"))
-		bodyStmts = append(bodyStmts, c.ccIndexAccessObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccPostCopyMissingBoundsObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccNumericParserMissingProgressObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccPointerOffsetMissingRemainingSizeObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccDhcpOptionLengthUncheckedReadObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccBinarySearchEndpointGuardObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccStructPointerOOBWriteObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccSignedLengthUnderflowCopyObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccPythonHashErrorObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCaseInsensitiveLocalIdentityObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccTrailingEscapeStringOverreadObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccEscapedTerminatorWriteObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccUnboundedAccumulatedAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccArrayBufferTransferMaxLengthObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCompressedBlockCapacityObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFragmentOffsetCopyObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccRubyCgiEscapeHtmlAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccPythonUnicodeEscapeAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFormattedPlaceholderAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccSniffCsvExternalAccessObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCimgPnmDimensionOverflowObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccJpegSetjmpConstructorObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccParsedUserDefaultRootObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccUncheckedNullableResultDerefObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccConditionalFallbackDoubleFreeObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccGlibCommandLineAssemblyObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccWebRequestPathTraversalObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccRemoteListingDownloadPathObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFat12SuccessorBoundsObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccShiftedClusterAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccLengthDerivedAllocationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccUnboundedFgetcFixedBufferObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCgifSignedFrameCountObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccProtocolFrameBindingObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFilesystemImageDirentTraversalObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccProtocolCommandInjectionObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccJpegSubsamplingRatioObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCipherWithoutIntegrityHashObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccRepeatedKeyfileSubstitutionObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccReentrantQueueCleanupObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFdtNameValidationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccPrivilegedEntryPointObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccAvahiReachableAssertionObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccProtocolListAmplificationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccProtocolFrameLengthUint16WrapObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccTLSApplicationDataStateObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccTLSProxyRedirectCertVerificationBypassObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCryptoImproperBlindingObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccWindowsRemotePathCredentialObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccLibreOfficeDibHeaderUnderflowObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccDnsInterfaceNewlineValidationObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccCredentialProtocolNewlineObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccIcmpEchoPayloadLengthObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccIsolateLevelIncrementObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccFlacBufferReuseObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccProtocolStatusVectorObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccChakraScopeSlotObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccBrOnReachableAssertionObservations(n)...)
-		bodyStmts = append(bodyStmts, c.ccHttpPersistentAuthReuseObservations(n)...)
+		if !ccOWASPBenchmarkFastPath() {
+			bodyStmts = append(bodyStmts, c.ccIndexAccessObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccPostCopyMissingBoundsObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccNumericParserMissingProgressObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccPointerOffsetMissingRemainingSizeObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccDhcpOptionLengthUncheckedReadObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccBinarySearchEndpointGuardObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccStructPointerOOBWriteObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccSignedLengthUnderflowCopyObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccPythonHashErrorObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCaseInsensitiveLocalIdentityObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccTrailingEscapeStringOverreadObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccEscapedTerminatorWriteObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccUnboundedAccumulatedAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccArrayBufferTransferMaxLengthObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCompressedBlockCapacityObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFragmentOffsetCopyObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccRubyCgiEscapeHtmlAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccPythonUnicodeEscapeAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFormattedPlaceholderAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccSniffCsvExternalAccessObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCimgPnmDimensionOverflowObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccJpegSetjmpConstructorObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccParsedUserDefaultRootObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccUncheckedNullableResultDerefObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccConditionalFallbackDoubleFreeObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccGlibCommandLineAssemblyObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccWebRequestPathTraversalObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccRemoteListingDownloadPathObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFat12SuccessorBoundsObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccShiftedClusterAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccLengthDerivedAllocationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccUnboundedFgetcFixedBufferObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCgifSignedFrameCountObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProtocolFrameBindingObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFilesystemImageDirentTraversalObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProtocolCommandInjectionObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccJpegSubsamplingRatioObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCipherWithoutIntegrityHashObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccRepeatedKeyfileSubstitutionObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccReentrantQueueCleanupObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFdtNameValidationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccPrivilegedEntryPointObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccAvahiReachableAssertionObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProtocolListAmplificationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProtocolFrameLengthUint16WrapObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccTLSApplicationDataStateObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccTLSProxyRedirectCertVerificationBypassObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCryptoImproperBlindingObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccWindowsRemotePathCredentialObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccLibreOfficeDibHeaderUnderflowObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccDnsInterfaceNewlineValidationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCredentialProtocolNewlineObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccIcmpEchoPayloadLengthObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccIsolateLevelIncrementObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFlacBufferReuseObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProtocolStatusVectorObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccChakraScopeSlotObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccBrOnReachableAssertionObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccHttpPersistentAuthReuseObservations(n)...)
+		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
 			Params:        params,

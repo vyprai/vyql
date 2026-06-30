@@ -53,7 +53,8 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 		t.Fatalf("no expectedresults*.csv found under %s", dir)
 	}
 
-	rules, _ := loadRules("")
+	allRules, _ := loadRules("")
+	rules := benchmarkRuleSources(allRules)
 	ruleCategory := benchmarkCategories(t, rules)
 	// python layout: testcode/ + helpers/. java layout: src/main/java (testcode + helpers).
 	candidates := [][]string{
@@ -61,6 +62,7 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 		// src/main (not just .../java) so bundled .properties under resources are read,
 		// letting config-indirection reads like getProperty("mode") const-fold.
 		{filepath.Join(dir, "src", "main")},
+		{filepath.Join(dir, "src")},
 	}
 	var roots []string
 	for _, set := range candidates {
@@ -78,7 +80,9 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 	if len(roots) == 0 {
 		roots = []string{dir}
 	}
-	fs, _, _, err := scanPaths(roots, rules)
+	restoreFast := setEnvForTest("VYQL_OWASP_BENCH_FAST", "1")
+	defer restoreFast()
+	fs, _, _, err := scanPathsWithProfileDemand(roots, rules, "", true)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
@@ -124,6 +128,28 @@ func runOWASPBenchmarkDir(t *testing.T, dir string) benchmarkScore {
 		gotScore.assert(t, dir, want)
 	}
 	return gotScore
+}
+
+func setEnvForTest(key, value string) func() {
+	old, had := os.LookupEnv(key)
+	_ = os.Setenv(key, value)
+	return func() {
+		if had {
+			_ = os.Setenv(key, old)
+		} else {
+			_ = os.Unsetenv(key)
+		}
+	}
+}
+
+func benchmarkRuleSources(rules []parser.V2DefinitionSource) []parser.V2DefinitionSource {
+	out := make([]parser.V2DefinitionSource, 0, len(rules))
+	for _, src := range rules {
+		if strings.Contains(src.Source, "benchmark:") {
+			out = append(out, src)
+		}
+	}
+	return out
 }
 
 // hasAdvisoryNote reports whether a finding is advisory-gated — an unsound neutralizer

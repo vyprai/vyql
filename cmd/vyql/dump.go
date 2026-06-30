@@ -17,11 +17,15 @@ import (
 
 var scanBindingOverlay string
 
+type graphBuildOptions struct {
+	BindingConcepts map[string]bool
+}
+
 // buildGraph runs extract → lower → bindings → SCA and returns the analysis graph (the
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
 // Returns a nil store when recognized files produced nothing to analyze.
 func buildGraph(paths []string) (usg.Store, scanStats, error) {
-	return buildGraphWith(paths, lowerCache())
+	return buildGraphWithOptions(paths, lowerCache(), graphBuildOptions{})
 }
 
 // lowerCache returns the process cache as a lowering.DeltaCache, or nil when caching is off.
@@ -37,6 +41,13 @@ func lowerCache() lowering.DeltaCache {
 // (nil = no caching / full lowering). Threading the cache makes the incremental path testable
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
+	return buildGraphWithOptions(paths, cache, graphBuildOptions{})
+}
+
+func buildGraphWithOptions(paths []string, cache lowering.DeltaCache, opts graphBuildOptions) (usg.Store, scanStats, error) {
+	restoreConcepts := frontend.SetActiveBindingConcepts(opts.BindingConcepts)
+	defer restoreConcepts()
+
 	tk := newTimer()
 	prog, bindingApps, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
