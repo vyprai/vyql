@@ -208,6 +208,75 @@ impl Config {
 	}
 }
 
+func TestRustFunctionContextMarksRunTestsAutoApprovalExecutesCode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test_runner.rs")
+	src := []byte(`
+pub enum ApprovalRequirement {
+    Auto,
+    Required,
+}
+
+pub enum ToolCapability {
+    ExecutesCode,
+    Sandboxable,
+}
+
+pub struct RunTestsTool;
+pub struct FixedRunTestsTool;
+
+impl RunTestsTool {
+    fn name(&self) -> &'static str {
+        "run_tests"
+    }
+
+    fn capabilities(&self) -> Vec<ToolCapability> {
+        vec![ToolCapability::ExecutesCode, ToolCapability::Sandboxable]
+    }
+
+    fn command(&self) -> &'static str {
+        "cargo test"
+    }
+}
+
+impl FixedRunTestsTool {
+    fn name(&self) -> &'static str {
+        "run_tests"
+    }
+
+    fn capabilities(&self) -> Vec<ToolCapability> {
+        vec![ToolCapability::ExecutesCode, ToolCapability::Sandboxable]
+    }
+
+    fn command(&self) -> &'static str {
+        "cargo test"
+    }
+
+    fn fixed_approval_requirement(&self) -> ApprovalRequirement {
+        ApprovalRequirement::Required
+    }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.run_tests_auto_approval_executes_code") != 1 {
+		t.Fatalf("run_tests auto-approval observation missing: %#v", nodes)
+	}
+}
+
 func TestRustFunctionContextIncludesModexpBitLengthArithmetic(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "lib.rs")

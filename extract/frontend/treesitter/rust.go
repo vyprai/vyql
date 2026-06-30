@@ -124,6 +124,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
+		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
 		out = append(out, c.decls(field(n, "body"))...)
 		return out
 	case "mod_item", "trait_item":
@@ -186,6 +187,21 @@ func (c *rsConv) rsUninitializedMetadata(n *tree_sitter.Node) []nir.Stmt {
 		Method: "uninitialized",
 		Loc:    loc,
 	}}}
+}
+
+func (c *rsConv) rsRunTestsAutoApprovalMetadata(n *tree_sitter.Node) []nir.Stmt {
+	compact := rustCompactText(c.text(n))
+	if !strings.Contains(compact, "\"run_tests\"") ||
+		!strings.Contains(compact, "ToolCapability::ExecutesCode") ||
+		!strings.Contains(compact, "\"cargotest\"") ||
+		strings.Contains(compact, "ApprovalRequirement::Required") ||
+		strings.Contains(compact, "ApprovalRequirement::Suggest") {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.run_tests_auto_approval_executes_code",
+		"run_tests_auto_approval_executes_code", loc,
+		"lang=rust", "tool=run_tests", "capability=executes_code", "approval=auto")}
 }
 
 func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
