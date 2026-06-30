@@ -918,6 +918,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		bodyStmts = append(bodyStmts, c.ccProtocolStatusVectorObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccChakraScopeSlotObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccBrOnReachableAssertionObservations(n)...)
+		bodyStmts = append(bodyStmts, c.ccHttpPersistentAuthReuseObservations(n)...)
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
 			Params:        params,
@@ -4152,6 +4153,54 @@ func (c *ccConv) ccBrOnReachableAssertionObservations(fn *tree_sitter.Node) []ni
 		Method: "bron_operand_ref_check_missing",
 		Loc:    loc,
 	}}}
+}
+
+func (c *ccConv) ccHttpPersistentAuthReuseObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil || c.lang != "c" {
+		return nil
+	}
+	text := compactCExprText(c.text(body))
+	hasAuthorizationHeader := strings.Contains(text, "spool_getheader(") && strings.Contains(text, "\"Authorization\"")
+	hasPersistentAuthState := strings.Contains(text, "httpd_userid") &&
+		(strings.Contains(text, "saslprops.authid") || strings.Contains(text, "auth_success("))
+	hasChallengeState := strings.Contains(text, "auth_chal") && strings.Contains(text, ".scheme")
+	hasProxyAuthorization := strings.Contains(text, "\"Authorize-As\"") && strings.Contains(text, "proxy_authz(")
+	hasProtectedNamespace := strings.Contains(text, "need_auth(")
+	if !hasAuthorizationHeader || !hasPersistentAuthState || !hasChallengeState || !hasProxyAuthorization || !hasProtectedNamespace {
+		return nil
+	}
+	proxyIdx := strings.Index(text, "\"Authorize-As\"")
+	clearUserIdx := firstCIndex(text, "free(httpd_userid);httpd_userid=NULL", "free(httpd_userid);httpd_userid=0")
+	clearAuthIdx := firstCIndex(text, "auth_freestate(httpd_authstate);httpd_authstate=NULL", "auth_freestate(httpd_authstate);httpd_authstate=0")
+	if clearUserIdx >= 0 && clearAuthIdx >= 0 && clearUserIdx < proxyIdx && clearAuthIdx < proxyIdx &&
+		strings.Contains(text, "IMAPOPT_PROXYSERVERS") {
+		return nil
+	}
+	loc := c.loc(body)
+	path := "analysis.http.persistent_auth_reuse_without_reset"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "state=httpd_userid"},
+			nir.Const{Loc: loc, Value: "state=txn.auth_chal.scheme"},
+			nir.Const{Loc: loc, Value: "guard=missing_drop_non_backend_credentials"},
+		},
+		Path:   path,
+		Method: "persistent_auth_reuse_without_reset",
+		Loc:    loc,
+	}}}
+}
+
+func firstCIndex(text string, needles ...string) int {
+	best := -1
+	for _, needle := range needles {
+		idx := strings.Index(text, needle)
+		if idx >= 0 && (best < 0 || idx < best) {
+			best = idx
+		}
+	}
+	return best
 }
 
 func ccHasAnyCallWithArg(text string, calls []string, arg string) bool {

@@ -1,0 +1,6 @@
+module bindings.c.generated.mce54b166;
+
+binding httpPersistentAuthReuse205 {
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "http.persistent_auth_reuse_without_reset"
+  emit issue code.HttpPersistentAuthReuse at node
+}

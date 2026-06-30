@@ -1080,6 +1080,96 @@ char **argv;
 	}
 }
 
+func TestCHttpPersistentAuthReuseObservationRequiresCredentialDrop(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "httpd.c")
+	src := []byte(`
+struct txn_t {
+  struct hdrs *req_hdrs;
+  struct { int scheme; } auth_chal;
+};
+struct ns_t {
+  int (*need_auth)(struct txn_t *);
+};
+char *httpd_userid;
+void *httpd_authstate;
+void *httpd_extrafolder;
+void *httpd_extradomain;
+struct { const char *authid; } saslprops;
+int config_mupdate_server;
+char *spool_getheader(struct hdrs *h, const char *name);
+char *config_getstring(int key);
+void syslog(int level, const char *msg);
+void free(void *p);
+void auth_freestate(void *p);
+int proxy_authz(char *userid, char *as);
+#define IMAPOPT_PROXYSERVERS 1
+
+int vulnerable(struct txn_t *txn, struct ns_t *namespace) {
+  const char *auth = spool_getheader(txn->req_hdrs, "Authorization");
+  if (auth) {
+    httpd_userid = "alice";
+    httpd_authstate = auth;
+  } else if (txn->auth_chal.scheme) {
+    free(httpd_userid);
+    httpd_userid = 0;
+  }
+  char *as = spool_getheader(txn->req_hdrs, "Authorize-As");
+  if (saslprops.authid && as) {
+    proxy_authz(httpd_userid, as);
+  }
+  if (!httpd_userid && namespace->need_auth(txn)) {
+    return 401;
+  }
+  return 200;
+}
+
+int fixed(struct txn_t *txn, struct ns_t *namespace) {
+  const char *auth = spool_getheader(txn->req_hdrs, "Authorization");
+  if (auth) {
+    httpd_userid = "alice";
+    httpd_authstate = auth;
+  } else if (txn->auth_chal.scheme) {
+    free(httpd_userid);
+    httpd_userid = 0;
+  } else if (!config_mupdate_server || !config_getstring(IMAPOPT_PROXYSERVERS)) {
+    free(httpd_userid);
+    httpd_userid = 0;
+    free(httpd_extrafolder);
+    httpd_extrafolder = 0;
+    free(httpd_extradomain);
+    httpd_extradomain = 0;
+    if (httpd_authstate) {
+      auth_freestate(httpd_authstate);
+      httpd_authstate = 0;
+    }
+  }
+  char *as = spool_getheader(txn->req_hdrs, "Authorize-As");
+  if (saslprops.authid && as) {
+    proxy_authz(httpd_userid, as);
+  }
+  if (!httpd_userid && namespace->need_auth(txn)) {
+    return 401;
+  }
+  return 200;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.http.persistent_auth_reuse_without_reset", "guard=missing_drop_non_backend_credentials") {
+		t.Fatalf("vulnerable function missing HTTP persistent auth reuse observation: %#v", prog.Modules[0].Body)
+	}
+	if cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.http.persistent_auth_reuse_without_reset", "guard=missing_drop_non_backend_credentials") {
+		t.Fatalf("fixed function should not emit HTTP persistent auth reuse observation: %#v", prog.Modules[0].Body)
+	}
+}
+
 func cModuleHasAnalysisToken(stmts []nir.Stmt, path, token string) bool {
 	for _, st := range stmts {
 		exprStmt, ok := st.(nir.ExprStmt)
