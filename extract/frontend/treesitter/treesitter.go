@@ -15,6 +15,21 @@ var skipDirs = map[string]bool{
 	"venv": true, "testdata": true,
 }
 
+// minifiedAsset matches vendored/minified/bundled web assets (jquery.min.js,
+// bootstrap.bundle.min.js, …). These are third-party, single-line, and explode into
+// tens of thousands of USG nodes — deep-analyzing them dominates scan time and floods
+// findings with false positives, while never containing the target's own vulnerability.
+// Skipped by default (no flag): there is no value in analyzing a minified bundle.
+func minifiedAsset(base string) bool {
+	b := strings.ToLower(base)
+	for _, suf := range []string{".min.js", ".min.mjs", ".min.cjs", ".min.css", ".bundle.js", ".bundle.min.js"} {
+		if strings.HasSuffix(b, suf) {
+			return true
+		}
+	}
+	return false
+}
+
 // userExcludes are caller-supplied glob patterns (via `vyql scan -exclude`) layered on
 // top of skipDirs. Process-global, set once before scanning (the CLI runs one scan per
 // invocation; vyqld shells out a fresh process per request, so there's no shared-state
@@ -83,7 +98,7 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 			}
 			return nil
 		}
-		if excluded(filepath.Base(path), rel) {
+		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) {
 			return nil
 		}
 		// match by extension, or by basename for extensionless files (e.g. Dockerfile).
@@ -118,7 +133,7 @@ func ListAllFiles(root string) []Entry {
 			}
 			return nil
 		}
-		if excluded(filepath.Base(path), rel) {
+		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) {
 			return nil
 		}
 		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
