@@ -1,0 +1,11 @@
+module code;
+
+concept BackendCalendarEventsMissingAuthorization : issue {
+  cwe: [CWE_862]
+  reviewAssumption: "the backend calendar AJAX endpoint can be invoked without an authenticated role or appointment-view privilege"
+  reviewCategory: auth
+  reviewCondition: "a backend calendar events handler returns appointment, provider, service, and customer data without first enforcing an appointment-view authorization check"
+  reviewConfidence: high
+  reviewEvidence: "backend calendar context {pattern} loads appointment batches and enriches them with provider, service, and customer records before any observed appointment-view privilege guard"
+  vulnerableTo: [access_control.MissingAuthorization, secrets.SecretLeak]
+}

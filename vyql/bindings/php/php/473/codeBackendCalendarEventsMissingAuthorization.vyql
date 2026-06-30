@@ -1,0 +1,6 @@
+module bindings.php.generated.m8d6b2a31;
+
+binding backendCalendarEventsMissingAuthorization473 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "analysis.php.backend_calendar_events_missing_authorization"
+  emit issue code.BackendCalendarEventsMissingAuthorization at node
+}

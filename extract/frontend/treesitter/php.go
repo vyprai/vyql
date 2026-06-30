@@ -139,6 +139,14 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		c.funcName = name
 		reviewTokens := c.phpReviewTokens(n)
 		body := c.block(field(n, "body"))
+		if phpHasReviewToken(reviewTokens, "backend_calendar_events_missing_authorization") {
+			body = append([]nir.Stmt{nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "analysis.php.backend_calendar_events_missing_authorization", Loc: L},
+				Path:   "analysis.php.backend_calendar_events_missing_authorization",
+				Method: "backend_calendar_events_missing_authorization",
+				Loc:    L,
+			}}}, body...)
+		}
 		if phpHasReviewToken(reviewTokens, "fatfree_clear_eval_compile_without_key_validation") {
 			for _, param := range params {
 				if param != "$key" {
@@ -1203,6 +1211,16 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 	if strings.Contains(compact, "DashboardAjaxController") && strings.Contains(compact, "/dashboard/") &&
 		!strings.Contains(compact, "inheritAccessFromModule") {
 		add("backend_route_missing_module_authorization")
+	}
+	if strings.Contains(compact, "ajax_get_calendar_events(") &&
+		strings.Contains(compact, "appointments_model->get_batch") &&
+		strings.Contains(compact, "providers_model->get_row") &&
+		strings.Contains(compact, "services_model->get_row") &&
+		strings.Contains(compact, "customers_model->get_row") &&
+		!strings.Contains(compact, "PRIV_APPOINTMENTS]['view']") &&
+		!strings.Contains(compact, "PRIV_APPOINTMENTS\"][\"view\"]") &&
+		!strings.Contains(compact, "cannot(") {
+		add("backend_calendar_events_missing_authorization")
 	}
 	if strings.Contains(compact, "findAllTrash") && strings.Contains(compact, "setShareToken") &&
 		!strings.Contains(compact, "checkEditPermissions") {

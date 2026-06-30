@@ -908,6 +908,73 @@ foreach ($_GET as $key => $value) {
 	}
 }
 
+func TestPHPBackendCalendarEventsMissingAuthorizationReviewToken(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.php")
+	fixed := filepath.Join(dir, "fixed.php")
+	if err := os.WriteFile(vuln, []byte(`<?php
+class Backend_api {
+  public function ajax_get_calendar_events() {
+    $response = [
+      'appointments' => $this->appointments_model->get_batch([
+        'is_unavailable' => FALSE,
+        'start_datetime >=' => $this->input->post('startDate'),
+        'end_datetime <=' => $this->input->post('endDate')
+      ])
+    ];
+    foreach ($response['appointments'] as &$appointment) {
+      $appointment['provider'] = $this->providers_model->get_row($appointment['id_users_provider']);
+      $appointment['service'] = $this->services_model->get_row($appointment['id_services']);
+      $appointment['customer'] = $this->customers_model->get_row($appointment['id_users_customer']);
+    }
+    $this->output->set_output(json_encode($response));
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<?php
+class Backend_api {
+  public function ajax_get_calendar_events() {
+    if ($this->privileges[PRIV_APPOINTMENTS]['view'] == FALSE) {
+      throw new Exception('You do not have the required privileges for this task.');
+    }
+    $response = [
+      'appointments' => $this->appointments_model->get_batch([
+        'is_unavailable' => FALSE,
+        'start_datetime >=' => $this->input->post('startDate'),
+        'end_datetime <=' => $this->input->post('endDate')
+      ])
+    ];
+    foreach ($response['appointments'] as &$appointment) {
+      $appointment['provider'] = $this->providers_model->get_row($appointment['id_users_provider']);
+      $appointment['service'] = $this->services_model->get_row($appointment['id_services']);
+      $appointment['customer'] = $this->customers_model->get_row($appointment['id_users_customer']);
+    }
+    $this->output->set_output(json_encode($response));
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramFileHasContextToken(t, prog, "vuln.php", "php_review:backend_calendar_events_missing_authorization") {
+		t.Fatalf("vulnerable backend calendar events handler missing review token: %#v", prog.Modules)
+	}
+	if !phpProgramFileHasCallPath(t, prog, "vuln.php", "analysis.php.backend_calendar_events_missing_authorization") {
+		t.Fatalf("vulnerable backend calendar events handler missing analysis observation: %#v", prog.Modules)
+	}
+	if phpProgramFileHasContextToken(t, prog, "fixed.php", "php_review:backend_calendar_events_missing_authorization") {
+		t.Fatalf("fixed backend calendar events handler should not emit review token: %#v", prog.Modules)
+	}
+	if phpProgramFileHasCallPath(t, prog, "fixed.php", "analysis.php.backend_calendar_events_missing_authorization") {
+		t.Fatalf("fixed backend calendar events handler should not emit analysis observation: %#v", prog.Modules)
+	}
+}
+
 func phpProgramHasContextToken(t *testing.T, prog nir.Program, want string) bool {
 	t.Helper()
 	g, err := lowering.Lower(prog, true)
@@ -920,6 +987,42 @@ func phpProgramHasContextToken(t *testing.T, prog nir.Program, want string) bool
 	}
 	for _, n := range nodes {
 		if strings.Contains(n.Prop("str_args"), want) {
+			return true
+		}
+	}
+	return false
+}
+
+func phpProgramFileHasContextToken(t *testing.T, prog nir.Program, file, want string) bool {
+	t.Helper()
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if strings.Contains(n.Prop("loc"), file) && strings.Contains(n.Prop("str_args"), want) {
+			return true
+		}
+	}
+	return false
+}
+
+func phpProgramFileHasCallPath(t *testing.T, prog nir.Program, file, want string) bool {
+	t.Helper()
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && strings.Contains(n.Prop("loc"), file) && n.Prop("callee_path") == want {
 			return true
 		}
 	}
