@@ -1,0 +1,8 @@
+module code;
+
+review code.EverestFormsEntryFileDeleteWithoutPathGuard {
+  category: path
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  kind: attention
+  text: "verify entry-file deletion resolves paths and enforces upload-directory containment before deleting files"
+}

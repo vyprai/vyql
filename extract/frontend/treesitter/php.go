@@ -161,6 +161,14 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				break
 			}
 		}
+		if phpHasReviewToken(reviewTokens, "everest_forms_entry_file_delete_without_path_guard") {
+			body = append([]nir.Stmt{nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "analysis.php.everest_forms_entry_file_delete_without_path_guard", Loc: L},
+				Path:   "analysis.php.everest_forms_entry_file_delete_without_path_guard",
+				Method: "everest_forms_entry_file_delete_without_path_guard",
+				Loc:    L,
+			}}}, body...)
+		}
 		body = append(body, c.phpFunctionContext(n)...)
 		c.funcName = prevFunc
 		if n.Kind() == "method_declaration" && phpIsWPListTableColumn(name) && len(params) > 0 {
@@ -729,6 +737,9 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 				add("absolute_path_disclosure_" + op)
 			}
 		}
+	}
+	if phpEverestFormsEntryFileDeleteWithoutPathGuard(compact, calls) {
+		add("everest_forms_entry_file_delete_without_path_guard")
 	}
 	for _, opt := range []string{"--delete-key", "--delete-secret-key", "--list-keys", "--export", "--export-secret-keys", "--list-secret-keys", "--list-public-keys"} {
 		if phpGPGOptionArgMissingDelimiter(compact, opt) {
@@ -1359,6 +1370,25 @@ func phpHasSeparatorGuardBefore(prefix, varName string) bool {
 		}
 	}
 	return false
+}
+
+func phpEverestFormsEntryFileDeleteWithoutPathGuard(compact string, calls map[string]bool) bool {
+	if !strings.Contains(compact, "functiondelete_entry_files(") {
+		return false
+	}
+	if !calls["wp_delete_file"] && !calls["unlink"] {
+		return false
+	}
+	if !strings.Contains(compact, "evf_get_entry(") || !strings.Contains(compact, "->meta") {
+		return false
+	}
+	if strings.Contains(compact, "safe_delete_file(") ||
+		strings.Contains(compact, "realpath(") ||
+		strings.Contains(compact, "wp_normalize_path(") ||
+		strings.Contains(compact, "strpos(") {
+		return false
+	}
+	return true
 }
 
 func phpFatFreeClearEvalCompileWithoutKeyValidation(compact string) bool {

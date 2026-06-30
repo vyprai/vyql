@@ -975,6 +975,75 @@ class Backend_api {
 	}
 }
 
+func TestPHPEverestFormsEntryFileDeleteWithoutPathGuardReviewToken(t *testing.T) {
+	dir := t.TempDir()
+	vuln := filepath.Join(dir, "vuln.php")
+	fixed := filepath.Join(dir, "fixed.php")
+	if err := os.WriteFile(vuln, []byte(`<?php
+class EVF_Form_Task {
+  public function delete_entry_files( $entry_id ) {
+    $get_entry = evf_get_entry( $entry_id, 'meta' );
+    foreach ( $get_entry->meta as $meta_key => $meta_value ) {
+      $files = explode( "\n", $meta_value );
+      foreach ( $files as $file ) {
+        $path_from_url = wp_parse_url( $file, PHP_URL_PATH );
+        $uploaded_file = wp_upload_dir()['basedir'] . preg_replace( '/.*uploads/', '/everest_forms_uploads', $path_from_url );
+        wp_delete_file( $uploaded_file );
+      }
+    }
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, []byte(`<?php
+class EVF_Form_Task {
+  public function delete_entry_files( $entry_id ) {
+    $get_entry = evf_get_entry( $entry_id, 'meta' );
+    $uploads = wp_upload_dir();
+    $base_dir = realpath( $uploads['basedir'] );
+    foreach ( $get_entry->meta as $meta_key => $meta_value ) {
+      $files = explode( "\n", $meta_value );
+      foreach ( $files as $file ) {
+        $path_from_url = wp_parse_url( $file, PHP_URL_PATH );
+        $uploaded_file = $uploads['basedir'] . preg_replace( '/.*uploads/', '/everest_forms_uploads', $path_from_url );
+        $this->safe_delete_file( $uploaded_file, $base_dir );
+      }
+    }
+  }
+
+  private function safe_delete_file( $path, $allowed_base ) {
+    $normalized_path = wp_normalize_path( $path );
+    $resolved_path = realpath( $normalized_path );
+    if ( $resolved_path && strpos( $resolved_path, $allowed_base ) === 0 ) {
+      if ( is_file( $resolved_path ) ) {
+        wp_delete_file( $resolved_path );
+      }
+    }
+  }
+}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{vuln, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "php_review:everest_forms_entry_file_delete_without_path_guard"
+	if !phpProgramFileHasContextToken(t, prog, "vuln.php", want) {
+		t.Fatalf("vulnerable Everest Forms deletion method missing review token: %#v", prog.Modules)
+	}
+	if !phpProgramFileHasCallPath(t, prog, "vuln.php", "analysis.php.everest_forms_entry_file_delete_without_path_guard") {
+		t.Fatalf("vulnerable Everest Forms deletion method missing analysis observation: %#v", prog.Modules)
+	}
+	if phpProgramFileHasContextToken(t, prog, "fixed.php", want) {
+		t.Fatalf("fixed safe_delete_file shape should not emit review token: %#v", prog.Modules)
+	}
+	if phpProgramFileHasCallPath(t, prog, "fixed.php", "analysis.php.everest_forms_entry_file_delete_without_path_guard") {
+		t.Fatalf("fixed safe_delete_file shape should not emit analysis observation: %#v", prog.Modules)
+	}
+}
+
 func phpProgramHasContextToken(t *testing.T, prog nir.Program, want string) bool {
 	t.Helper()
 	g, err := lowering.Lower(prog, true)
