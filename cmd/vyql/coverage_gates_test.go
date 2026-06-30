@@ -1453,12 +1453,10 @@ var cve1000AcceptedLedgerCVEMetadataOverrides = map[int]string{
 // rank here; new non-SKIP ledger rows without specs fail the gate.
 var cve1000AcceptedNoSpecRanks = map[int]bool{
 	21: true,
-	23: true, 28: true, 37: true,
-	57: true, 62: true, 69: true, 71: true, 73: true,
+	28: true, 37: true,
+	62: true, 69: true, 71: true, 73: true,
 	83:  true,
-	114: true,
-	574: true, 588: true, 592: true,
-	829: true,
+	574: true, 588: true,
 }
 
 func nonemptyTSVRows(src string) []string {

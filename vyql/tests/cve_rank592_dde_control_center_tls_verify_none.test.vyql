@@ -1,0 +1,36 @@
+# verify_current_expected: skip-fresh-target
+# The rank 592 corpus appears directionally inverted: the selected parent does
+# not contain the insecure code, while the commit-side file disables TLS peer
+# verification with QSslSocket::VerifyNone.
+
+test "rank592: downloader disables Qt TLS peer verification"
+  lang cpp
+  expect VYQL-CFG-004
+  expect_review code.CertValidationDisabled
+  code
+  ```
+  class DownloadUrl {
+  public:
+      void downloadFileFromURL(QUrl url) {
+          QSslConfiguration config = QSslConfiguration::defaultConfiguration();
+          config.setPeerVerifyMode(QSslSocket::VerifyNone);
+          manager.get(QNetworkRequest(url));
+      }
+  };
+  ```
+
+test "rank592: downloader keeps Qt TLS peer verification enabled"
+  lang cpp
+  reject VYQL-CFG-004
+  reject_review code.CertValidationDisabled
+  code
+  ```
+  class DownloadUrl {
+  public:
+      void downloadFileFromURL(QUrl url) {
+          QSslConfiguration config = QSslConfiguration::defaultConfiguration();
+          config.setPeerVerifyMode(QSslSocket::VerifyPeer);
+          manager.get(QNetworkRequest(url));
+      }
+  };
+  ```

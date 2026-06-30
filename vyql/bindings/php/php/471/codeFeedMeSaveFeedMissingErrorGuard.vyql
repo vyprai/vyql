@@ -1,0 +1,6 @@
+module bindings.php.generated.mfbe84119;
+
+binding feedMeSaveFeedMissingErrorGuard471 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "actionSaveFeed" and node.context.callPath contains "$this._getModelFromPost" and node.context.callPath contains "$this._saveAndRedirect" and not (node.context.scopeCall contains "$feed.getErrors")
+  emit issue code.FeedMeSaveFeedMissingErrorGuard at node
+}
