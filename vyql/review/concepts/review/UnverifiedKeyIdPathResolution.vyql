@@ -1,0 +1,8 @@
+module code;
+
+review code.UnverifiedKeyIdPathResolution {
+  category: path
+  expected: [core.PathCanonicalization, core.PathAccessCheck]
+  kind: target
+  text: "verify unverified key identifiers are not resolved into filesystem paths before a fixed filename or containment guard is applied"
+}

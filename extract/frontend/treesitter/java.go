@@ -140,6 +140,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(paramsNode)
 		body := c.block(field(n, "body"))
 		body = append(body, c.jvIntegerSizeArithmeticObservations(n)...)
+		body = append(body, c.jvUnverifiedKeyIdPathResolveObservations(n)...)
 		annotationTokens := c.jvAnnotationTokens(n, "annotation:")
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, annotationTokens...)
@@ -996,6 +997,38 @@ func (c *jvConv) jvIntegerSizeArithmeticObservations(fn *tree_sitter.Node) []nir
 	}
 	walk(field(fn, "body"))
 	return out
+}
+
+func (c *jvConv) jvUnverifiedKeyIdPathResolveObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := javaCompactText(c.text(body))
+	if !strings.Contains(text, ".resolve(keyId.getSchemeSpecificPart())") {
+		return nil
+	}
+	if !strings.Contains(text, "Files.exists(") || !strings.Contains(text, ".load(") {
+		return nil
+	}
+	if strings.Contains(text, ".resolve(Constants.MASTERKEY_FILENAME)") ||
+		strings.Contains(text, ".resolve(DEFAULT_MASTERKEY_PATH)") ||
+		strings.Contains(text, ".normalize()") {
+		return nil
+	}
+	loc := c.loc(body)
+	path := "analysis.java.unverified_keyid_path_resolve"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "source=unverified_key_id"},
+			nir.Const{Loc: loc, Value: "sink=path_resolve_then_load"},
+			nir.Const{Loc: loc, Value: "guard=missing_fixed_filename_or_containment"},
+		},
+		Path:   path,
+		Method: "unverified_keyid_path_resolve",
+		Loc:    loc,
+	}}}
 }
 
 func (c *jvConv) javaLengthCheckToken(n *tree_sitter.Node) string {

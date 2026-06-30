@@ -634,6 +634,65 @@ func TestJavaFunctionContextExpressionShapeTokens(t *testing.T) {
 	}
 }
 
+func TestJavaUnverifiedKeyIdPathResolveObservation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "MasterkeyFileLoadingStrategy.java")
+	src := []byte(`import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+class Vault {
+  Path getPath() { return Path.of("/vault"); }
+}
+class MasterkeyFileAccess {
+  Object load(Path path, Object passphrase) { return null; }
+}
+class Constants {
+  static final String MASTERKEY_FILENAME = "masterkey.cryptomator";
+}
+class MasterkeyFileLoadingStrategy {
+  private final Vault vault = new Vault();
+  private final MasterkeyFileAccess masterkeyFileAccess = new MasterkeyFileAccess();
+  private Object passphrase;
+
+  Object vulnerable(URI keyId) throws Exception {
+    Path filePath = vault.getPath().resolve(keyId.getSchemeSpecificPart());
+    if (!Files.exists(filePath)) {
+      filePath = Path.of("/chosen/masterkey.cryptomator");
+    }
+    Object masterkey = masterkeyFileAccess.load(filePath, passphrase);
+    if (filePath.startsWith(vault.getPath())) {
+      System.out.println(filePath);
+    }
+    return masterkey;
+  }
+
+  Object fixed(URI keyId) throws Exception {
+    if (!Constants.MASTERKEY_FILENAME.equals(keyId.getSchemeSpecificPart())) {
+      System.out.println(keyId.getSchemeSpecificPart());
+    }
+    Path filePath = vault.getPath().resolve(Constants.MASTERKEY_FILENAME);
+    if (!Files.exists(filePath)) {
+      filePath = Path.of("/chosen/masterkey.cryptomator");
+    }
+    return masterkeyFileAccess.load(filePath, passphrase);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !javaFuncHasAnalysisCall(prog.Modules[0].Body, "vulnerable", "analysis.java.unverified_keyid_path_resolve") {
+		t.Fatalf("vulnerable keyId path resolution did not emit observation: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "vulnerable"))
+	}
+	if javaFuncHasAnalysisCall(prog.Modules[0].Body, "fixed", "analysis.java.unverified_keyid_path_resolve") {
+		t.Fatalf("fixed keyId path resolution should not emit observation: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "fixed"))
+	}
+}
+
 func javaHasAnalysisCall(stmts []nir.Stmt, path string) bool {
 	for _, st := range stmts {
 		switch x := st.(type) {
@@ -652,6 +711,22 @@ func javaHasAnalysisCall(stmts []nir.Stmt, path string) bool {
 		case nir.ExprStmt:
 			if c, ok := x.Value.(nir.Call); ok && c.Path == path {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func javaFuncHasAnalysisCall(stmts []nir.Stmt, funcName, path string) bool {
+	for _, st := range stmts {
+		switch x := st.(type) {
+		case nir.ClassDef:
+			if javaFuncHasAnalysisCall(x.Body, funcName, path) {
+				return true
+			}
+		case nir.FuncDef:
+			if x.Name == funcName {
+				return javaHasAnalysisCall(x.Body, path)
 			}
 		}
 	}

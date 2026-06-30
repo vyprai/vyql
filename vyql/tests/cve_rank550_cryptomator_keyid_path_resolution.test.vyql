@@ -1,0 +1,74 @@
+# Rank 550 / CVE-2026-32310: Cryptomator trusted an unverified vault config
+# keyId path segment when selecting the masterkey file. The fix ignores
+# keyId.getSchemeSpecificPart() for filesystem resolution and uses the fixed
+# masterkey filename instead.
+
+test "rank550: unverified keyId controls masterkey path"
+  lang java
+  file MasterkeyFileLoadingStrategy.java
+  expect VYQL-PATH-058
+  expect_review code.UnverifiedKeyIdPathResolution
+  code
+  ```
+  import java.net.URI;
+  import java.nio.file.Files;
+  import java.nio.file.Path;
+
+  class Vault {
+    Path getPath() { return Path.of("/vault"); }
+  }
+  class MasterkeyFileAccess {
+    Object load(Path path, Object passphrase) { return null; }
+  }
+  class MasterkeyFileLoadingStrategy {
+    private final Vault vault = new Vault();
+    private final MasterkeyFileAccess masterkeyFileAccess = new MasterkeyFileAccess();
+    private Object passphrase;
+
+    Object loadKey(URI keyId) throws Exception {
+      Path filePath = vault.getPath().resolve(keyId.getSchemeSpecificPart());
+      if (!Files.exists(filePath)) {
+        filePath = Path.of("/chosen/masterkey.cryptomator");
+      }
+      return masterkeyFileAccess.load(filePath, passphrase);
+    }
+  }
+  ```
+
+test "rank550: fixed masterkey filename ignores unverified keyId path"
+  lang java
+  file MasterkeyFileLoadingStrategy.java
+  reject VYQL-PATH-058
+  reject_review code.UnverifiedKeyIdPathResolution
+  code
+  ```
+  import java.net.URI;
+  import java.nio.file.Files;
+  import java.nio.file.Path;
+
+  class Constants {
+    static final String MASTERKEY_FILENAME = "masterkey.cryptomator";
+  }
+  class Vault {
+    Path getPath() { return Path.of("/vault"); }
+  }
+  class MasterkeyFileAccess {
+    Object load(Path path, Object passphrase) { return null; }
+  }
+  class MasterkeyFileLoadingStrategy {
+    private final Vault vault = new Vault();
+    private final MasterkeyFileAccess masterkeyFileAccess = new MasterkeyFileAccess();
+    private Object passphrase;
+
+    Object loadKey(URI keyId) throws Exception {
+      if (!Constants.MASTERKEY_FILENAME.equals(keyId.getSchemeSpecificPart())) {
+        System.out.println(keyId.getSchemeSpecificPart());
+      }
+      Path filePath = vault.getPath().resolve(Constants.MASTERKEY_FILENAME);
+      if (!Files.exists(filePath)) {
+        filePath = Path.of("/chosen/masterkey.cryptomator");
+      }
+      return masterkeyFileAccess.load(filePath, passphrase);
+    }
+  }
+  ```
