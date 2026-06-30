@@ -522,6 +522,58 @@ void fixed(struct Ctx *ctx) {
 	}
 }
 
+func TestCProtocolFrameLengthUint16WrapObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "frames.c")
+	src := []byte(`
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long size_t;
+typedef unsigned char uint8_t;
+
+static uint16_t nswap16(uint16_t v);
+#define VALID_CHANNEL(ch) ((ch) >= 0x4000)
+
+int vulnerable(uint8_t *buf, size_t blen, size_t *app_len) {
+  uint16_t chn = nswap16(((const uint16_t *)buf)[0]);
+  if (VALID_CHANNEL(chn)) {
+    uint16_t total = 4 + nswap16(((const uint16_t *)buf)[1]);
+    *app_len = total;
+    if (total <= blen) {
+      return total;
+    }
+  }
+  return -1;
+}
+
+int fixed(uint8_t *buf, size_t blen, size_t *app_len) {
+  uint16_t chn = nswap16(((const uint16_t *)buf)[0]);
+  if (VALID_CHANNEL(chn)) {
+    uint32_t total = 4u + (uint32_t)nswap16(((const uint16_t *)buf)[1]);
+    *app_len = total;
+    if (total <= blen) {
+      return (int)total;
+    }
+  }
+  return -1;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.protocol.frame_length_uint16_wrap", "guard=missing_wide_accumulator") {
+		t.Fatalf("vulnerable function missing frame-length uint16 wrap observation: %#v", prog.Modules[0].Body)
+	}
+	if cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.protocol.frame_length_uint16_wrap", "guard=missing_wide_accumulator") {
+		t.Fatalf("fixed function should not emit frame-length uint16 wrap observation: %#v", prog.Modules[0].Body)
+	}
+}
+
 func TestCPPExtractsReallocFailureInputFreeObservation(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "realloc.cpp")

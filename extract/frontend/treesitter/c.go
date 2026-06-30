@@ -904,6 +904,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		bodyStmts = append(bodyStmts, c.ccPrivilegedEntryPointObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccAvahiReachableAssertionObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccProtocolListAmplificationObservations(n)...)
+		bodyStmts = append(bodyStmts, c.ccProtocolFrameLengthUint16WrapObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccTLSApplicationDataStateObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccCryptoImproperBlindingObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccWindowsRemotePathCredentialObservations(n)...)
@@ -3683,6 +3684,52 @@ func (c *ccConv) ccProtocolListAmplificationObservations(fn *tree_sitter.Node) [
 		Method: "list_amplification_missing_charge",
 		Loc:    loc,
 	}}}
+}
+
+func (c *ccConv) ccProtocolFrameLengthUint16WrapObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := compactCExprText(c.text(body))
+	declRe := regexp.MustCompile(`uint16_t([A-Za-z_][A-Za-z0-9_]*)=\(?([0-9]+)u?\+[^;]*(?:ntohs|nswap16|read_u?16|load_u?16)\(`)
+	for _, m := range declRe.FindAllStringSubmatchIndex(text, -1) {
+		if len(m) < 6 {
+			continue
+		}
+		lengthVar := text[m[2]:m[3]]
+		header := text[m[4]:m[5]]
+		after := text[m[1]:]
+		if !strings.Contains(after, "*app_len="+lengthVar) &&
+			!strings.Contains(after, "app_len="+lengthVar) &&
+			!strings.Contains(after, "*out_len="+lengthVar) &&
+			!strings.Contains(after, "out_len="+lengthVar) {
+			continue
+		}
+		if !strings.Contains(after, lengthVar+"<=blen") &&
+			!strings.Contains(after, lengthVar+"<=len") &&
+			!strings.Contains(after, lengthVar+"<=available") {
+			continue
+		}
+		if !strings.Contains(text, "VALID_CHANNEL") && !strings.Contains(strings.ToLower(text), "channel") {
+			continue
+		}
+		loc := c.loc(body)
+		path := "analysis.protocol.frame_length_uint16_wrap"
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: loc, Value: "length=uint16_total_frame_length"},
+				nir.Const{Loc: loc, Value: "wire=network_uint16_length"},
+				nir.Const{Loc: loc, Value: "header=" + header},
+				nir.Const{Loc: loc, Value: "guard=missing_wide_accumulator"},
+			},
+			Path:   path,
+			Method: "frame_length_uint16_wrap",
+			Loc:    loc,
+		}}}
+	}
+	return nil
 }
 
 func (c *ccConv) ccTLSApplicationDataStateObservations(fn *tree_sitter.Node) []nir.Stmt {
