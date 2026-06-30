@@ -906,6 +906,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		bodyStmts = append(bodyStmts, c.ccProtocolListAmplificationObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccProtocolFrameLengthUint16WrapObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccTLSApplicationDataStateObservations(n)...)
+		bodyStmts = append(bodyStmts, c.ccTLSProxyRedirectCertVerificationBypassObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccCryptoImproperBlindingObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccWindowsRemotePathCredentialObservations(n)...)
 		bodyStmts = append(bodyStmts, c.ccLibreOfficeDibHeaderUnderflowObservations(n)...)
@@ -3755,6 +3756,40 @@ func (c *ccConv) ccTLSApplicationDataStateObservations(fn *tree_sitter.Node) []n
 		},
 		Path:   path,
 		Method: "tls_appdata_before_decryptable",
+		Loc:    loc,
+	}}}
+}
+
+func (c *ccConv) ccTLSProxyRedirectCertVerificationBypassObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil || c.lang != "cpp" {
+		return nil
+	}
+	text := compactCExprText(cCommentRe.ReplaceAllString(c.text(body), ""))
+	if !strings.Contains(text, "SSLClient") ||
+		!strings.Contains(text, "enable_server_certificate_verification(false)") ||
+		!strings.Contains(text, "enable_server_hostname_verification(false)") {
+		return nil
+	}
+	if !containsAnyString(text, []string{"detail::redirect(", "redirect("}) ||
+		!containsAnyString(text, []string{"set_proxy(", "proxy_host", "proxyHost"}) {
+		return nil
+	}
+	proxyDisableRe := regexp.MustCompile(`if\([^)]*[Pp]roxy[^)]*\)[^{;]*\{[^{}]*enable_server_certificate_verification\(false\)[^{}]*enable_server_hostname_verification\(false\)`)
+	if !proxyDisableRe.MatchString(text) {
+		return nil
+	}
+	loc := c.loc(body)
+	path := "analysis.tls.proxy_redirect_cert_verification_bypass"
+	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "client=redirect_ssl_client"},
+			nir.Const{Loc: loc, Value: "proxy=enabled"},
+			nir.Const{Loc: loc, Value: "guard=cert_and_hostname_verification_disabled"},
+		},
+		Path:   path,
+		Method: "proxy_redirect_cert_verification_bypass",
 		Loc:    loc,
 	}}}
 }

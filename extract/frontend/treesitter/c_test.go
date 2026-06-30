@@ -574,6 +574,71 @@ int fixed(uint8_t *buf, size_t blen, size_t *app_len) {
 	}
 }
 
+func TestCPPTLSProxyRedirectCertVerificationBypassObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "redirect.cpp")
+	src := []byte(`
+class SSLClient {
+public:
+  SSLClient(const char *host, int port);
+  void set_proxy(const char *host, int port);
+  void enable_server_certificate_verification(bool enabled);
+  void enable_server_hostname_verification(bool enabled);
+};
+
+namespace detail {
+bool redirect(SSLClient &client, int &req, int &res, const char *path,
+              const char *location, int &error);
+}
+
+class ClientImpl {
+public:
+  bool vulnerable(const char *host, int port, int &req, int &res,
+                  const char *path, const char *location, int &error) {
+    SSLClient redirect_client(host, port);
+    redirect_client.set_proxy(proxy_host_, proxy_port_);
+    if (proxy_host_[0] != '\0' && proxy_port_ != -1) {
+      redirect_client.enable_server_certificate_verification(false);
+      redirect_client.enable_server_hostname_verification(false);
+    } else {
+      redirect_client.enable_server_certificate_verification(server_certificate_verification_);
+      redirect_client.enable_server_hostname_verification(server_hostname_verification_);
+    }
+    return detail::redirect(redirect_client, req, res, path, location, error);
+  }
+
+  bool fixed(const char *host, int port, int &req, int &res,
+             const char *path, const char *location, int &error) {
+    SSLClient redirect_client(host, port);
+    redirect_client.set_proxy(proxy_host_, proxy_port_);
+    redirect_client.enable_server_certificate_verification(server_certificate_verification_);
+    redirect_client.enable_server_hostname_verification(server_hostname_verification_);
+    return detail::redirect(redirect_client, req, res, path, location, error);
+  }
+
+private:
+  const char *proxy_host_;
+  int proxy_port_;
+  bool server_certificate_verification_;
+  bool server_hostname_verification_;
+};
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractCPP([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.tls.proxy_redirect_cert_verification_bypass", "guard=cert_and_hostname_verification_disabled") {
+		t.Fatalf("vulnerable redirect client missing TLS proxy verification-bypass observation: %#v", prog.Modules[0].Body)
+	}
+	if cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.tls.proxy_redirect_cert_verification_bypass", "guard=cert_and_hostname_verification_disabled") {
+		t.Fatalf("fixed redirect client should not emit TLS proxy verification-bypass observation: %#v", prog.Modules[0].Body)
+	}
+}
+
 func TestCPPExtractsReallocFailureInputFreeObservation(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "realloc.cpp")
@@ -1037,24 +1102,30 @@ func cModuleHasAnalysisToken(stmts []nir.Stmt, path, token string) bool {
 
 func cFuncHasAnalysisToken(stmts []nir.Stmt, funcName, path, token string) bool {
 	for _, st := range stmts {
-		fn, ok := st.(nir.FuncDef)
-		if !ok || fn.Name != funcName {
-			continue
-		}
-		for _, bodyStmt := range fn.Body {
-			exprStmt, ok := bodyStmt.(nir.ExprStmt)
-			if !ok {
+		switch x := st.(type) {
+		case nir.FuncDef:
+			if x.Name != funcName {
 				continue
 			}
-			call, ok := exprStmt.Value.(nir.Call)
-			if !ok || call.Path != path {
-				continue
-			}
-			for _, arg := range call.Args {
-				c, ok := arg.(nir.Const)
-				if ok && c.Value == token {
-					return true
+			for _, bodyStmt := range x.Body {
+				exprStmt, ok := bodyStmt.(nir.ExprStmt)
+				if !ok {
+					continue
 				}
+				call, ok := exprStmt.Value.(nir.Call)
+				if !ok || call.Path != path {
+					continue
+				}
+				for _, arg := range call.Args {
+					c, ok := arg.(nir.Const)
+					if ok && c.Value == token {
+						return true
+					}
+				}
+			}
+		case nir.ClassDef:
+			if cFuncHasAnalysisToken(x.Body, funcName, path, token) {
+				return true
 			}
 		}
 	}
