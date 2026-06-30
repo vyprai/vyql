@@ -480,6 +480,7 @@ func (c *conv) goSecurityObservations(name string, params []string, body *ast.Bl
 	if obs, ok := c.goPowerShellCommandStringWrapperEnvObservation(name, params, body); ok {
 		out = append(out, obs)
 	}
+	out = append(out, c.goPublicUserListRouteMissingAuthObservations(name, body)...)
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.FuncLit:
@@ -521,6 +522,71 @@ func (c *conv) goSecurityObservations(name string, params []string, body *ast.Bl
 		return true
 	})
 	return out
+}
+
+func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *ast.BlockStmt) []nir.Stmt {
+	var out []nir.Stmt
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.CallExpr:
+			callee := c.path(x.Fun)
+			if callee == "" || goLastSeg(callee) != "GET" || len(x.Args) == 0 {
+				return true
+			}
+			calleeLower := strings.ToLower(callee)
+			if !goRouteGroupLooksPublic(calleeLower) {
+				return true
+			}
+			route := goStringLiteral(x.Args[0])
+			if !goRouteLooksAllUsers(route) || !c.goCallArgsContainUserListHandler(x.Args[1:]) {
+				return true
+			}
+			handler := ""
+			for _, arg := range x.Args[1:] {
+				if p := c.path(arg); p != "" && goPathLooksUserListHandler(p) {
+					handler = p
+					break
+				}
+			}
+			out = append(out, c.goAnalysisObservation("analysis.go.public_user_list_route_missing_auth", "public_user_list_route_missing_auth", x.Pos(),
+				"lang=go", "function_name:"+name, "route:"+route, "callee:"+callee, "handler:"+handler))
+		}
+		return true
+	})
+	return out
+}
+
+func goRouteGroupLooksPublic(calleeLower string) bool {
+	return strings.Contains(calleeLower, "public") ||
+		strings.Contains(calleeLower, "anonymous") ||
+		strings.Contains(calleeLower, "unauth")
+}
+
+func goRouteLooksAllUsers(route string) bool {
+	normalized := strings.ToLower(route)
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "_", "")
+	return strings.Contains(normalized, "allusers")
+}
+
+func (c *conv) goCallArgsContainUserListHandler(args []ast.Expr) bool {
+	for _, arg := range args {
+		if goPathLooksUserListHandler(c.path(arg)) {
+			return true
+		}
+	}
+	return false
+}
+
+func goPathLooksUserListHandler(path string) bool {
+	normalized := strings.ToLower(path)
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "_", "")
+	return strings.Contains(normalized, "getallusers") ||
+		strings.Contains(normalized, "listallusers") ||
+		strings.Contains(normalized, "listusers")
 }
 
 func (c *conv) goContainerdCRIImageEnvAliasObservation(name string, body *ast.BlockStmt) (nir.Stmt, bool) {

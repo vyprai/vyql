@@ -278,6 +278,61 @@ func (s *service) generateContainerSpec(config *ContainerConfig, imageConfig *Im
 	}
 }
 
+func TestGoSemanticReviewDetectsPublicAllUsersRouteMissingAuth(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "user.go")
+	src := []byte(`package router
+
+type AppRouterGroup struct {
+	PublicRouterGroup *RouterGroup
+	AuthRouterGroup   *RouterGroup
+}
+type RouterGroup struct{}
+type UserHandler struct{}
+type HandlerBundle struct{ UserHandler *UserHandler }
+
+func (g *RouterGroup) GET(path string, handlers ...any) {}
+func (h *UserHandler) GetAllUsers() any { return nil }
+
+func vulnerable(groups *AppRouterGroup, h *HandlerBundle) {
+	groups.PublicRouterGroup.GET("/allusers", h.UserHandler.GetAllUsers())
+}
+
+func fixed(groups *AppRouterGroup, h *HandlerBundle) {
+	groups.AuthRouterGroup.GET("/allusers", h.UserHandler.GetAllUsers())
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.go.public_user_list_route_missing_auth" {
+			count++
+			if !strings.Contains(n.Prop("str_args"), "route:/allusers") ||
+				!strings.Contains(n.Prop("str_args"), "handler:h.UserHandler.GetAllUsers") {
+				t.Fatalf("public allusers observation has weak evidence tokens: %q", n.Prop("str_args"))
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("public allusers observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
 func TestGoSemanticReviewDetectsPowerShellCommandStringWrapperEnv(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "windows_share.go")
