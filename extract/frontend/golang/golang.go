@@ -474,6 +474,9 @@ func (c *conv) goSecurityObservations(name string, params []string, body *ast.Bl
 		return nil
 	}
 	var out []nir.Stmt
+	if obs, ok := c.goOsqueryAllowUnsafePlatformArgsObservation(name, body); ok {
+		out = append(out, obs)
+	}
 	if obs, ok := c.goContainerdCRIImageEnvAliasObservation(name, body); ok {
 		out = append(out, obs)
 	}
@@ -556,6 +559,27 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 		return true
 	})
 	return out
+}
+
+func (c *conv) goOsqueryAllowUnsafePlatformArgsObservation(name string, body *ast.BlockStmt) (nir.Stmt, bool) {
+	if name != "platformArgs" || body == nil {
+		return nil, false
+	}
+	for _, stmt := range body.List {
+		ret, ok := stmt.(*ast.ReturnStmt)
+		if !ok {
+			continue
+		}
+		for _, res := range ret.Results {
+			lit, ok := res.(*ast.CompositeLit)
+			if !ok || !c.goCompositeStringBoolField(lit, "allow_unsafe", "true") {
+				continue
+			}
+			return c.goAnalysisObservation("analysis.go.osquery_allow_unsafe_platform_args", "osquery_allow_unsafe_platform_args", res.Pos(),
+				"lang=go", "function_name:"+name, "component:osqueryd", "arg:allow_unsafe", "value:true"), true
+		}
+	}
+	return nil, false
 }
 
 func goRouteGroupLooksPublic(calleeLower string) bool {
@@ -898,6 +922,17 @@ func (c *conv) goCompositeBoolField(lit *ast.CompositeLit, field string) string 
 		return c.goBoolLiteral(kv.Value)
 	}
 	return ""
+}
+
+func (c *conv) goCompositeStringBoolField(lit *ast.CompositeLit, field, want string) bool {
+	for _, el := range lit.Elts {
+		kv, ok := el.(*ast.KeyValueExpr)
+		if !ok || goStringLiteral(kv.Key) != field {
+			continue
+		}
+		return c.goBoolLiteral(kv.Value) == want
+	}
+	return false
 }
 
 func (c *conv) goCompositeFieldPath(lit *ast.CompositeLit, field string) string {

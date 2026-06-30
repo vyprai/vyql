@@ -383,6 +383,60 @@ func fixedConstantEnv() error {
 	}
 }
 
+func TestGoSemanticReviewDetectsOsqueryAllowUnsafePlatformArgs(t *testing.T) {
+	dir := t.TempDir()
+	vulnPath := filepath.Join(dir, "vuln_osqueryd_windows.go")
+	vulnSrc := []byte(`package osqd
+
+func platformArgs() map[string]interface{} {
+	return map[string]interface{}{
+		"allow_unsafe": true,
+	}
+}
+`)
+	if err := os.WriteFile(vulnPath, vulnSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fixedPath := filepath.Join(dir, "fixed_osqueryd_windows.go")
+	fixedSrc := []byte(`package osqd
+
+func platformArgs() map[string]interface{} {
+	return nil
+}
+`)
+	if err := os.WriteFile(fixedPath, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{vulnPath, fixedPath}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.osquery_allow_unsafe_platform_args" {
+			continue
+		}
+		count++
+		if !strings.Contains(n.Prop("str_args"), "arg:allow_unsafe") ||
+			!strings.Contains(n.Prop("str_args"), "component:osqueryd") ||
+			strings.Contains(n.Prop("loc"), "fixed_osqueryd_windows.go") {
+			t.Fatalf("osquery allow_unsafe observation has weak evidence: loc=%q args=%q", n.Prop("loc"), n.Prop("str_args"))
+		}
+	}
+	if count != 1 {
+		t.Fatalf("osquery allow_unsafe platformArgs observations = %d, want 1; nodes=%#v", count, nodes)
+	}
+}
+
 func TestGoFunctionContextIncludesNonAdjacentCallBeforeTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "commands.go")
