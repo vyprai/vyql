@@ -128,6 +128,7 @@ func cmdScan(args []string) error {
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
+	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	_ = fs.Parse(args)
@@ -143,6 +144,9 @@ func cmdScan(args []string) error {
 	oldOverlay := scanBindingOverlay
 	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
 	defer func() { scanBindingOverlay = oldOverlay }()
+	oldExcludes := scanExcludes
+	scanExcludes = parseExcludes(*exclude)
+	defer func() { scanExcludes = oldExcludes }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:    *stats,
 		IncludeFlags: *allResults,
@@ -784,7 +788,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags -exclude _vendor,…]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

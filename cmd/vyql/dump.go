@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,40 @@ import (
 )
 
 var scanBindingOverlay string
+
+// scanExcludes holds path segments to skip during source discovery (e.g. "_vendor",
+// "node_modules"). Set from --exclude; matched against whole path segments so
+// "_vendor" skips src/pip/_vendor/... but not a file literally named my_vendor.py.
+var scanExcludes []string
+
+func parseExcludes(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// pathHasExcludedSegment reports whether any path segment of p equals an exclude.
+func pathHasExcludedSegment(p string, excludes []string) bool {
+	if len(excludes) == 0 {
+		return false
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(p), "/") {
+		for _, ex := range excludes {
+			if seg == ex {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 type graphBuildOptions struct {
 	BindingConcepts map[string]bool
