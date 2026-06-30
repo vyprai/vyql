@@ -38,13 +38,42 @@ type Node struct {
 	HasOrder bool              `json:"hasOrder,omitempty"` // distinguishes Order==0 from "unset"
 	Props    map[string]string `json:"props,omitempty"`
 	Scope    string            `json:"scope,omitempty"`
+
+	// Method/CalleePath/StrArgs are the hottest match-path properties, carried inline
+	// (like Loc/Region) so the matcher avoids a map hash per lookup and so leaf value
+	// nodes — the bulk of the graph — need no Props map at all. A store that leaves
+	// these empty and keeps the values in Props still works: Prop falls through to the
+	// map, so behavior is identical regardless of where a store puts them.
+	Method     string `json:"-"`
+	CalleePath string `json:"-"`
+	StrArgs    string `json:"-"`
+	Vkind      string `json:"-"`
 }
 
-// Prop returns a property value (empty string if absent). loc/region/order resolve to the inline
+// inlinedPropKeys are the property keys a store copies into Node columns in AddNode, so a
+// node carrying only these needs no Props map. It deliberately excludes loc/region/order:
+// those are inline on the Node value but are NOT extracted from the Props map here, so a
+// map that still holds them must be retained for Prop's fall-through to find them.
+var inlinedPropKeys = map[string]bool{
+	"method": true, "callee_path": true, "str_args": true, "vkind": true,
+}
+
+// PropsOnlyInlined reports whether every key in m is one a store copies into an inline Node
+// field, so the store can drop the map entirely after copying the values into columns.
+func PropsOnlyInlined(m map[string]string) bool {
+	for k := range m {
+		if !inlinedPropKeys[k] {
+			return false
+		}
+	}
+	return true
+}
+
+// Prop returns a property value (empty string if absent). Inlined keys resolve to the inline
 // fields; everything else comes from the Props map.
 func (n Node) Prop(k string) string {
 	// inline fields win when set; otherwise fall through to Props so nodes built the old way
-	// (hand-built graphs, tests, spec fixtures that put loc/region/order in the map) still work.
+	// (hand-built graphs, tests, spec fixtures that put these in the map) still work.
 	switch k {
 	case "loc":
 		if n.Loc != "" {
@@ -57,6 +86,22 @@ func (n Node) Prop(k string) string {
 	case "order":
 		if n.HasOrder {
 			return strconv.Itoa(int(n.Order))
+		}
+	case "method":
+		if n.Method != "" {
+			return n.Method
+		}
+	case "callee_path":
+		if n.CalleePath != "" {
+			return n.CalleePath
+		}
+	case "str_args":
+		if n.StrArgs != "" {
+			return n.StrArgs
+		}
+	case "vkind":
+		if n.Vkind != "" {
+			return n.Vkind
 		}
 	}
 	if n.Props == nil {

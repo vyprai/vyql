@@ -11,13 +11,17 @@ type IntStore struct {
 	idx map[string]int32 // id -> index (stage 2: replace with hash -> index, ids on disk)
 	ids []string         // index -> id
 
-	typ      []string // index -> node type
-	loc      []string
-	region   []string
-	order    []int32
-	hasOrder []bool
-	scope    []string
-	props    []map[string]string // index -> extras (usually nil)
+	typ        []string // index -> node type
+	loc        []string
+	region     []string
+	order      []int32
+	hasOrder   []bool
+	scope      []string
+	method     []string // index -> hot inlined props (kept out of the props map)
+	calleePath []string
+	strArgs    []string
+	vkind      []string
+	props      []map[string]string // index -> extras (usually nil)
 
 	out [][]iedge         // index -> outgoing edges
 	in  map[int32][]iedge // reverse edges, ONLY for inIndexedTypes (sparse)
@@ -92,6 +96,10 @@ func (s *IntStore) intern(id string) int32 {
 	s.order = append(s.order, 0)
 	s.hasOrder = append(s.hasOrder, false)
 	s.scope = append(s.scope, "")
+	s.method = append(s.method, "")
+	s.calleePath = append(s.calleePath, "")
+	s.strArgs = append(s.strArgs, "")
+	s.vkind = append(s.vkind, "")
 	s.props = append(s.props, nil)
 	s.out = append(s.out, nil)
 	return i
@@ -100,7 +108,9 @@ func (s *IntStore) intern(id string) int32 {
 func (s *IntStore) nodeAt(i int32) Node {
 	return Node{
 		ID: s.ids[i], Type: s.typ[i], Loc: s.loc[i], Region: s.region[i],
-		Order: s.order[i], HasOrder: s.hasOrder[i], Scope: s.scope[i], Props: s.props[i],
+		Order: s.order[i], HasOrder: s.hasOrder[i], Scope: s.scope[i],
+		Method: s.method[i], CalleePath: s.calleePath[i], StrArgs: s.strArgs[i], Vkind: s.vkind[i],
+		Props: s.props[i],
 	}
 }
 
@@ -123,7 +133,32 @@ func (s *IntStore) AddNode(n Node) error {
 	s.order[i] = n.Order
 	s.hasOrder[i] = n.HasOrder
 	s.scope[i] = n.Scope
-	s.props[i] = n.Props
+	// Carry the hottest properties in columns and, when a node has nothing else, drop its
+	// Props map entirely — leaf value nodes (the bulk of the graph) then hold no map, which
+	// is the dominant heap/GC saving on large graphs.
+	s.method[i] = n.Method
+	s.calleePath[i] = n.CalleePath
+	s.strArgs[i] = n.StrArgs
+	s.vkind[i] = n.Vkind
+	props := n.Props
+	if props != nil {
+		if v, ok := props["method"]; ok {
+			s.method[i] = v
+		}
+		if v, ok := props["callee_path"]; ok {
+			s.calleePath[i] = v
+		}
+		if v, ok := props["str_args"]; ok {
+			s.strArgs[i] = v
+		}
+		if v, ok := props["vkind"]; ok {
+			s.vkind[i] = v
+		}
+		if PropsOnlyInlined(props) {
+			props = nil
+		}
+	}
+	s.props[i] = props
 	s.epoch = nextStructEpoch()
 	return nil
 }
