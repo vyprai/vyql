@@ -203,6 +203,20 @@ func (s *IntStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	return out, nil
 }
 
+func (s *IntStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	i, ok := s.idx[dst]
+	if !ok {
+		return
+	}
+	for _, e := range s.in[i] {
+		if edgeType == "" || e.typ == edgeType {
+			if !fn(s.ids[e.dst]) {
+				return
+			}
+		}
+	}
+}
+
 func (s *IntStore) NodesWithConcept(concept string) ([]string, error) {
 	idxs := s.byConcept[concept]
 	out := make([]string, len(idxs))
@@ -223,6 +237,14 @@ func (s *IntStore) NodesOfType(nodeType string) ([]string, error) {
 	}
 	s.typeIDs[nodeType] = out
 	return out, nil
+}
+
+func (s *IntStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, i := range s.byType[nodeType] {
+		if !fn(s.nodeAt(i)) {
+			return
+		}
+	}
 }
 
 func (s *IntStore) AllNodes() ([]Node, error) {

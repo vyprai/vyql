@@ -20,7 +20,7 @@ import (
 //	gx\0<idx>         -> id string             reverse: index -> id
 //	gn\0<idx>         -> node detail blob       type/loc/region/order/scope/props
 //	go\0<idx>         -> out-adjacency blob     []{typeId, dstIdx[, props]}
-//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes: PROTECTS/CHECKS)
+//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes)
 //	gl\0<idx>         -> labels blob
 //	gc\0<concept>     -> []int32 (nodes w/ concept)
 //	gt\0<type>        -> []int32 (nodes of type)
@@ -276,12 +276,35 @@ func (g *BadgerGraph) InEdges(dst, edgeType string) ([]Edge, error) {
 	return out, nil
 }
 
+func (g *BadgerGraph) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	i, ok := g.idxOf(dst)
+	if !ok {
+		return
+	}
+	for _, e := range g.in[i] {
+		if edgeType == "" || e.typ == edgeType {
+			if !fn(g.ids[e.dst]) {
+				return
+			}
+		}
+	}
+}
+
 func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
 	return g.idsOf(g.byConcept[concept]), nil
 }
 func (g *BadgerGraph) NodesOfType(nodeType string) ([]string, error) {
 	return g.idsOf(g.byType[nodeType]), nil
 }
+
+func (g *BadgerGraph) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, i := range g.byType[nodeType] {
+		if !fn(g.nodeAt(i)) {
+			return
+		}
+	}
+}
+
 func (g *BadgerGraph) idsOf(idxs []int32) []string {
 	out := make([]string, len(idxs))
 	for k, i := range idxs {

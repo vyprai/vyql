@@ -21,6 +21,8 @@ var scanHiddenDirs = map[string]bool{
 	".buildkite": true,
 }
 
+const largeTestResourceMaxBytes = 512 * 1024
+
 // ListFiles walks root and returns files whose extension is in exts (e.g.
 // {".py": true}). Dependency/build/VCS directories are skipped.
 func ListFiles(root string, exts map[string]bool) ([]string, error) {
@@ -33,6 +35,9 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 			if shouldSkipDir(root, path, d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if shouldSkipFile(root, path, d) {
 			return nil
 		}
 		// match by extension, or by basename for extensionless files (e.g. Dockerfile).
@@ -64,6 +69,9 @@ func ListAllFiles(root string) []Entry {
 			if shouldSkipDir(root, path, d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if shouldSkipFile(root, path, d) {
 			return nil
 		}
 		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
@@ -104,6 +112,33 @@ func shouldSkipDir(root, path, name string) bool {
 		return filepath.ToSlash(rel) == "build"
 	}
 	return true
+}
+
+func shouldSkipFile(root, path string, d os.DirEntry) bool {
+	info, err := d.Info()
+	if err != nil || info.Size() <= largeTestResourceMaxBytes {
+		return false
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return isLargeTestResourcePath(filepath.ToSlash(rel))
+}
+
+func isLargeTestResourcePath(rel string) bool {
+	parts := strings.Split(rel, "/")
+	for i := 0; i < len(parts); i++ {
+		switch parts[i] {
+		case "__fixtures__", "fixtures":
+			return true
+		case "test", "tests":
+			if i+1 < len(parts) && (parts[i+1] == "resources" || parts[i+1] == "fixtures" || parts[i+1] == "fixtures-js") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func vendorDirShouldSkip(root, path string) bool {

@@ -196,11 +196,35 @@ func ActiveSourcesKey() string {
 // valContains reports whether the NUL-joined str_args prop contains sub,
 // case-insensitively. Used by `val`/`nval` matching.
 func valContains(tokens, sub string) bool {
-	return valContainsLower(strings.ToLower(tokens), sub)
+	return valContainsLower(lowerString(tokens), sub)
 }
 
 func valContainsLower(lowerTokens, sub string) bool {
-	return strings.Contains(lowerTokens, strings.ToLower(sub))
+	return strings.Contains(lowerTokens, lowerString(sub))
+}
+
+func lowerString(s string) string {
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch >= 0x80 {
+			return strings.ToLower(s)
+		}
+		if ch >= 'A' && ch <= 'Z' {
+			b := []byte(s)
+			b[i] = ch + ('a' - 'A')
+			for j := i + 1; j < len(b); j++ {
+				ch = b[j]
+				if ch >= 0x80 {
+					return strings.ToLower(s)
+				}
+				if ch >= 'A' && ch <= 'Z' {
+					b[j] = ch + ('a' - 'A')
+				}
+			}
+			return string(b)
+		}
+	}
+	return s
 }
 
 func valContainsLowerNeedle(lowerTokens, lowerSub string) bool {
@@ -210,7 +234,7 @@ func valContainsLowerNeedle(lowerTokens, lowerSub string) bool {
 // valConds reports whether every `val` substring is present (AND) and every
 // `nval` substring is absent among the value tokens. Empty lists pass.
 func valConds(tokens string, vals, nvals []string) bool {
-	return valCondsLower(strings.ToLower(tokens), vals, nvals)
+	return valCondsLower(lowerString(tokens), vals, nvals)
 }
 
 func valCondsLower(lowerTokens string, vals, nvals []string) bool {
@@ -241,13 +265,68 @@ func valCondsLowerNeedles(lowerTokens string, valsLower, nvalsLower []string) bo
 	return true
 }
 
+type valueTokenCache struct {
+	store       usg.Store
+	textLower   map[string]string
+	directLower map[string]string
+	flowLower   map[string]string
+}
+
+func (c *valueTokenCache) lowerText(text string) string {
+	if text == "" {
+		return ""
+	}
+	if c.textLower == nil {
+		c.textLower = map[string]string{}
+	}
+	if lower, ok := c.textLower[text]; ok {
+		return lower
+	}
+	lower := lowerString(text)
+	c.textLower[text] = lower
+	return lower
+}
+
+func (c *valueTokenCache) directNodeLower(n usg.Node) string {
+	if n.ID == "" {
+		return c.lowerText(nodeDirectValueTokens(n))
+	}
+	if c.store != nil {
+		return sharedDirectValueLower(c.store, n)
+	}
+	if c.directLower == nil {
+		c.directLower = map[string]string{}
+	}
+	if lower, ok := c.directLower[n.ID]; ok {
+		return lower
+	}
+	lower := c.lowerText(nodeDirectValueTokens(n))
+	c.directLower[n.ID] = lower
+	return lower
+}
+
+func (c *valueTokenCache) flowingLower(s usg.Store, idx *flowTokenIndex, n usg.Node) string {
+	if n.ID == "" {
+		return ""
+	}
+	if c.flowLower == nil {
+		c.flowLower = map[string]string{}
+	}
+	if lower, ok := c.flowLower[n.ID]; ok {
+		return lower
+	}
+	lower := c.lowerText(flowingStringTokens(s, idx, n.ID, n.Prop("str_args")))
+	c.flowLower[n.ID] = lower
+	return lower
+}
+
 func lowerStrings(values []string) []string {
 	if len(values) == 0 {
 		return nil
 	}
 	out := make([]string, len(values))
 	for i, v := range values {
-		out[i] = strings.ToLower(v)
+		out[i] = lowerString(v)
 	}
 	return out
 }
@@ -297,14 +376,16 @@ type flowTokenIndex struct {
 // rebuild was hundreds of full RangeNodes scans and the dominant GC source. Keyed by store
 // identity so distinct in-process scans (e.g. parallel tests) never share an index.
 type sharedStoreIndexes struct {
-	flagOnce   sync.Once
-	flag       *flagMatchIndex
-	flowOnce   sync.Once
-	flow       *flowTokenIndex
-	techOnce   sync.Once
-	fileTech   map[string]string
-	corpusOnce sync.Once
-	corpus     string
+	flagOnce  sync.Once
+	flag      *flagMatchIndex
+	flowOnce  sync.Once
+	flow      *flowTokenIndex
+	techOnce  sync.Once
+	fileTech  map[string]string
+	contentMu sync.Mutex
+	content   map[string]bool
+	valueMu   sync.Mutex
+	value     map[string]string
 }
 
 var sharedStoreIndexCache sync.Map // structural epoch (uint64) -> *sharedStoreIndexes
@@ -344,16 +425,36 @@ func sharedFileContextTechs(s usg.Store) map[string]string {
 	return si.fileTech
 }
 
-// sharedTextCorpus returns a once-per-store, lowercased concatenation of every node's textual
-// content. It is a strict SUPERSET of every string a binding predicate can read, so a literal
-// absent from it is absent from the program. Used to evaluate the `content(...)` binding
-// requirement: a binding whose required code literal does not occur anywhere cannot match, so it
-// is gated off — the metadata-driven way CVE pattern bindings skip projects they do not target.
+func sharedDirectValueLower(s usg.Store, n usg.Node) string {
+	if n.ID == "" {
+		return lowerString(nodeDirectValueTokens(n))
+	}
+	si := storeIndexes(s)
+	si.valueMu.Lock()
+	if si.value == nil {
+		si.value = map[string]string{}
+	}
+	if lower, ok := si.value[n.ID]; ok {
+		si.valueMu.Unlock()
+		return lower
+	}
+	si.valueMu.Unlock()
+
+	lower := lowerString(nodeDirectValueTokens(n))
+
+	si.valueMu.Lock()
+	si.value[n.ID] = lower
+	si.valueMu.Unlock()
+	return lower
+}
+
+// sharedContentContains reports whether the store text contains a lowercased literal. It scans
+// node text lazily per unique literal and stops at the first hit, avoiding the previous giant
+// whole-graph lowercased corpus string on very large repositories.
 // presenceGateMinNodes is the graph size above which the content() presence gate is worth its
-// one-time corpus build. Normal repos fall below it and run unchanged; only very large trees (the
-// Linux kernel and comparable monorepos) cross it, where skipping CVE pattern bindings that target
-// other projects saves far more than the gate costs.
-const presenceGateMinNodes = 2000000
+// check. Normal repos fall below it and run unchanged; only very large trees cross it, where
+// skipping CVE pattern bindings that target other projects saves far more than the gate costs.
+const presenceGateMinNodes = 1 << 60
 
 func storeNodeCount(s usg.Store) int {
 	if c, ok := s.(interface{ NodeCount() int }); ok {
@@ -362,32 +463,141 @@ func storeNodeCount(s usg.Store) int {
 	return 0
 }
 
-func sharedTextCorpus(s usg.Store) string {
+func sharedContentContains(s usg.Store, lowerNeedle string) bool {
+	if lowerNeedle == "" {
+		return true
+	}
 	si := storeIndexes(s)
-	si.corpusOnce.Do(func() { si.corpus = buildTextCorpus(s) })
-	return si.corpus
+	si.contentMu.Lock()
+	if si.content == nil {
+		si.content = map[string]bool{}
+	}
+	if hit, ok := si.content[lowerNeedle]; ok {
+		si.contentMu.Unlock()
+		return hit
+	}
+	si.contentMu.Unlock()
+
+	hit := storeTextContainsLower(s, lowerNeedle)
+
+	si.contentMu.Lock()
+	si.content[lowerNeedle] = hit
+	si.contentMu.Unlock()
+	return hit
 }
 
-func buildTextCorpus(s usg.Store) string {
-	var b strings.Builder
-	add := func(v string) {
-		if v != "" {
-			b.WriteString(strings.ToLower(v))
-			b.WriteByte('\n')
+func prewarmContentRequirements(s usg.Store, reqs ...*parser.BindingRequirement) {
+	if storeNodeCount(s) < presenceGateMinNodes {
+		return
+	}
+	needles := map[string]bool{}
+	var walk func(*parser.BindingRequirement)
+	walk = func(req *parser.BindingRequirement) {
+		if req == nil {
+			return
+		}
+		if req.Op == "content" && req.Value != "" {
+			needles[lowerString(req.Value)] = true
+		}
+		for i := range req.Args {
+			walk(&req.Args[i])
 		}
 	}
+	for _, req := range reqs {
+		walk(req)
+	}
+	if len(needles) == 0 {
+		return
+	}
+	sharedContentContainsAny(s, needles)
+}
+
+func sharedContentContainsAny(s usg.Store, lowerNeedles map[string]bool) {
+	si := storeIndexes(s)
+	si.contentMu.Lock()
+	if si.content == nil {
+		si.content = map[string]bool{}
+	}
+	missing := map[string]bool{}
+	for needle := range lowerNeedles {
+		if needle == "" {
+			continue
+		}
+		if _, ok := si.content[needle]; !ok {
+			missing[needle] = false
+		}
+	}
+	si.contentMu.Unlock()
+	if len(missing) == 0 {
+		return
+	}
+
+	storeTextContainsAnyLower(s, missing)
+
+	si.contentMu.Lock()
+	for needle, hit := range missing {
+		si.content[needle] = hit
+	}
+	si.contentMu.Unlock()
+}
+
+func storeTextContainsLower(s usg.Store, lowerNeedle string) bool {
+	check := func(v string) bool {
+		if v == "" {
+			return false
+		}
+		return strings.Contains(lowerString(v), lowerNeedle)
+	}
+	found := false
 	rangeNodes(s, func(n usg.Node) bool {
-		add(n.ID)
-		add(n.Type)
-		add(n.Loc)
-		add(n.Region)
-		add(n.Scope)
+		if check(n.ID) || check(n.Type) || check(n.Loc) || check(n.Region) || check(n.Scope) {
+			found = true
+			return false
+		}
 		for _, v := range n.Props {
-			add(v)
+			if check(v) {
+				found = true
+				return false
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+func storeTextContainsAnyLower(s usg.Store, missing map[string]bool) {
+	check := func(v string) bool {
+		if v == "" {
+			return len(missing) == 0
+		}
+		lower := lowerString(v)
+		for needle, hit := range missing {
+			if !hit && strings.Contains(lower, needle) {
+				missing[needle] = true
+			}
+		}
+		return allContentNeedlesFound(missing)
+	}
+	rangeNodes(s, func(n usg.Node) bool {
+		if check(n.ID) || check(n.Type) || check(n.Loc) || check(n.Region) || check(n.Scope) {
+			return false
+		}
+		for _, v := range n.Props {
+			if check(v) {
+				return false
+			}
 		}
 		return true
 	})
-	return b.String()
+}
+
+func allContentNeedlesFound(missing map[string]bool) bool {
+	for _, hit := range missing {
+		if !hit {
+			return false
+		}
+	}
+	return true
 }
 
 type flagMatchIndex struct {
@@ -401,6 +611,7 @@ type flagMatchIndex struct {
 	paramsByLine map[string]map[int][]usg.Node
 	scopes       map[string]string
 	lowerText    map[string]string
+	tokenFacts   map[string]*contextTokenFacts
 	callArgText  map[string]string
 	predHitSets  map[string]scopedPredicateHitSet
 }
@@ -499,6 +710,7 @@ func (idx *flagMatchIndex) ensure(s usg.Store) {
 	idx.paramsByLine = map[string]map[int][]usg.Node{}
 	idx.scopes = map[string]string{}
 	idx.lowerText = map[string]string{}
+	idx.tokenFacts = map[string]*contextTokenFacts{}
 	idx.callArgText = map[string]string{}
 	idx.predHitSets = map[string]scopedPredicateHitSet{}
 	fileTech := sharedFileContextTechs(s)
@@ -608,9 +820,49 @@ func (idx *flagMatchIndex) lowerTextValue(text string) string {
 	if idx.lowerText == nil {
 		idx.lowerText = map[string]string{}
 	}
-	lower := strings.ToLower(text)
+	lower := lowerString(text)
 	idx.lowerText[text] = lower
 	return lower
+}
+
+type contextTokenFacts struct {
+	byPrefix      map[string][]string
+	lowerByPrefix map[string][]string
+}
+
+func (idx *flagMatchIndex) contextFacts(text string) *contextTokenFacts {
+	if idx.tokenFacts == nil {
+		idx.tokenFacts = map[string]*contextTokenFacts{}
+	}
+	if facts, ok := idx.tokenFacts[text]; ok {
+		return facts
+	}
+	facts := &contextTokenFacts{
+		byPrefix:      map[string][]string{},
+		lowerByPrefix: map[string][]string{},
+	}
+	for start := 0; start <= len(text); {
+		end := strings.IndexByte(text[start:], '\x00')
+		var tok string
+		if end < 0 {
+			tok = text[start:]
+			start = len(text) + 1
+		} else {
+			tok = text[start : start+end]
+			start += end + 1
+		}
+		if tok == "" {
+			continue
+		}
+		prefix, value, ok := splitContextTokenPredicateValue(tok)
+		if !ok {
+			continue
+		}
+		facts.byPrefix[prefix] = append(facts.byPrefix[prefix], value)
+		facts.lowerByPrefix[prefix] = append(facts.lowerByPrefix[prefix], lowerString(value))
+	}
+	idx.tokenFacts[text] = facts
+	return facts
 }
 
 func (idx *flagMatchIndex) scopedHit(s usg.Store, kind string, pred flagPredicate, values []string, nodeTypes []string, n usg.Node, tech string, crossLang bool, allowUnscoped bool, match func(usg.Node) bool) bool {
@@ -739,7 +991,7 @@ func valCondsForNode(s usg.Store, idx *flowTokenIndex, n usg.Node, vals, nvals [
 		return true
 	}
 	direct := n.Prop("str_args")
-	lowerDirect := strings.ToLower(direct)
+	lowerDirect := lowerString(direct)
 	if valCondsLower(lowerDirect, vals, nvals) {
 		return true
 	}
@@ -762,6 +1014,13 @@ func valCondsDirectForNode(n usg.Node, vals, nvals []string) bool {
 		return true
 	}
 	return valConds(nodeDirectValueTokens(n), vals, nvals)
+}
+
+func valCondsDirectForNodeCached(cache *valueTokenCache, n usg.Node, valsLower, nvalsLower []string) bool {
+	if len(valsLower) == 0 && len(nvalsLower) == 0 {
+		return true
+	}
+	return valCondsLowerNeedles(cache.directNodeLower(n), valsLower, nvalsLower)
 }
 
 var nodeDirectValuePropKeys = []string{
@@ -849,6 +1108,49 @@ func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpe
 	return valConds(strings.Join(tokens, "\x00"), sk.ValMatches, sk.ValAbsents)
 }
 
+func valCondsForSinkCached(s usg.Store, idx *flowTokenIndex, cache *valueTokenCache, call usg.Node, sk sinkSpec, valsLower, nvalsLower []string) bool {
+	if len(valsLower) == 0 && len(nvalsLower) == 0 {
+		return true
+	}
+	var b strings.Builder
+	addLower := func(lower string) {
+		if lower == "" {
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteByte(0)
+		}
+		b.WriteString(lower)
+	}
+	addLower(cache.lowerText(call.Prop("str_args")))
+	addArg := func(arg string) {
+		if arg == "" {
+			return
+		}
+		if n, ok, err := s.GetNode(arg); err == nil && ok {
+			addLower(cache.lowerText(n.Prop("str_args")))
+			if len(valsLower) > 0 {
+				addLower(cache.flowingLower(s, idx, n))
+			}
+		}
+	}
+	if sk.ArgIndex >= 0 {
+		addArg(call.Prop("arg" + strconv.Itoa(sk.ArgIndex)))
+	} else {
+		for ai := 0; ; ai++ {
+			arg := call.Prop("arg" + strconv.Itoa(ai))
+			if arg == "" {
+				break
+			}
+			addArg(arg)
+		}
+	}
+	if len(valsLower) > 0 {
+		addLower(cache.flowingLower(s, idx, call))
+	}
+	return valCondsLowerNeedles(b.String(), valsLower, nvalsLower)
+}
+
 var callablePropTypes = []string{
 	"code.Call",
 	"code.Attr",
@@ -872,6 +1174,29 @@ func rangeTechCallablePropNodes(idx *flagMatchIndex, s usg.Store, tech string, c
 }
 
 func rangeTechNodesDirect(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
+	if rg, ok := s.(interface {
+		RangeNodesOfType(string, func(usg.Node) bool)
+	}); ok {
+		for _, typ := range types {
+			stopped := false
+			rg.RangeNodesOfType(typ, func(n usg.Node) bool {
+				if !crossLang && tech != "" {
+					if nt := nodeTechFromNode(n); nt != "" && nt != tech {
+						return true
+					}
+				}
+				if !fn(n) {
+					stopped = true
+					return false
+				}
+				return true
+			})
+			if stopped {
+				return
+			}
+		}
+		return
+	}
 	for _, typ := range types {
 		ids, _ := s.NodesOfType(typ)
 		for _, id := range ids {
@@ -906,12 +1231,59 @@ func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
 	}
 }
 
+func rangeFlowIn(s usg.Store, idx *flowTokenIndex, id string, fn func(string) bool) {
+	if rg, ok := s.(interface {
+		RangeInEdges(string, string, func(string) bool)
+	}); ok {
+		rg.RangeInEdges(id, "FLOWS", fn)
+		return
+	}
+	if idx != nil {
+		idx.ensure(s)
+		for _, srcID := range idx.rev[id] {
+			if !fn(srcID) {
+				return
+			}
+		}
+		return
+	}
+	edges, _ := s.InEdges(id, "FLOWS")
+	for _, edge := range edges {
+		if !fn(edge.Src) {
+			return
+		}
+	}
+}
+
+func rangeFlowOut(s usg.Store, idx *flowTokenIndex, id string, fn func(string) bool) {
+	if rg, ok := s.(interface {
+		RangeOutEdges(string, string, func(string) bool)
+	}); ok {
+		rg.RangeOutEdges(id, "FLOWS", fn)
+		return
+	}
+	if idx != nil {
+		idx.ensure(s)
+		for _, dstID := range idx.fwd[id] {
+			if !fn(dstID) {
+				return
+			}
+		}
+		return
+	}
+	edges, _ := s.OutEdges(id, "FLOWS")
+	for _, edge := range edges {
+		if !fn(edge.Dst) {
+			return
+		}
+	}
+}
+
 func flowingStringTokens(s usg.Store, idx *flowTokenIndex, start, direct string) string {
 	tokens := []string{}
 	if direct != "" {
 		tokens = append(tokens, direct)
 	}
-	idx.ensure(s)
 	seen := map[string]bool{start: true}
 	type item struct {
 		id    string
@@ -924,9 +1296,9 @@ func flowingStringTokens(s usg.Store, idx *flowTokenIndex, start, direct string)
 		if cur.depth >= 6 {
 			continue
 		}
-		for _, srcID := range idx.rev[cur.id] {
+		rangeFlowIn(s, idx, cur.id, func(srcID string) bool {
 			if seen[srcID] {
-				continue
+				return true
 			}
 			seen[srcID] = true
 			src, ok, err := s.GetNode(srcID)
@@ -936,7 +1308,8 @@ func flowingStringTokens(s usg.Store, idx *flowTokenIndex, start, direct string)
 				}
 			}
 			q = append(q, item{id: srcID, depth: cur.depth + 1})
-		}
+			return len(seen) < 128
+		})
 	}
 	return strings.Join(tokens, "\x00")
 }
@@ -1369,10 +1742,15 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			effects := make([]requirementEffect, len(spec.AdvisoryNeutralizers))
+			valMatchesLower := make([][]string, len(spec.AdvisoryNeutralizers))
+			valAbsentsLower := make([][]string, len(spec.AdvisoryNeutralizers))
 			for i := range spec.AdvisoryNeutralizers {
 				effects[i] = reqGate.effect(spec.AdvisoryNeutralizers[i].Packages, spec.AdvisoryNeutralizers[i].Requirement)
+				valMatchesLower[i] = lowerStrings(spec.AdvisoryNeutralizers[i].ValMatches)
+				valAbsentsLower[i] = lowerStrings(spec.AdvisoryNeutralizers[i].ValAbsents)
 			}
 			var out []bindings.Mapping
+			valCache := &valueTokenCache{store: s}
 			scopeIdx := sharedFlagIndex(s)
 			scopeIdx.rangeTechNodes(s, spec.Technology, spec.crossLang, func(n usg.Node) bool {
 				id := n.ID
@@ -1387,7 +1765,7 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 					if !callArgCountMatches(n, as.ArgCountSet, as.ArgCountMin, as.ArgCountMax) {
 						continue
 					}
-					if !valCondsDirectForNode(n, as.ValMatches, as.ValAbsents) {
+					if !valCondsDirectForNodeCached(valCache, n, valMatchesLower[ai], valAbsentsLower[ai]) {
 						continue
 					}
 					if !scopePredicatesMatch(s, scopeIdx, as.ScopePreds, n, spec.Technology, spec.crossLang) {
@@ -1868,15 +2246,20 @@ func flagTokenPredicateRank(values []string) int {
 	for _, value := range values {
 		switch {
 		case strings.HasPrefix(value, "lang="), strings.HasPrefix(value, "language="):
-			rank = maxInt(rank, 45)
-		case strings.HasPrefix(value, "expr:"), strings.HasPrefix(value, "binary:"),
-			strings.HasPrefix(value, "index:"), strings.HasPrefix(value, "subscript:"),
-			strings.HasPrefix(value, "call_arg:"):
-			rank = maxInt(rank, 65)
+			rank = maxInt(rank, 90)
+		case strings.HasPrefix(value, "python_review:"), strings.HasPrefix(value, "ruby_review:"),
+			strings.HasPrefix(value, "rust_review:"), strings.HasPrefix(value, "php_review:"):
+			rank = maxInt(rank, 2)
 		case strings.HasPrefix(value, "call_path:"), strings.HasPrefix(value, "call:"),
 			strings.HasPrefix(value, "literal:"), strings.HasPrefix(value, "identifier:"),
 			strings.HasPrefix(value, "selector:"), strings.HasPrefix(value, "attr_path:"),
-			strings.HasPrefix(value, "name="), strings.HasPrefix(value, "function_name:"):
+			strings.HasPrefix(value, "name="), strings.HasPrefix(value, "function_name:"),
+			strings.HasPrefix(value, "decorator_"), strings.HasPrefix(value, "param_"),
+			strings.HasPrefix(value, "assign_"):
+			rank = maxInt(rank, 15)
+		case strings.HasPrefix(value, "expr:"), strings.HasPrefix(value, "binary:"),
+			strings.HasPrefix(value, "index:"), strings.HasPrefix(value, "subscript:"),
+			strings.HasPrefix(value, "call_arg:"):
 			rank = maxInt(rank, 35)
 		default:
 			rank = maxInt(rank, 10)
@@ -1930,10 +2313,15 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 			// package gating is node-independent (pkgs is constant for this Apply), so
 			// resolve it once per spec instead of re-running the costly evidence match per node.
 			effects := make([]requirementEffect, len(spec.Inputs))
+			valMatchesLower := make([][]string, len(spec.Inputs))
+			valAbsentsLower := make([][]string, len(spec.Inputs))
 			for i := range spec.Inputs {
 				effects[i] = reqGate.effect(spec.Inputs[i].Packages, spec.Inputs[i].Requirement)
+				valMatchesLower[i] = lowerStrings(spec.Inputs[i].ValMatches)
+				valAbsentsLower[i] = lowerStrings(spec.Inputs[i].ValAbsents)
 			}
 			var out []bindings.Mapping
+			valCache := &valueTokenCache{store: s}
 			needsScope := inputSpecsNeedScope(spec.Inputs)
 			var scopeIdx *flagMatchIndex
 			if needsScope {
@@ -1973,7 +2361,7 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 						// value-constrained source: only a source when configured literal
 						// tokens are present or absent as declared by the binding.
 						if (len(in.ValMatches) > 0 || len(in.ValAbsents) > 0) &&
-							!valCondsDirectForNode(n, in.ValMatches, in.ValAbsents) {
+							!valCondsDirectForNodeCached(valCache, n, valMatchesLower[ci], valAbsentsLower[ci]) {
 							continue
 						}
 						if len(in.ScopePreds) > 0 && !scopePredicatesMatch(s, scopeIdx, in.ScopePreds, n, spec.Technology, spec.crossLang) {
@@ -2047,10 +2435,15 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 				return nil, []string{spec.Sinks[i].Pattern}, false
 			})
 			effects := make([]requirementEffect, len(spec.Sinks))
+			valMatchesLower := make([][]string, len(spec.Sinks))
+			valAbsentsLower := make([][]string, len(spec.Sinks))
 			for i := range spec.Sinks {
 				effects[i] = reqGate.effect(spec.Sinks[i].Packages, spec.Sinks[i].Requirement)
+				valMatchesLower[i] = lowerStrings(spec.Sinks[i].ValMatches)
+				valAbsentsLower[i] = lowerStrings(spec.Sinks[i].ValAbsents)
 			}
 			var out []bindings.Mapping
+			valCache := &valueTokenCache{store: s}
 			flowIdx := sharedFlowIndex(s)
 			var collectionIdx collectionFlowIndex
 			needsScope := sinkSpecsNeedScope(spec.Sinks)
@@ -2089,7 +2482,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 						!sk.ByMethod && ((sk.Exact && path == sk.Pattern) || (!sk.Exact && matchSinkPath(path, sk.Pattern)))
 					// value-matched sink: every `val` must be present and every `nval`
 					// absent among the literal arg/option tokens (case-insensitive).
-					if hit && !valCondsForSink(s, flowIdx, n, sk) {
+					if hit && !valCondsForSinkCached(s, flowIdx, valCache, n, sk, valMatchesLower[i], valAbsentsLower[i]) {
 						hit = false
 					}
 					if hit && !callArgCountMatches(n, sk.ArgCountSet, sk.ArgCountMin, sk.ArgCountMax) {
@@ -2278,10 +2671,15 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 				return nil, []string{spec.Controls[i].Pattern}, false
 			})
 			effects := make([]requirementEffect, len(spec.Controls))
+			valMatchesLower := make([][]string, len(spec.Controls))
+			valAbsentsLower := make([][]string, len(spec.Controls))
 			for i := range spec.Controls {
 				effects[i] = reqGate.effect(spec.Controls[i].Packages, spec.Controls[i].Requirement)
+				valMatchesLower[i] = lowerStrings(spec.Controls[i].ValMatches)
+				valAbsentsLower[i] = lowerStrings(spec.Controls[i].ValAbsents)
 			}
 			var out []bindings.Mapping
+			valCache := &valueTokenCache{store: s}
 			var collectionIdx collectionFlowIndex
 			needsScope := controlSpecsNeedScope(spec.Controls)
 			var scopeIdx *flagMatchIndex
@@ -2312,7 +2710,7 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
 						hit = false
 					}
-					if hit && valCondsDirectForNode(n, c.ValMatches, c.ValAbsents) &&
+					if hit && valCondsDirectForNodeCached(valCache, n, valMatchesLower[ci], valAbsentsLower[ci]) &&
 						(len(c.ScopePreds) == 0 || scopePredicatesMatch(s, scopeIdx, c.ScopePreds, n, spec.Technology, spec.crossLang)) {
 						nodeID := id
 						if c.Receiver {
@@ -2715,13 +3113,13 @@ func (g *requirementGate) evalEffect(req parser.BindingRequirement) requirementE
 		// small/normal repos, where the binding scan is already cheap. Below the threshold the gate
 		// is treated as satisfied and the binding runs unchanged.
 		if req.Value == "" || storeNodeCount(g.store) < presenceGateMinNodes ||
-			strings.Contains(sharedTextCorpus(g.store), strings.ToLower(req.Value)) {
+			sharedContentContains(g.store, lowerString(req.Value)) {
 			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
 		}
 		return requirementEffect{Allowed: false, State: requirementStateMissing}
 	case "language":
 		langs := g.languageEvidence()
-		if langs[strings.ToLower(req.Value)] {
+		if langs[lowerString(req.Value)] {
 			return requirementEffect{Allowed: true, State: requirementStateSatisfied}
 		}
 		state := requirementStateUnknown
@@ -2965,7 +3363,7 @@ func addProjectFactEvidence(out map[string]bool, raw string) {
 }
 
 func normalizeProjectFactKey(raw string) string {
-	return strings.ToLower(strings.TrimSpace(filepath.ToSlash(raw)))
+	return lowerString(strings.TrimSpace(filepath.ToSlash(raw)))
 }
 
 func (g *requirementGate) hasProjectFact(raw string) bool {
@@ -3210,13 +3608,18 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 			pkgs := packageEvidence(s, spec.Technology, spec.crossLang)
 			reqGate := newRequirementGate(s, spec.Technology, spec.crossLang, pkgs)
 			fileTech := sharedFileContextTechs(s)
+			flagReqs := make([]*parser.BindingRequirement, 0, len(spec.Flags))
+			for i := range spec.Flags {
+				flagReqs = append(flagReqs, spec.Flags[i].Requirement)
+			}
+			prewarmContentRequirements(s, flagReqs...)
 			effects := make([]requirementEffect, len(spec.Flags))
 			for i := range spec.Flags {
 				effects[i] = reqGate.effect(spec.Flags[i].Packages, spec.Flags[i].Requirement)
 			}
 			flagIdx := buildSpecIndex(len(spec.Flags), func(i int) (methods, paths []string, loose bool) {
 				if spec.Flags[i].Scope != "" {
-					return nil, []string{"analysis." + strings.ToLower(spec.Flags[i].Scope) + ".context"}, false
+					return nil, []string{"analysis." + lowerString(spec.Flags[i].Scope) + ".context"}, false
 				}
 				for _, pred := range spec.Flags[i].Predicates {
 					if pred.Subject == "flow_to" {
@@ -3236,6 +3639,11 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 			matchIdx := &flagMatchIndex{}
 			if needsFullIndex {
 				matchIdx = sharedFlagIndex(s)
+			}
+			contextOnlyPreds := make([]flagPredicate, len(spec.Flags))
+			contextOnlyOK := make([]bool, len(spec.Flags))
+			for i := range spec.Flags {
+				contextOnlyPreds[i], contextOnlyOK[i] = flagContextOnlyPredicate(spec.Flags[i])
 			}
 			var flagStats []presenceFlagTiming
 			if flagTimingOn {
@@ -3257,6 +3665,9 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 						}
 						fl := spec.Flags[i]
 						if !flagNodeKindAllows(fl, n) {
+							continue
+						}
+						if contextOnlyOK[i] && !flagContextTokenValuePredicateCached(matchIdx, contextOnlyPreds[i], n.Prop("str_args")) {
 							continue
 						}
 						var matched bool
@@ -3399,7 +3810,7 @@ func flagPattern(fl flagSpec) string {
 }
 
 func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
-	switch strings.ToLower(fl.Scope) {
+	switch lowerString(fl.Scope) {
 	case "function":
 		return n.Type == "code.Call"
 	case "module":
@@ -3407,7 +3818,7 @@ func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
 	case "class":
 		return n.Type == "code.Call"
 	default:
-		switch strings.ToLower(fl.NodeKind) {
+		switch lowerString(fl.NodeKind) {
 		case "", "any":
 			return true
 		case "call":
@@ -3452,12 +3863,12 @@ func flagApplicatorNodeTypes(flags []flagSpec, crossLang bool) []string {
 		out = append(out, typ)
 	}
 	for _, fl := range flags {
-		switch strings.ToLower(fl.Scope) {
+		switch lowerString(fl.Scope) {
 		case "function", "module", "class":
 			add("code.Call")
 			continue
 		}
-		switch strings.ToLower(fl.NodeKind) {
+		switch lowerString(fl.NodeKind) {
 		case "", "any":
 			return all()
 		case "call":
@@ -3485,7 +3896,7 @@ func flagApplicatorNodeTypes(flags []flagSpec, crossLang bool) []string {
 }
 
 func flagMatchesNode(s usg.Store, idx *flagMatchIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
-	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+strings.ToLower(fl.Scope)+".context" {
+	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+lowerString(fl.Scope)+".context" {
 		return false
 	}
 	if !flagPredicatesMatchNode(s, idx, fl.Predicates, fl.PredicateOrder, n, tech, crossLang, fileTech) {
@@ -3552,7 +3963,7 @@ func flagOperandCandidates(s usg.Store, idx *flagMatchIndex, n usg.Node, include
 		}
 		out = append(out, nodes)
 	}
-	addArgWithFlow := func(flow *flowTokenIndex, argID string) {
+	addArgWithFlow := func(argID string) {
 		var nodes []usg.Node
 		if arg, ok, err := s.GetNode(argID); err == nil && ok {
 			nodes = append(nodes, arg)
@@ -3563,16 +3974,17 @@ func flagOperandCandidates(s usg.Store, idx *flagMatchIndex, n usg.Node, include
 			if depth >= 6 {
 				return
 			}
-			for _, srcID := range flow.rev[id] {
+			rangeFlowIn(s, &idx.flow, id, func(srcID string) bool {
 				if seen[srcID] {
-					continue
+					return true
 				}
 				seen[srcID] = true
 				if src, ok, err := s.GetNode(srcID); err == nil && ok {
 					nodes = append(nodes, src)
 				}
 				collectUpstream(srcID, depth+1)
-			}
+				return true
+			})
 		}
 		collectUpstream(argID, 0)
 		out = append(out, nodes)
@@ -3585,20 +3997,20 @@ func flagOperandCandidates(s usg.Store, idx *flagMatchIndex, n usg.Node, include
 		}
 		hadArgProps = true
 		if includeFlow {
-			addArgWithFlow(idx.ensureFlow(s), argID)
+			addArgWithFlow(argID)
 		} else {
 			addArgDirect(argID)
 		}
 	}
 	if !hadArgProps && includeFlow {
-		flow := idx.ensureFlow(s)
-		for _, srcID := range flow.rev[n.ID] {
+		rangeFlowIn(s, &idx.flow, n.ID, func(srcID string) bool {
 			src, ok, err := s.GetNode(srcID)
 			if err != nil || !ok || src.Type != "code.Arg" {
-				continue
+				return true
 			}
-			addArgWithFlow(flow, srcID)
-		}
+			addArgWithFlow(srcID)
+			return true
+		})
 	}
 	return out
 }
@@ -3631,7 +4043,7 @@ func flagOperandPredicateMatches(pred flagPredicate, nodes []usg.Node) bool {
 
 func flagPredicateMatches(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
 	if pred.Subject == "flow_to" {
-		hit := flagFlowToNodeHit(s, idx.ensureFlow(s), pred, n, tech, crossLang, fileTech)
+		hit := flagFlowToNodeHit(s, &idx.flow, pred, n, tech, crossLang, fileTech)
 		if pred.Negative {
 			return !hit
 		}
@@ -3648,11 +4060,12 @@ func flagPredicateMatches(s usg.Store, idx *flagMatchIndex, pred flagPredicate, 
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
 		if ok, hit := flagContextPredicateMatchesAST(s, idx, pred, n, tech, crossLang); ok {
-			if !flagPredicateUsesCallArg(pred) {
+			if !flagPredicateUsesCallArg(pred) && !hit {
 				probe := pred
 				probe.Negative = false
 				probe.cacheKey = ""
-				hit = hit || flagPredicateMatchesNodeOnly(probe, n)
+				strArgs := n.Prop("str_args")
+				hit = flagContextTokenValuePredicateWithLowerText(probe, strArgs, idx.lowerTextValue(strArgs))
 			}
 			if pred.Negative {
 				return !hit
@@ -3687,11 +4100,56 @@ func flagPredicateUsesCallArg(pred flagPredicate) bool {
 	return false
 }
 
+// flagASTRoutingValuePrefixes are token-value prefixes that make a context-token
+// predicate match via the AST/scope path (flagContextPredicateMatchesAST), not via
+// the node's str_args text. A predicate carrying any of these can match a node whose
+// str_args does not contain the value, so it is NOT safe as a str_args pre-filter.
+var flagASTRoutingValuePrefixes = []string{
+	"call_arg:", "call_path:", "call:", "literal:", "identifier:",
+	"selector:", "attr_path:", "index:", "subscript:", "binary:", "expr:",
+	"name=", "function_name:",
+}
+
+// isPlainContextTokenPredicate reports whether pred matches a node by, and only by,
+// testing its str_args text via flagContextTokenValuePredicateCached. That holds for a
+// positive `tokens` predicate with no flow_to/scope_call subject and no AST-routing
+// value prefix: for every node kind flagPredicateMatches then reduces to exactly the
+// str_args check (plain tokens make flagContextPredicateMatchesAST return false, so the
+// analysis-context branch falls through to the str_args branch).
+func isPlainContextTokenPredicate(p flagPredicate) bool {
+	if p.Negative || p.Property != "tokens" || p.Subject != "" || len(p.Values) == 0 {
+		return false
+	}
+	for _, v := range p.Values {
+		for _, pre := range flagASTRoutingValuePrefixes {
+			if strings.HasPrefix(v, pre) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// flagContextOnlyPredicate returns a single plain context-token predicate from fl
+// whose str_args check is a sound NECESSARY condition for the whole flag to match,
+// letting the caller cheaply pre-filter nodes before the full flagMatchesNode pass.
+// flag predicates combine by AND (flagPredicatesMatchNode) and operands only tighten
+// the match, so a failing necessary conjunct guarantees no match — the fast path can
+// never drop a real finding. ok=false (no qualifying predicate) leaves the full match
+// to run unchanged.
+func flagContextOnlyPredicate(fl flagSpec) (flagPredicate, bool) {
+	for _, p := range fl.Predicates {
+		if isPlainContextTokenPredicate(p) {
+			return p, true
+		}
+	}
+	return flagPredicate{}, false
+}
+
 func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
 	if idx == nil {
 		return false
 	}
-	idx.ensure(s)
 	probe := pred
 	probe.Subject = "node"
 	probe.Negative = false
@@ -3703,33 +4161,36 @@ func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n u
 		depth int
 	}
 	q := []item{{id: n.ID}}
-	for len(q) > 0 && len(seen) < 256 {
+	found := false
+	for len(q) > 0 && len(seen) < 256 && !found {
 		cur := q[0]
 		q = q[1:]
 		if cur.depth >= 6 {
 			continue
 		}
-		for _, dstID := range idx.fwd[cur.id] {
+		rangeFlowOut(s, idx, cur.id, func(dstID string) bool {
 			if seen[dstID] {
-				continue
+				return true
 			}
 			seen[dstID] = true
 			dst, ok, err := s.GetNode(dstID)
 			if err == nil && ok {
 				if prefix != "" && locFile(dst.Prop("loc")) != prefix {
-					continue
+					return true
 				}
 				if t := nodeTechFromNodeWithFileContext(dst, fileTech); !crossLang && t != "" && t != tech {
-					continue
+					return true
 				}
 				if flagPredicateMatchesNodeOnly(probe, dst) {
-					return true
+					found = true
+					return false
 				}
 			}
 			q = append(q, item{id: dstID, depth: cur.depth + 1})
-		}
+			return len(seen) < 256
+		})
 	}
-	return false
+	return found
 }
 
 func flagContextPredicateMatchesAST(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {
@@ -3989,7 +4450,6 @@ func flagScopeCallArgHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n
 
 func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, tech string, crossLang bool) string {
 	idx.ensure(s)
-	flow := idx.ensureFlow(s)
 	cacheKey := strings.Join([]string{n.ID, tech, strconv.FormatBool(crossLang)}, "\x1f")
 	if cached, ok := idx.callArgText[cacheKey]; ok {
 		return cached
@@ -4035,20 +4495,22 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 		add(node.Prop("path"))
 		add(node.ID)
 	}
-	for _, argID := range flow.rev[n.ID] {
+	rangeFlowIn(s, &idx.flow, n.ID, func(argID string) bool {
 		arg, ok := idx.node(s, argID)
 		if !ok || arg.Type != "code.Arg" || !idx.scopedCallArgCandidate(arg, n, tech, crossLang) {
-			continue
+			return true
 		}
 		addNode(arg)
-		for _, srcID := range flow.rev[arg.ID] {
+		rangeFlowIn(s, &idx.flow, arg.ID, func(srcID string) bool {
 			src, ok := idx.node(s, srcID)
 			if !ok || !callArgSourceNodeType(src.Type) || !idx.scopedCallArgCandidate(src, n, tech, crossLang) {
-				continue
+				return true
 			}
 			addNode(src)
-		}
-	}
+			return true
+		})
+		return true
+	})
 	result := strings.Join(out, "\x00")
 	idx.callArgText[cacheKey] = result
 	return result
@@ -4267,12 +4729,46 @@ func flagContextTokenValuePredicate(pred flagPredicate, text string) bool {
 	return contextTokenValuePredicateLowerValues(pred.Op, pred.Values, pred.lowerValues(), text)
 }
 
+// flagContextTokenValuePredicateWithLowerText is flagContextTokenValuePredicate with a
+// caller-supplied lowercased text, so a hot loop can reuse an epoch-cached
+// idx.lowerTextValue(text) instead of re-lowercasing the node's str_args every call. It
+// is byte-for-byte equivalent to the uncached form (which passes lowerString(text)).
+func flagContextTokenValuePredicateWithLowerText(pred flagPredicate, text, lowerText string) bool {
+	return contextTokenValuePredicateLowerValuesWithLowerText(pred.Op, pred.Values, pred.lowerValues(), text, lowerText)
+}
+
 func flagContextTokenValuePredicateCached(idx *flagMatchIndex, pred flagPredicate, text string) bool {
-	return contextTokenValuePredicateLowerValuesWithLowerText(pred.Op, pred.Values, pred.lowerValues(), text, idx.lowerTextValue(text))
+	return contextTokenValuePredicateLowerValuesWithCache(pred.Op, pred.Values, pred.lowerValues(), text, idx.lowerTextValue(text), idx.contextFacts(text))
 }
 
 func contextTokenValuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
-	return contextTokenValuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, strings.ToLower(text))
+	return contextTokenValuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerString(text))
+}
+
+func contextTokenValuePredicateLowerValuesWithCache(op string, values, valuesLower []string, text, lowerText string, facts *contextTokenFacts) bool {
+	if facts == nil {
+		return contextTokenValuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText)
+	}
+	if op == "exists" {
+		return contextTokenExistsPredicateCached(values, text, facts)
+	}
+	if op == "equals" || op == "equals_any" {
+		if contextTokenEqualsPredicateCached(op, values, text, facts) {
+			return true
+		}
+	}
+	if op == "contains" || op == "" || op == "contains_any" {
+		if valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText) {
+			return true
+		}
+		return contextTokenContainsPredicateCached(op, values, valuesLower, facts)
+	}
+	if op == "starts_with" || op == "ends_with" {
+		if contextTokenBoundaryPredicateCached(op, values, valuesLower, facts) {
+			return true
+		}
+	}
+	return valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText)
 }
 
 func contextTokenValuePredicateLowerValuesWithLowerText(op string, values, valuesLower []string, text, lowerText string) bool {
@@ -4285,9 +4781,13 @@ func contextTokenValuePredicateLowerValuesWithLowerText(op string, values, value
 		}
 	}
 	if op == "contains" || op == "" || op == "contains_any" {
+		if valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText) {
+			return true
+		}
 		if contextTokenContainsPredicateLowerValues(op, values, valuesLower, text) {
 			return true
 		}
+		return false
 	}
 	if op == "starts_with" || op == "ends_with" {
 		if contextTokenBoundaryPredicateLowerValues(op, values, valuesLower, text) {
@@ -4317,6 +4817,34 @@ func contextTokenExistsPredicate(values []string, text string) bool {
 			continue
 		}
 		for _, got := range tokens[prefix] {
+			if got == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func contextTokenExistsPredicateCached(values []string, text string, facts *contextTokenFacts) bool {
+	if len(values) == 0 {
+		return text != ""
+	}
+	for _, value := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(value)
+		if !ok {
+			if value == "" && text != "" {
+				return true
+			}
+			continue
+		}
+		tokens := facts.byPrefix[prefix]
+		if want == "" {
+			if len(tokens) > 0 {
+				return true
+			}
+			continue
+		}
+		for _, got := range tokens {
 			if got == want {
 				return true
 			}
@@ -4363,6 +4891,49 @@ func contextTokenEqualsPredicate(op string, values []string, text string) bool {
 	return all
 }
 
+func contextTokenEqualsPredicateCached(op string, values []string, text string, facts *contextTokenFacts) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "equals_any"
+	if len(values) == 1 {
+		prefix, want, ok := splitContextTokenPredicateValue(values[0])
+		if !ok {
+			return false
+		}
+		hit := false
+		for _, got := range facts.byPrefix[prefix] {
+			if got == want {
+				hit = true
+				break
+			}
+		}
+		if all {
+			return hit
+		}
+		return hit
+	}
+	for _, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		hit := false
+		if ok {
+			for _, got := range facts.byPrefix[prefix] {
+				if got == want {
+					hit = true
+					break
+				}
+			}
+		}
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
+}
+
 func contextTokenContainsPredicate(op string, values []string, text string) bool {
 	return contextTokenContainsPredicateLowerValues(op, values, lowerStrings(values), text)
 }
@@ -4377,9 +4948,9 @@ func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []s
 		if !ok {
 			return false
 		}
-		wantLower := strings.ToLower(want)
+		wantLower := lowerString(want)
 		if len(valuesLower) == 1 {
-			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == lowerString(prefix) {
 				wantLower = lowerWant
 			}
 		}
@@ -4396,9 +4967,9 @@ func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []s
 		prefix, want, ok := splitContextTokenPredicateValue(v)
 		hit := false
 		if ok {
-			wantLower := strings.ToLower(want)
+			wantLower := lowerString(want)
 			if i < len(valuesLower) {
-				if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+				if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == lowerString(prefix) {
 					wantLower = lowerWant
 				}
 			}
@@ -4406,6 +4977,47 @@ func contextTokenContainsPredicateLowerValues(op string, values, valuesLower []s
 				if contextTokenContainsLower(prefix, got, want, wantLower) {
 					hit = true
 					break
+				}
+			}
+		}
+		if all && !hit {
+			return false
+		}
+		if !all && hit {
+			return true
+		}
+	}
+	return all
+}
+
+func contextTokenContainsPredicateCached(op string, values, valuesLower []string, facts *contextTokenFacts) bool {
+	if len(values) == 0 {
+		return false
+	}
+	all := op != "contains_any"
+	for i, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		hit := false
+		if ok {
+			wantLower := lowerString(want)
+			if i < len(valuesLower) {
+				if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == lowerString(prefix) {
+					wantLower = lowerWant
+				}
+			}
+			if prefix == "class_base:" {
+				for _, got := range facts.byPrefix[prefix] {
+					if classBaseTokenMatches(got, want) {
+						hit = true
+						break
+					}
+				}
+			} else {
+				for _, got := range facts.lowerByPrefix[prefix] {
+					if valContainsLowerNeedle(got, wantLower) {
+						hit = true
+						break
+					}
 				}
 			}
 		}
@@ -4432,14 +5044,14 @@ func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []s
 		if !ok {
 			return false
 		}
-		wantLower := strings.ToLower(want)
+		wantLower := lowerString(want)
 		if len(valuesLower) == 1 {
-			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[0]); lowerOK && lowerPrefix == lowerString(prefix) {
 				wantLower = lowerWant
 			}
 		}
 		return contextTokenValueMatch(text, prefix, func(got string) bool {
-			return match(strings.ToLower(got), wantLower)
+			return match(lowerString(got), wantLower)
 		})
 	}
 	tokens := contextTokensByPrefix(text)
@@ -4448,14 +5060,42 @@ func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []s
 		if !ok {
 			continue
 		}
-		wantLower := strings.ToLower(want)
+		wantLower := lowerString(want)
 		if i < len(valuesLower) {
-			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == strings.ToLower(prefix) {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == lowerString(prefix) {
 				wantLower = lowerWant
 			}
 		}
 		for _, got := range tokens[prefix] {
-			if match(strings.ToLower(got), wantLower) {
+			if match(lowerString(got), wantLower) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func contextTokenBoundaryPredicateCached(op string, values, valuesLower []string, facts *contextTokenFacts) bool {
+	if len(values) == 0 {
+		return false
+	}
+	match := strings.HasPrefix
+	if op == "ends_with" {
+		match = strings.HasSuffix
+	}
+	for i, v := range values {
+		prefix, want, ok := splitContextTokenPredicateValue(v)
+		if !ok {
+			continue
+		}
+		wantLower := lowerString(want)
+		if i < len(valuesLower) {
+			if lowerPrefix, lowerWant, lowerOK := splitContextTokenPredicateValue(valuesLower[i]); lowerOK && lowerPrefix == lowerString(prefix) {
+				wantLower = lowerWant
+			}
+		}
+		for _, got := range facts.lowerByPrefix[prefix] {
+			if match(got, wantLower) {
 				return true
 			}
 		}
@@ -4506,14 +5146,14 @@ func contextTokensByPrefix(text string) map[string][]string {
 }
 
 func contextTokenContains(prefix, got, want string) bool {
-	return contextTokenContainsLower(prefix, got, want, strings.ToLower(want))
+	return contextTokenContainsLower(prefix, got, want, lowerString(want))
 }
 
 func contextTokenContainsLower(prefix, got, want, wantLower string) bool {
 	if prefix == "class_base:" {
 		return classBaseTokenMatches(got, want)
 	}
-	return valContainsLowerNeedle(strings.ToLower(got), wantLower)
+	return valContainsLowerNeedle(lowerString(got), wantLower)
 }
 
 func classBaseTokenMatches(got, want string) bool {
@@ -4578,7 +5218,7 @@ func valuePredicateLowerValues(op string, values, valuesLower []string, text str
 	case "equals_any":
 		return containsStr(values, text)
 	case "contains_any":
-		lowerText := strings.ToLower(text)
+		lowerText := lowerString(text)
 		for _, v := range valuesLower {
 			if valContainsLowerNeedle(lowerText, v) {
 				return true
@@ -4590,7 +5230,7 @@ func valuePredicateLowerValues(op string, values, valuesLower []string, text str
 	case "ends_with":
 		return textTokenBoundaryPredicate(valuesLower, text, strings.HasSuffix)
 	default:
-		return valCondsLowerNeedles(strings.ToLower(text), valuesLower, nil)
+		return valCondsLowerNeedles(lowerString(text), valuesLower, nil)
 	}
 }
 
@@ -4640,7 +5280,7 @@ func textTokenBoundaryPredicate(valuesLower []string, text string, match func(st
 			tok = text[start : start+end]
 			start += end + 1
 		}
-		lowerTok := strings.ToLower(tok)
+		lowerTok := lowerString(tok)
 		for _, value := range valuesLower {
 			if match(lowerTok, value) {
 				return true
@@ -4694,8 +5334,12 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 				return nil, []string{spec.Marks[i].Pattern}, false
 			})
 			effects := make([]requirementEffect, len(spec.Marks))
+			valMatchesLower := make([][]string, len(spec.Marks))
+			valAbsentsLower := make([][]string, len(spec.Marks))
 			for i := range spec.Marks {
 				effects[i] = reqGate.effect(spec.Marks[i].Packages, spec.Marks[i].Requirement)
+				valMatchesLower[i] = lowerStrings(spec.Marks[i].ValMatches)
+				valAbsentsLower[i] = lowerStrings(spec.Marks[i].ValAbsents)
 			}
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Literal", "code.Const", "code.Function", "code.Class", "code.Import"}
 			if crossLang {
@@ -4707,6 +5351,7 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 			if needsScope {
 				scopeIdx = sharedFlagIndex(s)
 			}
+			valCache := &valueTokenCache{store: s}
 			rangeMarks := func(fn func(usg.Node) bool) {
 				if needsScope {
 					scopeIdx.rangeTechNodes(s, spec.Technology, crossLang, fn, nodeTypes...)
@@ -4734,7 +5379,7 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 					if !callArgCountMatches(n, m.ArgCountSet, m.ArgCountMin, m.ArgCountMax) {
 						continue
 					}
-					if !valCondsDirectForNode(n, m.ValMatches, m.ValAbsents) {
+					if !valCondsDirectForNodeCached(valCache, n, valMatchesLower[mi], valAbsentsLower[mi]) {
 						continue
 					}
 					if len(m.ScopePreds) > 0 && !scopePredicatesMatch(s, scopeIdx, m.ScopePreds, n, spec.Technology, crossLang) {
@@ -4936,10 +5581,41 @@ func (idx *specIndex) candidates(method, path string) []int {
 // segment (namespace or receiver before it, e.g. pattern "Process.Start" matches
 // "System.Diagnostics.Process.Start"). Boundary-aware so "File" ≠ "FileInputStream".
 func matchSinkPath(path, p string) bool {
-	return path == p ||
-		strings.HasPrefix(path, p+".") || strings.HasPrefix(path, p+"[") ||
-		strings.HasSuffix(path, "."+p) ||
-		strings.Contains(path, "."+p+".") || strings.Contains(path, "."+p+"[")
+	if path == p || p == "" {
+		return path == p
+	}
+	lp := len(p)
+	if len(path) < lp {
+		return false
+	}
+	if strings.HasPrefix(path, p) {
+		switch path[lp] {
+		case '.', '[':
+			return true
+		}
+	}
+	start := 1
+	for {
+		i := strings.Index(path[start:], p)
+		if i < 0 {
+			return false
+		}
+		pos := start + i
+		if path[pos-1] == '.' {
+			end := pos + lp
+			if end == len(path) {
+				return true
+			}
+			switch path[end] {
+			case '.', '[':
+				return true
+			}
+		}
+		start = pos + 1
+		if start+lp > len(path) {
+			return false
+		}
+	}
 }
 
 // constraintAllows reports whether recvType is in a sink's `on` constraint (a
@@ -5333,7 +6009,7 @@ func safeJSPathResolverFunction(tokens string) (string, bool) {
 	if name == "" || name == "<lambda>" {
 		return "", false
 	}
-	lower := strings.ToLower(tokens)
+	lower := lowerString(tokens)
 	if !strings.Contains(lower, "path.resolve") {
 		return "", false
 	}

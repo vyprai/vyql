@@ -2034,6 +2034,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Seq", ex.Loc, props)
+		if staticLiteralSeq(ex) {
+			return n
+		}
 		for i, p := range ex.Parts {
 			elem := l.node("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
@@ -3012,6 +3015,35 @@ func (l *lowerer) addrTakenExpr(e nir.Expr) {
 		l.addrTakenExpr(x.Then)
 		l.addrTakenExpr(x.Else)
 	case nir.Const:
+	}
+}
+
+func staticLiteralSeq(ex nir.Seq) bool {
+	if len(ex.Parts) == 0 {
+		return true
+	}
+	for _, p := range ex.Parts {
+		if !staticLiteralExpr(p) {
+			return false
+		}
+	}
+	return true
+}
+
+func staticLiteralExpr(e nir.Expr) bool {
+	switch x := e.(type) {
+	case nil:
+		return true
+	case nir.Const:
+		return true
+	case nir.Pair:
+		return staticLiteralExpr(x.Value)
+	case nir.Seq:
+		return staticLiteralSeq(x)
+	case nir.Thru:
+		return staticLiteralExpr(x.Inner)
+	default:
+		return false
 	}
 }
 

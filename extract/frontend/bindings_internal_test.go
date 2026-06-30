@@ -108,6 +108,58 @@ func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	}
 }
 
+func TestFlagPredicateOrderChecksSelectiveContextBeforeLanguage(t *testing.T) {
+	preds := []flagPredicate{
+		newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"python_review:archive_symlink_filter_bypass"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"call_path:os.open"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"binary:len(payload)==0"}, false, false),
+	}
+	order := flagPredicateOrder(preds)
+	if len(order) != len(preds) {
+		t.Fatalf("expected reordered predicates, got %v", order)
+	}
+	if order[0] != 1 {
+		t.Fatalf("python_review predicate should run first, got order %v", order)
+	}
+	if order[len(order)-1] != 0 {
+		t.Fatalf("language predicate should run last, got order %v", order)
+	}
+}
+
+func TestCachedContextTokenPredicateMatchesUncachedSemantics(t *testing.T) {
+	text := strings.Join([]string{
+		"lang=python",
+		"function_name:load_model",
+		"literal:/admin.html",
+		"call_path:package.os.open",
+		"class_base:org.yaml.snakeyaml.constructor.SafeConstructor",
+	}, "\x00")
+	idx := &flagMatchIndex{tokenFacts: map[string]*contextTokenFacts{}, lowerText: map[string]string{}}
+	cases := []struct {
+		op     string
+		values []string
+	}{
+		{"equals", []string{"lang=python"}},
+		{"contains", []string{"function_name:load"}},
+		{"contains", []string{"call_path:os.open"}},
+		{"contains", []string{"class_base:Constructor"}},
+		{"contains", []string{"class_base:SafeConstructor"}},
+		{"starts_with", []string{"function_name:load"}},
+		{"ends_with", []string{"literal:.html"}},
+		{"contains_any", []string{"literal:/login", "literal:/admin"}},
+		{"contains_any", []string{"call_path:missing", "call_path:os.open"}},
+	}
+	for _, c := range cases {
+		pred := newFlagPredicate("node", "tokens", c.op, c.values, false, false)
+		got := flagContextTokenValuePredicateCached(idx, pred, text)
+		want := flagContextTokenValuePredicate(pred, text)
+		if got != want {
+			t.Fatalf("cached predicate %s %v = %v, want %v", c.op, c.values, got, want)
+		}
+	}
+}
+
 func TestPathEqualsAnyPredicateIsExact(t *testing.T) {
 	pred := newFlagPredicate("node", "path", "equals_any", []string{"source.value"}, false, false)
 	if flagPredicateHit(pred, usg.Node{Props: map[string]string{"callee_path": "source.valued"}}) {
