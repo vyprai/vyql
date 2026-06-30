@@ -558,6 +558,67 @@ static void* SafeRealloc(void *ptr, unsigned long size)
 	}
 }
 
+func TestCExtractsMysqlConnectErrorUseAfterFreeObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "dbdimp.c")
+	src := []byte(`
+typedef int bool;
+#define TRUE 1
+#define FALSE 0
+
+static bool connect_handle(void *dbh, struct handle *state)
+{
+    bool result;
+    Newz(908, state->mysql, 1, MYSQL);
+    result = mysql_dr_connect(state->mysql) ? TRUE : FALSE;
+    if (!result) {
+        Safefree(state->mysql);
+    }
+    return result;
+}
+
+int login(void *dbh, struct handle *state)
+{
+    if (!connect_handle(dbh, state)) {
+        do_error(dbh, mysql_errno(state->mysql),
+                 mysql_error(state->mysql), mysql_sqlstate(state->mysql));
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static bool fixed_connect(void *dbh, struct handle *ctx)
+{
+    bool ok;
+    Newz(908, ctx->conn, 1, MYSQL);
+    ok = mysql_dr_connect(ctx->conn) ? TRUE : FALSE;
+    return ok;
+}
+
+int fixed_login(void *dbh, struct handle *ctx)
+{
+    if (!fixed_connect(dbh, ctx)) {
+        do_error(dbh, mysql_errno(ctx->conn),
+                 mysql_error(ctx->conn), mysql_sqlstate(ctx->conn));
+        Safefree(ctx->conn);
+        return FALSE;
+    }
+    return TRUE;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cModuleHasAnalysisCall(prog.Modules[0].Body, "analysis.lifetime.mysql_connect_error_use_after_free") {
+		t.Fatalf("mysql connect error use-after-free observation missing: %#v", prog.Modules[0].Body)
+	}
+}
+
 func hasCFuncCall(stmts []nir.Stmt, funcName, method string) bool {
 	for _, st := range stmts {
 		fn, ok := st.(nir.FuncDef)

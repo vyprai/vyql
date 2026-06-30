@@ -75,6 +75,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 			body = append(body, c.decls(tree.RootNode())...)
 			body = append(body, c.ccLifetimeReleaseReturnObservations(tree.RootNode())...)
 			body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
+			body = append(body, c.ccMysqlConnectErrorUseAfterFreeObservations(tree.RootNode())...)
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
@@ -285,6 +286,183 @@ func (c *ccConv) ccReallocFailureInputFreeObservations(root *tree_sitter.Node) [
 	}
 	walk(root)
 	return out
+}
+
+type ccFunctionText struct {
+	name    string
+	node    *tree_sitter.Node
+	raw     string
+	compact string
+}
+
+var (
+	ccMysqlHandleReleaseRe = regexp.MustCompile(`\b(?:Safefree|free)\(([^()]*?(?:->|\.)[A-Za-z_][A-Za-z0-9_]*)\);`)
+	ccReturnIdentifierRe   = regexp.MustCompile(`return[A-Za-z_][A-Za-z0-9_]*;`)
+	ccFailedNegatedCallRe  = regexp.MustCompile(`if\(!([A-Za-z_][A-Za-z0-9_]*)\(`)
+	ccFailedFalseCallRe    = regexp.MustCompile(`if\(([A-Za-z_][A-Za-z0-9_]*)\([^;{}]*\)==(?:FALSE|false|0)\)`)
+)
+
+func (c *ccConv) ccMysqlConnectErrorUseAfterFreeObservations(root *tree_sitter.Node) []nir.Stmt {
+	var funcs []ccFunctionText
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "function_definition" {
+			raw := c.text(n)
+			name := c.declName(field(n, "declarator"))
+			if name == "" {
+				name = ccFunctionNameFromText(raw)
+			}
+			funcs = append(funcs, ccFunctionText{
+				name:    name,
+				node:    n,
+				raw:     raw,
+				compact: compactCExprText(raw),
+			})
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	if len(funcs) == 0 {
+		return nil
+	}
+	failedCallers := ccFailedMysqlConnectCallers(funcs)
+
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	for _, helper := range funcs {
+		if helper.name == "" || !ccLooksLikeMysqlConnectHelper(helper.compact) {
+			continue
+		}
+		for _, m := range ccMysqlHandleReleaseRe.FindAllStringSubmatchIndex(helper.compact, -1) {
+			if len(m) < 4 {
+				continue
+			}
+			released := helper.compact[m[2]:m[3]]
+			if !ccReleaseFollowsMysqlConnect(helper.compact, m[0]) {
+				continue
+			}
+			for _, caller := range failedCallers[helper.name] {
+				if caller.name == helper.name {
+					continue
+				}
+				if !ccMysqlErrorAccessesReleasedHandle(caller.compact, released) {
+					continue
+				}
+				if ccMysqlErrorAccessIsAfterLocalRelease(caller.compact, released) {
+					continue
+				}
+				loc := c.locAtCompactOffset(helper.node, helper.raw, m[0])
+				if seen[loc] {
+					continue
+				}
+				seen[loc] = true
+				path := "analysis.lifetime.mysql_connect_error_use_after_free"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "connect=mysql"},
+						nir.Const{Loc: loc, Value: "release=failed_connect_helper"},
+						nir.Const{Loc: loc, Value: "use=mysql_error_state_after_false_return"},
+					},
+					Path:   path,
+					Method: "mysql_connect_error_use_after_free",
+					Loc:    loc,
+				}})
+			}
+		}
+	}
+	return out
+}
+
+func ccFailedMysqlConnectCallers(funcs []ccFunctionText) map[string][]ccFunctionText {
+	out := map[string][]ccFunctionText{}
+	for _, fn := range funcs {
+		seen := map[string]bool{}
+		for _, m := range ccFailedNegatedCallRe.FindAllStringSubmatch(fn.compact, -1) {
+			if len(m) == 2 && !seen[m[1]] {
+				out[m[1]] = append(out[m[1]], fn)
+				seen[m[1]] = true
+			}
+		}
+		for _, m := range ccFailedFalseCallRe.FindAllStringSubmatch(fn.compact, -1) {
+			if len(m) == 2 && !seen[m[1]] {
+				out[m[1]] = append(out[m[1]], fn)
+				seen[m[1]] = true
+			}
+		}
+	}
+	return out
+}
+
+func ccFunctionNameFromText(text string) string {
+	header := text
+	if idx := strings.Index(header, "{"); idx >= 0 {
+		header = header[:idx]
+	}
+	m := regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)\s*\([^()]*\)\s*$`).FindStringSubmatch(header)
+	if len(m) == 2 {
+		return m[1]
+	}
+	return ""
+}
+
+func ccLooksLikeMysqlConnectHelper(text string) bool {
+	if !strings.Contains(text, "mysql_") ||
+		(!strings.Contains(text, "mysql_dr_connect(") && !strings.Contains(text, "mysql_real_connect(")) {
+		return false
+	}
+	return strings.Contains(text, "returnresult;") ||
+		strings.Contains(text, "returnFALSE;") ||
+		strings.Contains(text, "returnfalse;") ||
+		strings.Contains(text, "return0;") ||
+		ccReturnIdentifierRe.MatchString(text)
+}
+
+func ccReleaseFollowsMysqlConnect(text string, releaseStart int) bool {
+	connect := strings.Index(text, "mysql_dr_connect(")
+	if connect < 0 {
+		connect = strings.Index(text, "mysql_real_connect(")
+	}
+	if connect < 0 || connect > releaseStart {
+		return false
+	}
+	return strings.Contains(text[connect:releaseStart], "if(") ||
+		strings.Contains(text[connect:releaseStart], "?TRUE:FALSE") ||
+		strings.Contains(text[connect:releaseStart], "?true:false")
+}
+
+func ccMysqlErrorAccessesReleasedHandle(text, released string) bool {
+	hitCount := 0
+	for _, accessor := range []string{"mysql_errno", "mysql_error", "mysql_sqlstate"} {
+		if strings.Contains(text, accessor+"("+released+")") {
+			hitCount++
+		}
+	}
+	return hitCount >= 1
+}
+
+func ccMysqlErrorAccessIsAfterLocalRelease(text, released string) bool {
+	errIdx := len(text)
+	for _, accessor := range []string{"mysql_errno", "mysql_error", "mysql_sqlstate"} {
+		if idx := strings.Index(text, accessor+"("+released+")"); idx >= 0 && idx < errIdx {
+			errIdx = idx
+		}
+	}
+	if errIdx == len(text) {
+		return false
+	}
+	for _, rel := range []string{"Safefree(" + released + ");", "free(" + released + ");"} {
+		if idx := strings.Index(text, rel); idx >= 0 && idx < errIdx {
+			return true
+		}
+	}
+	return false
 }
 
 func ccFunctionDeclaresLocal(fnText, name string) bool {
