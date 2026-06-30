@@ -724,6 +724,14 @@ func rbSemanticReviewTokens(raw, scope string) []string {
 		!strings.Contains(compact, "devise_unconfirmed_email_will_change!") {
 		add("devise_reconfirmation_missing_dirty_tracking")
 	}
+	if scope == "function" &&
+		strings.Contains(compact, "run_shell_command(") &&
+		strings.Contains(compact, "gitclone") &&
+		rbGitCloneInterpolatedBranchOptionRe.MatchString(compact) &&
+		!strings.Contains(compact, "Shellwords") &&
+		!strings.Contains(compact, "shellescape") {
+		add("git_clone_interpolated_branch_option_unescaped")
+	}
 	return out
 }
 
@@ -733,6 +741,7 @@ var (
 	rbConvertBacktickInterpolationRe           = regexp.MustCompile("`\\s*convert\\s+#\\{[^}]+\\}.*-colors\\s+#\\{[^}]+\\}.*-depth\\s+#\\{[^}]+\\}")
 	rbBacktickInterpolationRe                  = regexp.MustCompile("`\\s*#\\{[^}]+\\}\\s*`")
 	rbQueryStringJoinInterpolationRe           = regexp.MustCompile(`\?[A-Za-z0-9_%-]+=\s*#\{[^}]+\.join\(`)
+	rbGitCloneInterpolatedBranchOptionRe       = regexp.MustCompile(`--branch#\{[^}]*branch[^}]*\}--single-branch`)
 )
 
 func rbPersistentResponseReuse(compact string) bool {

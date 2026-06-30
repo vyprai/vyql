@@ -141,6 +141,65 @@ end
 	t.Fatalf("analysis.function.context for ffi_lib not found; nodes=%#v", nodes)
 }
 
+func TestRubyFunctionContextMarksGitCloneInterpolatedBranchOption(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fetcher.rb")
+	src := []byte(`class Fetcher
+  def vulnerable_clone(source, path)
+    branch_option = " --branch #{source.branch} --single-branch" if source.branch
+    SharedHelpers.run_shell_command(
+      <<~CMD
+        git clone --no-tags --depth 1#{branch_option} #{source.url} #{path}
+      CMD
+    )
+  end
+
+  def fixed_clone(source, path)
+    branch_option = " --branch #{Shellwords.escape(source.branch)} --single-branch" if source.branch
+    SharedHelpers.run_shell_command(
+      <<~CMD
+        git clone --no-tags --depth 1#{branch_option} #{source.url} #{path}
+      CMD
+    )
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "name=vulnerable_clone") && strings.Contains(args, "ruby_review:git_clone_interpolated_branch_option_unescaped") {
+			sawVulnerable = true
+		}
+		if strings.Contains(args, "name=fixed_clone") && strings.Contains(args, "ruby_review:git_clone_interpolated_branch_option_unescaped") {
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable {
+		t.Fatalf("ruby function context did not mark interpolated git clone branch option; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("ruby function context marked Shellwords-escaped branch option as vulnerable; nodes=%#v", nodes)
+	}
+}
+
 func TestRubyClassContextIncludesSuperclassTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "base_controller.rb")

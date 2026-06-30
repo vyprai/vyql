@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule GitCloneBranchOptionShellInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_88]
+    id: "VYQL-INJ-201"
+    severity: critical
+  }
+  issue code.GitCloneBranchOptionShellInjection as sink
+}
