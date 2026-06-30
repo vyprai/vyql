@@ -118,6 +118,32 @@ func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
 	}
 }
 
+func TestParseComposerLockPackages(t *testing.T) {
+	got := ParseComposerLock(`{
+  "packages": [
+    {
+      "name": "amnah/yii2-user",
+      "version": "3.0.0"
+    }
+  ],
+  "packages-dev": [
+    {
+      "name": "yiisoft/yii2-debug",
+      "version": "2.1.0"
+    }
+  ]
+}`)
+	want := []Dep{{"amnah/yii2-user", "3.0.0"}, {"yiisoft/yii2-debug", "2.1.0"}}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestMinSafeAdvisoryMatch(t *testing.T) {
 	d := &scaData{advisories: map[string]map[string][]advisoryEntry{"npm": {
 		"tinymce": {{Version: "*", ID: "CVE-2024-21910", MinSafe: "5.10.0"}},

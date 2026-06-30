@@ -12,6 +12,9 @@
     "minimist": [{"version": "1.2.0", "id": "CVE-2020-7598"}],
     "tinymce": [{"version": "*", "id": "CVE-2024-21910", "cwe": ["CWE-79"], "min_safe": "5.10.0"}]
   },
+  "php": {
+    "amnah/yii2-user": [{"version": "3.0.0", "id": "CVE-2023-38871", "cwe": ["CWE-203"]}]
+  },
   "git": {
     "github.com/clash-verge-rev/clash-verge-service-ipc": [
       {

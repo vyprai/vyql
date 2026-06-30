@@ -386,6 +386,37 @@ func ParsePackageJSON(content string) []Dep {
 	return out
 }
 
+// ParseComposerLock reads package pins from Composer's lockfile. It uses the
+// resolved package versions rather than composer.json constraints so advisory
+// matching sees the exact installed PHP package revision.
+func ParseComposerLock(content string) []Dep {
+	var lock struct {
+		Packages    []composerPackage `json:"packages"`
+		PackagesDev []composerPackage `json:"packages-dev"`
+	}
+	if json.Unmarshal([]byte(content), &lock) != nil {
+		return nil
+	}
+	out := make([]Dep, 0, len(lock.Packages)+len(lock.PackagesDev))
+	for _, pkg := range append(lock.Packages, lock.PackagesDev...) {
+		name := NormalizePackageName(pkg.Name)
+		if name == "" {
+			continue
+		}
+		version := strings.TrimSpace(pkg.Version)
+		if version == "" {
+			version = "*"
+		}
+		out = append(out, Dep{name, version})
+	}
+	return out
+}
+
+type composerPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 // ParseGitmodules turns git submodule pins into SBOM dependencies. .gitmodules carries
 // identity (path/url); the checked-out git tree carries the immutable gitlink commit.
 func ParseGitmodules(content string, commits map[string]string) []Dep {
