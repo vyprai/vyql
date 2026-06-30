@@ -1,0 +1,6 @@
+test "rank92: OpenShift SCC ephemeralcontainers require admission subresource review"
+  expect_review code.AdmissionSubresourcePolicyReview
+  graph
+  ```
+  node op code.AdmissionSubresourcePolicyReview
+  ```

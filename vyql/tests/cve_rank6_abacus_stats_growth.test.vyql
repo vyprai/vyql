@@ -1,0 +1,60 @@
+test "rank6: high-cardinality stats overflow bucket is review-visible"
+  lang go
+  expect_review code.UnboundedStateGrowthReview
+  code
+  ```
+  package utils
+
+  import "sync"
+
+  const maxPaths = 120
+
+  type StatManager struct {
+      stats sync.Map
+      pathCount Counter
+  }
+
+  func (sm *StatManager) RecordStat(path string, count int64) {
+      val, loaded := sm.stats.Load(path)
+      if !loaded {
+          if sm.pathCount.Load() >= maxPaths {
+              val, _ = sm.stats.LoadOrStore("overflow", new(int64))
+          } else {
+              val = new(int64)
+              sm.stats.Store(path, val)
+              sm.pathCount.Add(1)
+          }
+      }
+      _ = val
+  }
+  ```
+
+test "rank6: stats path cardinality limit fails closed"
+  lang go
+  reject_review code.UnboundedStateGrowthReview
+  code
+  ```
+  package utils
+
+  import "fmt"
+
+  const maxPaths = 45
+
+  type StatManager struct {
+      stats Map
+      pathCount Counter
+  }
+
+  func (sm *StatManager) RecordStat(path string, count int64) {
+      val, loaded := sm.stats.Load(path)
+      if !loaded {
+          if sm.pathCount.Load() >= maxPaths {
+              panic(fmt.Sprintf("Stats path limit exceeded: %d paths is the maximum allowed", maxPaths))
+          }
+          val = new(int64)
+          sm.stats.Store(path, val)
+          sm.pathCount.Add(1)
+      }
+      _ = val
+  }
+  ```
