@@ -1455,9 +1455,9 @@ var cve1000AcceptedNoSpecRanks = map[int]bool{
 	21: true,
 	23: true, 28: true, 37: true,
 	57: true, 62: true, 69: true, 71: true, 73: true,
-	83: true,
+	83:  true,
 	114: true,
-	312: true, 342: true, 574: true, 588: true, 592: true,
+	574: true, 588: true, 592: true,
 	829: true,
 }
 

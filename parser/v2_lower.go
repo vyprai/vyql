@@ -1805,8 +1805,12 @@ func v2PresenceValuePrefix(field string) string {
 		return "call:"
 	case "callArg":
 		return "call_arg:"
+	case "callArgAt":
+		return "call_arg_at:"
 	case "callArgShape":
 		return "call_arg_shape:"
+	case "callArgShapeAt":
+		return "call_arg_shape_at:"
 	case "callMethod":
 		return "call_method:"
 	case "callOrder":

@@ -2332,7 +2332,7 @@ matcher sensitiveName {
   containsAny: ["token", "secret"]
 }
 binding contextFields {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName and node.context.advisoryCwe == "CWE-444" and node.context.status == "vulnerable" and node.context.reachable == "true" and node.context.indexKind == "field_derived" and node.context.guard == "missing_upper_bound" and node.context.shellBridge == "python_triple_quote_stdin_interpolation" and node.context.startupOrder == "clearance_policy_before_adapter_start" and node.context.csrfValidation == "double_submit_missing_nonempty_guard" and node.context.redirectFlow == "checksum_error_uses_default_logout" and node.context.rsaPkcs1 == "digest_suffix_sha256" and node.context.portProtocol == "request_response_missing_correlation" and node.context.rubyReview == "tls_ca_file_without_verify_mode" and node.context.rustReview == "uninitialized_buffer_exposure" and node.context.pythonReview == "flask_hardcoded_secret_key" and node.context.template == "erb" and node.context.attr == "href" and node.context.erbValue == "url-like" and node.context.decoratorPath contains "require_POST" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"]) and node.context.zeroStepSequenceRisk == "true" and node.context.convertSvgMultiSvgSanitizerBypass == "true" and node.context.incompleteGeneratedJsIdentifierReservedWords == "true" and node.context.ajaxBackslashProtocolRelativeUrlXss == "true"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.callArgAt contains "krb5_get_init_creds_password:7:NULL" and node.context.callArgShapeAt contains "krb5_get_init_creds_password:7:NULL" and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName and node.context.advisoryCwe == "CWE-444" and node.context.status == "vulnerable" and node.context.reachable == "true" and node.context.indexKind == "field_derived" and node.context.guard == "missing_upper_bound" and node.context.shellBridge == "python_triple_quote_stdin_interpolation" and node.context.startupOrder == "clearance_policy_before_adapter_start" and node.context.csrfValidation == "double_submit_missing_nonempty_guard" and node.context.redirectFlow == "checksum_error_uses_default_logout" and node.context.rsaPkcs1 == "digest_suffix_sha256" and node.context.portProtocol == "request_response_missing_correlation" and node.context.rubyReview == "tls_ca_file_without_verify_mode" and node.context.rustReview == "uninitialized_buffer_exposure" and node.context.pythonReview == "flask_hardcoded_secret_key" and node.context.template == "erb" and node.context.attr == "href" and node.context.erbValue == "url-like" and node.context.decoratorPath contains "require_POST" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"]) and node.context.zeroStepSequenceRisk == "true" and node.context.convertSvgMultiSvgSanitizerBypass == "true" and node.context.incompleteGeneratedJsIdentifierReservedWords == "true" and node.context.ajaxBackslashProtocolRelativeUrlXss == "true"
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -2340,7 +2340,7 @@ binding contextFields {
 		t.Fatalf("ParseV2Definitions: %v", err)
 	}
 	flag := decls[0].(*BindingSet).Mappings[0].Flag
-	if flag.Scope != "function" || len(flag.Predicates) != 27 {
+	if flag.Scope != "function" || len(flag.Predicates) != 29 {
 		t.Fatalf("flag predicates wrong: %+v", flag)
 	}
 	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "lang=javascript" {
@@ -2349,79 +2349,85 @@ binding contextFields {
 	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "call_path:parseOut" || got.Values[1] != "call_path:crypto.timingSafeEqual" {
 		t.Fatalf("callPath predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "selector:data.x-csrf-token" {
+	if got := flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "call_arg_at:krb5_get_init_creds_password:7:NULL" {
+		t.Fatalf("callArgAt predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[3]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "call_arg_shape_at:krb5_get_init_creds_password:7:NULL" {
+		t.Fatalf("callArgShapeAt predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[4]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "selector:data.x-csrf-token" {
 		t.Fatalf("selector predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[3]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "identifier:token" || got.Values[1] != "identifier:secret" {
+	if got := flag.Predicates[5]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "identifier:token" || got.Values[1] != "identifier:secret" {
 		t.Fatalf("matcher predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[4]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "advisory_cwe=CWE-444" {
+	if got := flag.Predicates[6]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "advisory_cwe=CWE-444" {
 		t.Fatalf("advisory CWE predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[5]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "status=vulnerable" {
+	if got := flag.Predicates[7]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "status=vulnerable" {
 		t.Fatalf("status predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[6]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "reachable=true" {
+	if got := flag.Predicates[8]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "reachable=true" {
 		t.Fatalf("reachable predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[7]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "index_kind=field_derived" {
+	if got := flag.Predicates[9]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "index_kind=field_derived" {
 		t.Fatalf("index kind predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[8]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "guard=missing_upper_bound" {
+	if got := flag.Predicates[10]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "guard=missing_upper_bound" {
 		t.Fatalf("guard predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[9]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "shell_bridge:python_triple_quote_stdin_interpolation" {
+	if got := flag.Predicates[11]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "shell_bridge:python_triple_quote_stdin_interpolation" {
 		t.Fatalf("shell bridge predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[10]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "startup_order:clearance_policy_before_adapter_start" {
+	if got := flag.Predicates[12]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "startup_order:clearance_policy_before_adapter_start" {
 		t.Fatalf("startup order predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[11]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "csrf_validation:double_submit_missing_nonempty_guard" {
+	if got := flag.Predicates[13]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "csrf_validation:double_submit_missing_nonempty_guard" {
 		t.Fatalf("csrf validation predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[12]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "redirect_flow:checksum_error_uses_default_logout" {
+	if got := flag.Predicates[14]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "redirect_flow:checksum_error_uses_default_logout" {
 		t.Fatalf("redirect flow predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[13]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "rsa_pkcs1:digest_suffix_sha256" {
+	if got := flag.Predicates[15]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "rsa_pkcs1:digest_suffix_sha256" {
 		t.Fatalf("rsa pkcs1 predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[14]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "port_protocol:request_response_missing_correlation" {
+	if got := flag.Predicates[16]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "port_protocol:request_response_missing_correlation" {
 		t.Fatalf("port protocol predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[15]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "ruby_review:tls_ca_file_without_verify_mode" {
+	if got := flag.Predicates[17]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "ruby_review:tls_ca_file_without_verify_mode" {
 		t.Fatalf("ruby review predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[16]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "rust_review:uninitialized_buffer_exposure" {
+	if got := flag.Predicates[18]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "rust_review:uninitialized_buffer_exposure" {
 		t.Fatalf("rust review predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[17]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "python_review:flask_hardcoded_secret_key" {
+	if got := flag.Predicates[19]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "python_review:flask_hardcoded_secret_key" {
 		t.Fatalf("python review predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[18]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "template=erb" {
+	if got := flag.Predicates[20]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "template=erb" {
 		t.Fatalf("template predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[19]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "attr=href" {
+	if got := flag.Predicates[21]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "attr=href" {
 		t.Fatalf("attr predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[20]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "value=url-like" {
+	if got := flag.Predicates[22]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "value=url-like" {
 		t.Fatalf("ERB value predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[21]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "decorator_path:require_POST" {
+	if got := flag.Predicates[23]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "decorator_path:require_POST" {
 		t.Fatalf("decorator path predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[22]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "assign_item:viewer_scopes:CONFIG_READ" || got.Values[1] != "assign_item:guest_scopes:CONFIG_READ" {
+	if got := flag.Predicates[24]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "assign_item:viewer_scopes:CONFIG_READ" || got.Values[1] != "assign_item:guest_scopes:CONFIG_READ" {
 		t.Fatalf("assign item predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[23]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "zero_step_sequence_risk=true" {
+	if got := flag.Predicates[25]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "zero_step_sequence_risk=true" {
 		t.Fatalf("zero-step sequence risk predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[24]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "convert_svg_multi_svg_sanitizer_bypass=true" {
+	if got := flag.Predicates[26]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "convert_svg_multi_svg_sanitizer_bypass=true" {
 		t.Fatalf("convert-svg sanitizer bypass predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[25]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "incomplete_generated_js_identifier_reserved_words=true" {
+	if got := flag.Predicates[27]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "incomplete_generated_js_identifier_reserved_words=true" {
 		t.Fatalf("incomplete generated JS identifier reserved words predicate wrong: %+v", got)
 	}
-	if got := flag.Predicates[26]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "ajax_backslash_protocol_relative_url_xss=true" {
+	if got := flag.Predicates[28]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "ajax_backslash_protocol_relative_url_xss=true" {
 		t.Fatalf("AJAX backslash URL predicate wrong: %+v", got)
 	}
 }

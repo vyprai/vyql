@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -422,12 +423,14 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				add("call:" + lastSeg(path))
-				for _, arg := range namedChildren(field(n, "arguments")) {
+				for i, arg := range namedChildren(field(n, "arguments")) {
 					if a := atom(arg); a != "" {
 						add("call_arg:" + path + ":" + a)
+						add(fmt.Sprintf("call_arg_at:%s:%d:%s", path, i, a))
 					}
 					if shape := c.ccExprShape(arg); shape != "" {
 						add("call_arg_shape:" + path + ":" + shape)
+						add(fmt.Sprintf("call_arg_shape_at:%s:%d:%s", path, i, shape))
 					}
 				}
 			}
