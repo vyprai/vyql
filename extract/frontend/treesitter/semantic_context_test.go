@@ -1508,6 +1508,70 @@ class TermViewlet:
 	}
 }
 
+func TestPythonSemanticReviewMarksRsaPkcs1v15DecryptErrorOracle(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rsa_oracle.py")
+	src := `def decrypt_with_oracle(lib, ffi, key, payload, pad):
+    if key.public:
+        crypt = lib.EVP_PKEY_encrypt
+    else:
+        crypt = lib.EVP_PKEY_decrypt
+
+    ctx = lib.EVP_PKEY_CTX_new(key.handle, ffi.NULL)
+    lib.EVP_PKEY_decrypt_init(ctx)
+    res = lib.EVP_PKEY_CTX_set_rsa_padding(ctx, pad)
+    outlen = ffi.new("size_t *", lib.EVP_PKEY_size(key.handle))
+    outbuf = ffi.new("unsigned char[]", outlen[0])
+    res = crypt(ctx, outbuf, outlen, payload, len(payload))
+    if res <= 0:
+        raise_decryption_error(lib)
+    return ffi.buffer(outbuf)[:outlen[0]]
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !programHasConstToken(prog, "python_review:rsa_pkcs1v15_decrypt_error_oracle") {
+		t.Fatalf("Python RSA decrypt oracle token missing: %#v", prog.Modules)
+	}
+}
+
+func TestPythonSemanticReviewDoesNotMarkMitigatedRsaPkcs1v15DecryptErrorOracle(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rsa_oracle.py")
+	src := `def decrypt_without_oracle(lib, ffi, key, payload, pad):
+    if key.public:
+        crypt = lib.EVP_PKEY_encrypt
+    else:
+        crypt = lib.EVP_PKEY_decrypt
+
+    ctx = lib.EVP_PKEY_CTX_new(key.handle, ffi.NULL)
+    lib.EVP_PKEY_decrypt_init(ctx)
+    res = lib.EVP_PKEY_CTX_set_rsa_padding(ctx, pad)
+    outlen = ffi.new("size_t *", lib.EVP_PKEY_size(key.handle))
+    outbuf = ffi.new("unsigned char[]", outlen[0])
+    res = crypt(ctx, outbuf, outlen, payload, len(payload))
+    result = ffi.buffer(outbuf)[:outlen[0]]
+    lib.ERR_clear_error()
+    if res <= 0:
+        raise ValueError("Encryption/decryption failed.")
+    return result
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if programHasConstToken(prog, "python_review:rsa_pkcs1v15_decrypt_error_oracle") {
+		t.Fatalf("mitigated Python RSA decrypt path should not emit oracle token: %#v", prog.Modules)
+	}
+}
+
 func TestPythonWaterfallReloadOptionIgnoresUnrelatedEscapes(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "waterfall.py")

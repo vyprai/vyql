@@ -972,6 +972,9 @@ func pySemanticReviewTokens(raw, name string) []string {
 		!strings.Contains(compact, "LOG.debug(\"Configfile:") {
 		add("sensitive_config_info_log")
 	}
+	if pyRsaPkcs1v15DecryptErrorOracle(compact) {
+		add("rsa_pkcs1v15_decrypt_error_oracle")
+	}
 	if strings.Contains(compact, ".__dict__.items()") &&
 		strings.Contains(compact, "not") &&
 		strings.Contains(compact, ".endswith(\"_e\")") &&
@@ -1208,6 +1211,39 @@ func pyCompactContainsAny(compact string, needles ...string) bool {
 		}
 	}
 	return false
+}
+
+func pyRsaPkcs1v15DecryptErrorOracle(compact string) bool {
+	if !pyCompactContainsAny(compact, "EVP_PKEY_decrypt", "RSA_private_decrypt") {
+		return false
+	}
+	if !pyCompactContainsAny(compact, "EVP_PKEY_CTX_set_rsa_padding", "RSA_PKCS1_PADDING") {
+		return false
+	}
+	resIdx := pyIndexAny(compact, "res=crypt(", "res=backend._lib.RSA_private_decrypt(")
+	branchIdx := pyIndexAny(compact, "ifres<=0", "ifres<1", "ifres==0", "ifres!=1")
+	if resIdx < 0 || branchIdx < resIdx {
+		return false
+	}
+	clearIdx := strings.Index(compact, "ERR_clear_error(")
+	if clearIdx >= 0 && clearIdx < branchIdx {
+		return false
+	}
+	bufferIdx := pyIndexAny(compact, "_ffi.buffer(", "ffi.buffer(")
+	if bufferIdx >= 0 && bufferIdx < branchIdx {
+		return false
+	}
+	return true
+}
+
+func pyIndexAny(s string, needles ...string) int {
+	best := -1
+	for _, needle := range needles {
+		if i := strings.Index(s, needle); i >= 0 && (best < 0 || i < best) {
+			best = i
+		}
+	}
+	return best
 }
 
 func pyContextHasAny(tokens []string, needles ...string) bool {

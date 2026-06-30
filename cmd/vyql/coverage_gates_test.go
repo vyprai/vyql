@@ -1350,7 +1350,7 @@ func TestCVE1000LedgerCoverageGate(t *testing.T) {
 	if len(missing) > 0 {
 		t.Fatalf("cve-1000 ledger missing %d pool rank(s): %s", len(missing), strings.Join(missing, ", "))
 	}
-	wantStatuses := map[string]int{"ATTENTION": 106, "CAUGHT": 107, "FIXED": 780, "SKIP": 7}
+	wantStatuses := map[string]int{"ATTENTION": 106, "CAUGHT": 107, "FIXED": 781, "SKIP": 6}
 	if !intMapsEqual(statuses, wantStatuses) {
 		t.Fatalf("cve-1000 ledger statuses = %v, want %v", statuses, wantStatuses)
 	}
