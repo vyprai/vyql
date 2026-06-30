@@ -1,5 +1,7 @@
 package usg
 
+import "sync"
+
 // IntStore is an int-indexed in-memory graph store: every node is referenced by a dense int32
 // instead of its (long) string id, so adjacency and the type/concept indexes hold 4-byte ints
 // rather than 16-byte string headers, and node payload lives in parallel slices (no per-node map
@@ -32,6 +34,8 @@ type IntStore struct {
 	conceptHas map[string]map[int32]bool
 	labels     [][]Label // index -> labels
 	epoch      uint64    // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
+
+	typeMu sync.Mutex // guards the lazy typeIDs cache, written during reads (NodesOfType)
 }
 
 // StructEpoch reports the store's structural epoch. See usg/epoch.go.
@@ -262,6 +266,8 @@ func (s *IntStore) NodesWithConcept(concept string) ([]string, error) {
 }
 
 func (s *IntStore) NodesOfType(nodeType string) ([]string, error) {
+	s.typeMu.Lock()
+	defer s.typeMu.Unlock()
 	if ids, ok := s.typeIDs[nodeType]; ok {
 		return ids, nil
 	}

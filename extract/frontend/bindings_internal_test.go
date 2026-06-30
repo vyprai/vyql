@@ -135,7 +135,7 @@ func TestCachedContextTokenPredicateMatchesUncachedSemantics(t *testing.T) {
 		"call_path:package.os.open",
 		"class_base:org.yaml.snakeyaml.constructor.SafeConstructor",
 	}, "\x00")
-	idx := &flagMatchIndex{tokenFacts: map[string]*contextTokenFacts{}, lowerText: map[string]string{}}
+	idx := &flagMatchIndex{}
 	cases := []struct {
 		op     string
 		values []string

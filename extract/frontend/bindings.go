@@ -363,9 +363,9 @@ func (pred flagPredicate) lowerValues() []string {
 }
 
 type flowTokenIndex struct {
-	built bool
-	rev   map[string][]string
-	fwd   map[string][]string
+	once sync.Once
+	rev  map[string][]string
+	fwd  map[string][]string
 }
 
 // Per-Apply shared node indexes. bindings.Apply runs every applicator sequentially
@@ -601,18 +601,22 @@ func allContentNeedlesFound(missing map[string]bool) bool {
 }
 
 type flagMatchIndex struct {
-	built        bool
+	once         sync.Once // guards the read-only index build (ensure)
 	flow         flowTokenIndex
 	types        map[string][]usg.Node
 	typesByTech  map[string]map[string][]usg.Node // tech -> type -> nodes ("" tech = unknown, kept by every language)
 	typesByFile  map[string]map[string][]usg.Node
 	binopsByFile map[string]map[string][]usg.Node
 	paramsByLine map[string]map[int][]usg.Node
-	scopes       map[string]string
-	lowerText    map[string]string
-	tokenFacts   map[string]*contextTokenFacts
-	callArgText  map[string]string
-	predHitSets  map[string]scopedPredicateHitSet
+	// Lazy memoization caches written during matching. They hold pure-function results
+	// (lowering/parsing/scope of a node or text), so concurrent racing producers compute
+	// the same value; sync.Map only has to keep the map itself race-free under the parallel
+	// binding phase, without serializing the hot read path the way an RWMutex would.
+	scopes      sync.Map // nodeID -> string
+	lowerText   sync.Map // text -> string
+	tokenFacts  sync.Map // text -> *contextTokenFacts
+	callArgText sync.Map // key -> string
+	predHitSets sync.Map // key -> scopedPredicateHitSet
 }
 
 // nodesOfTechType returns the nodes of nodeType that a binding of the given technology must
@@ -697,20 +701,15 @@ type scopedPredicateHitSet struct {
 }
 
 func (idx *flagMatchIndex) ensure(s usg.Store) {
-	if idx.built {
-		return
-	}
-	idx.built = true
+	idx.once.Do(func() { idx.build(s) })
+}
+
+func (idx *flagMatchIndex) build(s usg.Store) {
 	idx.types = map[string][]usg.Node{}
 	idx.typesByTech = map[string]map[string][]usg.Node{}
 	idx.typesByFile = map[string]map[string][]usg.Node{}
 	idx.binopsByFile = map[string]map[string][]usg.Node{}
 	idx.paramsByLine = map[string]map[int][]usg.Node{}
-	idx.scopes = map[string]string{}
-	idx.lowerText = map[string]string{}
-	idx.tokenFacts = map[string]*contextTokenFacts{}
-	idx.callArgText = map[string]string{}
-	idx.predHitSets = map[string]scopedPredicateHitSet{}
 	fileTech := sharedFileContextTechs(s)
 	rangeNodes(s, func(n usg.Node) bool {
 		idx.types[n.Type] = append(idx.types[n.Type], n)
@@ -801,11 +800,11 @@ func (idx *flagMatchIndex) normalizedScope(n usg.Node) string {
 	if n.ID == "" {
 		return scopeWithoutOrder(nodeLexicalScope(n))
 	}
-	if scope, ok := idx.scopes[n.ID]; ok {
-		return scope
+	if scope, ok := idx.scopes.Load(n.ID); ok {
+		return scope.(string)
 	}
 	scope := scopeWithoutOrder(nodeLexicalScope(n))
-	idx.scopes[n.ID] = scope
+	idx.scopes.Store(n.ID, scope)
 	return scope
 }
 
@@ -813,14 +812,11 @@ func (idx *flagMatchIndex) lowerTextValue(text string) string {
 	if text == "" {
 		return ""
 	}
-	if lower, ok := idx.lowerText[text]; ok {
-		return lower
-	}
-	if idx.lowerText == nil {
-		idx.lowerText = map[string]string{}
+	if lower, ok := idx.lowerText.Load(text); ok {
+		return lower.(string)
 	}
 	lower := lowerString(text)
-	idx.lowerText[text] = lower
+	idx.lowerText.Store(text, lower)
 	return lower
 }
 
@@ -830,11 +826,8 @@ type contextTokenFacts struct {
 }
 
 func (idx *flagMatchIndex) contextFacts(text string) *contextTokenFacts {
-	if idx.tokenFacts == nil {
-		idx.tokenFacts = map[string]*contextTokenFacts{}
-	}
-	if facts, ok := idx.tokenFacts[text]; ok {
-		return facts
+	if facts, ok := idx.tokenFacts.Load(text); ok {
+		return facts.(*contextTokenFacts)
 	}
 	facts := &contextTokenFacts{
 		byPrefix:      map[string][]string{},
@@ -860,7 +853,7 @@ func (idx *flagMatchIndex) contextFacts(text string) *contextTokenFacts {
 		facts.byPrefix[prefix] = append(facts.byPrefix[prefix], value)
 		facts.lowerByPrefix[prefix] = append(facts.lowerByPrefix[prefix], lowerString(value))
 	}
-	idx.tokenFacts[text] = facts
+	idx.tokenFacts.Store(text, facts)
 	return facts
 }
 
@@ -882,8 +875,8 @@ func (idx *flagMatchIndex) scopedPredicateHits(s usg.Store, kind string, pred fl
 		tech,
 		strconv.FormatBool(crossLang),
 	}, "\x1e")
-	if cached, ok := idx.predHitSets[key]; ok {
-		return cached
+	if cached, ok := idx.predHitSets.Load(key); ok {
+		return cached.(scopedPredicateHitSet)
 	}
 	var out scopedPredicateHitSet
 	for _, nodeType := range nodeTypes {
@@ -919,7 +912,7 @@ func (idx *flagMatchIndex) scopedPredicateHits(s usg.Store, kind string, pred fl
 		}
 	}
 	sort.Strings(out.scopes)
-	idx.predHitSets[key] = out
+	idx.predHitSets.Store(key, out)
 	return out
 }
 
@@ -959,10 +952,10 @@ func flagPredicateCacheKey(pred flagPredicate) string {
 }
 
 func (idx *flowTokenIndex) ensure(s usg.Store) {
-	if idx.built {
-		return
-	}
-	idx.built = true
+	idx.once.Do(func() { idx.build(s) })
+}
+
+func (idx *flowTokenIndex) build(s usg.Store) {
 	idx.rev = map[string][]string{}
 	idx.fwd = map[string][]string{}
 	rangeNodes(s, func(n usg.Node) bool {
@@ -4450,14 +4443,14 @@ func flagScopeCallArgHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n
 func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, tech string, crossLang bool) string {
 	idx.ensure(s)
 	cacheKey := strings.Join([]string{n.ID, tech, strconv.FormatBool(crossLang)}, "\x1f")
-	if cached, ok := idx.callArgText[cacheKey]; ok {
-		return cached
+	if cached, ok := idx.callArgText.Load(cacheKey); ok {
+		return cached.(string)
 	}
 	tokens := callArgContextTokens(n)
 	path := n.Prop("callee_path")
 	method := n.Prop("method")
 	if path == "" && method == "" {
-		idx.callArgText[cacheKey] = tokens
+		idx.callArgText.Store(cacheKey, tokens)
 		return tokens
 	}
 	var out []string
@@ -4511,7 +4504,7 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 		return true
 	})
 	result := strings.Join(out, "\x00")
-	idx.callArgText[cacheKey] = result
+	idx.callArgText.Store(cacheKey, result)
 	return result
 }
 
