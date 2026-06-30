@@ -389,6 +389,15 @@ func (idx *flagMatchIndex) techNodes(s usg.Store, tech string, crossLang bool, t
 	return out
 }
 
+func (idx *flagMatchIndex) rangeTechNodes(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
+	idx.ensure(s)
+	for _, t := range types {
+		if !idx.rangeNodesOfTechType(s, tech, t, crossLang, fn) {
+			return
+		}
+	}
+}
+
 func (idx *flagMatchIndex) nodesOfTechType(s usg.Store, tech, nodeType string, crossLang bool) []usg.Node {
 	idx.ensure(s)
 	if crossLang || tech == "" {
@@ -403,6 +412,29 @@ func (idx *flagMatchIndex) nodesOfTechType(s usg.Store, tech, nodeType string, c
 	out = append(out, own...)
 	out = append(out, unknown...)
 	return out
+}
+
+func (idx *flagMatchIndex) rangeNodesOfTechType(s usg.Store, tech, nodeType string, crossLang bool, fn func(usg.Node) bool) bool {
+	idx.ensure(s)
+	if crossLang || tech == "" {
+		for _, n := range idx.types[nodeType] {
+			if !fn(n) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, n := range idx.typesByTech[tech][nodeType] {
+		if !fn(n) {
+			return false
+		}
+	}
+	for _, n := range idx.typesByTech[""][nodeType] {
+		if !fn(n) {
+			return false
+		}
+	}
+	return true
 }
 
 type scopeHitCount struct {
@@ -801,11 +833,7 @@ var callablePropTypes = []string{
 // unknown-technology nodes), or all nodes for a cross-language binding — so a language applicator
 // visits only its own nodes instead of scanning every callable node and skipping by technology.
 func rangeTechCallablePropNodes(idx *flagMatchIndex, s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool) {
-	for _, n := range idx.techNodes(s, tech, crossLang, callablePropTypes...) {
-		if !fn(n) {
-			return
-		}
-	}
+	idx.rangeTechNodes(s, tech, crossLang, fn, callablePropTypes...)
 }
 
 func rangeCallablePropNodes(s usg.Store, fn func(usg.Node) bool) {
@@ -1234,7 +1262,7 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 			}
 			var out []bindings.Mapping
 			scopeIdx := sharedFlagIndex(s)
-			for _, n := range scopeIdx.techNodes(s, spec.Technology, spec.crossLang, "code.Call") {
+			scopeIdx.rangeTechNodes(s, spec.Technology, spec.crossLang, func(n usg.Node) bool {
 				id := n.ID
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				for ai, as := range spec.AdvisoryNeutralizers {
@@ -1265,7 +1293,8 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 						Fidelity: mappingFidelity(as.Fidelity, "syntactic"), Confidence: conf, Detail: detail})
 					break
 				}
-			}
+				return true
+			}, "code.Call")
 			return out
 		},
 	}
@@ -1293,7 +1322,7 @@ func (spec bindingSpec) filterApplicator() bindings.Applicator {
 				allowed[i] = reqGate.allowed(spec.Filters[i].Packages, spec.Filters[i].Requirement)
 			}
 			var out []bindings.Mapping
-			for _, n := range sharedFlagIndex(s).techNodes(s, spec.Technology, false, "code.Call") {
+			sharedFlagIndex(s).rangeTechNodes(s, spec.Technology, false, func(n usg.Node) bool {
 				id := n.ID
 				method, path := n.Prop("method"), n.Prop("callee_path")
 				matched, global := false, false
@@ -1308,7 +1337,7 @@ func (spec bindingSpec) filterApplicator() bindings.Applicator {
 					}
 				}
 				if !matched {
-					continue
+					return true
 				}
 				pattern, repl := n.Prop("lit0"), n.Prop("lit1")
 				alphabet, bounded, removed := replaceCharEffects(pattern, repl, global)
@@ -1321,7 +1350,8 @@ func (spec bindingSpec) filterApplicator() bindings.Applicator {
 					detail["removed"] = removed
 				}
 				out = append(out, bindings.Mapping{NodeID: id, Concept: concept, Detail: detail})
-			}
+				return true
+			}, "code.Call")
 			return out
 		},
 	}
@@ -1877,7 +1907,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 			flowIdx := sharedFlowIndex(s)
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
-			for _, n := range scopeIdx.techNodes(s, spec.Technology, false, "code.Call", "code.Attr", "code.BinOp") {
+			scopeIdx.rangeTechNodes(s, spec.Technology, false, func(n usg.Node) bool {
 				id := n.ID
 				isAttr := n.Type == "code.Attr"
 				method, path, recvType := n.Prop("method"), n.Prop("callee_path"), n.Prop("recv_type")
@@ -2041,7 +2071,8 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 					conf, detail = effects[i].apply(conf, detail)
 					out = append(out, bindings.Mapping{NodeID: target, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, fidelity), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 				}
-			}
+				return true
+			}, "code.Call", "code.Attr", "code.BinOp")
 			return out
 		},
 	}
@@ -2077,7 +2108,7 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 			var out []bindings.Mapping
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
-			for _, n := range scopeIdx.techNodes(s, spec.Technology, false, "code.Call") {
+			scopeIdx.rangeTechNodes(s, spec.Technology, false, func(n usg.Node) bool {
 				id := n.ID
 				path, method := n.Prop("callee_path"), n.Prop("method")
 				for _, ci := range ctrlIdx.candidates(method, path) {
@@ -2117,7 +2148,8 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 						out = append(out, bindings.Mapping{NodeID: nodeID, Concept: c.Concept, Fidelity: mappingFidelity(c.Fidelity, "resolved"), Confidence: conf, Specificity: spec, Detail: detail})
 					}
 				}
-			}
+				return true
+			}, "code.Call")
 			return out
 		},
 	}
@@ -3020,7 +3052,7 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 			}
 			nodeTypes := flagApplicatorNodeTypes(spec.Flags, spec.crossLang)
 			for _, nodeType := range nodeTypes {
-				for _, n := range matchIdx.nodesOfTechType(s, spec.Technology, nodeType, spec.crossLang) {
+				matchIdx.rangeNodesOfTechType(s, spec.Technology, nodeType, spec.crossLang, func(n usg.Node) bool {
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
 						if !effects[i].Allowed {
 							continue
@@ -3055,7 +3087,8 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 						}
 						out = append(out, bindings.Mapping{NodeID: n.ID, Concept: fl.Concept, Fidelity: mappingFidelity(fl.Fidelity, "resolved"), Confidence: conf, Specificity: specificity, Detail: detail})
 					}
-				}
+					return true
+				})
 			}
 			if flagTimingOn {
 				printPresenceFlagTiming(spec.Name+".flags", spec.Flags, flagStats)
@@ -4426,7 +4459,7 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 			var collectionIdx collectionFlowIndex
 			scopeIdx := sharedFlagIndex(s)
 			for _, nodeType := range nodeTypes {
-				for _, n := range scopeIdx.nodesOfTechType(s, spec.Technology, nodeType, crossLang) {
+				scopeIdx.rangeNodesOfTechType(s, spec.Technology, nodeType, crossLang, func(n usg.Node) bool {
 					path := n.Prop("callee_path")
 					method := n.Prop("method")
 					seenMapping := map[string]bool{}
@@ -4469,7 +4502,8 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 							seenMapping[key] = true
 						}
 					}
-				}
+					return true
+				})
 			}
 			return out
 		},

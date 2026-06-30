@@ -151,8 +151,7 @@ func (c *ccConv) ccOcppSharedMapRaceObservations(root *tree_sitter.Node) []nir.S
 		return nil
 	}
 	text := compactCExprText(c.text(root))
-	mapRe := regexp.MustCompile(`std::map<[^>]+>[A-Za-z_][A-Za-z0-9_]*`)
-	if !mapRe.MatchString(text) || !strings.Contains(text, "update_evcc_id_token(") {
+	if !ccOcppStdMapRe.MatchString(text) || !strings.Contains(text, "update_evcc_id_token(") {
 		return nil
 	}
 	if strings.Contains(text, "monitor<std::map") || strings.Contains(text, ".handle()") || strings.Contains(text, "->handle()") {
@@ -174,9 +173,26 @@ func (c *ccConv) ccOcppSharedMapRaceObservations(root *tree_sitter.Node) []nir.S
 }
 
 var (
-	ccNewAssignRe = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
-	ccDeleteRe    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
-	ccReallocRe   = regexp.MustCompile(`\brealloc\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,`)
+	ccNewAssignRe                 = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\b`)
+	ccDeleteRe                    = regexp.MustCompile(`delete\s*(?:\[\]\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*;`)
+	ccReallocRe                   = regexp.MustCompile(`\brealloc\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,`)
+	ccOcppStdMapRe                = regexp.MustCompile(`std::map<[^>]+>[A-Za-z_][A-Za-z0-9_]*`)
+	ccEscapedTerminatorDecodeRe   = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=[A-Za-z_][A-Za-z0-9_\.]*\(\*\(?([A-Za-z_][A-Za-z0-9_]*)\)?\+\+\)`)
+	ccFragmentOffsetCopyRe        = regexp.MustCompile(`memcpy\([^,]*\+\([^)]*\)\(([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*)<<3\),(?:\([^)]*\))?([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*),([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*)\)`)
+	ccFilesystemImageDirentCopyRe = regexp.MustCompile(`memcpy\(([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*),romfs_read\([^)]+\),([A-Za-z_][A-Za-z0-9_]*)\)`)
+	ccConditionalFallbackParseRe  = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=CommandLineParseCommaSeparatedValuesEx\(`)
+	ccLengthDerivedHeaderRe       = regexp.MustCompile(`read_and_decode_block_header\([^;{}]*&([A-Za-z_][A-Za-z0-9_]*)\)`)
+	ccRemoteListingSlashCheckRe   = regexp.MustCompile(`strchr\(([A-Za-z_][A-Za-z0-9_]*),'/\'\)!=NULL`)
+	ccFat12OffsetRe               = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\*3/2`)
+	ccCgifFrameLoopRe             = regexp.MustCompile(`for\(([^;]*);([^;]*[A-Za-z_][A-Za-z0-9_]*(?:->|\.)config\.width\*[A-Za-z_][A-Za-z0-9_]*(?:->|\.)config\.height[^;]*);`)
+	ccCompressedCapacityRe        = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*)>([A-Za-z_][A-Za-z0-9_]*)`)
+	ccAccumulatedAllocationRe     = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+=\*([A-Za-z_][A-Za-z0-9_]*)`)
+	ccParsedUserDefaultRootRe     = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=strtoll\([^,]+,&([A-Za-z_][A-Za-z0-9_]*),10\)`)
+	ccAssignedToIndexRe           = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=[^;{}]*toIndex\(`)
+	ccAssignedMaxByteLengthRe     = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=[^;{}]*maxByteLength\(`)
+	ccAssignedCallResultRePrefix  = `\b([A-Za-z_][A-Za-z0-9_]*)=[^;{}]*`
+	ccBackwardHeaderWriteRe       = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*\([^,]+-\d+,-[A-Za-z_][A-Za-z0-9_]*\)`)
+	ccOldStyleFunctionDefRe       = regexp.MustCompile(`(?ms)^[A-Za-z_][A-Za-z0-9_]*\s*\([^;{}]*\)\s*(?:[^{};]+;\s*)*\{`)
 )
 
 func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []nir.Stmt {
@@ -2468,8 +2484,7 @@ func (c *ccConv) ccEscapedTerminatorWriteObservations(fn *tree_sitter.Node) []ni
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	decodeRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=[A-Za-z_][A-Za-z0-9_\.]*\(\*\(?([A-Za-z_][A-Za-z0-9_]*)\)?\+\+\)`)
-	for _, m := range decodeRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccEscapedTerminatorDecodeRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
 		}
@@ -2514,8 +2529,7 @@ func (c *ccConv) ccUnboundedAccumulatedAllocationObservations(fn *tree_sitter.No
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	accumRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+=\*([A-Za-z_][A-Za-z0-9_]*)`)
-	for _, m := range accumRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccAccumulatedAllocationRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
 		}
@@ -2587,8 +2601,7 @@ func (c *ccConv) ccCompressedBlockCapacityObservations(fn *tree_sitter.Node) []n
 	if !ccHasBackwardHeaderWrite(text) {
 		return nil
 	}
-	capRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*)>([A-Za-z_][A-Za-z0-9_]*)`)
-	for _, m := range capRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccCompressedCapacityRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 8 {
 			continue
 		}
@@ -2628,8 +2641,7 @@ func (c *ccConv) ccFragmentOffsetCopyObservations(fn *tree_sitter.Node) []nir.St
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	copyRe := regexp.MustCompile(`memcpy\([^,]*\+\([^)]*\)\(([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*)<<3\),(?:\([^)]*\))?([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*),([A-Za-z_][A-Za-z0-9_]*\[[^]]+\]\.[A-Za-z_][A-Za-z0-9_]*)\)`)
-	for _, m := range copyRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccFragmentOffsetCopyRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 8 {
 			continue
 		}
@@ -2855,8 +2867,7 @@ func (c *ccConv) ccParsedUserDefaultRootObservations(fn *tree_sitter.Node) []nir
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	parseRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=strtoll\([^,]+,&([A-Za-z_][A-Za-z0-9_]*),10\)`)
-	for _, m := range parseRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccParsedUserDefaultRootRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 6 {
 			continue
 		}
@@ -2937,8 +2948,7 @@ func (c *ccConv) ccConditionalFallbackDoubleFreeObservations(fn *tree_sitter.Nod
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	parseRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=CommandLineParseCommaSeparatedValuesEx\(`)
-	for _, m := range parseRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccConditionalFallbackParseRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
 		}
@@ -3065,8 +3075,7 @@ func (c *ccConv) ccOldStyleRemoteListingDownloadPathObservations(root *tree_sitt
 }
 
 func ccRemoteListingDownloadPathMatch(text string) (int, bool) {
-	checkRe := regexp.MustCompile(`strchr\(([A-Za-z_][A-Za-z0-9_]*),'/\'\)!=NULL`)
-	for _, m := range checkRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccRemoteListingSlashCheckRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
 		}
@@ -3101,7 +3110,7 @@ func ccRemoteListingDownloadPathStmt(loc string) nir.Stmt {
 }
 
 func ccHasOldStyleFunctionDefinition(raw string) bool {
-	return regexp.MustCompile(`(?ms)^[A-Za-z_][A-Za-z0-9_]*\s*\([^;{}]*\)\s*(?:[^{};]+;\s*)*\{`).MatchString(raw)
+	return ccOldStyleFunctionDefRe.MatchString(raw)
 }
 
 func (c *ccConv) ccFat12SuccessorBoundsObservations(fn *tree_sitter.Node) []nir.Stmt {
@@ -3110,8 +3119,7 @@ func (c *ccConv) ccFat12SuccessorBoundsObservations(fn *tree_sitter.Node) []nir.
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	offRe := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\*3/2`)
-	for _, m := range offRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccFat12OffsetRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
 		}
@@ -3200,8 +3208,7 @@ func (c *ccConv) ccLengthDerivedAllocationObservations(fn *tree_sitter.Node) []n
 }
 
 func ccLengthDerivedAllocationBeforeFileBound(text string) bool {
-	headerRe := regexp.MustCompile(`read_and_decode_block_header\([^;{}]*&([A-Za-z_][A-Za-z0-9_]*)\)`)
-	for _, m := range headerRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccLengthDerivedHeaderRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 4 {
 			continue
 		}
@@ -3282,8 +3289,7 @@ func (c *ccConv) ccCgifSignedFrameCountObservations(fn *tree_sitter.Node) []nir.
 	if !strings.Contains(text, "cmpPixel(") || !strings.Contains(text, "pImageData[") {
 		return nil
 	}
-	loopRe := regexp.MustCompile(`for\(([^;]*);([^;]*[A-Za-z_][A-Za-z0-9_]*(?:->|\.)config\.width\*[A-Za-z_][A-Za-z0-9_]*(?:->|\.)config\.height[^;]*);`)
-	if !loopRe.MatchString(text) {
+	if !ccCgifFrameLoopRe.MatchString(text) {
 		return nil
 	}
 	if regexp.MustCompile(`for\([^;]*;[^;]*MULU16\([^)]*\.config\.width[^)]*\.config\.height[^)]*\)`).MatchString(text) {
@@ -3359,8 +3365,7 @@ func (c *ccConv) ccFilesystemImageDirentTraversalObservations(fn *tree_sitter.No
 		return nil
 	}
 	text := compactCExprText(c.text(body))
-	copyRe := regexp.MustCompile(`memcpy\(([A-Za-z_][A-Za-z0-9_]*)\+([A-Za-z_][A-Za-z0-9_]*),romfs_read\([^)]+\),([A-Za-z_][A-Za-z0-9_]*)\)`)
-	for _, m := range copyRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range ccFilesystemImageDirentCopyRe.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) < 8 {
 			continue
 		}
@@ -4296,7 +4301,13 @@ func ccHasAccumulatedAllocationGuard(text, total, elem string) bool {
 
 func ccAssignedCallResultVars(text, callName string) map[string]bool {
 	out := map[string]bool{}
-	re := regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)=[^;{}]*` + regexp.QuoteMeta(callName) + `\(`)
+	re := regexp.MustCompile(ccAssignedCallResultRePrefix + regexp.QuoteMeta(callName) + `\(`)
+	switch callName {
+	case "toIndex":
+		re = ccAssignedToIndexRe
+	case "maxByteLength":
+		re = ccAssignedMaxByteLengthRe
+	}
 	for _, m := range re.FindAllStringSubmatchIndex(text, -1) {
 		if len(m) >= 4 {
 			out[text[m[2]:m[3]]] = true
@@ -4325,7 +4336,7 @@ func ccHasMaxLengthGuard(text, lengthVar, maxVar string) bool {
 }
 
 func ccHasBackwardHeaderWrite(text string) bool {
-	return regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*\([^,]+-\d+,-[A-Za-z_][A-Za-z0-9_]*\)`).MatchString(text)
+	return ccBackwardHeaderWriteRe.MatchString(text)
 }
 
 func ccHasClampAssignment(text, target, capacity, written string) bool {
@@ -4564,8 +4575,10 @@ func ccIdentifierLike(s string) bool {
 	return s[0] == '_' || s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z'
 }
 
+var cWhitespaceReplacer = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+
 func compactCExprText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return cWhitespaceReplacer.Replace(s)
 }
 
 func (c *ccConv) unaryOp(n *tree_sitter.Node) string {

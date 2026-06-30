@@ -128,6 +128,8 @@ func cmdScan(args []string) error {
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
+	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
+	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	_ = fs.Parse(args)
 	paths := fs.Args()
 	if len(paths) == 0 {
@@ -136,6 +138,8 @@ func cmdScan(args []string) error {
 	}
 	cleanup := applyMaxRAM(*maxRAM)
 	defer cleanup()
+	cacheCleanup := applyScanCache(*cacheDir)
+	defer cacheCleanup()
 	oldOverlay := scanBindingOverlay
 	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
 	defer func() { scanBindingOverlay = oldOverlay }()
@@ -146,7 +150,36 @@ func cmdScan(args []string) error {
 		FlagCategory: *flagCategory,
 		FlagKind:     *flagKind,
 		FlagLoc:      *flagLoc,
+		GraphCache:   *incrementalCache,
 	})
+}
+
+func applyScanCache(v string) func() {
+	v = strings.TrimSpace(v)
+	if v == "" || v == "auto" {
+		base, err := os.UserCacheDir()
+		if err != nil || base == "" {
+			base = filepath.Join(os.TempDir(), "vyql-cache")
+		}
+		v = filepath.Join(base, "vyql", "scan-cache")
+	}
+	if v == "off" || v == "none" || v == "false" {
+		return func() {}
+	}
+	if err := os.MkdirAll(v, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: scan cache disabled: %v\n", err)
+		return func() {}
+	}
+	cache, err := parsecache.Open(v)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "vyql: scan cache disabled: %v\n", err)
+		return func() {}
+	}
+	restore := parsecache.SetShared(cache)
+	return func() {
+		restore()
+		_ = cache.Close()
+	}
 }
 
 // applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
@@ -348,6 +381,7 @@ type scanRunOptions struct {
 	FlagCategory string
 	FlagKind     string
 	FlagLoc      string
+	GraphCache   bool
 }
 
 func (o scanRunOptions) wantsFlags() bool {
@@ -386,7 +420,15 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	tk.mark("fingerprint")
 	if !hit {
-		all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
+		if cache != nil && !opts.GraphCache {
+			func() {
+				restore := parsecache.SetShared(nil)
+				defer restore()
+				all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
+			}()
+		} else {
+			all, stats, graph, err = scanPathsWithProfile(paths, ruleSources, prof.Name)
+		}
 		if err != nil {
 			return err
 		}
