@@ -885,6 +885,84 @@ function fixedAjax(nextHref, done) {
 	}
 }
 
+func TestJavaScriptModuleContextMarksCryptoJSRandomFloatWordArrayRisk(t *testing.T) {
+	dir := t.TempDir()
+	vulnerable := filepath.Join(dir, "vulnerable.js")
+	fixed := filepath.Join(dir, "fixed.js")
+	vulnerableSrc := []byte(`
+var CryptoJS = CryptoJS || (function () {
+  var nativeWordFraction = function () {
+    var nativeCrypto = global.crypto;
+    return Number('0.' + nativeCrypto.randomBytes(3).readUIntBE(0, 3));
+  };
+  var WordArray = {
+    random: function (nBytes) {
+      var words = [];
+      for (var i = 0; i < nBytes; i += 4) {
+        words.push((nativeWordFraction() * 0x100000000) | 0);
+      }
+      return words;
+    }
+  };
+}());
+`)
+	fixedSrc := []byte(`
+var CryptoJS = CryptoJS || (function () {
+  var nativeWordInt = function () {
+    var nativeCrypto = global.crypto || require('crypto');
+    return nativeCrypto.randomBytes(4).readInt32LE();
+  };
+  var WordArray = {
+    random: function (nBytes) {
+      var words = [];
+      for (var i = 0; i < nBytes; i += 4) {
+        words.push(nativeWordInt());
+      }
+      return words;
+    }
+  };
+}());
+`)
+	if err := os.WriteFile(vulnerable, vulnerableSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{vulnerable, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(n.Prop("loc"), "vulnerable.js") && strings.Contains(tokens, "cryptojs_random_float_wordarray_risk=true") {
+			sawVulnerable = true
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.js") && strings.Contains(tokens, "cryptojs_random_float_wordarray_risk=true") {
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable {
+		t.Fatalf("module context did not mark CryptoJS random float WordArray risk; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("module context marked direct native random int generation as vulnerable; nodes=%#v", nodes)
+	}
+}
+
 func TestJavaScriptTemplateFormatCarriesStaticText(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "clone.js")

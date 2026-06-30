@@ -1941,6 +1941,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "incomplete_generated_js_identifier_reserved_words="
 	case "ajaxBackslashProtocolRelativeUrlXss":
 		return "ajax_backslash_protocol_relative_url_xss="
+	case "cryptoJsRandomFloatWordArrayRisk":
+		return "cryptojs_random_float_wordarray_risk="
 	case "return":
 		return "return:"
 	case "returnCallPath":

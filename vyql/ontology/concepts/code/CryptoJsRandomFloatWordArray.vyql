@@ -1,0 +1,11 @@
+module code;
+
+concept CryptoJsRandomFloatWordArray : issue {
+  cwe: [CWE_330, CWE_331]
+  reviewAssumption: "the generated WordArray bytes are used as cryptographic random material"
+  reviewCategory: crypto
+  reviewCondition: "native random bytes are converted through a decimal floating-point string before being scaled into 32-bit words"
+  reviewConfidence: high
+  reviewEvidence: "CryptoJS-style WordArray.random context {pattern} uses Number(\"0.\" + native random bytes) and multiplies by 0x100000000 before words.push"
+  vulnerableTo: [crypto.InsufficientEntropy]
+}

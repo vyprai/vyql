@@ -470,6 +470,9 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	if jsAjaxBackslashProtocolRelativeURLXSS(c.text(root)) {
 		add("ajax_backslash_protocol_relative_url_xss=true")
 	}
+	if jsCryptoJSRandomFloatWordArrayRisk(c.text(root)) {
+		add("cryptojs_random_float_wordarray_risk=true")
+	}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
 		if n == nil || len(out) >= 512 {
@@ -646,6 +649,22 @@ func jsAjaxBackslashProtocolRelativeURLXSS(text string) bool {
 	secondSlashGuard := strings.Contains(compact, "[1]=='/'") || strings.Contains(compact, "[1]==\"/\"") ||
 		strings.Contains(compact, "[1]==='/'") || strings.Contains(compact, "[1]===\"/\"")
 	return firstSlashGuard && secondSlashGuard
+}
+
+func jsCryptoJSRandomFloatWordArrayRisk(text string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(text)), "")
+	if !strings.Contains(compact, "words.push(") ||
+		!(strings.Contains(compact, "*0x100000000") || strings.Contains(compact, "*4294967296")) {
+		return false
+	}
+	hasNativeRandom := strings.Contains(compact, ".randomBytes(") ||
+		strings.Contains(compact, ".getRandomValues(")
+	hasFloatConversion := strings.Contains(compact, "Number('0.'+") ||
+		strings.Contains(compact, "Number(\"0.\"+")
+	hasNativeRandomRead := strings.Contains(compact, ".readUIntBE(") ||
+		strings.Contains(compact, ".readUIntLE(") ||
+		strings.Contains(compact, ".getRandomValues(")
+	return hasNativeRandom && hasFloatConversion && hasNativeRandomRead
 }
 
 func (c *jsConv) jsIncompleteGeneratedIdentifierReservedWords(root *tree_sitter.Node) bool {
