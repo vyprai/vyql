@@ -21,6 +21,7 @@ var manifestParsers = []struct {
 	{"setup.py", "pypi", sca.ParseSetupPy},
 	{"setup.cfg", "pypi", sca.ParseSetupCfg},
 	{"package.json", "npm", sca.ParsePackageJSON},
+	{".npmrc", "npm", sca.ParseNpmrc},
 	{"composer.lock", "php", sca.ParseComposerLock},
 	{"go.mod", "go", sca.ParseGoMod},
 	{"cargo.lock", "git", sca.ParseCargoLockGit},

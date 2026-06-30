@@ -386,6 +386,48 @@ func ParsePackageJSON(content string) []Dep {
 	return out
 }
 
+// ParseNpmrc reads project-local npm runtime pins. Legacy Electron applications
+// often record the executable runtime in .npmrc rather than package.json; when
+// runtime=electron is present, the Brave Electron runtime version is dependency
+// evidence for SCA advisories.
+func ParseNpmrc(content string) []Dep {
+	values := map[string]string{}
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(stripHashComment(raw))
+		if line == "" || strings.HasPrefix(line, ";") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		values[key] = value
+	}
+	if !strings.EqualFold(values["runtime"], "electron") {
+		return nil
+	}
+	version := values["brave_electron_version"]
+	if version == "" {
+		version = values["target"]
+	}
+	if version == "" {
+		return nil
+	}
+	return []Dep{{Name: "brave/electron", Version: version}}
+}
+
+func stripHashComment(line string) string {
+	if i := strings.Index(line, "#"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
 // ParseComposerLock reads package pins from Composer's lockfile. It uses the
 // resolved package versions rather than composer.json constraints so advisory
 // matching sees the exact installed PHP package revision.

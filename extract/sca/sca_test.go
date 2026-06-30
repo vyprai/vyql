@@ -118,6 +118,36 @@ func TestParseVendoredJSTinyMCEBanner(t *testing.T) {
 	}
 }
 
+func TestParseNpmrcBraveElectronRuntime(t *testing.T) {
+	got := ParseNpmrc(`runtime = electron
+target = 1.4.0
+target_arch = x64
+brave_electron_version = 1.4.18
+disturl = https://atom.io/download/atom-shell
+`)
+	want := []Dep{{"brave/electron", "1.4.18"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseNpmrc() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseNpmrcElectronTargetFallback(t *testing.T) {
+	got := ParseNpmrc(`runtime = electron
+target = 1.4.20
+target_arch = x64
+`)
+	want := []Dep{{"brave/electron", "1.4.20"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseNpmrc() = %+v, want %+v", got, want)
+	}
+}
+
+func TestParseNpmrcIgnoresNonElectronRuntime(t *testing.T) {
+	if got := ParseNpmrc("runtime = node\ntarget = 20.0.0\n"); len(got) != 0 {
+		t.Fatalf("non-electron .npmrc should not emit deps, got %+v", got)
+	}
+}
+
 func TestParseComposerLockPackages(t *testing.T) {
 	got := ParseComposerLock(`{
   "packages": [

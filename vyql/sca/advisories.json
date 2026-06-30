@@ -8,6 +8,7 @@
     "requests": [{"version": "*", "id": "CVE-2023-48052", "cwe": ["CWE-295"], "max_safe": "2.31.0"}]
   },
   "npm": {
+    "brave/electron": [{"version": "*", "id": "CVE-2016-10718", "cwe": ["CWE-20"], "min_safe": "1.4.20"}],
     "lodash": [{"version": "4.17.4", "id": "CVE-2019-10744"}],
     "minimist": [{"version": "1.2.0", "id": "CVE-2020-7598"}],
     "tinymce": [{"version": "*", "id": "CVE-2024-21910", "cwe": ["CWE-79"], "min_safe": "5.10.0"}]
