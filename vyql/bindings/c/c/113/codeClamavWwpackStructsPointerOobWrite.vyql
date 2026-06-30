@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding clamavWwpackStructsPointerOobWrite113 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "wwunpack" and node.token contains "cli_writeint32" and node.token contains "cli_readint32" and not (node.token contains "CLI_ISCONTAINED")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "struct_pointer.oob_write"
   emit issue code.ClamavWwpackStructsPointerOobWrite at node
 }

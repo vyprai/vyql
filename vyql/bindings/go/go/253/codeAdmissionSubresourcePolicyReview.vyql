@@ -1,6 +1,6 @@
 module bindings.go.generated.m48a985c1;
 
 binding admissionSubresourcePolicyReview253 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "shouldIgnore" and node.context.call contains "GetSubresource" and not (node.token contains "ignoredSubresources")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "shouldIgnore" and node.context.call contains "GetSubresource" and not (node.context.identifier contains "ignoredSubresources")
   emit issue code.AdmissionSubresourcePolicyReview at node
 }

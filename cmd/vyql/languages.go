@@ -138,11 +138,34 @@ func filterEntriesForLanguage(entries []treesitter.Entry, lg language) []string 
 			}
 			continue
 		}
+		if lg.name == "python" && e.Ext == "" && fileHasPythonShebang(e.Path) {
+			out = append(out, e.Path)
+			continue
+		}
 		if lg.exts[e.Ext] || lg.exts[e.Base] {
 			out = append(out, e.Path)
 		}
 	}
 	return out
+}
+
+func fileHasPythonShebang(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	buf := make([]byte, 160)
+	n, err := f.Read(buf)
+	if err != nil && n == 0 {
+		return false
+	}
+	first := string(buf[:n])
+	if i := strings.IndexByte(first, '\n'); i >= 0 {
+		first = first[:i]
+	}
+	first = strings.ToLower(strings.TrimSpace(first))
+	return strings.HasPrefix(first, "#!") && strings.Contains(first, "python")
 }
 
 func headerLooksCPP(path string) bool {

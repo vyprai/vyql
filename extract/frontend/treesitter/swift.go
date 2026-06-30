@@ -58,6 +58,9 @@ func (c *swConv) swModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	for _, tok := range c.swStructuredContextTokens(root) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
+	for _, tok := range c.swSemanticModuleTokens(text) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
 		Args:   args,
@@ -65,6 +68,34 @@ func (c *swConv) swModuleContext(root *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *swConv) swSemanticModuleTokens(text string) []string {
+	var out []string
+	add := func(tok string) {
+		for _, existing := range out {
+			if existing == tok {
+				return
+			}
+		}
+		out = append(out, tok)
+	}
+	if swHasClearancePolicyBeforeAdapterStart(text) {
+		add("startup_order:clearance_policy_before_adapter_start")
+	}
+	return out
+}
+
+func swHasClearancePolicyBeforeAdapterStart(text string) bool {
+	lastApply := -1
+	for _, method := range []string{"applyPolicyToFilter(", "applyAllowlistToFilter(", "applyJailRulesToFilter("} {
+		idx := strings.Index(text, method)
+		if idx < 0 {
+			return false
+		}
+		lastApply = max(lastApply, idx)
+	}
+	return strings.Contains(text[lastApply:], ".start(initialRules:")
 }
 
 func (c *swConv) swStructuredContextTokens(root *tree_sitter.Node) []string {

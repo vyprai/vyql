@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding jpegSubsamplingRatioValidationMissing144 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "stbi__process_frame_header" and node.token contains "if(z->img_comp[i].h>h_max)h_max=z->img_comp[i].h;" and node.token contains "if(z->img_comp[i].v>v_max)v_max=z->img_comp[i].v;" and node.token contains "z->img_comp[i].x=(s->img_x*z->img_comp[i].h+h_max-1)/h_max;" and node.token contains "z->img_comp[i].y=(s->img_y*z->img_comp[i].v+v_max-1)/v_max;" and node.token contains "stbi__malloc_mad2(z->img_comp[i].w2,z->img_comp[i].h2,15)" and not (node.token contains "h_max%z->img_comp[i].h") and not (node.token contains "v_max%z->img_comp[i].v")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "jpeg.subsampling_ratio_validation_missing"
   emit issue code.JpegSubsamplingRatioValidationMissing at node
 }

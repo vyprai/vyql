@@ -1,0 +1,8 @@
+# Rank 67 / CVE-2020-36248: ownCloud Android backup/restore exposure.
+
+test "rank67: backup-allowed Android config is a CVE anchor"
+  expect VYQL-MOB-006
+  graph
+  ```
+  node cfg code.BackupAllowedConfig
+  ```

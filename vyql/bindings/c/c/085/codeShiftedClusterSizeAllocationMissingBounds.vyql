@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding shiftedClusterSizeAllocationMissingBounds85 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "exfat_mount" and node.token contains "malloc(CLUSTER_SIZE(*ef->sb))" and node.token contains "verify_vbr_checksum(ef->dev,ef->zero_cluster,SECTOR_SIZE(*ef->sb))" and node.token contains "ef->sb->sector_bits" and node.token contains "ef->sb->spc_bits" and not (node.token contains "ef->sb->sector_bits<9")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "cluster.shifted_size_allocation"
   emit issue code.ShiftedClusterSizeAllocationMissingBounds at node
 }

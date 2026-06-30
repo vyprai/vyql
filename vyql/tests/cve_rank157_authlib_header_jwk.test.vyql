@@ -4,6 +4,7 @@
 
 test "rank157: python authlib JWS header jwk fallback requires crypto review"
   lang python
+  expect VYQL-CRY-027
   expect_review code.HeaderControlledJwkReview
   code
   ```
@@ -21,6 +22,7 @@ test "rank157: python authlib JWS header jwk fallback requires crypto review"
 
 test "rank157: python authlib JWS caller-supplied key only is clean"
   lang python
+  reject VYQL-CRY-027
   reject_review code.HeaderControlledJwkReview
   code
   ```
@@ -36,6 +38,7 @@ test "rank157: python authlib JWS caller-supplied key only is clean"
 
 test "rank157: python authlib JWE header jwk fallback requires crypto review"
   lang python
+  expect VYQL-CRY-027
   expect_review code.HeaderControlledJwkReview
   code
   ```
@@ -49,6 +52,7 @@ test "rank157: python authlib JWE header jwk fallback requires crypto review"
 
 test "rank157: python authlib JWE caller-supplied key only is clean"
   lang python
+  reject VYQL-CRY-027
   reject_review code.HeaderControlledJwkReview
   code
   ```

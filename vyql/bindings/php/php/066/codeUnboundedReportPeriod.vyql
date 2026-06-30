@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding unboundedReportPeriod66 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "CHttpRequest::get_Value('period')" and node.token contains "DateTimeUtil::getLastDaysIntervals($period)" and node.token contains "getStoredBytes" and node.token contains "getStoredFiles" and not (node.token contains "array_key_exists") and not (node.token contains "filter_var($period")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "unbounded_report_period"
   emit issue code.UnboundedReportPeriod at node
 }

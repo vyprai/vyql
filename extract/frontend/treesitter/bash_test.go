@@ -10,10 +10,10 @@ import (
 	"github.com/vyprai/vyql/extract/nir"
 )
 
-func TestBashModuleContextIncludesRawAndCompactText(t *testing.T) {
+func TestBashModuleContextIncludesRawCompactAndSemanticText(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hook.sh")
-	src := "#!/bin/bash\ninput=$(cat)\npython3 -c \"json.loads('''$input''')\"\n"
+	src := "#!/bin/bash\npayload=$(cat)\npython3 -c \"json.loads('''$payload''')\"\n"
 	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -45,11 +45,48 @@ func TestBashModuleContextIncludesRawAndCompactText(t *testing.T) {
 	joined := strings.Join(tokens, "\x00")
 	for _, want := range []string{
 		"lang=bash",
-		"input=$(cat)",
-		"python3-c\"json.loads('''$input''')\"",
+		"payload=$(cat)",
+		"python3-c\"json.loads('''$payload''')\"",
+		"shell_bridge:python_triple_quote_stdin_interpolation",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("module context missing %q in %q", want, joined)
+		}
+	}
+}
+
+func TestBashModuleContextDoesNotMarkEnvHeredocBridge(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hook.sh")
+	src := `#!/bin/bash
+CC_INPUT=$(cat)
+export CC_INPUT
+python3 <<'PYEOF'
+import json, os
+json.loads(os.environ.get('CC_INPUT') or '{}')
+PYEOF
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractBash([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range prog.Modules[0].Body {
+		es, ok := st.(nir.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := es.Value.(nir.Call)
+		if !ok || call.Path != "analysis.module.context" {
+			continue
+		}
+		for _, arg := range call.Args {
+			if c, ok := arg.(nir.Const); ok && c.Value == "shell_bridge:python_triple_quote_stdin_interpolation" {
+				t.Fatalf("env/heredoc bridge should not emit triple-quote interpolation token: %#v", call.Args)
+			}
 		}
 	}
 }

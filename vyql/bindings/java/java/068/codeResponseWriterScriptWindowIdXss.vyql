@@ -1,6 +1,6 @@
 module bindings.java.generated.m420f6b67;
 
 binding responseWriterScriptWindowIdXss68 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "encodeBegin" and node.context.callPath contains "writer.write" and node.token contains "dswh.init" and node.token contains "windowId" and not (node.context.callPath contains "writer.writeText")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "encodeBegin" and node.context.callPath contains "writer.write" and node.context.literal contains "dswh.init" and node.context.identifier contains "windowId" and not (node.context.callPath contains "writer.writeText")
   emit issue code.ResponseWriterScriptWindowIdXss at node
 }

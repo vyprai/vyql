@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding composerGitBranchDiffCommandInjection126 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "getUnpushedChanges" and node.token contains "gitdiff--name-status%s...%s--" and node.token contains "$remoteBranch" and node.token contains "$branch" and node.token contains "$this->process->execute($command" and not (node.token contains "$command=['git','diff','--name-status'")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "getUnpushedChanges" and node.context.phpReview == "composer_git_branch_diff_command_injection"
   emit issue code.ComposerGitBranchDiffCommandInjection at node
 }

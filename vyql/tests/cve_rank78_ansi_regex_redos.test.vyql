@@ -1,0 +1,8 @@
+# Rank 78 / CVE-2021-3807: ansi-regex catastrophic regex.
+
+test "rank78: catastrophic regex is a CVE anchor"
+  expect VYQL-DOS-003
+  graph
+  ```
+  node regex code.CatastrophicRegex
+  ```

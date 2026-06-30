@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding jwtUnverified651 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "jwt.sign" and node.token contains "algorithm=none"
+  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "jwt.sign" and node.context.prop contains "algorithm=none"
   emit issue code.JwtUnverified at node
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding convertSvgMultiSvgSanitizerBypass304 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "cheerio.default.html" and node.token contains "this[_sanitize]" and node.token contains "cheerio.load(input,null,false)('svg')" and node.token contains "<body>${svg}</body>" and node.token contains "this[_getPage](html)" and not (node.token contains "cheerio.load(input,null,false)('svg:first')")
+  query pattern presenceNode where node.path == "analysis.function.context" and node.context.convertSvgMultiSvgSanitizerBypass == "true"
   emit issue code.ConvertSvgMultiSvgSanitizerBypass at node
 }

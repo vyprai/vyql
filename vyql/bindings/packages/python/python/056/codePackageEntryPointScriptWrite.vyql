@@ -4,6 +4,6 @@ binding packageEntryPointScriptWrite56 {
   requires {
     dependency("pip")
   }
-  query pattern presenceNode where node.scope == "function" and node.token contains "PipScriptMaker" and node.token contains "super().make" and node.token contains "_raise_for_invalid_entrypoint(specification)" and not (node.token contains "self.target_dir")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "make" and node.context.className contains "PipScriptMaker" and node.context.classBase contains "ScriptMaker" and node.context.callPath contains "_raise_for_invalid_entrypoint" and node.context.callPath contains "super.make" and not (node.context.selector contains "self.target_dir")
   emit issue code.PackageEntryPointScriptWrite at node
 }

@@ -79,3 +79,38 @@ test "rank545: crun user parser assigns parsed uid before bare uid return"
     return u;
   }
   ```
+
+test "rank545: parsed user default-root return generalizes across names"
+  lang c
+  file exec.c
+  expect VYQL-AUTH-031
+  expect_review code.ParsedUserIdDefaultRootPrivilegeEscalation
+  code
+  ```
+  typedef struct {
+    int uid;
+    int gid;
+  } process_user;
+
+  extern void *xmalloc0(unsigned long size);
+  extern long long strtoll(const char *nptr, char **endptr, int base);
+
+  static process_user *build_user(const char *spec)
+  {
+    process_user *account;
+    char *tail = 0;
+    long long parsed;
+
+    account = xmalloc0(sizeof(process_user));
+    parsed = strtoll(spec, &tail, 10);
+    if (*tail == '\0')
+      return account;
+    if (*tail != ':')
+      return 0;
+
+    account->uid = (int) parsed;
+    parsed = strtoll(tail + 1, &tail, 10);
+    account->gid = (int) parsed;
+    return account;
+  }
+  ```

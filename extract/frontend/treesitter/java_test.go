@@ -346,6 +346,45 @@ func TestJavaFunctionContextIncludesCallOrderTokens(t *testing.T) {
 	t.Fatalf("doFilter context did not include expected call order tokens: %#v", contexts)
 }
 
+func TestJavaFunctionContextIncludesLdapCrlCredentialReuseTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "LdaptiveResourceCRLFetcher.java")
+	src := []byte(`import org.ldaptive.ConnectionConfig;
+import org.ldaptive.ConnectionFactory;
+import org.ldaptive.DefaultConnectionFactory;
+
+class LdaptiveResourceCRLFetcher {
+  private final ConnectionConfig connectionConfig = new ConnectionConfig();
+
+  protected ConnectionFactory prepareConnectionFactory(final String ldapURL) {
+    val copiedConfig = ConnectionConfig.copy(this.connectionConfig);
+    copiedConfig.setLdapUrl(ldapURL);
+    return new DefaultConnectionFactory(copiedConfig);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := javaFunctionContextTokens(prog.Modules[0].Body, "prepareConnectionFactory")
+	for _, want := range []string{
+		"function_name:prepareConnectionFactory",
+		"call_path:ConnectionConfig.copy",
+		"call:setLdapUrl",
+		"call:DefaultConnectionFactory",
+	} {
+		if !javaTokenListContains(tokens, want) {
+			t.Fatalf("prepareConnectionFactory context missing %q: %#v", want, tokens)
+		}
+	}
+	if javaTokenListContains(tokens, "call:setConnectionInitializers") {
+		t.Fatalf("vulnerable context unexpectedly had initializer clearing token: %#v", tokens)
+	}
+}
+
 func TestJavaFunctionContextIncludesNumericLiteralTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "WorldGuard.java")
@@ -521,6 +560,98 @@ func javaFunctionContextContains(stmts []nir.Stmt, name, token string) bool {
 				if got == token {
 					return true
 				}
+			}
+		}
+	}
+	return false
+}
+
+func javaFunctionContextTokens(stmts []nir.Stmt, name string) []string {
+	for _, st := range stmts {
+		switch x := st.(type) {
+		case nir.ClassDef:
+			if got := javaFunctionContextTokens(x.Body, name); got != nil {
+				return got
+			}
+		case nir.FuncDef:
+			if x.Name == name {
+				return x.ContextTokens
+			}
+		}
+	}
+	return nil
+}
+
+func javaTokenListContains(tokens []string, want string) bool {
+	for _, got := range tokens {
+		if got == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestJavaFunctionContextExpressionShapeTokens(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "BCrypt.java")
+	src := []byte(`class BCrypt {
+  int vulnerable(int cost) {
+    return 1 << cost;
+  }
+  long fixed(int cost) {
+    return 1L << cost;
+  }
+  Object safeDecryptPreMasterSecret(byte[] input) throws Exception {
+    byte[] secret = input;
+    if (secret.length == 48) {
+      return createSecret(secret);
+    }
+    return createSecret(secret[0]);
+  }
+  Object createSecret(Object m) { return m; }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "vulnerable", "binary_shape:INT<<ID") {
+		t.Fatalf("vulnerable context missing INT shift shape: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "vulnerable"))
+	}
+	if !javaHasAnalysisCall(prog.Modules[0].Body, "analysis.integer_size.int_shift") {
+		t.Fatalf("vulnerable int shift did not emit analysis observation")
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "fixed", "binary_shape:LONG<<ID") {
+		t.Fatalf("fixed context missing LONG shift shape: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "fixed"))
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "safeDecryptPreMasterSecret", "index_shape:ID[INT]") {
+		t.Fatalf("premaster context missing index shape: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "safeDecryptPreMasterSecret"))
+	}
+	if !javaFunctionContextContains(prog.Modules[0].Body, "safeDecryptPreMasterSecret", "length_check:length_==_48") {
+		t.Fatalf("premaster context missing length check: %#v", javaFunctionContextTokens(prog.Modules[0].Body, "safeDecryptPreMasterSecret"))
+	}
+}
+
+func javaHasAnalysisCall(stmts []nir.Stmt, path string) bool {
+	for _, st := range stmts {
+		switch x := st.(type) {
+		case nir.ClassDef:
+			if javaHasAnalysisCall(x.Body, path) {
+				return true
+			}
+		case nir.FuncDef:
+			if javaHasAnalysisCall(x.Body, path) {
+				return true
+			}
+		case nir.Block:
+			if javaHasAnalysisCall(x.Stmts, path) {
+				return true
+			}
+		case nir.ExprStmt:
+			if c, ok := x.Value.(nir.Call); ok && c.Path == path {
+				return true
 			}
 		}
 	}

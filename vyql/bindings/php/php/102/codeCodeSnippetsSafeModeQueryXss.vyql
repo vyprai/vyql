@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding codeSnippetsSafeModeQueryXss102 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "add_safe_mode_query_var" and node.token contains "add_query_arg('snippets-safe-mode',$_REQUEST['snippets-safe-mode'],$url)" and not (node.token contains "(bool)$_REQUEST['snippets-safe-mode']") and not (node.token contains "esc_attr") and not (node.token contains "htmlspecialchars")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "add_safe_mode_query_var" and node.context.phpReview == "safe_mode_query_xss"
   emit issue code.CodeSnippetsSafeModeQueryXss at node
 }

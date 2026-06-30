@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding commandStringWrapperExecution127 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "convert" and node.token contains "$cmd_string=\"$this->executable-headers$headers-i$source$args$cmd_params-f$format$temp_file_path\"" and node.token contains "$this->generateDerivativeResponse($cmd_string,$source,$temp_file_path,$content_type)" and not (node.token contains "$cmd=array_merge") and not (node.token contains "HeaderBag")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "convert" and node.context.phpReview == "command_string_wrapper_execution"
   emit issue code.CommandStringWrapperExecution at node
 }

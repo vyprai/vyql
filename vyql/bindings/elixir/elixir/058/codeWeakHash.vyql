@@ -1,6 +1,6 @@
 module bindings.elixir.generated.m728b8a72;
 
 binding weakHash58 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= ":crypto.hash" and node.token contains ":sha" and not (node.token contains ":sha2") and not (node.token contains ":sha3") and not (node.token contains ":sha5")
-  emit issue code.WeakHash at node
+  query pattern callExpr where callee.path ~= ":crypto.hash" and args.any.literal contains ":sha" and not args.any.literal contains ":sha2" and not args.any.literal contains ":sha3" and not args.any.literal contains ":sha5"
+  emit issue code.WeakHash at call
 }

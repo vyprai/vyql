@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -18,6 +19,8 @@ type shConv struct {
 	file string
 	key  string
 }
+
+var shCatInputAssignRE = regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\$\(\s*cat\s*\)`)
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
 func ExtractBash(files []string, root string) (nir.Program, error) {
@@ -52,17 +55,58 @@ func (c *shConv) shModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.file + ":1"
 	text := c.text(root)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=bash"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+	}
+	for _, tok := range c.shSemanticModuleTokens(text) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=bash"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *shConv) shSemanticModuleTokens(text string) []string {
+	var out []string
+	add := func(tok string) {
+		for _, existing := range out {
+			if existing == tok {
+				return
+			}
+		}
+		out = append(out, tok)
+	}
+	if shHasPythonTripleQuoteStdinInterpolation(text) {
+		add("shell_bridge:python_triple_quote_stdin_interpolation")
+	}
+	return out
+}
+
+func shHasPythonTripleQuoteStdinInterpolation(text string) bool {
+	if !strings.Contains(text, "python3") || !strings.Contains(text, "-c") ||
+		!strings.Contains(text, "json.loads") || strings.Contains(text, "<<'PYEOF'") ||
+		strings.Contains(text, "os.environ.get") {
+		return false
+	}
+	for _, match := range shCatInputAssignRE.FindAllStringSubmatch(text, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		name := match[1]
+		if strings.Contains(text, "'''$"+name+"'''") ||
+			strings.Contains(text, "'''${"+name+"}'''") ||
+			strings.Contains(text, "'''$"+name) ||
+			strings.Contains(text, "'''${"+name+"}") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *shConv) block(n *tree_sitter.Node) []nir.Stmt {

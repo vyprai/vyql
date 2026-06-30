@@ -1,0 +1,10 @@
+module code;
+
+concept SizeSensitiveIntegerArithmetic : issue {
+  cwe: [CWE_190]
+  enabledBy: [taint.UntrustedData]
+  reviewAssumption: "the arithmetic result is later used for allocation, indexing, copy size, or bounds"
+  reviewCategory: numeric
+  reviewCondition: "attacker-controlled value participates in size-sensitive arithmetic"
+  vulnerableTo: [memory.IntegerOverflow]
+}

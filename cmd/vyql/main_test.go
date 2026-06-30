@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/engine"
+	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/ontology"
 	"github.com/vyprai/vyql/parser"
 )
@@ -129,6 +130,97 @@ func TestExtractAllSupportsJavaScriptModules(t *testing.T) {
 	if got := stats.files["javascript"]; got != 1 {
 		t.Fatalf(".mjs should route through javascript frontend, got count %d stats=%v", got, stats.files)
 	}
+}
+
+func TestExtractAllRoutesExtensionlessPythonShebangScripts(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "cloakserve")
+	code := `#!/usr/bin/env python3
+import asyncio
+import os
+import shutil
+
+class ChromePool:
+    def __init__(self, data_dir):
+        self._data_dir = data_dir
+
+    async def get_or_launch(self, seed):
+        if seed is None:
+            seed_key = "__default__"
+        else:
+            seed_key = seed
+        user_data_dir = os.path.join(self._data_dir, seed_key)
+        os.makedirs(user_data_dir, exist_ok=True)
+        await asyncio.to_thread(shutil.rmtree, user_data_dir, True)
+`
+	if err := os.WriteFile(src, []byte(code), 0o755); err != nil {
+		t.Fatalf("write extensionless python source: %v", err)
+	}
+
+	prog, _, _, stats, err := extractAll([]string{dir})
+	if err != nil {
+		t.Fatalf("extractAll extensionless python: %v", err)
+	}
+	if got := stats.files["python"]; got != 1 {
+		t.Fatalf("extensionless python shebang should route through python frontend, got count %d stats=%v", got, stats.files)
+	}
+	if !programHasContextToken(prog, "python_review:cloakserve_fingerprint_seed_path_traversal") {
+		t.Fatalf("extensionless python shebang did not emit Cloakserve semantic context: %#v", prog.Modules)
+	}
+}
+
+func programHasContextToken(prog nir.Program, want string) bool {
+	for _, mod := range prog.Modules {
+		if stmtsHaveContextToken(mod.Body, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func stmtsHaveContextToken(stmts []nir.Stmt, want string) bool {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case nir.FuncDef:
+			for _, tok := range s.ContextTokens {
+				if tok == want {
+					return true
+				}
+			}
+			if stmtsHaveContextToken(s.Body, want) {
+				return true
+			}
+		case nir.ClassDef:
+			if stmtsHaveContextToken(s.Body, want) {
+				return true
+			}
+		case nir.ExprStmt:
+			if exprHasContextToken(s.Value, want) {
+				return true
+			}
+		case nir.Assign:
+			if exprHasContextToken(s.Value, want) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func exprHasContextToken(expr nir.Expr, want string) bool {
+	switch e := expr.(type) {
+	case nir.Call:
+		for _, arg := range e.Args {
+			if exprHasContextToken(arg, want) {
+				return true
+			}
+		}
+	case nir.Const:
+		return e.Value == want
+	case nir.Thru:
+		return exprHasContextToken(e.Inner, want)
+	}
+	return false
 }
 
 func TestExtractAllSupportsVueSingleFileComponents(t *testing.T) {

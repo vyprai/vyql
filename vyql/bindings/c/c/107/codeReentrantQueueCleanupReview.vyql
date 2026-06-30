@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding reentrantQueueCleanupReview107 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "bt_att_cancel" and node.token contains "queue_remove_if(att->req_queue" and node.token contains "queue_remove_if(att->ind_queue" and node.token contains "queue_remove_if(att->write_queue" and node.token contains "destroy_att_send_op(op)" and not (node.token contains "att->in_disc") and not (node.token contains "bt_att_disc_cancel")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "queue.reentrant_cleanup_without_disconnect_guard"
   emit issue code.ReentrantQueueCleanupReview at node
 }

@@ -1,3 +1,8 @@
+# verify_current_expected: skip-fresh-target
+# The rank 576 pool commit is a version bump; the actual Dalfox API
+# FoundAction fix is earlier. Keep the mechanic covered, but do not count the
+# version-bump checkout as an expected fresh-scan finding.
+
 test "rank576: API scan handler must strip found-action command options"
   lang go
   expect VYQL-INJ-123

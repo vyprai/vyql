@@ -54,3 +54,43 @@ test "rank265: brace expansion sequence step is clamped away from zero"
     return N;
   }
   ```
+
+test "rank265: brace expansion helper comparator still permits zero step"
+  lang javascript
+  expect VYQL-DOS-009
+  expect_review code.ZeroStepSequenceExpansion
+  code
+  ```
+  function numeric(str) {
+    return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
+  }
+
+  function lte(i, y) {
+    return i <= y;
+  }
+
+  function gte(i, y) {
+    return i >= y;
+  }
+
+  function expand(str) {
+    var n = str.split(/\.\./);
+    var x = numeric(n[0]);
+    var y = numeric(n[1]);
+    var incr = n.length == 3
+      ? Math.abs(numeric(n[2]))
+      : 1;
+    var test = lte;
+    var reverse = y < x;
+    if (reverse) {
+      incr *= -1;
+      test = gte;
+    }
+    var N = [];
+
+    for (var i = x; test(i, y); i += incr) {
+      N.push(String(i));
+    }
+    return N;
+  }
+  ```

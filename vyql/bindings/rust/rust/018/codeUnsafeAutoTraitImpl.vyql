@@ -1,6 +1,6 @@
 module bindings.rust.generated.mdc4f74cd;
 
 binding unsafeAutoTraitImpl18 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unsafe_impl" and node.token contains "trait:Sync" and not (node.token contains "bound:Sync") and not (node.token contains "bound:Send")
+  query pattern presenceNode where node.kind == "any" and node.analysis == "rust.unsafe_sync_impl_missing_bound"
   emit issue code.UnsafeAutoTraitImpl at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding ownCloudLoginRedirectUrlOpenRedirect189 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "redirectToDefaultPage" and node.token contains "isset($_REQUEST['redirect_url'])" and node.token contains "header('Location:/'.htmlentities($_REQUEST['redirect_url']))" and not (node.token contains "substr($_REQUEST['redirect_url'],0,strlen(OC::$WEBROOT))==OC::$WEBROOT")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "redirectToDefaultPage" and node.context.phpReview == "owncloud_login_redirect_url_open_redirect"
   emit issue code.OwnCloudLoginRedirectUrlOpenRedirect at node
 }

@@ -1,0 +1,8 @@
+module code;
+
+review code.ArchiveEntryRawPrefixContainment {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review archive extraction containment that uses raw startswith(out_dir) instead of canonical filesystem containment"
+}

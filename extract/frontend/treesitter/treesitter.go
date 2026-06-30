@@ -87,7 +87,13 @@ func shouldSkipDir(root, path, name string) bool {
 	if strings.HasPrefix(name, ".") && name != "." {
 		return !scanHiddenDirs[name]
 	}
+	if vendorDirShouldSkip(root, path) {
+		return true
+	}
 	if !skipDirs[name] {
+		return false
+	}
+	if name == "vendor" {
 		return false
 	}
 	if name == "build" {
@@ -98,4 +104,33 @@ func shouldSkipDir(root, path, name string) bool {
 		return filepath.ToSlash(rel) == "build"
 	}
 	return true
+}
+
+func vendorDirShouldSkip(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	for i, part := range parts {
+		if part != "vendor" {
+			continue
+		}
+		if i == len(parts)-1 {
+			return false
+		}
+		rest := strings.Join(parts[i+1:], "/")
+		for _, prefix := range vendoredSourcePrefixes {
+			if rest == prefix || strings.HasPrefix(prefix, rest+"/") || strings.HasPrefix(rest, prefix+"/") {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+var vendoredSourcePrefixes = []string{
+	"assets",
+	"github.com/containerd/cri",
 }

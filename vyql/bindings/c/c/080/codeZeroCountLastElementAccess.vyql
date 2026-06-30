@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding zeroCountLastElementAccess80 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "zero_count.last_index" and node.token contains "index_kind=field_minus_one" and node.token contains "guard=missing_nonzero"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "zero_count.missing_nonzero_last_index"
   emit issue code.ZeroCountLastElementAccess at node
 }

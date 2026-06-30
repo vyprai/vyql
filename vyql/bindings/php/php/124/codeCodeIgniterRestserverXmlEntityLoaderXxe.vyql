@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding codeIgniterRestserverXmlEntityLoaderXxe124 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "__construct" and node.token contains "_detect_input_format" and node.token contains "$this->format->factory" and node.token contains "->to_array" and not (node.token contains "libxml_disable_entity_loader")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "__construct" and node.context.phpReview == "codeigniter_restserver_xml_entity_loader_xxe"
   emit issue code.CodeIgniterRestserverXmlEntityLoaderXxe at node
 }

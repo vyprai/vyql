@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding coerciblePathSegmentPrototypePollution588 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "path.length-1" and node.token contains "temp=path[i]" and node.token contains "temp===\"constructor\"||temp===\"__proto__\"||temp===\"prototype\"" and node.token contains "obj[temp]===void0" and node.token contains "obj=obj[temp]" and node.token contains "obj[temp]=value" and not (node.token contains "temp.constructor!==String&&temp.constructor!==Number") and not (node.token contains "typeof temp") and not (node.token contains "String(temp)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains ".length" and node.context.dynamicPropertyWriteObjectLiteral == "true" and node.context.dynamicPropertyWrite == "true" and node.context.prototypeKeyGuard == "true" and not (node.context.pathSegmentTypeGuard == "true")
   emit issue code.CoerciblePathSegmentPrototypePollution at node
 }

@@ -1,4 +1,8 @@
 # Rank 442 / CVE-2023-26113: Collection.js extend prototype pollution.
+# verify_current_expected: skip-fresh-target
+# The current pool parent is already guarded in src and dist; this file keeps
+# the vulnerable/fixed Collection.extend mechanic covered without making that
+# fixed checkout an expected fresh-scan finding.
 
 test "rank442: Collection.js extend recursively merges __proto__ keys"
   lang javascript

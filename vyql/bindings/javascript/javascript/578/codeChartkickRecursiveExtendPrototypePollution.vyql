@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding chartkickRecursiveExtendPrototypePollution578 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "extend" and node.token contains "for(keyinsource)" and node.token contains "target[key]=source[key]" and node.token contains "extend(target[key],source[key])" and not (node.token contains "key===\"__proto__\"")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.forIn == "true" and node.context.dynamicPropertyWriteFromSubscript == "true" and node.context.dynamicPropertyWriteObjectLiteral == "true" and node.context.callPath contains "isPlainObject" and node.context.callPath contains "isArray" and not (node.context.prototypeKeyGuard == "true")
   emit issue code.ChartkickRecursiveExtendPrototypePollution at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding unescapedSessionFlash69 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "$_SESSION['info']" and node.token contains "$" and not (node.token contains "htmlspecialchars") and not (node.token contains "htmlentities") and not (node.token contains "esc_html") and not (node.token contains "strip_tags")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "unescaped_session_flash_info"
   emit issue code.UnescapedSessionFlash at node
 }

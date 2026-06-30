@@ -66,6 +66,41 @@ test "rank774: DHCP option parser reads payload before length guards"
   }
   ```
 
+test "rank774: DHCP option parser unchecked read generalizes across cursor names"
+  lang c
+  file renamed_dhcpserver.c
+  expect VYQL-MEM-037
+  code
+  ```
+  typedef unsigned char u8_t;
+  typedef short s16_t;
+  typedef unsigned short u16_t;
+  typedef unsigned int uint32_t;
+  int memcmp(const char *a, const char *b, unsigned long n);
+
+  static u8_t parse_packet(u8_t *scan, s16_t remaining) {
+      u8_t *limit = scan + remaining;
+      u16_t message = 0;
+
+      while (scan < limit) {
+          switch ((s16_t) *scan) {
+              case DHCP_OPTION_MSG_TYPE:
+                  message = *(scan + 2);
+                  break;
+              case DHCP_OPTION_REQ_IPADDR:
+                  if (memcmp((char *) &message, (char *) scan + 2, 4) == 0) {
+                      return 1;
+                  }
+                  break;
+          }
+
+          scan += scan[1] + 2;
+      }
+
+      return message;
+  }
+  ```
+
 test "rank774: DHCP option parser validates header and payload lengths"
   lang c
   file dhcpserver.c

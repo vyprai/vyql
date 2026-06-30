@@ -1,7 +1,7 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding pdfJsEvalSupported617 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "__object_literal" and node.token contains "isEvalSupported=true"
+  query pattern presenceNode where node.kind == "any" and node.path ~= "__object_literal" and node.arg contains "isEvalSupported=true"
   emit issue code.PdfJsEvalSupported at node
   emit source code.PdfJsEvalSupportedSource at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding gleezRedactorEditorStoredXss284 {
-  query pattern presenceNode where node.kind == "any" and node.path == "self.codes" and node.token contains ".redactor({" and node.token contains "autoresize: false"
+  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "gleez_redactor_editor_stored_xss"
   emit issue code.GleezRedactorEditorStoredXss at node
 }

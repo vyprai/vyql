@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ProtocolStateReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287, CWE_290, CWE_349, CWE_404, CWE_841]
+    id: "VYQL-AUTH-082"
+    severity: high
+  }
+  issue code.ProtocolStateReview as sink
+}

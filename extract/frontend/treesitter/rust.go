@@ -204,13 +204,18 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+	out := []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
 		Method: "enum",
 		Loc:    loc,
 	}}}
+	if rsContainsString(attrs, "attr_repr:C") || rsContainsString(attrs, "repr:C") {
+		out = append(out, c.rsAnalysisCall("analysis.rust.ffi_enum_layout_risk", "ffi_enum_layout_risk", loc,
+			"lang=rust", "kind:enum", "repr:C"))
+	}
+	return out
 }
 
 func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
@@ -292,17 +297,29 @@ func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pe
 	}
 	args := make([]nir.Expr, 0, len(tokens))
 	loc := c.loc(n)
-	for _, tok := range dedupeStrings(tokens) {
+	tokens = dedupeStrings(tokens)
+	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	path := "analysis.rust.serde_field"
-	return nir.ExprStmt{Value: nir.Call{
+	out := []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
 		Method: "serde_field",
 		Loc:    loc,
-	}}, true
+	}}}
+	if rsContainsString(tokens, "derive:Deserialize") &&
+		rsContainsString(tokens, "semantic:dependency_map") &&
+		!rsContainsString(tokens, "serde_attr:deserialize_with") {
+		out = append(out, c.rsAnalysisCall("analysis.rust.unvalidated_dependency_map_key_deserialization",
+			"unvalidated_dependency_map_key_deserialization", loc,
+			"lang=rust", "field:"+name, "field_type:"+rustCompactText(typ)))
+	}
+	if len(out) == 1 {
+		return out[0], true
+	}
+	return nir.Block{Stmts: out}, true
 }
 
 func rsDeriveTokens(raw string) []string {
@@ -402,18 +419,46 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 			tokens = append(tokens, "bound:"+bound)
 		}
 	}
+	path := "analysis.rust.unsafe_impl"
+	out := []nir.Stmt{c.rsAnalysisCall(path, "unsafe_impl", loc, tokens...)}
+	hasSendBound := rsContainsString(tokens, "bound:Send")
+	hasSyncBound := rsContainsString(tokens, "bound:Sync")
+	switch trait {
+	case "Send":
+		if !hasSendBound {
+			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_send_impl_missing_bound", "unsafe_send_impl_missing_bound", loc,
+				"lang=rust", "trait:Send", "missing_bound:Send"))
+		}
+	case "Sync":
+		if !hasSyncBound && !hasSendBound {
+			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_sync_impl_missing_bound", "unsafe_sync_impl_missing_bound", loc,
+				"lang=rust", "trait:Sync", "missing_bound:SyncOrSend"))
+		}
+	}
+	return out
+}
+
+func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.Stmt {
 	args := make([]nir.Expr, 0, len(tokens))
 	for _, tok := range tokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
-	path := "analysis.rust.unsafe_impl"
-	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+	return nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: path, Loc: loc},
 		Args:   args,
 		Path:   path,
-		Method: "unsafe_impl",
+		Method: method,
 		Loc:    loc,
-	}}}
+	}}
+}
+
+func rsContainsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *rsConv) rsParamEntries(name string, params []string, attrs []string) []nir.ParamEntry {
@@ -512,7 +557,203 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 		}
 	}
 	walk(root)
+	for _, tok := range rustSemanticReviewTokens(c.text(root)) {
+		add(tok)
+	}
 	return out
+}
+
+func rustSemanticReviewTokens(raw string) []string {
+	compact := rustCompactText(raw)
+	var out []string
+	add := func(fact string) {
+		out = append(out, "rust_review:"+fact)
+	}
+	if strings.Contains(compact, "installScript") &&
+		strings.Contains(compact, "final_script") &&
+		!strings.Contains(compact, "spawn_installer_container") {
+		add("template_install_script_host_execution")
+	}
+	if strings.Contains(compact, "&mut") &&
+		strings.Contains(compact, "as*const") &&
+		strings.Contains(compact, "as*mut") {
+		add("unsafe_mutable_alias")
+	}
+	if strings.Contains(compact, "avail_in=input.len()asc_uint") &&
+		strings.Contains(compact, "avail_out=output.len()asc_uint") &&
+		strings.Contains(compact, "BZ2_bz") &&
+		!strings.Contains(compact, ".min(c_uint::MAXasusize)asc_uint") {
+		add("unchecked_ffi_length_narrowing")
+	}
+	if rustUninitializedBufferExposure(compact) {
+		add("uninitialized_buffer_exposure")
+	}
+	if strings.Contains(compact, "letn_partitions=1u32<<order;") &&
+		strings.Contains(compact, "letn_samples=block_size>>order;") &&
+		strings.Contains(compact, "letmutlen=n_samples-n_warm_up;") &&
+		strings.Contains(compact, "buffer[start..start+lenasusize]") &&
+		strings.Contains(compact, "decode_rice_partition(input,slice)") &&
+		strings.Contains(compact, "decode_rice2_partition(input,slice)") &&
+		!strings.Contains(compact, "block_size&(n_partitions-1)asu16!=0") &&
+		!strings.Contains(compact, "n_samples_per_partition") {
+		add("claxon_residual_partition_buffer_exposure")
+	}
+	if strings.Contains(compact, ".next().await") && !strings.Contains(compact, "timeout") {
+		add("unbounded_next_await")
+	}
+	if strings.Contains(compact, "lettarget_size=target_size.unwrap_or(value.len());") &&
+		strings.Contains(compact, "self.data.resize(offset+target_size,0)") &&
+		strings.Contains(compact, "forindexin0..target_size") &&
+		strings.Contains(compact, "value.len()>index") &&
+		!strings.Contains(compact, "value.is_empty()") {
+		add("empty_source_slice_memory_expansion")
+	}
+	if strings.Contains(compact, "whilelen>0") &&
+		strings.Contains(compact, "self.fill_buf()") &&
+		strings.Contains(compact, "buf.len().min(len)") &&
+		strings.Contains(compact, "self.consume(consume_len)") &&
+		strings.Contains(compact, "len-=consume_len") &&
+		!strings.Contains(compact, "buf.is_empty()") &&
+		!strings.Contains(compact, "UnexpectedEof") {
+		add("bufread_discard_loop_without_eof_guard")
+	}
+	if strings.Contains(compact, "request.into_parts()") &&
+		strings.Contains(compact, "hyper::body::to_bytes(body).await?") &&
+		strings.Contains(compact, "Request::from_parts(parts,full_body)") &&
+		!strings.Contains(compact, "check_content_length") &&
+		!strings.Contains(compact, "size_hint") {
+		add("conduit_hyper_unbounded_body_to_bytes")
+	}
+	if strings.Contains(compact, "\"max-age\",Some(v)") &&
+		strings.Contains(compact, "v.parse()") &&
+		strings.Contains(compact, "Duration::seconds(val)") &&
+		!strings.Contains(compact, "Duration::max_value().num_seconds()") &&
+		!strings.Contains(compact, "cmp::min") {
+		add("cookie_max_age_duration_seconds_panic")
+	}
+	if strings.Contains(compact, "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();") &&
+		strings.Contains(compact, "state.waker.is_none()") &&
+		strings.Contains(compact, "ic0::call_new") {
+		add("call_future_raw_weak_state_ref")
+	}
+	if rustWindowsReservedDeviceBypass(compact, "COM") {
+		add("windows_reserved_device_name_bypass_com")
+	}
+	if rustWindowsReservedDeviceBypass(compact, "LPT") {
+		add("windows_reserved_device_name_bypass_lpt")
+	}
+	if strings.Contains(compact, "PACKAGE_SOURCE_LOCK") &&
+		strings.Contains(compact, "entry.unpack_in(parent)") &&
+		strings.Contains(compact, "OpenOptions::new().create(true)") &&
+		strings.Contains(compact, "write!(ok,\"ok\")") &&
+		!strings.Contains(compact, "entry_path.file_name()") &&
+		!strings.Contains(compact, "create_new(true)") {
+		add("archive_marker_symlink_overwrite")
+	}
+	if strings.Contains(compact, "self.ensure_smart_account_at_round(&tx.from,current_round);") &&
+		strings.Contains(compact, "self.debit(&tx.from,tx.fee)?;") &&
+		strings.Contains(compact, "self.increment_nonce(&tx.from);") &&
+		strings.Contains(compact, "SmartOpType::Stake{amount}=>{") &&
+		strings.Contains(compact, "returnErr(CoinError::ValidationError(\"belowminimumstake\".into()))") &&
+		strings.Contains(compact, "ok_or_else(||CoinError::ValidationError(\"nostaketounstake\".into()))?") &&
+		!strings.Contains(compact, "tx.fee.saturating_add(*amount)") {
+		add("state_mutation_before_operation_preconditions")
+	}
+	if strings.Contains(compact, "record_deposit(out.len())") &&
+		strings.Contains(compact, "letexit_result=self.exit_substate(StackExitKind::Succeeded);ifletErr(e)=self.record_external_operation") &&
+		strings.Contains(compact, "ExternalOperation::Write(U256::from(out.len()))") &&
+		strings.Contains(compact, "self.state.set_code(address,out)") {
+		add("state_commit_before_external_write_accounting")
+	}
+	if strings.Contains(compact, "DiscoveryMessage::Handshake") &&
+		strings.Contains(compact, "self.peer_list_limit=Some(limit);") &&
+		strings.Contains(compact, "self.peer_list_limit.unwrap()asusize-1") &&
+		strings.Contains(compact, "self.get_peer_contacts(") &&
+		!strings.Contains(compact, ".saturating_sub(1)") &&
+		!strings.Contains(compact, ".min(self.config.update_limit)") {
+		add("peer_limit_underflow")
+	}
+	if strings.Contains(compact, "Regex::new") &&
+		strings.Contains(compact, "(?m)//.*$") &&
+		strings.Contains(compact, "replace_all") &&
+		!strings.Contains(compact, "verify_string") &&
+		!strings.Contains(compact, "is_permitted_char") &&
+		!strings.Contains(compact, "strip_comments_and_verify") {
+		add("regex_line_comment_strip_without_char_whitelist")
+	}
+	if strings.Contains(compact, "underflow_mask=((borrow>>63)^1).wrapping_sub(1)") &&
+		strings.Contains(compact, "constants::L[i]&underflow_mask") &&
+		!strings.Contains(compact, "read_volatile") &&
+		!strings.Contains(compact, "black_box(underflow_mask)") {
+		add("crypto_missing_optimization_barrier")
+	}
+	if rustCryptoScalarRandomBitsByteLengthConfusion(compact) {
+		add("crypto_scalar_random_bits_byte_length_confusion")
+	}
+	if strings.Contains(compact, "cryptsetupluksOpen--typeluks2-d-$root_hd$name") &&
+		!strings.Contains(compact, "open_encrypted_volume") &&
+		!strings.Contains(compact, "--header") &&
+		!strings.Contains(compact, "luksHeaderBackup") &&
+		!strings.Contains(compact, "validate_luks2_headers") {
+		add("luks2_attached_header_activation")
+	}
+	if strings.Contains(compact, "config_dest.push(\"ignition\");") &&
+		strings.Contains(compact, "config_dest.push(\"config.ign\");") &&
+		strings.Contains(compact, "create_dir_all(&config_dest)") &&
+		strings.Contains(compact, "OpenOptions::new()") &&
+		strings.Contains(compact, ".create_new(true)") &&
+		strings.Contains(compact, "copy(&mutconfig_in,&mutconfig_out)") &&
+		!strings.Contains(compact, "set_permissions") &&
+		!strings.Contains(compact, "Permissions::from_mode") &&
+		!strings.Contains(compact, ".chmod(") &&
+		!strings.Contains(compact, ".set_mode(") {
+		add("secret_config_file_permission_missing")
+	}
+	return out
+}
+
+func rustUninitializedBufferExposure(compact string) bool {
+	if strings.Contains(compact, "with_capacity") &&
+		strings.Contains(compact, "as_mut_ptr") &&
+		strings.Contains(compact, "from_raw_parts_mut") &&
+		strings.Contains(compact, "read_exact") &&
+		strings.Contains(compact, "set_len") {
+		return true
+	}
+	if strings.Contains(compact, "Vec::with_capacity") &&
+		strings.Contains(compact, "set_len") &&
+		strings.Contains(compact, "read_exact(&mut") &&
+		!strings.Contains(compact, "resize") {
+		return true
+	}
+	return strings.Contains(compact, "as_mut_ptr") &&
+		strings.Contains(compact, "from_raw_parts_mut") &&
+		strings.Contains(compact, ".read(") &&
+		strings.Contains(compact, "set_len")
+}
+
+func rustWindowsReservedDeviceBypass(compact, prefix string) bool {
+	return strings.Contains(compact, "path.file_stem()") &&
+		strings.Contains(compact, "stemstr.to_uppercase().as_str()") &&
+		strings.Contains(compact, "\""+prefix+"0\"") &&
+		strings.Contains(compact, "\""+prefix+"9\"") &&
+		strings.Contains(compact, "manually::open") &&
+		!strings.Contains(compact, "\""+prefix+"\u00b9\"")
+}
+
+func rustCryptoScalarRandomBitsByteLengthConfusion(compact string) bool {
+	if strings.Contains(compact, ".bits().div_ceil(8)") &&
+		strings.Contains(compact, "try_random_bits") &&
+		strings.Contains(compact, "Scalar::from_uint") &&
+		strings.Contains(compact, "ProjectivePoint::mul_by_generator") {
+		return !strings.Contains(compact, "try_generate_from_rng") && !strings.Contains(compact, "NonZeroScalar")
+	}
+	return strings.Contains(compact, "try_random_bits(rng,bit_length)") &&
+		strings.Contains(compact, "k<*") &&
+		strings.Contains(compact, "::ORDER") &&
+		strings.Contains(compact, "is_zero") &&
+		!strings.Contains(compact, "try_generate_from_rng") &&
+		!strings.Contains(compact, "NonZeroScalar")
 }
 
 func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {

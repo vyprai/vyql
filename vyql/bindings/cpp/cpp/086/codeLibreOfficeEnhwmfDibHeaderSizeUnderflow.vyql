@@ -1,6 +1,6 @@
 module bindings.cpp.generated.m4e783366;
 
 binding libreOfficeEnhwmfDibHeaderSizeUnderflow86 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "EMR_ALPHABLEND" and node.token contains "getDIBV5HeaderSize" and node.token contains "cbBmiSrc" and node.token contains "nDeltaToDIB5HeaderSize" and node.token contains "nTargetSize" and node.token contains "newchar" and node.token contains "ReadBytes" and not (node.token contains "cbBmiSrc>nHeaderSize") and not (node.token contains "bSafeRead=false")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "image.dib_header_size_underflow"
   emit issue code.LibreOfficeEnhwmfDibHeaderSizeUnderflow at node
 }

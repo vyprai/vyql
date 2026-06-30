@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding preservedRequestHiddenInputValueXss144 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "modifyForm" and node.context.attrPath contains "$this.parentPlugin.piVars" and node.context.assignLiteral contains "$hiddenFields[]:<inputtype=\"hidden\"name=" and node.context.assignLiteral contains "$hiddenFields[]:value=" and node.context.subscript contains "$markers['hidden_parameter_fields']" and node.context.call contains "implode" and not (containsAny(node.context.scopeCall, [cleanFormValue, htmlspecialchars, htmlentities, esc_attr, esc_html, strip_tags, removeXSS, filter_var]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "modifyForm" and node.context.attrPath contains "$this.parentPlugin.piVars" and node.context.assignLiteral contains "$hiddenFields[]:<inputtype=\"hidden\"name=" and node.context.assignLiteral contains "$hiddenFields[]:value=" and node.context.subscript contains "$markers['hidden_parameter_fields']" and node.context.call contains "implode" and not (containsAny(node.context.scopeCall, [cleanFormValue, htmlspecialchars, htmlentities, esc_attr, esc_html, strip_tags, removeXSS, filter_var]))
   emit issue code.PreservedRequestHiddenInputValueXss at node
 }

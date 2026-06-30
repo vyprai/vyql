@@ -139,6 +139,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		params := c.params(paramsNode)
 		paramTypes := c.paramTypes(paramsNode)
 		body := c.block(field(n, "body"))
+		body = append(body, c.jvIntegerSizeArithmeticObservations(n)...)
 		annotationTokens := c.jvAnnotationTokens(n, "annotation:")
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, annotationTokens...)
@@ -763,6 +764,19 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 			if expr := javaExprToken(c.text(m)); expr != "" {
 				add("expr:" + expr)
 			}
+			if shape := c.javaExprShape(m); shape != "" {
+				add("binary_shape:" + shape)
+			}
+			if check := c.javaLengthCheckToken(m); check != "" {
+				add("length_check:" + check)
+			}
+		case "array_access":
+			if idx := javaExprToken(c.text(m)); idx != "" {
+				add("index:" + idx)
+			}
+			if shape := c.javaExprShape(m); shape != "" {
+				add("index_shape:" + shape)
+			}
 		case "string_literal":
 			if lit := javaStringToken(c.text(m)); lit != "" {
 				add("literal:" + lit)
@@ -910,6 +924,145 @@ func javaExprToken(raw string) string {
 	return b.String()
 }
 
+func (c *jvConv) javaExprShape(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "identifier", "field_access", "method_invocation":
+		return "ID"
+	case "array_access":
+		base := c.javaExprShape(field(n, "array"))
+		key := c.javaExprShape(field(n, "index"))
+		if base == "" || key == "" {
+			return ""
+		}
+		return base + "[" + key + "]"
+	case "decimal_integer_literal", "hex_integer_literal":
+		raw := strings.TrimSpace(c.text(n))
+		if strings.HasSuffix(raw, "L") || strings.HasSuffix(raw, "l") {
+			return "LONG"
+		}
+		return "INT"
+	case "decimal_floating_point_literal":
+		return "FLOAT"
+	case "character_literal":
+		return "CHAR"
+	case "string_literal":
+		return "STRING"
+	case "true", "false":
+		return "BOOL"
+	case "parenthesized_expression":
+		if kids := namedChildren(n); len(kids) > 0 {
+			return c.javaExprShape(kids[0])
+		}
+	case "binary_expression":
+		left := c.javaExprShape(field(n, "left"))
+		right := c.javaExprShape(field(n, "right"))
+		op := c.javaOp(n)
+		if left == "" || right == "" || op == "" {
+			return ""
+		}
+		return left + op + right
+	}
+	return ""
+}
+
+func (c *jvConv) jvIntegerSizeArithmeticObservations(fn *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "binary_expression" && c.javaExprShape(n) == "INT<<ID" {
+			loc := c.loc(n)
+			path := "analysis.integer_size.int_shift"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: loc, Value: "left=int_literal"},
+					c.expr(field(n, "right")),
+					nir.Const{Loc: loc, Value: "operator=shift_left"},
+				},
+				Path:   path,
+				Method: "int_shift",
+				Loc:    loc,
+			}})
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(field(fn, "body"))
+	return out
+}
+
+func (c *jvConv) javaLengthCheckToken(n *tree_sitter.Node) string {
+	if n == nil || n.Kind() != "binary_expression" {
+		return ""
+	}
+	op := c.javaOp(n)
+	if op != "==" && op != "!=" {
+		return ""
+	}
+	left := field(n, "left")
+	right := field(n, "right")
+	if javaIsLengthField(c, left) {
+		if val := javaIntLiteral(c.text(right)); val != "" {
+			return "length_" + op + "_" + val
+		}
+	}
+	if javaIsLengthField(c, right) {
+		if val := javaIntLiteral(c.text(left)); val != "" {
+			return "length_" + op + "_" + val
+		}
+	}
+	return ""
+}
+
+func (c *jvConv) javaOp(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if op := strings.TrimSpace(c.text(field(n, "operator"))); op != "" {
+		return op
+	}
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if ch := n.Child(i); !ch.IsNamed() {
+			return strings.TrimSpace(c.text(ch))
+		}
+	}
+	return ""
+}
+
+func javaIsLengthField(c *jvConv, n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "field_access":
+		return c.text(field(n, "field")) == "length"
+	case "identifier":
+		return false
+	default:
+		return strings.HasSuffix(javaExprToken(c.text(n)), ".length")
+	}
+}
+
+func javaIntLiteral(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	for _, r := range raw {
+		if r < '0' || r > '9' {
+			return ""
+		}
+	}
+	return raw
+}
+
 func javaCompactText(s string) string {
 	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
@@ -1034,7 +1187,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// binding applicators can match constructor and type information.
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: arglist, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
-		op := c.text(field(n, "operator"))
+		op := c.javaOp(n)
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		if op == "+" {
 			// `+` is overloaded (string concat / arithmetic); keep it a taint-propagating
@@ -1045,7 +1198,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// evaluation of opaque branch conditions; BinOp also flows taint through both sides.
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_expression":
-		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
+		return nir.Unary{Op: c.javaOp(n), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}

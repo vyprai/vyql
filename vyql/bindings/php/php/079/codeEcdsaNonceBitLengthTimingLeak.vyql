@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding ecdsaNonceBitLengthTimingLeak79 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "sign" and node.token contains "HmacDRBG" and node.token contains "$drbg->generate($bytes)" and node.token contains "$k=$this->_truncateToN($k,true)" and node.token contains "$kp=$this->g->mul($k)" and node.token contains "$s=$k->invm($this->n)" and not (node.token contains "$ks=$k->add($this->n)") and not (node.token contains "$kt=$ks->add($this->n)") and not (node.token contains "$ks->bitLength()===$this->n->bitLength()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "sign" and node.context.phpReview == "ecdsa_nonce_bit_length_timing_leak"
   emit issue code.EcdsaNonceBitLengthTimingLeak at node
 }

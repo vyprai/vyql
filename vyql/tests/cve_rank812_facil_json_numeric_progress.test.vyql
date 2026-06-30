@@ -40,6 +40,38 @@ test "rank812: JSON numeric parser retries without cursor progress guard"
   }
   ```
 
+test "rank812: numeric progress check generalizes across cursor variable names"
+  lang c
+  file renamed_numeric_parser.h
+  expect VYQL-DOS-029
+  expect_review code.NumericParserMissingProgressCheck
+  code
+  ```
+  #include <stdint.h>
+  #define JSON_NUMERAL ((uint8_t *)"")
+
+  long long fio_atol(char **p);
+  double fio_atof(char **p);
+
+  static size_t parse_number(const char *buffer, size_t length) {
+      uint8_t *mark = (uint8_t *)buffer;
+      uint8_t *limit = mark + length;
+      uint8_t *scan = mark;
+      long long integer_value = fio_atol((char **)&scan);
+      if (scan > limit)
+          return 0;
+      if (!scan || JSON_NUMERAL[*scan]) {
+          scan = mark;
+          double float_value = fio_atof((char **)&scan);
+          if (scan > limit)
+              return 0;
+          if (!scan || JSON_NUMERAL[*scan])
+              return 0;
+      }
+      return (size_t)(scan - (uint8_t *)buffer);
+  }
+  ```
+
 test "rank812: JSON numeric parser rejects non-advancing cursor"
   lang c
   file fio_json_parser.h

@@ -1,6 +1,6 @@
 module bindings.rust.generated.mdc4f74cd;
 
 binding luks2AttachedHeaderActivation44 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "mount_data_disk" and node.token contains "cryptsetupluksOpen--typeluks2-d-$root_hd$name" and not (node.token contains "open_encrypted_volume") and not (node.token contains "--header") and not (node.token contains "luksHeaderBackup") and not (node.token contains "validate_luks2_headers")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "luks2_attached_header_activation"
   emit issue code.Luks2AttachedHeaderActivation at node
 }

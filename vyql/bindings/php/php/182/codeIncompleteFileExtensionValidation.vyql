@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding incompleteFileExtensionValidation182 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "fileExt" and node.token contains "decodeContent" and node.token contains "$file['type']" and node.token contains "$file['name']" and node.token contains "in_array($ext,$exts)" and not (node.token contains "pathinfo") and not (node.token contains "PATHINFO_EXTENSION") and not (node.token contains "is_string")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "fileExt" and node.context.phpReview == "incomplete_file_extension_validation"
   emit issue code.IncompleteFileExtensionValidation at node
 }

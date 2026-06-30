@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding privilegedEntryPointReview120 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "perform_http_xact" and node.token contains "CREATION_NOTIFICATION" and node.token contains "run_post_create" and not (node.token contains "client_uid!=0")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "privileged.entrypoint_missing_uid_gate"
   emit issue code.PrivilegedEntryPointReview at node
 }

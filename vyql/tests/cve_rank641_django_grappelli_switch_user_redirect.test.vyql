@@ -1,0 +1,26 @@
+# Rank 641 / CVE-2021-46898: Django Grappelli switch-user open redirect.
+# Ledger verification: VYQL-RF-002 catches redirect_url.startswith("/") guard.
+
+test "rank641: Grappelli redirects to request-selected path"
+  lang python
+  expect VYQL-RF-002
+  code
+  ```
+  def switch_user(request):
+      redirect_url = request.GET["redirect"]
+      if redirect_url.startswith("/"):
+          return redirect(redirect_url)
+      return redirect("/")
+  ```
+
+test "rank641: Grappelli validates redirect host and scheme"
+  lang python
+  reject VYQL-RF-002
+  code
+  ```
+  def switch_user(request):
+      redirect_url = request.GET["redirect"]
+      if url_has_allowed_host_and_scheme(redirect_url):
+          return redirect(redirect_url)
+      return redirect("/")
+  ```

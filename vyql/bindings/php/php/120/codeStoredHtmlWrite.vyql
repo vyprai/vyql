@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding storedHtmlWrite120 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "save" and node.token contains "$html=post('html')" and node.token contains "$html=$this->_filter_html($html)" and node.token contains "Comment_model::updateOrCreate" and node.token contains "'html'=>$html" and not (node.token contains "ParseMarkdown") and not (node.token contains "setSafeMode(true)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "save" and node.context.phpReview == "stored_html_write"
   emit issue code.StoredHtmlWrite at node
 }

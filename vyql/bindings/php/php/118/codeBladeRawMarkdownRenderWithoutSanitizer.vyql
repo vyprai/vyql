@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding bladeRawMarkdownRenderWithoutSanitizer118 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "module.context" and node.context.language == "php" and node.token contains "{!!" and node.token contains "->markdown(" and node.token contains "data['content']" and not (node.token contains "strip_tags") and not (node.token contains "htmlspecialchars") and not (node.token contains "htmlentities") and not (node.token contains " e(") and not (node.token contains "sanitize") and not (node.token contains "purify") and not (node.token contains "HtmlString")
+  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "blade_raw_markdown_without_sanitizer"
   emit issue code.BladeRawMarkdownRenderWithoutSanitizer at node
 }

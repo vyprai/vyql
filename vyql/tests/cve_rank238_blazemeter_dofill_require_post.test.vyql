@@ -1,5 +1,6 @@
 test "rank238: Jenkins doFill endpoint without RequirePOST is surfaced for CSRF review"
   lang java
+  expect VYQL-RF-043
   expect_review code.StateChangingOp
   code
   ```
@@ -17,6 +18,7 @@ test "rank238: Jenkins doFill endpoint without RequirePOST is surfaced for CSRF 
 
 test "rank238: Jenkins doFill endpoint with RequirePOST is clean for CSRF review"
   lang java
+  reject VYQL-RF-043
   reject_review code.StateChangingOp
   code
   ```

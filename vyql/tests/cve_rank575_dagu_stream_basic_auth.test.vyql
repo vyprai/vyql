@@ -1,3 +1,8 @@
+# verify_current_expected: skip-fresh-target
+# The rank 575 pool parent already has AuthRequired: true for the stream path;
+# this synthetic CVE spec covers the real Dagu Basic Auth bypass mechanic while
+# the corpus pointer remains an attention item.
+
 test "rank575: stream basic auth options must require authentication"
   lang go
   expect VYQL-AUTH-033

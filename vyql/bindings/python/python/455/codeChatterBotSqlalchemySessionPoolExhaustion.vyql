@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding chatterBotSqlalchemySessionPoolExhaustion455 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_name=SQLStorageAdapter" and node.context.name contains "filter" and node.token contains "session=self.Session()" and node.token contains "yieldself.model_to_object(statement)" and not (node.token contains "finally")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "chatterbot_sqlalchemy_session_pool_exhaustion_filter"
   emit issue code.ChatterBotSqlalchemySessionPoolExhaustion at node
 }

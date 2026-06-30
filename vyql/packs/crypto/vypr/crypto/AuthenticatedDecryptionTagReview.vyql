@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule AuthenticatedDecryptionTagReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287, CWE_347]
+    id: "VYQL-CRY-028"
+    severity: high
+  }
+  issue code.AuthenticatedDecryptionTagReview as sink
+}

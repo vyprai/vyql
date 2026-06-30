@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding cobblerDjangoStateChangeGetCsrf614 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "buildiso" and node.token contains "remote.background_buildiso" and not (node.context.decoratorPath contains "require_POST")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cobbler_get_state_change_without_post" and not (node.context.decoratorPath contains "require_POST")
   emit issue code.CobblerDjangoStateChangeGetCsrf at node
 }

@@ -13,6 +13,13 @@
     "tinymce": [{"version": "*", "id": "CVE-2024-21910", "cwe": ["CWE-79"], "min_safe": "5.10.0"}]
   },
   "git": {
+    "github.com/clash-verge-rev/clash-verge-service-ipc": [
+      {
+        "version": "37b9964a9bce767b5b95ea2be75613b23400c9f0",
+        "id": "CVE-2026-26422",
+        "cwe": ["CWE-732"]
+      }
+    ],
     "github.com/nodejs/llhttp": [
       {
         "version": "69d6db2008508489d19267a0dcab30602b16fc5b",

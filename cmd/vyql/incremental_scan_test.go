@@ -229,6 +229,28 @@ func TestStaticBindingFingerprintIncludesSplitLayout(t *testing.T) {
 	}
 }
 
+func TestScanFingerprintVendorAssetsMatchScanSurface(t *testing.T) {
+	root := t.TempDir()
+	cases := []struct {
+		rel  string
+		skip bool
+	}{
+		{"vendor", false},
+		{"vendor/assets", false},
+		{"vendor/assets/javascripts", false},
+		{"vendor/bundle", true},
+		{"vendor/lib", true},
+		{"app/vendor/assets/javascripts", false},
+		{"app/vendor/cache", true},
+	}
+	for _, tc := range cases {
+		path := filepath.Join(root, filepath.FromSlash(tc.rel))
+		if got := vendorFingerprintDirShouldSkip(root, path); got != tc.skip {
+			t.Fatalf("%s skip=%v, want %v", tc.rel, got, tc.skip)
+		}
+	}
+}
+
 // TestIncrementalFingerprintActiveSources proves the incremental cache fingerprints the active
 // source set, not just source content. Populating the cache under one source policy and rescanning
 // under another must match a full scan under the new policy: cached labels from policy A must not

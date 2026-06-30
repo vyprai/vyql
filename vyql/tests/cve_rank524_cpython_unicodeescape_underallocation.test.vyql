@@ -94,3 +94,44 @@ test "rank524: CPython unicodeescape_string allocates wide Unicode escape capaci
       return repr;
   }
   ```
+
+test "rank524: unicode escape wide underallocation generalizes across names"
+  lang c
+  expect VYQL-MEM-030
+  expect_review code.PythonUnicodeEscapeWideUnderallocation
+  code
+  ```
+  typedef unsigned int Py_UNICODE;
+  typedef void PyObject;
+  PyObject *PyString_FromStringAndSize(char *s, int size);
+  char *PyString_AS_STRING(PyObject *o);
+
+  static PyObject *encode_wide_unicode(const Py_UNICODE *input, int count)
+  {
+      PyObject *object;
+      char *out;
+      static const char *hex = "0123456789abcdef";
+
+      object = PyString_FromStringAndSize(NULL, 2 + 6*count + 1);
+      if (object == NULL)
+          return NULL;
+
+      out = PyString_AS_STRING(object);
+      while (count-- > 0) {
+          Py_UNICODE codepoint = *input++;
+          if (codepoint >= 0x10000) {
+              *out++ = '\\';
+              *out++ = 'U';
+              *out++ = hex[(codepoint >> 28) & 0x0000000F];
+              *out++ = hex[(codepoint >> 24) & 0x0000000F];
+              *out++ = hex[(codepoint >> 20) & 0x0000000F];
+              *out++ = hex[(codepoint >> 16) & 0x0000000F];
+              *out++ = hex[(codepoint >> 12) & 0x0000000F];
+              *out++ = hex[(codepoint >> 8) & 0x0000000F];
+              *out++ = hex[(codepoint >> 4) & 0x0000000F];
+              *out++ = hex[codepoint & 0x0000000F];
+          }
+      }
+      return object;
+  }
+  ```

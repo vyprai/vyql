@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding centreonMyAccountContactXss82 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "RowMenu_name" and node.token contains "RowMenu_desc" and node.token contains "contact_name" and node.token contains "contact_alias" and node.token contains "html_entity_decode" and not (node.token contains "ESCAPE_ILLEGAL_CHARS")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "centreon_contact_html_entity_decode_xss"
   emit issue code.CentreonMyAccountContactXss at node
 }

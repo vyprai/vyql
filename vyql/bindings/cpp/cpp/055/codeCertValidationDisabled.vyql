@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m4e783366;
-
-binding certValidationDisabled55 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "setPeerVerifyMode" and node.token contains "QSslSocket::VerifyNone"
-  emit issue code.CertValidationDisabled at node
-}

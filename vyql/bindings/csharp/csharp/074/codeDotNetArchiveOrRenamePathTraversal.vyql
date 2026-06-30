@@ -1,6 +1,6 @@
 module bindings.csharp.generated.m1caa8bf2;
 
 binding dotNetArchiveOrRenamePathTraversal74 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.name contains "ExtractAsync" and node.token contains "Path.Combine(rootPath,entry.FullName)" and node.token contains "entry.ExtractToFile(file,true)" and not (node.token contains "Path.GetFullPath(file)") and not (node.token contains "StartsWith(rootPath")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName contains "ExtractAsync" and node.context.callPath contains "Path.Combine" and node.context.identifier contains "rootPath" and node.context.selector contains "entry.FullName" and node.context.callPath contains "entry.ExtractToFile" and not (node.context.callPath contains "Path.GetFullPath") and not (node.context.callPath contains "StartsWith")
   emit issue code.DotNetArchiveOrRenamePathTraversal at node
 }

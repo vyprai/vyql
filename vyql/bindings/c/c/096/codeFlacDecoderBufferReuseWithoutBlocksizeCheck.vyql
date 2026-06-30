@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding flacDecoderBufferReuseWithoutBlocksizeCheck96 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "flac_buffer_copy" and node.context.callPath contains "memcpy" and node.context.selector contains "frame.header.blocksize" and node.context.attrPath contains "pflac.wbuffer" and node.context.attrPath contains "pflac.rbuffer" and node.context.binary contains "frame->header.blocksize>FLAC__MAX_BLOCK_SIZE" and not (node.context.attrPath contains "pflac.wbuffer_size") and not (node.context.binary contains "frame->header.blocksize>pflac->wbuffer_size")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "flac.buffer_reuse_without_blocksize_check"
   emit issue code.FlacDecoderBufferReuseWithoutBlocksizeCheck at node
 }

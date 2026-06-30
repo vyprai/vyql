@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding unsafeWatchUrlProtocol445 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "link" and node.token contains "self.get('url','')" and node.token contains "ready_url=url" and node.token contains "returnready_url" and not (node.token contains "is_safe_url(url)") and not (node.token contains "SAFE_PROTOCOL_REGEX") and not (node.token contains "return'DISABLED'")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unsafe_watch_url_protocol"
   emit issue code.UnsafeWatchUrlProtocol at node
 }

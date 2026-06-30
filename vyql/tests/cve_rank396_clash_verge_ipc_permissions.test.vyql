@@ -1,66 +1,39 @@
-test "rank396: Clash Verge service IPC endpoint is world reachable"
+# Rank 396 / CVE-2026-26422: Clash Verge Rev depended on a vulnerable
+# clash_verge_service_ipc git revision with world-reachable service IPC
+# permissions; the source-level permission mechanic is covered by the Rust
+# InsecurePermission bindings, while this repository snapshot exposes the CVE
+# through Cargo.lock.
+
+test "rank396: vulnerable clash_verge_service_ipc git dependency is reported"
   lang rust
-  expect VYQL-CFG-008
-  expect_review code.InsecurePermission
+  expect VYQL-SCA-001
+  file src/lib.rs
   code
   ```
-  use kode_bridge::{IpcHttpServer, Result};
-  use std::fs::Permissions;
-  use std::os::unix::fs::PermissionsExt;
-  use std::path::Path;
-  use tokio::fs;
-
-  const IPC_PATH: &str = "/var/run/clash-verge/service.sock";
-
-  async fn make_ipc_dir() -> Result<()> {
-      if let Some(dir_path) = Path::new(IPC_PATH).parent() {
-          if !dir_path.exists() {
-              fs::create_dir_all(dir_path).await?;
-          }
-          fs::set_permissions(dir_path, Permissions::from_mode(0o777)).await?;
-      }
-      Ok(())
-  }
-
-  fn create_ipc_server() -> Result<IpcHttpServer> {
-      let server = IpcHttpServer::new(IPC_PATH)?;
-      use platform_lib::{S_IRWXG, S_IRWXO, S_IRWXU, mode_t};
-      let mode: mode_t = platform_lib::mode_t::from(S_IRWXU | S_IRWXG | S_IRWXO);
-      Ok(server.with_listener_mode(mode))
-  }
+  pub fn uses_service_ipc() {}
   ```
-
-test "rank396: Clash Verge service IPC endpoint is admin-group restricted"
-  lang rust
-  reject VYQL-CFG-008
-  reject_review code.InsecurePermission
+  file Cargo.lock
   code
   ```
-  use kode_bridge::{IpcHttpServer, Result};
-  use std::fs::Permissions;
-  use std::os::unix::fs::PermissionsExt;
-  use std::path::Path;
-  use tokio::fs;
+  [[package]]
+  name = "clash_verge_service_ipc"
+  version = "2.0.26"
+  source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#37b9964a9bce767b5b95ea2be75613b23400c9f0"
+  ```
 
-  const IPC_PATH: &str = "/var/run/clash-verge/service.sock";
-
-  async fn make_ipc_dir() -> Result<()> {
-      let Some(dir_path) = Path::new(IPC_PATH).parent() else {
-          return Ok(());
-      };
-
-      if !dir_path.exists() {
-          fs::create_dir_all(dir_path).await?;
-      }
-
-      fs::set_permissions(dir_path, Permissions::from_mode(0o750)).await?;
-      Ok(())
-  }
-
-  fn create_ipc_server() -> Result<IpcHttpServer> {
-      let server = IpcHttpServer::new(IPC_PATH)?;
-      use platform_lib::{S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR, mode_t};
-      let mode: mode_t = platform_lib::mode_t::from(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-      Ok(server.with_listener_mode(mode))
-  }
+test "rank396: patched clash_verge_service_ipc git dependency is clean"
+  lang rust
+  reject VYQL-SCA-001
+  file src/lib.rs
+  code
+  ```
+  pub fn uses_service_ipc() {}
+  ```
+  file Cargo.lock
+  code
+  ```
+  [[package]]
+  name = "clash_verge_service_ipc"
+  version = "2.0.27"
+  source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#43274f2fc603620f344aa155d77fe25d262c7c3f"
   ```

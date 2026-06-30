@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding werkzeugDebugConsoleExposure100 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "app.run" and node.token contains "host='0.0.0.0'" and node.token contains "debug=True" and not (node.token contains "use_evalex=False")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "werkzeug_debug_console_exposure"
   emit issue code.WerkzeugDebugConsoleExposure at node
 }

@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding protocolCommandInjection119 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "dispatch_cmd" and node.token contains "OP_PUT" and node.token contains "body_size=strtoul" and node.token contains "body_size>job_data_size_limit" and node.token contains "reply_msg(c,MSG_JOB_TOO_BIG)" and not (node.token contains "skip(c,body_size+2,MSG_JOB_TOO_BIG)")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.oversized_body_not_discarded"
   emit issue code.ProtocolCommandInjection at node
 }

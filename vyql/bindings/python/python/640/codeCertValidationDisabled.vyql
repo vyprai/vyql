@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding certValidationDisabled640 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "use_ssl=False" and node.token contains "Tls(" and node.token contains "validate=ssl.CERT_REQUIRED" and node.token contains "Server("
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cert_validation_disabled_tls_fallback"
   emit issue code.CertValidationDisabled at node
 }

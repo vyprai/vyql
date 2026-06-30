@@ -1,6 +1,6 @@
 module bindings.rust.generated.mdc4f74cd;
 
 binding incompleteIpDenylist55 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "is_private" and node.token contains "is_loopback" and node.token contains "is_link_local" and node.token contains "is_multicast" and node.token contains "is_documentation" and not (node.token contains "is_broadcast")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call contains "is_private" and node.context.call contains "is_loopback" and node.context.call contains "is_link_local" and node.context.call contains "is_multicast" and node.context.call contains "is_documentation" and not (node.context.call contains "is_broadcast")
   emit issue code.IncompleteIpDenylist at node
 }

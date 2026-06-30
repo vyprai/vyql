@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding cinderUnsafeMinidomXmlDeserializer316 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "class_bases=wsgi.MetadataXMLDeserializer" and node.context.name contains "default" and node.token contains "minidom.parseString(string)" and not (node.token contains "safe_minidom_parse_string(string)")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cinder_unsafe_minidom_xml_deserializer"
   emit issue code.CinderUnsafeMinidomXmlDeserializer at node
 }

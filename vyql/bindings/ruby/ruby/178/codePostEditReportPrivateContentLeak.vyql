@@ -1,6 +1,6 @@
 module bindings.ruby.generated.m5a48bf47;
 
 binding postEditReportPrivateContentLeak178 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.name contains "report_post_edits" and node.token contains "FROM post_revisions pr" and node.token contains "JOIN posts p" and node.token contains "report.data << revision" and not (node.token contains "Archetype.private_message") and not (node.token contains "secure_category")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "report_post_edits" and node.context.rubyReview == "post_edit_report_missing_private_filters"
   emit issue code.PostEditReportPrivateContentLeak at node
 }

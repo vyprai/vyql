@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding unboundedDelimiterSplitCount628 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "body.split('&').length" and node.token contains "len>limit?undefined:len-1" and not (node.token contains "indexOf('&'")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "split" and node.context.selector contains ".split.length" and node.context.literal contains "&" and node.context.expr contains "len>limit" and not (node.context.callPath contains "indexOf")
   emit issue code.UnboundedDelimiterSplitCount at node
 }

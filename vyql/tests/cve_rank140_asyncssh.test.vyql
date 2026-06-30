@@ -4,6 +4,7 @@
 
 test "rank140: python asyncssh pre-auth packet dispatch requires protocol-state review"
   lang python
+  expect VYQL-AUTH-082
   expect_review code.ProtocolStateReview
   code
   ```
@@ -23,6 +24,7 @@ test "rank140: python asyncssh pre-auth packet dispatch requires protocol-state 
 
 test "rank140: python asyncssh pre-auth packet dispatch guard is clean"
   lang python
+  reject VYQL-AUTH-082
   reject_review code.ProtocolStateReview
   code
   ```

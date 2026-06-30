@@ -1,5 +1,6 @@
 test "rank510: CoreDNS malformed UDP response aborts before ID-bound response"
   lang go
+  expect VYQL-AUTH-082
   expect_review code.ProtocolStateReview
   code
   ```
@@ -63,6 +64,7 @@ test "rank510: CoreDNS malformed UDP response aborts before ID-bound response"
 
 test "rank510: CoreDNS continues waiting after malformed UDP parse errors"
   lang go
+  reject VYQL-AUTH-082
   reject_review code.ProtocolStateReview
   code
   ```

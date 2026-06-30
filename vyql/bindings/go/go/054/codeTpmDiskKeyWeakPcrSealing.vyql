@@ -1,6 +1,6 @@
 module bindings.go.generated.m48a985c1;
 
 binding tpmDiskKeyWeakPcrSealing54 {
-  query pattern presenceNode where node.scope == "module" and node.context.varName contains "DiskKeySealingPCRs" and node.token contains "tpm2.PCRSelection" and node.token contains "Hash:tpm2.AlgSHA1" and node.token contains "PCRs:[]int{0,1,2,3,4,6,7,8,9,13}" and not (node.token contains "AlgSHA256")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.tpm_weak_pcr_sealing"
   emit issue code.TpmDiskKeyWeakPcrSealing at node
 }

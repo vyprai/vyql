@@ -1,3 +1,8 @@
+# verify_current_expected: skip-fresh-target
+# The current 1000-CVE pool parent for rank 336 already contains the
+# allow_nodetool_archive_command guard; this file keeps the real mechanic
+# covered without treating that fixed checkout as a recall miss.
+
 test "rank336: Cassandra FQL accepts nodetool archive command without privileged opt-in"
   lang java
   expect VYQL-AUTH-014

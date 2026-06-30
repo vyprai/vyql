@@ -1,6 +1,6 @@
 module bindings.ruby.generated.m5a48bf47;
 
 binding clockworkWebJobCsrf174 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.name contains "HomeController" and node.token contains "params[:job]" and node.token contains "params[:enable]" and node.token contains "ClockworkWeb.enable(job)" and node.token contains "ClockworkWeb.disable(job)" and not (node.token contains "protect_from_forgery")
+  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and node.context.className == "HomeController" and node.context.rubyReview == "clockwork_job_csrf_missing_forgery_protection"
   emit issue code.ClockworkWebJobCsrf at node
 }

@@ -1,5 +1,6 @@
 test "rank169: Avro wire length is narrowed before size validation"
   lang go
+  expect VYQL-NUM-017
   expect_review code.IntegerSizeArithmetic
   code
   ```
@@ -23,6 +24,7 @@ test "rank169: Avro wire length is narrowed before size validation"
 
 test "rank169: Avro wire length is range-checked before narrowing"
   lang go
+  reject VYQL-NUM-017
   reject_review code.IntegerSizeArithmetic
   code
   ```
@@ -53,6 +55,7 @@ test "rank169: Avro wire length is range-checked before narrowing"
 
 test "rank169: Avro block counts are added before overflow-safe cap check"
   lang go
+  expect VYQL-NUM-017
   expect_review code.IntegerSizeArithmetic
   code
   ```
@@ -79,6 +82,7 @@ test "rank169: Avro block counts are added before overflow-safe cap check"
 
 test "rank169: Avro block counts use subtraction-form cap check before addition"
   lang go
+  reject VYQL-NUM-017
   reject_review code.IntegerSizeArithmetic
   code
   ```

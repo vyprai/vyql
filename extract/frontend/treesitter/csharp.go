@@ -105,6 +105,7 @@ func (c *csConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.csFunctionContext(n)...)
+		body = append(body, c.csSecurityObservations(n)...)
 		methodTokens := append([]string{}, c.classParamTokens...)
 		methodTokens = append(methodTokens, c.csAttributeTokens(n, "method_attribute:")...)
 		if n.Kind() == "method_declaration" && len(c.propertyEntryInfo) > 0 {
@@ -325,6 +326,111 @@ func (c *csConv) csFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	}}}
 }
 
+func (c *csConv) csSecurityObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	name := c.text(field(fn, "name"))
+	var out []nir.Stmt
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "object_creation_expression" && lastSeg(c.text(field(n, "type"))) == "TokenValidationParameters" {
+			loc := c.loc(n)
+			if c.csObjectInitializerBoolField(n, "RequireSignedTokens") == "false" {
+				out = append(out, c.csAnalysisStmt("analysis.csharp.jwt_require_signed_tokens_false", "jwt_require_signed_tokens_false", loc,
+					"lang=csharp", "function_name:"+name, "type:TokenValidationParameters", "field:RequireSignedTokens", "value:false"))
+			}
+			if c.csObjectInitializerBoolField(n, "ValidateIssuerSigningKey") == "false" {
+				out = append(out, c.csAnalysisStmt("analysis.csharp.jwt_validate_issuer_signing_key_false", "jwt_validate_issuer_signing_key_false", loc,
+					"lang=csharp", "function_name:"+name, "type:TokenValidationParameters", "field:ValidateIssuerSigningKey", "value:false"))
+			}
+		}
+		if n.Kind() == "invocation_expression" && c.csUnencodedTicketQueryParameter(n) {
+			loc := c.loc(n)
+			out = append(out, c.csAnalysisStmt("analysis.csharp.cas_unencoded_ticket_query_parameter", "cas_unencoded_ticket_query_parameter", loc,
+				"lang=csharp", "function_name:"+name, "call_path:"+c.dotted(field(n, "function"))))
+		}
+		for _, ch := range namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+func (c *csConv) csUnencodedTicketQueryParameter(n *tree_sitter.Node) bool {
+	path := c.dotted(field(n, "function"))
+	if !strings.HasSuffix(path, ".QueryItems.Add") {
+		return false
+	}
+	args := field(n, "arguments")
+	if args == nil {
+		return false
+	}
+	var vals []string
+	for _, arg := range namedChildren(args) {
+		vals = append(vals, c.text(arg))
+	}
+	if len(vals) < 2 {
+		return false
+	}
+	key := vals[0]
+	value := vals[1]
+	if !strings.Contains(key, "ArtifactParameterName") && csContextValue(key) != "ticket" {
+		return false
+	}
+	return !strings.Contains(value, "UrlEncode(") && !strings.Contains(value, "UrlEncode ")
+}
+
+func (c *csConv) csObjectInitializerBoolField(n *tree_sitter.Node, fieldName string) string {
+	for _, ch := range namedChildren(n) {
+		if ch.Kind() != "initializer_expression" {
+			continue
+		}
+		if value := c.csInitializerBoolField(ch, fieldName); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func (c *csConv) csInitializerBoolField(init *tree_sitter.Node, fieldName string) string {
+	for _, ch := range namedChildren(init) {
+		if ch.Kind() == "assignment_expression" {
+			left := field(ch, "left")
+			if lastSeg(c.csContextPath(left)) != fieldName {
+				continue
+			}
+			right := field(ch, "right")
+			if right != nil && right.Kind() == "boolean_literal" {
+				return c.text(right)
+			}
+		}
+		if value := c.csInitializerBoolField(ch, fieldName); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func (c *csConv) csAnalysisStmt(path, method, loc string, tokens ...string) nir.Stmt {
+	args := make([]nir.Expr, 0, len(tokens))
+	for _, tok := range tokens {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args:   args,
+		Path:   path,
+		Method: method,
+		Loc:    loc,
+	}}
+}
+
 func csCompactText(s string) string {
 	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
 }
@@ -369,6 +475,11 @@ func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []
 				if rhs := csContextValue(c.text(right)); rhs != "" {
 					add("assign:" + lhs + "=" + rhs)
 				}
+				if lshape, rshape := c.csExprShape(left), c.csExprShape(right); lshape != "" && rshape != "" {
+					if op := c.csOp(n); op != "" {
+						add("assign_op_shape:" + lshape + op + rshape)
+					}
+				}
 				if right != nil && right.Kind() == "invocation_expression" {
 					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
 						add("assign_call:" + lhs + ":" + path)
@@ -405,6 +516,13 @@ func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []
 				if m := lastSeg(path); m != "" {
 					add("call:" + m)
 				}
+				if args := field(n, "arguments"); args != nil {
+					for _, arg := range namedChildren(args) {
+						if shape := c.csExprShape(arg); shape != "" {
+							add("call_arg_shape:" + path + ":" + shape)
+						}
+					}
+				}
 			}
 		case "object_creation_expression":
 			if typ := c.text(field(n, "type")); typ != "" {
@@ -433,6 +551,17 @@ func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []
 			if expr := csContextCompact(c.text(n)); expr != "" {
 				add("expr:" + expr)
 			}
+			if shape := c.csExprShape(n); shape != "" {
+				add("binary_shape:" + shape)
+			}
+		case "cast_expression":
+			if shape := c.csExprShape(n); shape != "" {
+				add("cast_shape:" + shape)
+			}
+		case "checked_expression":
+			if shape := c.csExprShape(n); shape != "" {
+				add("checked_shape:" + shape)
+			}
 		case "string_literal", "verbatim_string_literal", "raw_string_literal", "integer_literal", "real_literal", "character_literal", "boolean_literal", "null_literal":
 			if lit := csContextValue(c.text(n)); lit != "" {
 				add("literal:" + lit)
@@ -448,6 +577,104 @@ func (c *csConv) csStructuredContextTokens(fn *tree_sitter.Node, name string) []
 	}
 	walk(body)
 	return out
+}
+
+func (c *csConv) csExprShape(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind() {
+	case "argument":
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return ""
+		}
+		return c.csExprShape(kids[len(kids)-1])
+	case "identifier", "member_access_expression", "qualified_name":
+		return "ID"
+	case "invocation_expression", "object_creation_expression":
+		return "CALL"
+	case "element_access_expression":
+		base := c.csExprShape(field(n, "expression"))
+		key := c.csExprShape(field(n, "subscript"))
+		if base == "" || key == "" {
+			return "INDEX"
+		}
+		return base + "[" + key + "]"
+	case "bracketed_argument_list":
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return ""
+		}
+		return c.csExprShape(kids[0])
+	case "integer_literal":
+		return "INT"
+	case "real_literal":
+		return "FLOAT"
+	case "string_literal", "verbatim_string_literal", "raw_string_literal":
+		return "STRING"
+	case "character_literal":
+		return "CHAR"
+	case "boolean_literal":
+		return "BOOL"
+	case "null_literal":
+		return "NULL"
+	case "sizeof_expression":
+		return "SIZEOF"
+	case "parenthesized_expression", "checked_expression":
+		kids := namedChildren(n)
+		if len(kids) == 0 {
+			return ""
+		}
+		return c.csExprShape(kids[len(kids)-1])
+	case "cast_expression":
+		typ := lastSeg(c.text(field(n, "type")))
+		kids := namedChildren(n)
+		if typ == "" || len(kids) == 0 {
+			return ""
+		}
+		expr := c.csExprShape(kids[len(kids)-1])
+		if expr == "" {
+			return ""
+		}
+		return "CAST(" + typ + "," + expr + ")"
+	case "binary_expression":
+		left := c.csExprShape(field(n, "left"))
+		right := c.csExprShape(field(n, "right"))
+		op := c.csOp(n)
+		if left == "" || right == "" || op == "" {
+			return ""
+		}
+		return left + op + right
+	case "assignment_expression":
+		left := c.csExprShape(field(n, "left"))
+		right := c.csExprShape(field(n, "right"))
+		op := c.csOp(n)
+		if left == "" || right == "" || op == "" {
+			return ""
+		}
+		return left + op + right
+	}
+	return ""
+}
+
+func (c *csConv) csOp(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	if op := strings.TrimSpace(c.text(field(n, "operator"))); op != "" {
+		return op
+	}
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if ch := n.Child(i); !ch.IsNamed() {
+			op := strings.TrimSpace(c.text(ch))
+			switch op {
+			case "+", "-", "*", "/", "%", "<<", ">>", "+=", "-=", "*=", "/=", "=", "==", "!=", "<", ">", "<=", ">=":
+				return op
+			}
+		}
+	}
+	return ""
 }
 
 func (c *csConv) csContextPath(n *tree_sitter.Node) string {

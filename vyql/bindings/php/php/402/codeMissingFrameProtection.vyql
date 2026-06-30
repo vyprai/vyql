@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding missingFrameProtection402 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "header" and node.token contains "X-Frame-Options: ALLOWALL"
+  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "missing_frame_protection_allowall"
   emit issue code.MissingFrameProtection at node
 }

@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding filesystemImageDirentTraversal118 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "do_directory" and node.token contains "memcpy(newpath+pathlen,romfs_read(offset),newlen)" and node.token contains "newpath[pathlen+newlen]=0" and node.token contains "expand_fs(newpath,child)" and not (node.token contains "strchr(name,'/')") and not (node.token contains "strcmp(name,\"..\")")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "filesystem_image.dirent_traversal"
   emit issue code.FilesystemImageDirentTraversal at node
 }

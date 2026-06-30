@@ -1,5 +1,6 @@
 test "rank204: basic-auth-connect ordinary credential equality needs timing review"
   lang javascript
+  expect VYQL-CRY-006
   expect_review code.SecretComparisonReview
   code
   ```
@@ -23,6 +24,7 @@ test "rank204: basic-auth-connect ordinary credential equality needs timing revi
 
 test "rank204: basic-auth-connect timing-safe credential compare is clean"
   lang javascript
+  reject VYQL-CRY-006
   reject_review code.SecretComparisonReview
   code
   ```

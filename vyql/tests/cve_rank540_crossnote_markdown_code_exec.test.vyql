@@ -1,0 +1,25 @@
+# Rank 540 / CVE-2026-11422: Crossnote TypeScript code execution.
+# Ledger verification: VYQL-INJ-003/VYQL-INJ-002 catch direct code execution.
+
+test "rank540: Crossnote evaluates user markdown expression"
+  lang javascript
+  file preview.ts
+  expect VYQL-INJ-003
+  code
+  ```
+  export function render(req) {
+    const expression = req.query.expression;
+    return eval(expression);
+  }
+  ```
+
+test "rank540: Crossnote evaluates static expression"
+  lang javascript
+  file preview.ts
+  reject VYQL-INJ-003
+  code
+  ```
+  export function render(req) {
+    return eval("1 + 1");
+  }
+  ```

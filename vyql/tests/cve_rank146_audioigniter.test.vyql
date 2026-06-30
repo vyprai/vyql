@@ -3,6 +3,7 @@
 
 test "rank146: php wordpress public playlist endpoint without read policy is review attention"
   lang php
+  expect VYQL-AUTH-081
   expect_review code.IdorPolicyReview
   code
   ```
@@ -28,6 +29,7 @@ test "rank146: php wordpress public playlist endpoint without read policy is rev
 
 test "rank146: php wordpress public playlist endpoint with publish/read policy is clean"
   lang php
+  reject VYQL-AUTH-081
   expect_review core.AuthorizationCheck
   reject_review code.IdorPolicyReview
   code

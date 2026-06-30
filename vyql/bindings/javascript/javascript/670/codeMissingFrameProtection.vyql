@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding missingFrameProtection670 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "helmet" and node.token contains "frameguard=false"
+  query pattern presenceNode where node.context.language == "javascript" and node.context.callPath contains "helmet" and node.context.prop contains "frameguard=false"
   emit issue code.MissingFrameProtection at node
 }

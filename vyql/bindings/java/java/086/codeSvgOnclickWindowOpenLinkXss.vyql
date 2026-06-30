@@ -1,6 +1,6 @@
 module bindings.java.generated.m420f6b67;
 
 binding svgOnclickWindowOpenLinkXss86 {
-  query pattern presenceNode where node.scope == "function" and node.context.identifier contains "link" and node.token contains "window.open" and node.token contains "cursor: pointer" and node.context.call contains "escapeHtml" and node.context.call contains "replace" and node.context.call contains "getBytes" and not (node.context.scopeCall contains "getProtocol") and not (node.token contains "&quot;")
+  query pattern presenceNode where node.scope == "function" and node.context.identifier contains "link" and node.context.literal contains "window.open" and node.context.literal contains "cursor: pointer" and node.context.call contains "escapeHtml" and node.context.call contains "replace" and node.context.call contains "getBytes" and not (node.context.scopeCall contains "getProtocol") and not (node.context.literal contains "&quot;")
   emit issue code.SvgOnclickWindowOpenLinkXss at node
 }

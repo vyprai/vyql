@@ -129,17 +129,38 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *scConvScala) conditionContextCall(cond *tree_sitter.Node, loc string) nir.Call {
 	raw := c.text(cond)
 	compact := strings.Join(strings.Fields(raw), "")
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: raw},
+		nir.Const{Loc: loc, Value: compact},
+		nir.Const{Loc: loc, Value: c.currentFunc},
+	}
+	if scHasIncompleteCsrfDoubleSubmit(raw, c.currentFunc) {
+		args = append(args, nir.Const{Loc: loc, Value: "csrf_validation:double_submit_missing_nonempty_guard"})
+	}
 	return nir.Call{
 		Callee: nir.Name{ID: "analysis.condition.if", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: raw},
-			nir.Const{Loc: loc, Value: compact},
-			nir.Const{Loc: loc, Value: c.currentFunc},
-		},
+		Args:   args,
 		Path:   "analysis.condition.if",
 		Method: "if",
 		Loc:    loc,
 	}
+}
+
+func scHasIncompleteCsrfDoubleSubmit(raw, fn string) bool {
+	compact := strings.Join(strings.Fields(raw), "")
+	lower := strings.ToLower(compact)
+	if !strings.Contains(strings.ToLower(fn), "csrf") {
+		return false
+	}
+	if !strings.Contains(lower, "submitted==cookie") && !strings.Contains(lower, "cookie==submitted") {
+		return false
+	}
+	for _, guard := range []string{".isempty", ".nonempty", "!=null", "!=''", "!=\"\""} {
+		if strings.Contains(lower, guard) {
+			return false
+		}
+	}
+	return true
 }
 
 // scMatch lowers a `x match { case … }` to a subject+labelled nir.Switch so a constant

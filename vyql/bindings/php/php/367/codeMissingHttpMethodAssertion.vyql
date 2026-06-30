@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding missingHttpMethodAssertion367 {
-  query pattern presenceNode where node.scope == "class" and node.token contains "Action" and node.token contains "PasswordReset::class" and node.token contains "->initiateReset" and not (node.token contains "$this->assertAllowedHttpMethod")
+  query pattern presenceNode where node.scope == "class" and node.context.phpReview == "state_changing_action_missing_method_assertion_password_reset"
   emit issue code.MissingHttpMethodAssertion at node
 }

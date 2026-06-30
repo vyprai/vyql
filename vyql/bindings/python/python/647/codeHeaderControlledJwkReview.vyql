@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding headerControlledJwkReview647 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "_prepare_algorithm_key" and node.token contains "key is None and \"jwk\" in header" and node.token contains "key = header[\"jwk\"]" and node.token contains "prepare_key(key)"
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "header_controlled_jwk"
   emit issue code.HeaderControlledJwkReview at node
 }

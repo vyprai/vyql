@@ -1,5 +1,6 @@
 test "rank235: Java signature verification must bind supplied pubkey to committed hash"
   lang java
+  expect VYQL-CRY-030
   expect_review code.PublicKeyHashBindingReview
   code
   ```
@@ -22,6 +23,7 @@ test "rank235: Java signature verification must bind supplied pubkey to committe
 
 test "rank235: Java signature verification checks supplied pubkey hash first"
   lang java
+  reject VYQL-CRY-030
   reject_review code.PublicKeyHashBindingReview
   code
   ```

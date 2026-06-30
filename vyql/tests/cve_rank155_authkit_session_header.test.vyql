@@ -4,6 +4,7 @@
 
 test "rank155: typescript authkit middleware must strip client session header"
   lang javascript
+  expect VYQL-AUTH-082
   expect_review code.ProtocolStateReview
   code
   ```
@@ -53,6 +54,7 @@ test "rank155: typescript authkit middleware must strip client session header"
 
 test "rank155: typescript authkit middleware strips client session header"
   lang javascript
+  reject VYQL-AUTH-082
   reject_review code.ProtocolStateReview
   code
   ```

@@ -1,7 +1,7 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding catastrophicRegex548 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "StringPrototypeSplit" and node.token contains "\\s*,\\s*"
+  query pattern callExpr where callee.path ~= "StringPrototypeSplit" and args.any.literal contains "\\s*,\\s*"
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

@@ -1,5 +1,6 @@
 test "rank176: Jenkins AWS global configure endpoint saves config without admin permission check"
   lang java
+  expect VYQL-AUTH-079
   expect_review code.SensitiveOperation
   code
   ```
@@ -24,6 +25,7 @@ test "rank176: Jenkins AWS global configure endpoint saves config without admin 
 
 test "rank176: Jenkins AWS global configure endpoint checks admin permission before save"
   lang java
+  reject VYQL-AUTH-079
   reject_review code.SensitiveOperation
   code
   ```

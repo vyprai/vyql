@@ -1,6 +1,6 @@
 module bindings.cpp.generated.m4e783366;
 
 binding ocppEvccIdSharedMapRace120 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "module.context" and node.context.language == "cpp" and node.token contains "classOCPP201" and node.token contains "std::map<int32_t,std::string>evse_evcc_id" and not (node.token contains "monitor<std::map<int32_t,std::string>>evse_evcc_id") and not (node.token contains "evse_evcc_id.handle()")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ocpp.shared_map_race"
   emit issue code.OcppEvccIdSharedMapRace at node
 }

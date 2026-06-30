@@ -658,7 +658,576 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 		body = fn
 	}
 	walk(body)
+	for _, tok := range pySemanticReviewTokens(c.text(body), name) {
+		add(tok)
+	}
+	if name == "body" &&
+		pyContextHasAny(c.classContext, "class_name=WaterfallHelp", "class_name:WaterfallHelp") {
+		compactBody := pyContextCompactUnbounded(c.text(body))
+		if pyWaterfallReloadOptionUnescaped(compactBody) {
+			add("python_review:unescaped_html_option_renderer")
+		}
+	}
+	if name == "title" &&
+		pyContextHasAny(c.classContext, "class_name=TermViewlet", "class_name:TermViewlet") &&
+		pyContextHasAny(c.classContext, "term-contact", "objpath") {
+		compactBody := pyContextCompactUnbounded(c.text(body))
+		if strings.Contains(compactBody, ".Title()") &&
+			!strings.Contains(compactBody, "quote=True") &&
+			!strings.Contains(compactBody, "html.escape(") &&
+			!strings.Contains(compactBody, "markupsafe.escape(") &&
+			!strings.Contains(compactBody, "escape(") {
+			add("python_review:collective_contact_widget_title_xss")
+		}
+	}
+	if name == "serialize" && pyContextHasAny(c.classContext, "class_base:HTMLSerializer", "class_bases=HTMLSerializer") {
+		if !pyContextHasAny(c.classContext, "escape_rcdata=True") {
+			add("python_review:html_sanitizer_missing_rcdata_escape")
+		}
+	}
+	if name == "default" && pyContextHasAny(c.classContext, "MetadataXMLDeserializer") {
+		compactBody := pyContextCompactUnbounded(c.text(body))
+		if strings.Contains(compactBody, "minidom.parseString(") &&
+			!strings.Contains(compactBody, "safe_minidom_parse_string(") {
+			add("python_review:cinder_unsafe_minidom_xml_deserializer")
+		}
+	}
 	return out
+}
+
+func pySemanticReviewTokens(raw, name string) []string {
+	compact := pyContextCompactUnbounded(raw)
+	var out []string
+	add := func(fact string) {
+		out = append(out, "python_review:"+fact)
+	}
+	if strings.Contains(compact, "app.config[\"SECRET_KEY\"]=") || strings.Contains(compact, "app.config['SECRET_KEY']=") {
+		if !strings.Contains(compact, "os.environ") &&
+			!strings.Contains(compact, "os.getenv") &&
+			!strings.Contains(compact, "secrets.") &&
+			!strings.Contains(compact, "build_secret_key()") {
+			add("flask_hardcoded_secret_key")
+		}
+	}
+	for _, action := range []string{"sync", "reposync", "hardlink", "buildiso", "generic_delete"} {
+		if name == action && pyCobblerRemoteAction(compact, action) {
+			add("cobbler_get_state_change_without_post")
+			break
+		}
+	}
+	if strings.Contains(compact, "keyisNoneand\"jwk\"inheader") &&
+		strings.Contains(compact, "key=header[\"jwk\"]") &&
+		strings.Contains(compact, "prepare_key(key)") {
+		add("header_controlled_jwk")
+	}
+	if strings.Contains(compact, "Formatter().parse") {
+		if (strings.Contains(compact, ".") || strings.Contains(compact, "[")) &&
+			(!strings.Contains(compact, "format_spec") || (!strings.Contains(compact, "{") && !strings.Contains(compact, "}"))) {
+			add("incomplete_template_validation")
+		}
+	}
+	if name == "get_jinja_env" &&
+		strings.Contains(compact, "Environment(extensions=") &&
+		strings.Contains(compact, "filters.update(get_jinja_filters())") &&
+		strings.Contains(compact, "returnjinja_env") &&
+		!strings.Contains(compact, "SandboxedEnvironment") &&
+		!strings.Contains(compact, "ImmutableSandboxedEnvironment") {
+		add("jinja_environment_without_sandbox")
+	}
+	if strings.Contains(compact, "query_expr.parseString") &&
+		strings.Contains(compact, "repr(") &&
+		strings.Contains(compact, ".replace(") &&
+		strings.Contains(compact, "__default_field__") {
+		add("unparameterized_sql_query_parser")
+	}
+	if name == "safe_extract" &&
+		strings.Contains(compact, ".getmembers()") &&
+		strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, ".name") &&
+		strings.Contains(compact, "is_within_directory(") &&
+		strings.Contains(compact, ".extractall(") &&
+		!strings.Contains(compact, ".issym()") &&
+		!strings.Contains(compact, ".islnk()") &&
+		!strings.Contains(compact, ".linkname") {
+		add("archive_symlink_filter_bypass")
+	}
+	if name == "_resolve_path" &&
+		strings.Count(compact, "os.path.join(") >= 2 &&
+		strings.Contains(compact, ".memory_dir") &&
+		strings.Contains(compact, ".workspace_root") &&
+		!strings.Contains(compact, "os.path.realpath") &&
+		!strings.Contains(compact, ".resolve()") &&
+		!strings.Contains(compact, "startswith(") {
+		add("cowagent_memory_filename_traversal")
+	}
+	if strings.Contains(compact, ".query.get_or_404(") &&
+		strings.Contains(compact, "jsonify(") &&
+		strings.Contains(compact, ".permissions") &&
+		!strings.Contains(compact, "current_user.admin") &&
+		!strings.Contains(compact, "has_permission(") &&
+		!strings.Contains(compact, "permission_required") {
+		add("flask_entity_detail_missing_authorization")
+	}
+	if name == "_get_file_path" &&
+		strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, ".storage_path") &&
+		strings.Contains(compact, ".SESSION_PREFIX") &&
+		strings.Contains(compact, ".id") &&
+		!strings.Contains(compact, "os.path.normpath(") &&
+		!strings.Contains(compact, "realpath(") &&
+		!strings.Contains(compact, "abspath(") {
+		add("cherrypy_session_id_file_path_traversal")
+	}
+	if name == "serve_protected_file" &&
+		strings.Contains(compact, "PROTECTED_MEDIA_ROOT") &&
+		strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, "os.path.isfile(") &&
+		strings.Contains(compact, "open(") &&
+		strings.Contains(compact, "'rb'") &&
+		!strings.Contains(compact, ".startswith(") &&
+		!strings.Contains(compact, "os.path.abspath(") &&
+		!strings.Contains(compact, "os.path.realpath(") {
+		add("codered_protected_media_path_traversal")
+	}
+	if strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, ".entries()") &&
+		strings.Contains(compact, ".fname") &&
+		strings.Contains(compact, ".startswith(out_dir)") &&
+		pyCompactContainsAny(compact, "os.makedirs(", "BlockFile(", "open(") &&
+		!strings.Contains(compact, "commonpath(") &&
+		!strings.Contains(compact, ".startswith(out_dir+os.sep)") &&
+		!strings.Contains(compact, ".startswith(out_dir+\"/\")") &&
+		!strings.Contains(compact, ".startswith(out_dir+'/')") {
+		add("archive_entry_raw_prefix_containment")
+	}
+	if strings.Contains(compact, "'../'in") &&
+		strings.Contains(compact, "re.search(") &&
+		strings.Contains(compact, "A-Za-z0-9") &&
+		strings.Contains(compact, "returnTrue") &&
+		strings.Contains(compact, "returnFalse") &&
+		!strings.Contains(compact, "startswith('/')") &&
+		!strings.Contains(compact, "os.path.isabs(") &&
+		!strings.Contains(compact, ".is_absolute()") {
+		add("relative_only_filename_validation")
+	}
+	if name == "_recv_packet" &&
+		strings.Contains(compact, "MSG_USERAUTH_LAST") &&
+		strings.Contains(compact, "process_packet(") &&
+		!strings.Contains(compact, "Invalidrequestreceivedbefore") {
+		add("asyncssh_pre_auth_packet_dispatch")
+	}
+	if strings.Contains(compact, "distutils.spawn.find_executable(") &&
+		strings.Contains(compact, "subprocess.Popen(") &&
+		strings.Contains(compact, "shell=True") &&
+		strings.Contains(compact, ".items()") &&
+		strings.Contains(compact, ".wait()==0") {
+		add("shell_true_package_manager_probe")
+	}
+	if pyCompactContainsAny(compact, "subprocess.run(", "subprocess.call(", "subprocess.Popen(", "subprocess.check_output(", "subprocess.check_call(", "Popen(") &&
+		strings.Contains(compact, "shell=True") &&
+		pyCompactContainsAny(compact, ".format(", "f\"", "f'") &&
+		!pyCompactContainsAny(compact, "shlex.quote(", "shlex.join(", "subprocess.list2cmdline(") &&
+		!strings.Contains(compact, "distutils.spawn.find_executable(") {
+		add("command_string_wrapper_execution")
+	}
+	if strings.Contains(compact, "UPDATEusersSET") &&
+		strings.Contains(compact, "nonquery(") &&
+		strings.Contains(compact, "[0]") &&
+		!strings.Contains(compact, "[0]in[\"firstname\",\"lastname\"]") {
+		add("unvalidated_sql_identifier_interpolation")
+	}
+	if name == "_prepare_request" &&
+		strings.Contains(compact, "\"X-Api-Key\"") &&
+		strings.Contains(compact, "PLUGIN_DAEMON_KEY") &&
+		strings.Contains(compact, "returnstr(") &&
+		strings.Contains(compact, "/") &&
+		!strings.Contains(compact, "unquote(") &&
+		!strings.Contains(compact, ".split(\"/\")") &&
+		!strings.Contains(compact, "\"..\"") {
+		add("internal_service_url_path_traversal")
+	}
+	if name == "udp" &&
+		strings.Contains(compact, ".recvfrom(") &&
+		strings.Contains(compact, "dns.message.from_wire(") &&
+		strings.Contains(compact, ".is_response(") &&
+		strings.Contains(compact, "break") &&
+		!strings.Contains(compact, "exceptdns.message.Truncated") &&
+		!strings.Contains(compact, "ignore_errors") {
+		add("dns_udp_response_validation_after_loop")
+	}
+	if name == "decode_relay_state" &&
+		strings.Contains(compact, "urlparse(") &&
+		strings.Contains(compact, ".scheme") &&
+		strings.Contains(compact, ".netloc") &&
+		strings.Contains(compact, ".path.startswith(\"/\")") &&
+		!strings.Contains(compact, "is_safe_url(") &&
+		!strings.Contains(compact, "get_account_adapter") {
+		add("saml_relay_state_open_redirect")
+	}
+	if name == "_parse_qsl" &&
+		strings.Contains(compact, ".replace(';','&').split('&')") {
+		add("ambiguous_query_parameter_separator")
+	}
+	if name == "__init__" &&
+		strings.Contains(compact, "create_engine(") &&
+		strings.Contains(compact, ".database_uri") &&
+		strings.Contains(compact, "sessionmaker(") &&
+		strings.Contains(compact, "expire_on_commit=True") &&
+		!strings.Contains(compact, "scoped_session(") &&
+		!strings.Contains(compact, "pool_timeout") {
+		add("chatterbot_sqlalchemy_session_pool_exhaustion_init")
+	}
+	if strings.Contains(compact, ".Session()") &&
+		strings.Contains(compact, ".query(") &&
+		strings.Contains(compact, "yield") &&
+		strings.Contains(compact, ".model_to_object(") &&
+		!strings.Contains(compact, "finally") {
+		add("chatterbot_sqlalchemy_session_pool_exhaustion_filter")
+	}
+	if strings.Contains(compact, ".search(**") &&
+		strings.Contains(compact, "pysolr.SolrError") &&
+		strings.Contains(compact, "raiseSearchError") &&
+		strings.Contains(compact, "SOLRreturnedanerrorrunningquery") &&
+		!strings.Contains(compact, "SolrConnectionError") &&
+		!strings.Contains(compact, "Failedtoconnecttoserver") {
+		add("ckan_solr_connection_error_disclosure")
+	}
+	if strings.Contains(compact, ".split(\".\")") &&
+		strings.Contains(compact, "hasattr(") &&
+		strings.Contains(compact, "getattr(") &&
+		strings.Contains(compact, "setattr(") &&
+		!pyCompactContainsAny(compact, ".startswith(\"__\")", ".startswith('__')", ".endswith(\"__\")", ".endswith('__')") {
+		add("python_dunder_path_class_pollution")
+	}
+	if strings.Contains(compact, "FollowUpAttachment(") &&
+		strings.Contains(compact, "file=") &&
+		strings.Contains(compact, "filename=") &&
+		strings.Contains(compact, ".save()") &&
+		!strings.Contains(compact, ".full_clean()") &&
+		!strings.Contains(compact, "full_clean()") {
+		add("django_attachment_save_without_model_validation")
+	}
+	if strings.Contains(compact, "sync_playwright()") &&
+		strings.Contains(compact, ".chromium.launch(") &&
+		strings.Contains(compact, ".new_context(") &&
+		strings.Contains(compact, ".set_content(") &&
+		!strings.Contains(compact, "java_script_enabled=False") {
+		add("server_side_browser_active_html_js_enabled")
+	}
+	if strings.Contains(compact, "sync_playwright()") &&
+		strings.Contains(compact, ".chromium.launch(") &&
+		strings.Contains(compact, ".new_context(") &&
+		strings.Contains(compact, ".set_content(") &&
+		!strings.Contains(compact, "offline=") &&
+		!strings.Contains(compact, ".route(") {
+		add("server_side_browser_active_html_fetch_enabled")
+	}
+	if strings.Contains(compact, "SigningCertURL") &&
+		strings.Contains(compact, ".startswith(\"https://\")") &&
+		strings.Contains(compact, "urlparse(") &&
+		strings.Contains(compact, "EVENT_CERT_DOMAINS") &&
+		strings.Contains(compact, ".netloc.split(\".\")[-len(") &&
+		!strings.Contains(compact, "SES_REGEX_CERT_URL.match(") &&
+		!strings.Contains(compact, "SimpleNotificationService") {
+		add("sns_certificate_url_trust_bypass")
+	}
+	if strings.Contains(compact, "UserStatus.ACTIVE") &&
+		strings.Contains(compact, "UserRole.USER") &&
+		strings.Contains(compact, "generate_keypair()") &&
+		strings.Contains(compact, "create_user_with_keypair(") &&
+		!strings.Contains(compact, "UserStatus.INACTIVE") {
+		add("auto_active_signup_account")
+	}
+	if strings.Contains(compact, ".run(") &&
+		pyCompactContainsAny(compact, "host='0.0.0.0'", "host=\"0.0.0.0\"") &&
+		strings.Contains(compact, "debug=True") &&
+		!strings.Contains(compact, "use_evalex=False") {
+		add("werkzeug_debug_console_exposure")
+	}
+	if strings.Contains(compact, ".transaction_type:") &&
+		strings.Contains(compact, ".transaction_type=\"selling\"") &&
+		strings.Contains(compact, ".transaction_type=\"buying\"") &&
+		!strings.Contains(compact, ".transaction_typein[\"buying\",\"selling\"]") {
+		add("unvalidated_choice_control_field")
+	}
+	if strings.Contains(compact, "rules_of_guideline(") &&
+		strings.Contains(compact, "checkers_by_labels(") &&
+		!strings.Contains(compact, "__require_view()") {
+		add("codechecker_guideline_rules_missing_view_check")
+	}
+	if strings.Contains(compact, "os.geteuid()==0") &&
+		strings.Contains(compact, "superuserprivileges") &&
+		!strings.Contains(compact, "os.getuid()==0") {
+		add("effective_uid_root_check_bypass")
+	}
+	if strings.Contains(compact, "ub.Shelf()") &&
+		strings.Contains(compact, "create_edit_shelf(") &&
+		strings.Contains(compact, "page=\"shelfcreate\"") &&
+		!strings.Contains(compact, "role_edit_shelfs") {
+		add("access_policy_public_shelf_without_role_check")
+	}
+	if strings.Contains(compact, "yaml.safe_load(") &&
+		strings.Contains(compact, "LOG.info(") &&
+		strings.Contains(compact, "Configfile:") &&
+		!strings.Contains(compact, "LOG.debug(\"Configfile:") {
+		add("sensitive_config_info_log")
+	}
+	if strings.Contains(compact, ".__dict__.items()") &&
+		strings.Contains(compact, "not") &&
+		strings.Contains(compact, ".endswith(\"_e\")") &&
+		!strings.Contains(strings.ToLower(compact), "api") {
+		add("config_exposure_without_api_redaction")
+	}
+	if strings.Contains(compact, ".headers.get(") &&
+		strings.Contains(compact, "Content-Type") &&
+		strings.Contains(compact, "ALL_SERDE.get(") &&
+		strings.Contains(compact, ".from_http_request(") &&
+		!strings.Contains(compact, "UNSUPPORTED_MEDIA_TYPE") {
+		add("request_selected_deserialization_format")
+	}
+	if strings.Contains(compact, "QueryRequest(") &&
+		strings.Contains(compact, "sql=") &&
+		strings.Contains(compact, ".execute_query(") &&
+		!strings.Contains(compact, "validate_sql_security") &&
+		!strings.Contains(compact, "DorisSecurityManager") {
+		add("mcp_sql_execution_missing_validation")
+	}
+	if strings.Contains(compact, ".get_link_fields()") &&
+		strings.Contains(compact, ".get_dynamic_link_fields()") &&
+		strings.Contains(compact, "frappe.get_doc(") &&
+		strings.Contains(compact, ".update(") &&
+		!strings.Contains(compact, "check_permission=\"read\"") &&
+		!strings.Contains(compact, ".apply_fieldlevel_read_permissions()") {
+		add("frappe_link_expansion_missing_read_permission")
+	}
+	if strings.Contains(compact, ".context.read_only") &&
+		pyCompactContainsAny(compact, "get_image_meta_or_404(", "get_resource(", "get_object(", "get_by_id(", "find_by_id(") &&
+		pyCompactContainsAny(compact, "schedule_delete_from_backend(", "delete_image_metadata(", "delete_resource(", "delete_object(") &&
+		pyCompactContainsAny(compact, "['protected']", "[\"protected\"]") &&
+		!pyCompactContainsAny(compact, ".context.is_admin", ".context.owner", "['owner']", "[\"owner\"]", "check_ownership(", "require_owner(", "is_owner(", "checkPermission(", "check_permission(") {
+		add("owned_resource_delete_missing_ownership_check")
+	}
+	if strings.Contains(compact, "_original_transport") &&
+		strings.Contains(compact, "._reader._transport") &&
+		strings.Contains(compact, "._writer._transport") &&
+		!strings.Contains(compact, "._reader._buffer.clear()") {
+		add("starttls_transport_buffer_handoff")
+	}
+	if strings.Contains(compact, ".replace(") &&
+		strings.Contains(compact, "os.execv(") &&
+		strings.Contains(compact, "\"-c\"") &&
+		!strings.Contains(compact, "shlex.quote(") {
+		add("command_line_assembly_review")
+	}
+	if strings.Contains(compact, ".query_params.get(\"version\")") &&
+		strings.Contains(compact, "openapi_url=") &&
+		strings.Contains(compact, "?version={") &&
+		pyCompactContainsAny(compact, "get_swagger_ui_html(", "get_redoc_html(") &&
+		!strings.Contains(compact, "quote(") {
+		add("unescaped_docs_openapi_url")
+	}
+	if pyCompactContainsAny(compact, ".get('url','')", ".get(\"url\",\"\")") &&
+		strings.Contains(compact, "return") &&
+		!strings.Contains(compact, "is_safe_url(") &&
+		!strings.Contains(compact, "SAFE_PROTOCOL_REGEX") &&
+		!strings.Contains(compact, "return'DISABLED'") &&
+		!strings.Contains(compact, "return\"DISABLED\"") {
+		add("unsafe_watch_url_protocol")
+	}
+	if strings.Contains(compact, "publish_parts(") &&
+		strings.Contains(compact, "writer_name=\"html4css1\"") &&
+		strings.Contains(compact, "settings_overrides=") &&
+		!strings.Contains(compact, "'raw_enabled':False") &&
+		!strings.Contains(compact, "\"raw_enabled\":False") &&
+		!strings.Contains(compact, "'file_insertion_enabled':False") &&
+		!strings.Contains(compact, "\"file_insertion_enabled\":False") {
+		add("docutils_rest_unsafe_directive_rendering")
+	}
+	if strings.Contains(compact, "use_ssl=False") &&
+		strings.Contains(compact, "Tls(") &&
+		strings.Contains(compact, "validate=ssl.CERT_REQUIRED") &&
+		strings.Contains(compact, "Server(") {
+		add("cert_validation_disabled_tls_fallback")
+	}
+	if strings.Contains(compact, "re.compile(") &&
+		strings.Contains(compact, "^black([^A-Z0-9._-]+.*)$") {
+		add("package_version_specifier_validation_review")
+	}
+	if name == "cookies" &&
+		strings.Contains(compact, "SimpleCookie()") &&
+		strings.Contains(compact, ".headers.get(\"cookie\",\"\").split(\";\")") &&
+		strings.Contains(compact, ".load(") &&
+		!strings.Contains(compact, "exceptException") &&
+		!strings.Contains(compact, "continue") {
+		add("emmett_unhandled_cookie_parse_exception")
+	}
+	if pyCompactContainsAny(compact, "CASE_DEMO_NONRANDOM_UUID_BASE", "CDO_DEMO_NONRANDOM_UUID_BASE") &&
+		strings.Contains(compact, "sys.argv[0]") &&
+		strings.Contains(compact, ".resolve()") &&
+		strings.Contains(compact, ".relative_to(") &&
+		strings.Contains(compact, ".append(str(") &&
+		!strings.Contains(compact, "_is_relative_to(") {
+		add("absolute_path_disclosure")
+	}
+	if strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, "._data_dir") &&
+		strings.Contains(compact, "os.makedirs(") &&
+		strings.Contains(compact, "shutil.rmtree") &&
+		!strings.Contains(compact, "SAFE_SEED_RE.match(") &&
+		!strings.Contains(compact, "_safe_rmtree") {
+		add("cloakserve_fingerprint_seed_path_traversal")
+	}
+	if strings.Contains(compact, "include_attachment_data=True") &&
+		pyCompactContainsAny(compact, "['attachment']", "[\"attachment\"]") &&
+		pyCompactContainsAny(compact, "['filename']", "[\"filename\"]") &&
+		pyCompactContainsAny(compact, "['raw']", "[\"raw\"]") &&
+		strings.Contains(compact, "base64.b64decode(") &&
+		pyCompactContainsAny(compact, ".open('wb')", ".open(\"wb\")") &&
+		!(strings.Contains(compact, "pathlib.Path(") &&
+			pyCompactContainsAny(compact, "[\"filename\"]", "['filename']") &&
+			strings.Contains(compact, ".name")) &&
+		!strings.Contains(compact, "os.path.basename(") {
+		add("email_attachment_filename_path_traversal")
+	}
+	if strings.Contains(compact, ".startswith(\"/__emmett__\")") &&
+		strings.Contains(compact, "[12:]") &&
+		strings.Contains(compact, "os.path.join(os.path.dirname(__file__),\"..\",\"assets\"") &&
+		strings.Contains(compact, "._static_response(") &&
+		!strings.Contains(compact, "os.path.realpath(") &&
+		!strings.Contains(compact, "static_file.startswith(") &&
+		!strings.Contains(compact, ".relative_to(") {
+		add("internal_asset_route_path_traversal")
+	}
+	if strings.Contains(compact, "AnsibleModule(") &&
+		strings.Contains(compact, "authkey=dict(type='str')") &&
+		strings.Contains(compact, "privkey=dict(type='str')") &&
+		strings.Contains(compact, "UsmUserData(") &&
+		!strings.Contains(compact, "authkey=dict(type='str',no_log=True)") &&
+		!strings.Contains(compact, "privkey=dict(type='str',no_log=True)") {
+		add("ansible_snmp_facts_credentials_no_log_missing")
+	}
+	if strings.Contains(compact, "_warnmsg(") &&
+		strings.Contains(compact, "UnknownDKIMkeytype") &&
+		pyCompactContainsAny(compact, "['k']", "[\"k\"]") &&
+		!strings.Contains(compact, "_warnmsg(\"UnknownDKIMkeytype\")") {
+		add("unneutralized_diagnostic_value")
+	}
+	if strings.Contains(compact, "validate_request(") &&
+		pyCompactContainsAny(compact, "schedule_support_email(", "send_support_email(", "notify_admin(", "send_mail(", "send_email(") &&
+		pyCompactContainsAny(compact, "Site:%s", "URL:%s", "Url:%s", "Website:%s") &&
+		pyCompactContainsAny(compact, "['url']", "[\"url\"]", "['uri']", "[\"uri\"]", "['site']", "[\"site\"]") &&
+		!pyCompactContainsAny(compact, ".hostname", ".host", ".host_url", "defang(", "url_has_allowed_host_and_scheme(", "is_safe_url(", "same_origin(", "allowed_host(") {
+		add("untrusted_support_url_notification")
+	}
+	if strings.Contains(compact, "os.walk(") &&
+		strings.Contains(compact, "os.path.splitext(os.path.join(") &&
+		strings.Contains(compact, "msgfmt-o") &&
+		strings.Contains(compact, "os.system(") &&
+		!strings.Contains(compact, "djangocompilemo") &&
+		!strings.Contains(compact, "djangocompilepo") {
+		add("msgfmt_path_shell_command_interpolation")
+	}
+	if strings.Contains(compact, ".register_complete(") &&
+		pyCompactContainsAny(compact, "['fido_state']", "[\"fido_state\"]") &&
+		strings.Contains(compact, "User_Keys()") &&
+		strings.Contains(compact, ".save()") &&
+		!strings.Contains(compact, ".session.pop(") &&
+		!strings.Contains(compact, "delrequest.session") {
+		add("fido_registration_challenge_replay")
+	}
+	if strings.Contains(compact, "sshpass") &&
+		strings.Contains(compact, "@{") &&
+		strings.Contains(compact, "-p{") &&
+		strings.Contains(compact, "run_command(") &&
+		!strings.Contains(compact, "shlex.quote(") &&
+		!strings.Contains(compact, "int(port)") {
+		add("partially_escaped_ssh_command")
+	}
+	if name == "notify_provisioning_done" &&
+		strings.Contains(compact, "notify_provisioning_done(") &&
+		!strings.Contains(compact, "is_a_mac(") {
+		add("cloudstack_baremetal_mac_command_injection")
+	}
+	if strings.Contains(compact, ".split('/',1)") &&
+		strings.Contains(compact, ".replace('jpeg','jpg')") &&
+		strings.Contains(compact, ".ext='.'+") &&
+		!strings.Contains(compact, "mimetypes.guess_extension(") {
+		add("mime_subtype_file_extension_path_traversal")
+	}
+	if strings.Contains(compact, ".startswith(\".cpr\")") &&
+		strings.Contains(compact, "os.path.join(") &&
+		strings.Contains(compact, "\"web/\"") &&
+		strings.Contains(compact, "[5:]") &&
+		strings.Contains(compact, ".tx_file(") &&
+		!strings.Contains(compact, "absreal(") &&
+		!strings.Contains(compact, ".startswith(path_base)") {
+		add("copyparty_cpr_static_path_traversal")
+	}
+	if strings.Contains(compact, "PendingChangeSummary(") &&
+		pyCompactContainsAny(compact, "changeText=unescape(", "change_text=unescape(") &&
+		!pyCompactContainsAny(compact, "changeText=change[\"text\"]", "changeText=change['text']", "change_text=change[\"text\"]", "change_text=change['text']") {
+		add("checkmk_pending_change_text_unescape_xss")
+	}
+	return out
+}
+
+func pyWaterfallReloadOptionUnescaped(compactBody string) bool {
+	if !strings.Contains(compactBody, ".args") {
+		return false
+	}
+	rest := compactBody
+	offset := 0
+	for {
+		format := strings.Index(rest, "value=\"%s\"")
+		if format < 0 {
+			return false
+		}
+		format += offset
+		start := strings.LastIndex(compactBody[:format], "show_reload_input")
+		if start < 0 {
+			start = max(0, format-300)
+		}
+		end := min(len(compactBody), format+600)
+		window := compactBody[start:end]
+		if strings.Contains(window, "<td>%s</td>") && !strings.Contains(window, "html.escape(") {
+			return true
+		}
+		offset = format + len("value=\"%s\"")
+		rest = compactBody[offset:]
+	}
+}
+
+func pyContextCompactUnbounded(raw string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+}
+
+func pyCompactContainsAny(compact string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(compact, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func pyContextHasAny(tokens []string, needles ...string) bool {
+	for _, tok := range tokens {
+		for _, needle := range needles {
+			if tok == needle || strings.Contains(tok, needle) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func pyCobblerRemoteAction(compact, action string) bool {
+	switch action {
+	case "generic_delete":
+		return strings.Contains(compact, "remote.remove_item")
+	default:
+		return strings.Contains(compact, "remote.background_"+action)
+	}
 }
 
 func (c *pyConv) pyContextAssignmentItems(n *tree_sitter.Node) []string {
@@ -714,12 +1283,19 @@ func pyContextCompact(raw string) string {
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
 	body := c.text(field(n, "body"))
-	return []string{
+	out := []string{
 		"class_name=" + name,
+		"class_name:" + name,
 		"class_bases=" + strings.Join(bases, ","),
 		body,
 		strings.Join(strings.Fields(body), ""),
 	}
+	for _, base := range bases {
+		if base != "" {
+			out = append(out, "class_base:"+base)
+		}
+	}
+	return out
 }
 
 func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {

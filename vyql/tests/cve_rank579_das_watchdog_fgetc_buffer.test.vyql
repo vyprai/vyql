@@ -62,3 +62,21 @@ test "rank579: fgetc loop grows the buffer before writing"
       }
   }
   ```
+
+test "rank579: unbounded fgetc fixed buffer generalizes across names"
+  lang c
+  expect VYQL-MEM-032
+  code
+  ```
+  int fgetc(void *stream);
+
+  static char *read_env(void *stream) {
+    char scratch[128];
+    int offset = 0;
+    for (;;) {
+      scratch[offset] = fgetc(stream);
+      offset++;
+    }
+    return scratch;
+  }
+  ```

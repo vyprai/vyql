@@ -1,6 +1,6 @@
 module bindings.ruby.generated.m5a48bf47;
 
 binding erbHrefInterpolationHtmlEscapeMissing158 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "erb.unescaped_href_interpolation" and node.token contains "template=erb" and node.token contains "attr=href"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "erb.unescaped_href_interpolation" and node.context.template == "erb" and node.context.attr == "href"
   emit issue code.ErbHrefInterpolationHtmlEscapeMissing at node
 }

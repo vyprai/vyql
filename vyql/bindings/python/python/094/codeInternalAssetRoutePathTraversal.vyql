@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding internalAssetRoutePathTraversal94 {
-  query pattern presenceNode where node.scope == "function" and node.analysis == "function.context" and node.token contains "path.startswith(\"/__emmett__\")" and node.token contains "file_name = path[12:]" and node.token contains "os.path.join(os.path.dirname(__file__), \"..\", \"assets\", file_name)" and node.token contains "self._static_response(static_file)" and not (node.token contains "os.path.realpath") and not (node.token contains "static_file.startswith") and not (node.token contains ".relative_to")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "internal_asset_route_path_traversal"
   emit issue code.InternalAssetRoutePathTraversal at node
 }

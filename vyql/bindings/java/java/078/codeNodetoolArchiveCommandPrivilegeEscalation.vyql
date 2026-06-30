@@ -1,6 +1,6 @@
 module bindings.java.generated.m420f6b67;
 
 binding nodetoolArchiveCommandPrivilegeEscalation78 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "enableFullQueryLogger" and node.token contains "archiveCommand" and node.token contains "fqlOptions.archive_command" and node.token contains "FullQueryLogger.instance.enableWithoutClean" and not (node.token contains "allow_nodetool_archive_command")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "enableFullQueryLogger" and node.context.identifier contains "archiveCommand" and node.context.selector contains "fqlOptions.archive_command" and node.context.callPath contains "FullQueryLogger.instance.enableWithoutClean" and not (node.context.identifier contains "allow_nodetool_archive_command")
   emit issue code.NodetoolArchiveCommandPrivilegeEscalation at node
 }

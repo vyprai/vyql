@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding permissiveCors656 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "CORS" and node.token contains "origins=*"
-  emit issue code.PermissiveCors at node
+  query pattern callExpr where callee.path ~= "CORS" and args.any.literal contains "origins=*"
+  emit issue code.PermissiveCors at call
 }

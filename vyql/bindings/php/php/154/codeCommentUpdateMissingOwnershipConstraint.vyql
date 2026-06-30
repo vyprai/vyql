@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding commentUpdateMissingOwnershipConstraint154 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "updateComment" and node.token contains "comment_comment" and node.token contains "comment_id" and node.token contains "getDb()->update" and not (node.token contains "comment_author_id") and not (node.token contains "USERID")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "updateComment" and node.context.phpReview == "comment_update_missing_ownership_constraint"
   emit issue code.CommentUpdateMissingOwnershipConstraint at node
 }

@@ -4,6 +4,7 @@
 
 test "rank264: groupblog settings can link blogs and roles without permission validation"
   lang php
+  expect VYQL-AUTH-080
   expect_review code.AccessPolicyReview
   code
   ```
@@ -57,6 +58,7 @@ test "rank264: groupblog settings can link blogs and roles without permission va
 
 test "rank264: groupblog settings validate group/blog permissions and role allowlist"
   lang php
+  reject VYQL-AUTH-080
   reject_review code.AccessPolicyReview
   code
   ```

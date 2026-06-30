@@ -2,6 +2,7 @@
 
 test "rank129: cpp mesh allocation from unbounded face counts is review-visible"
   lang cpp
+  expect VYQL-DOS-041
   expect_review code.UnboundedAllocationReview
   code
   ```
@@ -32,6 +33,7 @@ test "rank129: cpp mesh allocation from unbounded face counts is review-visible"
 
 test "rank129: cpp mesh allocation with per-face and aggregate bounds is clean"
   lang cpp
+  reject VYQL-DOS-041
   reject_review code.UnboundedAllocationReview
   code
   ```
@@ -62,6 +64,35 @@ test "rank129: cpp mesh allocation with per-face and aggregate bounds is clean"
       out_mesh->mVertices = new aiVector3D[count_vertices];
       out_mesh->mNumFaces = count_faces;
       aiFace *fac = out_mesh->mFaces = new aiFace[count_faces]();
+      return 0;
+  }
+  ```
+
+test "rank129: accumulated array allocation generalizes across names"
+  lang cpp
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  unsigned int BuildOutput(const Geometry &geometry, MaterialId material) {
+      OutputMesh *const target = MakeMesh(geometry);
+      const IndexList &materials = geometry.Materials();
+      const std::vector<unsigned int> &parts = geometry.PartSizes();
+      unsigned int selected = 0;
+      unsigned int total_items = 0;
+
+      std::vector<unsigned int>::const_iterator part = parts.begin();
+      for (IndexList::const_iterator item = materials.begin(), stop = materials.end(); item != stop; ++item, ++part) {
+          if ((*item) != material) {
+              continue;
+          }
+          ++selected;
+          total_items += *part;
+      }
+
+      target->itemCount = total_items;
+      target->items = new Vertex[total_items];
+      target->faceCount = selected;
       return 0;
   }
   ```

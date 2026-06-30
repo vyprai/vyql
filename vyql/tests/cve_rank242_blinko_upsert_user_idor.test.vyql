@@ -1,5 +1,6 @@
 test "rank242: Blinko upsertUser updates supplied account id without ownership check"
   lang javascript
+  expect VYQL-AUTH-081
   expect_review code.IdorPolicyReview
   code
   ```
@@ -32,6 +33,7 @@ test "rank242: Blinko upsertUser updates supplied account id without ownership c
 
 test "rank242: Blinko upsertUser constrains updates to self or superadmin"
   lang javascript
+  reject VYQL-AUTH-081
   reject_review code.IdorPolicyReview
   code
   ```
@@ -71,6 +73,7 @@ test "rank242: Blinko upsertUser constrains updates to self or superadmin"
 
 test "rank242: Blinko admin-only upsert route is not the affected endpoint"
   lang javascript
+  reject VYQL-AUTH-081
   reject_review code.IdorPolicyReview
   code
   ```

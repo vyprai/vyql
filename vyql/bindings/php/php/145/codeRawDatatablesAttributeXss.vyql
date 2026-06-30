@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding rawDatatablesAttributeXss145 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "Datatables.of" and node.token contains ".rawColumns" and node.token contains "data-title" and node.context.attrPath contains "$tasks.title" and not (node.token contains "htmlspecialchars") and not (node.token contains "htmlentities") and not (node.token contains "e($tasks->title")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "raw_datatables_attribute_xss"
   emit issue code.RawDatatablesAttributeXss at node
 }

@@ -1,0 +1,8 @@
+# Rank 20 / CVE-2018-25024: actix-web unsafe mutable alias review.
+
+test "rank20: unsafe mutable alias is a CVE anchor"
+  expect VYQL-MEM-009
+  graph
+  ```
+  node alias code.UnsafeMutableAlias
+  ```

@@ -4,6 +4,7 @@
 
 test "rank154: python authentik token PKCE verifier without stored challenge requires protocol-state review"
   lang python
+  expect VYQL-AUTH-082
   expect_review code.ProtocolStateReview
   code
   ```
@@ -34,6 +35,7 @@ test "rank154: python authentik token PKCE verifier without stored challenge req
 
 test "rank154: python authentik token rejects verifier without stored challenge"
   lang python
+  reject VYQL-AUTH-082
   reject_review code.ProtocolStateReview
   code
   ```

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UserIdentityMappingReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_286, CWE_863]
+    id: "VYQL-AUTH-083"
+    severity: high
+  }
+  issue code.UserIdentityMappingReview as sink
+}

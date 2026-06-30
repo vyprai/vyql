@@ -1,6 +1,6 @@
 module bindings.scala.generated.m06d0685b;
 
 binding incompleteCsrfTokenValidation41 {
-  query pattern presenceNode where node.kind == "any" and node.analysis == "condition.if" and node.token contains "csrf" and node.token contains "==" and node.token contains "submitted" and node.token contains "cookie" and not (node.token contains ".isEmpty") and not (node.token contains ".nonEmpty") and not (node.token contains "!=null") and not (node.token contains "!=''") and not (node.token contains "!=\"\"")
+  query pattern presenceNode where node.kind == "any" and node.analysis == "condition.if" and node.context.csrfValidation == "double_submit_missing_nonempty_guard"
   emit issue code.IncompleteCsrfTokenValidation at node
 }

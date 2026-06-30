@@ -1,6 +1,6 @@
 module bindings.ruby.generated.m5a48bf47;
 
 binding polymorphicTypeSelectionReview249 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.token contains "polymorphic_as" and node.token contains "_type=" and node.token contains "params[\"#{polymorphic_as}_type\"]" and node.token contains "model.send" and not (node.token contains "valid_polymorphic_class")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.rubyReview == "polymorphic_type_selected_from_params"
   emit issue code.PolymorphicTypeSelectionReview at node
 }

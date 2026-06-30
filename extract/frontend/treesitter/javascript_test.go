@@ -600,6 +600,291 @@ function evaluate(tokens, expr, values) {
 	t.Fatalf("function context did not include subscript/regex tokens; nodes=%#v", nodes)
 }
 
+func TestJavaScriptFunctionContextMarksZeroStepSequenceRisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "brace.js")
+	src := []byte(`
+function numeric(str) {
+  return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
+}
+
+function lte(i, y) {
+  return i <= y;
+}
+
+function gte(i, y) {
+  return i >= y;
+}
+
+function expand(str) {
+  var n = str.split(/\.\./);
+  var x = numeric(n[0]);
+  var y = numeric(n[1]);
+  var width = Math.max(n[0].length, n[1].length);
+  var incr = n.length == 3
+    ? Math.abs(numeric(n[2]))
+    : 1;
+  var test = lte;
+  var reverse = y < x;
+  if (reverse) {
+    incr *= -1;
+    test = gte;
+  }
+  var pad = n.some(isPadded);
+  var N = [];
+
+  for (var i = x; test(i, y); i += incr) {
+    N.push(String(i));
+  }
+  return N;
+}
+
+function fixed(str) {
+  var n = str.split(/\.\./);
+  var incr = n.length == 3
+    ? Math.max(Math.abs(numeric(n[2])), 1)
+    : 1;
+  for (var i = 0; i < 10; i += incr) {}
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVuln, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "name=expand") && strings.Contains(tokens, "zero_step_sequence_risk=true") {
+			sawVuln = true
+		}
+		if strings.Contains(tokens, "name=fixed") && strings.Contains(tokens, "zero_step_sequence_risk=true") {
+			sawFixed = true
+		}
+	}
+	if !sawVuln {
+		t.Fatalf("function context did not mark zero-step sequence risk; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("function context marked clamped zero-step sequence as risky; nodes=%#v", nodes)
+	}
+}
+
+func TestJavaScriptFunctionContextMarksConvertSvgMultiSvgSanitizerBypass(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Converter.js")
+	src := []byte(`
+class Converter {
+  async [_convert](input, options) {
+    input = Buffer.isBuffer(input) ? input.toString('utf8') : input;
+
+    const { provider } = this;
+    const svg = cheerio.default.html(this[_sanitize](cheerio.load(input, null, false)('svg'), options));
+
+    const html = ` + "`" + `<!DOCTYPE html>
+<html>
+<head>
+<base href="${options.baseUrl}">
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; }
+html { background-color: ${provider.getBackgroundColor(options)}; }
+</style>
+</head>
+<body>${svg}</body>
+</html>` + "`" + `;
+
+    const page = await this[_getPage](html);
+    return await page.screenshot();
+  }
+
+  async fixed(input, options) {
+    const svg = cheerio.default.html(this[_sanitize](cheerio.load(input, null, false)('svg:first'), options));
+    const html = ` + "`" + `<body>${svg}</body>` + "`" + `;
+    const page = await this[_getPage](html);
+    return await page.screenshot();
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVuln, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "name=[_convert]") && strings.Contains(tokens, "convert_svg_multi_svg_sanitizer_bypass=true") {
+			sawVuln = true
+		}
+		if strings.Contains(tokens, "name=fixed") && strings.Contains(tokens, "convert_svg_multi_svg_sanitizer_bypass=true") {
+			sawFixed = true
+		}
+	}
+	if !sawVuln {
+		t.Fatalf("function context did not mark convert-svg multi-SVG sanitizer bypass; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("function context marked fixed svg:first flow as vulnerable; nodes=%#v", nodes)
+	}
+}
+
+func TestJavaScriptModuleContextMarksIncompleteGeneratedIdentifierReservedWords(t *testing.T) {
+	dir := t.TempDir()
+	vulnerable := filepath.Join(dir, "vulnerable.ts")
+	fixed := filepath.Join(dir, "fixed.ts")
+	vulnerableSrc := []byte(`
+const IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+const BLOCKED_TERMS = new Set([
+  'class', 'function', 'return', 'await', 'yield', 'this', 'var', 'let', 'const', 'enum',
+]);
+
+function usableMember(candidate: string): boolean {
+  return IDENTIFIER.test(candidate) && !BLOCKED_TERMS.has(candidate);
+}
+
+export function makeAccessExpression(member: string): string {
+  if (!usableMember(member)) throw new Error('bad member');
+  return ` + "`hostApi.${member}`" + `;
+}
+`)
+	fixedSrc := []byte(`
+const IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+const BLOCKED_TERMS = new Set([
+  'class', 'function', 'return', 'await', 'yield', 'this', 'var', 'let', 'const', 'enum',
+  'eval', 'arguments',
+]);
+
+function usableMember(candidate: string): boolean {
+  return IDENTIFIER.test(candidate) && !BLOCKED_TERMS.has(candidate);
+}
+
+export function makeAccessExpression(member: string): string {
+  if (!usableMember(member)) throw new Error('bad member');
+  return ` + "`hostApi.${member}`" + `;
+}
+`)
+	if err := os.WriteFile(vulnerable, vulnerableSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fixed, fixedSrc, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{vulnerable, fixed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.module.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(n.Prop("loc"), "vulnerable.ts") && strings.Contains(tokens, "incomplete_generated_js_identifier_reserved_words=true") {
+			sawVulnerable = true
+		}
+		if strings.Contains(n.Prop("loc"), "fixed.ts") && strings.Contains(tokens, "incomplete_generated_js_identifier_reserved_words=true") {
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable {
+		t.Fatalf("module context did not mark incomplete generated identifier reserved words; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("module context marked eval/arguments-protected generated identifiers as incomplete; nodes=%#v", nodes)
+	}
+}
+
+func TestJavaScriptFunctionContextMarksAjaxBackslashProtocolRelativeURLXSS(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pagination.js")
+	src := []byte(`
+function vulnerableAjax(nextHref, done) {
+  if (nextHref[0] != '/' || nextHref[1] == '/')
+    nextHref = ('' + location).replace(/[#\?].*/, '') + nextHref;
+  $.ajax({ type: 'GET', url: nextHref, success: done });
+}
+
+function fixedAjax(nextHref, done) {
+  if (nextHref[0] != '/' || nextHref[1] == '/' || nextHref.startsWith("/\\"))
+    nextHref = ('' + location).replace(/[#\?].*/, '') + nextHref;
+  $.ajax({ type: 'GET', url: nextHref, success: done });
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawVulnerable, sawFixed bool
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if strings.Contains(tokens, "name=vulnerableAjax") && strings.Contains(tokens, "ajax_backslash_protocol_relative_url_xss=true") {
+			sawVulnerable = true
+		}
+		if strings.Contains(tokens, "name=fixedAjax") && strings.Contains(tokens, "ajax_backslash_protocol_relative_url_xss=true") {
+			sawFixed = true
+		}
+	}
+	if !sawVulnerable {
+		t.Fatalf("function context did not mark slash-only AJAX URL guard; nodes=%#v", nodes)
+	}
+	if sawFixed {
+		t.Fatalf("function context marked explicit backslash guard as vulnerable; nodes=%#v", nodes)
+	}
+}
+
 func TestJavaScriptTemplateFormatCarriesStaticText(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "clone.js")

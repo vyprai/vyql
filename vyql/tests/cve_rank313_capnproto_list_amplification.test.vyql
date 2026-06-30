@@ -21,6 +21,28 @@ test "cve rank313 capnproto: zero-sized list count reaches reader without amplif
   }
   ```
 
+test "cve rank313 capnproto: list amplification generalizes across names"
+  lang cpp
+  file layout.c++
+  expect VYQL-DOS-012
+  expect_review code.ProtocolListAmplification
+  code
+  ```
+  enum class ElementSize { VOID, POINTER };
+
+  void readAnyList(Tag* meta, Segment* seg, void* ptr) {
+    auto count = meta->inlineCompositeListElementCount();
+    auto words = meta->structRef.wordSize();
+    ListReader(seg, ptr, count, words);
+  }
+
+  void readEmpty(ElementSize size_kind, int count, Segment* seg, void* ptr) {
+    if (size_kind == ElementSize::VOID) {
+      ListReader(seg, ptr, count, 0);
+    }
+  }
+  ```
+
 test "cve rank313 capnproto: zero-sized list count charged as amplified read"
   lang cpp
   file layout.c++

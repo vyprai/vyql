@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding fidoRegistrationChallengeReplay263 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "complete_reg" and node.token contains "server.register_complete" and node.token contains "request.session['fido_state']" and node.token contains "User_Keys()" and node.token contains "uk.save()" and not (node.token contains "request.session.pop") and not (node.token contains "del request.session['fido_state']")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "fido_registration_challenge_replay"
   emit issue code.FidoRegistrationChallengeReplay at node
 }

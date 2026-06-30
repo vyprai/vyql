@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding javaScriptUrlRedirectXss193 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.token contains "URLSearchParams(window.location.search).get" and node.token contains "window.location=decodeURI" and not (node.token contains "redirect[0]==='/'") and not (node.token contains "redirect[1]!=='/'")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "URLSearchParams" and node.context.callPath contains "?.get" and node.context.selector contains "window.location.search" and node.context.assign contains "window.location=decodeURI" and not (node.context.expr contains "redirect[0]==='/'") and not (node.context.expr contains "redirect[1]!=='/'")
   emit issue code.JavaScriptUrlRedirectXss at node
 }

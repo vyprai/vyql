@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding idorPolicyReview649 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "prisma.accounts.update" and node.token contains "where:{id}" and node.token contains "passwordHash" and node.token contains "originalPassword" and not (node.token contains "currentUserId") and not (node.token contains "ctx.id")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "prisma.accounts.update" and node.context.prop contains "where={id}" and node.context.identifier contains "passwordHash" and node.context.identifier contains "originalPassword" and not (node.context.identifier contains "currentUserId") and not (node.context.selector contains "ctx.id")
   emit issue code.IdorPolicyReview at node
 }

@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding missingGuestFallbackForWebAuth184 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "WebBasicAuth" and node.token contains "db_fetch_row_prepared('SELECT * FROM user_auth WHERE username = ? AND realm = 2'" and node.token contains "read_config_option('user_template')=='0'" and node.token contains "read_config_option('guest_user')!='0'" and not (node.token contains "read_config_option('user_template')=='0'&&read_config_option('guest_user')=='0'")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "missing_guest_fallback_for_web_auth"
   emit issue code.MissingGuestFallbackForWebAuth at node
 }

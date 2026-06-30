@@ -1,6 +1,6 @@
 module bindings.cpp.generated.m4e783366;
 
 binding cimgPnmDimensionProductOverflow83 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "cimg::fsize(filename)" and node.token contains "W*H*D>siz" and not (node.token contains "(cimg_int64)W*H*D>siz")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "cimg_pnm.dimension_product_overflow"
   emit issue code.CimgPnmDimensionProductOverflow at node
 }

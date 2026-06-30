@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding cloudStackBaremetalMacCommandInjection265 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "notify_provisioning_done" and node.token contains "/baremetal/provisiondone/<mac>" and node.token contains "server.notify_provisioning_done(mac)" and not (node.token contains "is_a_mac(mac)")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloudstack_baremetal_mac_command_injection"
   emit issue code.CloudStackBaremetalMacCommandInjection at node
 }

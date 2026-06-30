@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -19,6 +20,11 @@ type solConv struct {
 	key          string
 	adminGuarded bool
 }
+
+var (
+	solRsaSha256SuffixRE = regexp.MustCompile(`sha256\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes32\([A-Za-z_][A-Za-z0-9_]*\.length-32\)`)
+	solRsaSha1SuffixRE   = regexp.MustCompile(`SHA1\.sha1\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes20\([A-Za-z_][A-Za-z0-9_]*\.length-20\)`)
+)
 
 // ExtractSolidity parses .sol files into one NIR Program.
 func ExtractSolidity(files []string, root string) (nir.Program, error) {
@@ -79,12 +85,12 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		c.adminGuarded = prevAdminGuarded
 		name := c.text(field(n, "name"))
 		return []nir.Stmt{nir.FuncDef{
-			Name:         name,
-			Params:       params,
-			ParamTypes:   c.paramTypes(n),
-			ParamEntries: c.solParamEntries(n, params),
-			Body:         body,
-			Loc:          L,
+			Name:          name,
+			Params:        params,
+			ParamTypes:    c.paramTypes(n),
+			ParamEntries:  c.solParamEntries(n, params),
+			Body:          body,
+			Loc:           L,
 			ContextTokens: c.solFunctionContext(name, bodyNode),
 		}}
 	case "statement":
@@ -338,12 +344,36 @@ func (c *solConv) solFunctionContext(name string, body *tree_sitter.Node) []stri
 		return nil
 	}
 	text := c.text(body)
-	return []string{
+	out := []string{
 		"lang=solidity",
 		"name=" + name,
+		"function_name:" + name,
 		text,
 		solCompactText(text),
 	}
+	for _, tok := range solSemanticFunctionTokens(text) {
+		out = append(out, tok)
+	}
+	return out
+}
+
+func solSemanticFunctionTokens(text string) []string {
+	compact := solCompactText(text)
+	if !strings.Contains(compact, "RSAVerify.rsarecover(") ||
+		strings.Contains(compact, "RSAPKCS1Verify.verifySHA256") ||
+		strings.Contains(compact, "RSAPKCS1Verify.verifySHA1") ||
+		strings.Contains(compact, "DigestInfo") ||
+		strings.Contains(compact, "[0]!=0x00||") {
+		return nil
+	}
+	var out []string
+	if solRsaSha256SuffixRE.MatchString(compact) {
+		out = append(out, "rsa_pkcs1:digest_suffix_sha256")
+	}
+	if solRsaSha1SuffixRE.MatchString(compact) {
+		out = append(out, "rsa_pkcs1:digest_suffix_sha1")
+	}
+	return out
 }
 
 func solCompactText(s string) string {

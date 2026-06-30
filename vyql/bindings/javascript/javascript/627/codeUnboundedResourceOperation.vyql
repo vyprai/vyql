@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding unboundedResourceOperation627 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "responseBuffer.push(chunk)" and node.token contains "Buffer.concat(responseBuffer).length>config.maxContentLength" and not (node.token contains "stream.destroy()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "responseBuffer.push" and node.context.callPath contains "Buffer.concat" and node.context.selector contains "config.maxContentLength" and not (node.context.callPath contains "stream.destroy")
   emit issue code.UnboundedResourceOperation at node
 }

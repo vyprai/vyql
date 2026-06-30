@@ -3,6 +3,7 @@
 
 test "rank141: go webhook secret ordinary comparison requires review"
   lang go
+  expect VYQL-CRY-006
   expect_review code.SecretComparisonReview
   code
   ```
@@ -27,6 +28,7 @@ test "rank141: go webhook secret ordinary comparison requires review"
 
 test "rank141: go webhook secret constant-time comparison is clean"
   lang go
+  reject VYQL-CRY-006
   reject_review code.SecretComparisonReview
   code
   ```

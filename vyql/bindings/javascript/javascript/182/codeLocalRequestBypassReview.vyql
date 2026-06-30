@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding localRequestBypassReview182 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "isLocalRequest" and node.token contains "isLocal||awaithasValidToken" and not (node.token contains "hasValidCliToken")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "localhost" and node.context.literal contains "127.0.0.1" and node.context.literal contains "::1" and node.context.callPath contains "hasValidToken" and not (node.context.callPath contains "hasValidCliToken")
   emit issue code.LocalRequestBypassReview at node
 }

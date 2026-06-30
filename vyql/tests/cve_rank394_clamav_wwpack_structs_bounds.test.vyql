@@ -54,8 +54,8 @@ test "rank394: ClamAV WWPack OOB write generalizes over variable renaming"
   static void cli_writeint32(uint8_t *p, uint32_t v);
   static void *memset(void *p, int c, unsigned long n);
 
-  int wwunpack(uint8_t *buf, uint32_t bufsz, uint8_t *sect,
-               struct cli_exe_section *secs, uint16_t n, uint32_t hdr) {
+  int rebuild_headers(uint8_t *buf, uint32_t bufsz, uint8_t *sect,
+                      struct cli_exe_section *secs, uint16_t n, uint32_t hdr) {
     uint8_t *cur = sect + 0x2a1;
     uint16_t k;
 

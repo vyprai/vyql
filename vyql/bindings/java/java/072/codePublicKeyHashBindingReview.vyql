@@ -1,6 +1,6 @@
 module bindings.java.generated.m420f6b67;
 
 binding publicKeyHashBindingReview72 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "correctlySpends" and node.context.call contains "fromPublicOnly" and node.context.call contains "verify" and node.token contains "hashFor" and not (node.context.scopeCall contains "sha256hash160")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "correctlySpends" and node.context.call contains "fromPublicOnly" and node.context.call contains "verify" and node.context.call contains "hashFor" and not (node.context.scopeCall contains "sha256hash160")
   emit issue code.PublicKeyHashBindingReview at node
 }

@@ -68,3 +68,37 @@ test "rank554: csrf cookie uses configured secure flag"
     }
   }
   ```
+
+test "rank554: renamed receiver still detects insecure csrf cookie"
+  lang go
+  expect VYQL-CFG-007
+  expect_review code.InsecureCookie
+  code
+  ```
+  package csrf
+
+  import "time"
+
+  type Context struct{}
+  func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool, expires time.Time) {}
+
+  type Options struct {
+    Cookie string
+    CookiePath string
+    CookieHttpOnly bool
+    SetCookie bool
+    Secure bool
+  }
+
+  func GenerateToken(secret, id, method string) string { return secret + id + method }
+
+  func Generate(options ...Options) func(*Context) {
+    opt := options[0]
+    return func(session *Context) {
+      csrfValue := GenerateToken("secret", "0", "POST")
+      if opt.SetCookie {
+        session.SetCookie(opt.Cookie, csrfValue, 0, opt.CookiePath, "", false, opt.CookieHttpOnly, time.Now().AddDate(0, 0, 1))
+      }
+    }
+  }
+  ```

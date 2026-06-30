@@ -458,6 +458,18 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 		seen[tok] = true
 		out = append(out, tok)
 	}
+	if jsZeroStepSequenceRisk(c.text(root)) {
+		add("zero_step_sequence_risk=true")
+	}
+	if jsConvertSvgMultiSvgSanitizerBypass(c.text(root)) {
+		add("convert_svg_multi_svg_sanitizer_bypass=true")
+	}
+	if c.jsIncompleteGeneratedIdentifierReservedWords(root) {
+		add("incomplete_generated_js_identifier_reserved_words=true")
+	}
+	if jsAjaxBackslashProtocolRelativeURLXSS(c.text(root)) {
+		add("ajax_backslash_protocol_relative_url_xss=true")
+	}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
 		if n == nil || len(out) >= 512 {
@@ -466,9 +478,31 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 		switch n.Kind() {
 		case "assignment_expression":
 			left, right := field(n, "left"), field(n, "right")
+			if left != nil && left.Kind() == "subscript_expression" {
+				add("dynamic_property_write=true")
+				rightText := jsContextCompact(c.text(right))
+				if right != nil && right.Kind() == "object" {
+					add("dynamic_property_write_object_literal=true")
+				}
+				if right != nil && right.Kind() == "array" {
+					add("dynamic_property_write_array_literal=true")
+				}
+				if strings.Contains(rightText, "[") {
+					add("dynamic_property_write_from_subscript=true")
+				}
+				if strings.Contains(rightText, "(") {
+					add("dynamic_property_write_from_call=true")
+				}
+				if strings.Contains(rightText, "||{}") {
+					add("dynamic_property_plain_object_fallback=true")
+				}
+			}
 			if lhs := c.jsContextPath(left); lhs != "" {
 				if rhs := jsContextValue(c.text(right)); rhs != "" {
 					add("assign:" + lhs + "=" + rhs)
+				}
+				if jsRejectUnauthorizedPath(lhs) && jsRejectUnauthorizedDisabledDefault(right, c) {
+					add("tls_reject_unauthorized_disabled_default=true")
 				}
 				if c.isJsPublicRuntimeConfigPath(lhs) {
 					if ok, name := c.jsCallArgsContainSecretConfig(right, secretConfigVars); ok {
@@ -486,13 +520,34 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 		case "binary_expression":
 			if expr := jsContextCompact(c.text(n)); expr != "" {
 				add("expr:" + expr)
+				if jsPrototypeKeyComparison(expr) {
+					add("prototype_key_guard=true")
+				}
 			}
 		case "pair":
 			if key := jsContextCompact(c.keyName(field(n, "key"))); key != "" {
 				if val := jsContextValue(c.text(field(n, "value"))); val != "" {
 					add("prop:" + key + "=" + val)
+					if key == "rejectUnauthorized" && jsRejectUnauthorizedPath(val) {
+						add("tls_reject_unauthorized_propagated=true")
+					}
 				}
 			}
+		case "if_statement":
+			if c.jsFoldedHeaderCurrentGuard(n) {
+				add("folded_header_current_guard=true")
+			}
+			if c.jsPrototypeKeyGuard(n) {
+				add("prototype_key_guard=true")
+			}
+			if c.jsPathSegmentTypeGuard(n) {
+				add("path_segment_type_guard=true")
+			}
+			if c.jsOwnPropertyKeyGuard(n) {
+				add("own_property_key_guard=true")
+			}
+		case "for_in_statement":
+			add("for_in=true")
 		case "member_expression":
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)
@@ -524,6 +579,9 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 				if m := lastSeg(path); m != "" {
 					add("call:" + m)
 				}
+				if path == "Object.keys.forEach" {
+					add("object_keys_for_each=true")
+				}
 			}
 		case "string", "template_string":
 			if lit := jsContextValue(c.text(n)); lit != "" {
@@ -544,6 +602,168 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	walk(root)
 	return out
+}
+
+func jsZeroStepSequenceRisk(text string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(text)), "")
+	return strings.Contains(compact, "Math.abs(numeric(") &&
+		strings.Contains(compact, "[2]") &&
+		strings.Contains(compact, "for(") &&
+		strings.Contains(compact, "+=") &&
+		!strings.Contains(compact, "Math.max(Math.abs(numeric(")
+}
+
+func jsConvertSvgMultiSvgSanitizerBypass(text string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(text)), "")
+	return strings.Contains(compact, "cheerio.default.html(") &&
+		strings.Contains(compact, "this[_sanitize](") &&
+		strings.Contains(compact, "cheerio.load(") &&
+		strings.Contains(compact, "('svg')") &&
+		strings.Contains(compact, "<body>${svg}</body>") &&
+		strings.Contains(compact, "this[_getPage](html)") &&
+		!strings.Contains(compact, "svg:first")
+}
+
+func jsAjaxBackslashProtocolRelativeURLXSS(text string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(text)), "")
+	if !strings.Contains(compact, "$.ajax") ||
+		!strings.Contains(compact, "url:") ||
+		!strings.Contains(compact, "location") ||
+		!strings.Contains(compact, ".replace(") {
+		return false
+	}
+	if strings.Contains(compact, "startsWith(\"/\\\\\")") ||
+		strings.Contains(compact, "startsWith('/\\\\')") ||
+		strings.Contains(compact, "[1]=='\\\\'") ||
+		strings.Contains(compact, "[1]==\"\\\\\"") ||
+		strings.Contains(compact, "[1]==='\\\\'") ||
+		strings.Contains(compact, "[1]===\"\\\\\"") ||
+		strings.Contains(compact, "newURL(") {
+		return false
+	}
+	firstSlashGuard := strings.Contains(compact, "[0]!='/'") || strings.Contains(compact, "[0]!=\"/\"") ||
+		strings.Contains(compact, "[0]!=='/'") || strings.Contains(compact, "[0]!==\"/\"")
+	secondSlashGuard := strings.Contains(compact, "[1]=='/'") || strings.Contains(compact, "[1]==\"/\"") ||
+		strings.Contains(compact, "[1]==='/'") || strings.Contains(compact, "[1]===\"/\"")
+	return firstSlashGuard && secondSlashGuard
+}
+
+func (c *jsConv) jsIncompleteGeneratedIdentifierReservedWords(root *tree_sitter.Node) bool {
+	if root == nil {
+		return false
+	}
+	incompleteSets := map[string]bool{}
+	hasIdentifierRegex := false
+	hasGeneratedPropertyTemplate := false
+
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "variable_declarator":
+			name := field(n, "name")
+			value := field(n, "value")
+			if name != nil && name.Kind() == "identifier" && jsIncompleteReservedWordSet(c, value) {
+				incompleteSets[c.text(name)] = true
+			}
+		case "regex":
+			if jsIdentifierRegex(c.text(n)) {
+				hasIdentifierRegex = true
+			}
+		case "template_string":
+			if jsGeneratedPropertyTemplate(c.text(n)) {
+				hasGeneratedPropertyTemplate = true
+			}
+		case "binary_expression":
+			if jsGeneratedPropertyConcat(c.text(n)) {
+				hasGeneratedPropertyTemplate = true
+			}
+		}
+		for _, ch := range namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(root)
+	usesIncompleteSet := false
+	var findUse func(*tree_sitter.Node)
+	findUse = func(n *tree_sitter.Node) {
+		if n == nil || usesIncompleteSet {
+			return
+		}
+		if n.Kind() == "call_expression" && jsSetHasCallUses(n, incompleteSets, c) {
+			usesIncompleteSet = true
+			return
+		}
+		for _, ch := range namedChildren(n) {
+			findUse(ch)
+		}
+	}
+	findUse(root)
+	return len(incompleteSets) > 0 && hasIdentifierRegex && hasGeneratedPropertyTemplate && usesIncompleteSet
+}
+
+func jsIncompleteReservedWordSet(c *jsConv, n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	words := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(cur *tree_sitter.Node) {
+		if cur == nil {
+			return
+		}
+		if cur.Kind() == "string" {
+			if v := strings.ToLower(jsContextValue(c.text(cur))); v != "" {
+				words[v] = true
+			}
+		}
+		for _, ch := range namedChildren(cur) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	if words["eval"] || words["arguments"] || !words["enum"] {
+		return false
+	}
+	core := 0
+	for _, word := range []string{"class", "function", "return", "await", "yield", "this", "var", "let", "const"} {
+		if words[word] {
+			core++
+		}
+	}
+	return core >= 3
+}
+
+func jsIdentifierRegex(raw string) bool {
+	raw = strings.ReplaceAll(raw, "\\", "")
+	return strings.Contains(raw, "[a-zA-Z_$]") && strings.Contains(raw, "[a-zA-Z0-9_$]")
+}
+
+func jsGeneratedPropertyTemplate(raw string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	return strings.Contains(compact, ".${")
+}
+
+func jsGeneratedPropertyConcat(raw string) bool {
+	compact := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	return strings.Contains(compact, "+'.'+") || strings.Contains(compact, "+\".\"+")
+}
+
+func jsSetHasCallUses(n *tree_sitter.Node, sets map[string]bool, c *jsConv) bool {
+	if n == nil || len(sets) == 0 {
+		return false
+	}
+	fn := field(n, "function")
+	if fn == nil || fn.Kind() != "member_expression" {
+		return false
+	}
+	if c.text(field(fn, "property")) != "has" {
+		return false
+	}
+	obj := field(fn, "object")
+	return obj != nil && obj.Kind() == "identifier" && sets[c.text(obj)]
 }
 
 func (c *jsConv) jsGitCloneArgvTokens(n *tree_sitter.Node) []string {
@@ -615,6 +835,74 @@ func jsGitRemoteArgName(s string) bool {
 		}
 	}
 	return false
+}
+
+func jsRejectUnauthorizedPath(s string) bool {
+	s = jsContextCompact(s)
+	return s == "rejectUnauthorized" || strings.HasSuffix(s, ".rejectUnauthorized")
+}
+
+func jsRejectUnauthorizedDisabledDefault(n *tree_sitter.Node, c *jsConv) bool {
+	if n == nil {
+		return false
+	}
+	expr := jsContextCompact(c.text(n))
+	if !strings.Contains(expr, "rejectUnauthorized") || !strings.Contains(expr, "===undefined?") {
+		return false
+	}
+	return strings.Contains(expr, "?null:") || strings.Contains(expr, "?false:")
+}
+
+func (c *jsConv) jsFoldedHeaderCurrentGuard(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "if_statement" {
+		return false
+	}
+	txt := jsContextCompact(c.text(n))
+	hasGuard := strings.Contains(txt, "if(h)") ||
+		strings.Contains(txt, "if(h!==undefined)") ||
+		strings.Contains(txt, "if(h!=null)") ||
+		strings.Contains(txt, "if(h!==null)")
+	if !hasGuard {
+		return false
+	}
+	return strings.Contains(txt, "this.header[h]") && strings.Contains(txt, "lines[i]")
+}
+
+func (c *jsConv) jsPrototypeKeyGuard(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "if_statement" {
+		return false
+	}
+	txt := jsContextCompact(c.text(n))
+	return jsPrototypeKeyComparison(txt)
+}
+
+func jsPrototypeKeyComparison(expr string) bool {
+	if !strings.Contains(expr, "==") && !strings.Contains(expr, "!=") {
+		return false
+	}
+	return strings.Contains(expr, "__proto__") ||
+		strings.Contains(expr, "constructor") && strings.Contains(expr, "prototype")
+}
+
+func (c *jsConv) jsPathSegmentTypeGuard(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "if_statement" {
+		return false
+	}
+	txt := jsContextCompact(c.text(n))
+	return strings.Contains(txt, ".constructor!==String") ||
+		strings.Contains(txt, ".constructor!==Number") ||
+		strings.Contains(txt, "typeof") && strings.Contains(txt, "String(")
+}
+
+func (c *jsConv) jsOwnPropertyKeyGuard(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "if_statement" {
+		return false
+	}
+	txt := jsContextCompact(c.text(n))
+	return strings.Contains(txt, "hasOwnProperty") ||
+		strings.Contains(txt, "hasOwn(") ||
+		strings.Contains(txt, "Object.getOwnPropertyNames") ||
+		strings.Contains(txt, ".includes(") && strings.Contains(txt, "continue")
 }
 
 func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]bool {
@@ -1941,6 +2229,7 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 	bodyText := c.text(body)
 	tokens := []string{
 		"lang=javascript\x00name=" + name,
+		"function_name:" + name,
 		bodyText,
 		strings.Join(strings.Fields(bodyText), ""),
 	}

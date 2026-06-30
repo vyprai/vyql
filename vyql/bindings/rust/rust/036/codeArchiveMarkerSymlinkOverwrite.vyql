@@ -1,6 +1,6 @@
 module bindings.rust.generated.mdc4f74cd;
 
 binding archiveMarkerSymlinkOverwrite36 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "PACKAGE_SOURCE_LOCK" and node.token contains "entry.unpack_in(parent)" and node.token contains "OpenOptions::new().create(true)" and node.token contains "write!(ok,\"ok\")" and not (node.token contains "entry_path.file_name()") and not (node.token contains "create_new(true)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "archive_marker_symlink_overwrite"
   emit issue code.ArchiveMarkerSymlinkOverwrite at node
 }

@@ -60,3 +60,31 @@ test "rank769: ArrayBuffer transfer rejects lengths above maxByteLength"
       return newValue;
   }
   ```
+
+test "rank769: ArrayBuffer max length bypass generalizes across names"
+  lang cpp
+  file BuiltinArrayBuffer.cpp
+  expect VYQL-MEM-036
+  expect_review code.ArrayBufferTransferMaxLengthBypass
+  code
+  ```
+  static Value moveBuffer(ExecutionState& exec, Value receiver, size_t count, Value* inputs, Optional<Object*> target)
+  {
+      RESOLVE_THIS_BINDING_TO_ARRAYBUFFER(buffer, ArrayBuffer, transfer);
+      buffer->throwTypeErrorIfDetached(exec);
+
+      uint64_t requested = buffer->byteLength();
+      if (count > 0 && !inputs[0].isUndefined()) {
+          requested = inputs[0].toIndex(exec);
+      }
+
+      Optional<uint64_t> cap;
+      if (buffer->isResizableArrayBuffer()) {
+          cap = buffer->maxByteLength();
+      }
+      ArrayBuffer* clone = ArrayBufferObject::allocateArrayBuffer(exec, exec.context()->globalObject()->arrayBuffer(), requested, cap);
+      clone->fillData(buffer->data(), std::min(requested, static_cast<uint64_t>(buffer->byteLength())));
+      buffer->asArrayBufferObject()->detachArrayBuffer();
+      return clone;
+  }
+  ```

@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding freePbxContactManagerGroupLinkXss110 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "ajaxHandler" and node.token contains "$final[$i]['actions']" and node.token contains "group='.$_REQUEST['group'].'" and not (node.token contains "(int)$_REQUEST['group']")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "ajaxHandler" and node.context.phpReview == "freepbx_contact_manager_group_link_xss"
   emit issue code.FreePbxContactManagerGroupLinkXss at node
 }

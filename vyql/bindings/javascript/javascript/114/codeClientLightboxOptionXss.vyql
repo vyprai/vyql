@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding clientLightboxOptionXss114 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "setHTMLContent" and node.token contains "setMessage(html)" and not (node.token contains "DOMPurify") and not (node.token contains "sanitize(html)") and not (node.token contains "sanitizeHtml(html)")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "setMessage" and node.context.identifier contains "html" and not (node.context.callPath contains "DOMPurify.sanitize") and not (node.context.callPath contains "sanitizeHtml") and not (node.context.callPath contains "sanitize")
   emit issue code.ClientLightboxOptionXss at node
 }

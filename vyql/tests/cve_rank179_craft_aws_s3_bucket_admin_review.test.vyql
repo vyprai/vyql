@@ -1,5 +1,6 @@
 test "rank179: Craft AWS S3 bucket loader lists buckets without admin check"
   lang php
+  expect VYQL-AUTH-078
   expect_review code.CredentialedEndpointReview
   code
   ```
@@ -29,6 +30,7 @@ test "rank179: Craft AWS S3 bucket loader lists buckets without admin check"
 
 test "rank179: Craft AWS S3 bucket loader requires admin before listing buckets"
   lang php
+  reject VYQL-AUTH-078
   reject_review code.CredentialedEndpointReview
   code
   ```

@@ -1,6 +1,6 @@
 module bindings.rust.generated.mdc4f74cd;
 
 binding callFutureRawWeakStateRef33 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name contains "poll" and node.token contains "letstate_ptr=Weak::into_raw(Arc::downgrade(&self_ref.state));letmutstate=self_ref.state.write().unwrap();" and node.token contains "state.waker.is_none()" and node.token contains "ic0::call_new"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.rustReview == "call_future_raw_weak_state_ref"
   emit issue code.CallFutureRawWeakStateRef at node
 }

@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnboundedResourceOperation {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400, CWE_772]
+    id: "VYQL-DOS-042"
+    severity: high
+  }
+  issue code.UnboundedResourceOperation as sink
+}

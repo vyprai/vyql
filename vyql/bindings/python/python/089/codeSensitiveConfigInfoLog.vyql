@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding sensitiveConfigInfoLog89 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "load_config" and node.token contains "yaml.safe_load" and node.token contains "LOG.info" and node.token contains "Config file:" and not (node.token contains "LOG.debug(\"Config file:")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "sensitive_config_info_log"
   emit issue code.SensitiveConfigInfoLog at node
 }

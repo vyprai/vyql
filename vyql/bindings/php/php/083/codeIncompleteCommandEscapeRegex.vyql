@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding incompleteCommandEscapeRegex83 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "escape_command" and node.token contains "preg_replace" and node.token contains "/(\\\\\\$|`)/" and node.token contains "popen" and node.token contains "ns_id"
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.context.phpReview == "incomplete_command_escape_regex"
   emit issue code.IncompleteCommandEscapeRegex at node
 }

@@ -62,6 +62,28 @@ test "rank551: Rabin-Williams blinding factor inverted before Jacobi hardening"
   }
   ```
 
+test "rank551: Rabin-Williams blinding inversion generalizes across names"
+  lang cpp
+  file rw.cpp
+  expect VYQL-CRY-011
+  expect_review code.CryptoImproperBlinding
+  code
+  ```
+  class Integer { public: void Randomize(Rng &, const Integer &, const Integer &); };
+  class Mod { public: Integer MultiplicativeInverse(const Integer &); Integer Square(const Integer &); Integer Multiply(const Integer &, const Integer &); };
+  int Jacobi(const Integer &, const Integer &);
+
+  Integer sign(Rng& rng, const Integer& msg) {
+    Mod modulus;
+    Integer blind, inverse, y;
+    blind.Randomize(rng, Integer(), Integer());
+    inverse = modulus.MultiplicativeInverse(blind);
+    if (Jacobi(msg, msg) != 1) {}
+    y = modulus.Multiply(y, inverse);
+    return y;
+  }
+  ```
+
 test "rank551: Rabin-Williams blinding factor squared before inversion is clean"
   lang cpp
   file rw.cpp

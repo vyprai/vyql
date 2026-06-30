@@ -1,0 +1,8 @@
+# Rank 55 / CVE-2026-34400: Alerta query parser SQL injection.
+
+test "rank55: unparameterized SQL query parser is a CVE anchor"
+  expect VYQL-INJ-030
+  graph
+  ```
+  node sink code.UnparameterizedSqlQueryParser
+  ```

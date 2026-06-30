@@ -1,7 +1,8 @@
-# Rank 853 / CVE-2026-32630: file-type manually read ZIP entry content using
-# zipHeader.compressedSize during type detection, allowing ZIP-bomb memory growth.
+# File-type ZIP parser coverage: older manual ZIP entry reads sized from
+# zipHeader.compressedSize are still a useful DOS mechanic, but this is not the
+# direct expected rule for the current rank 853 repository snapshot.
 
-test "rank853: ZIP mimetype read is sized by compressed ZIP header"
+test "file-type: ZIP mimetype read is sized by compressed ZIP header"
   lang javascript
   file core.js
   expect VYQL-DOS-031
@@ -28,7 +29,7 @@ test "rank853: ZIP mimetype read is sized by compressed ZIP header"
   }
   ```
 
-test "rank853: ZIP handler delegates bounded entry reads"
+test "file-type: ZIP handler delegates bounded entry reads"
   lang javascript
   file core.js
   reject VYQL-DOS-031

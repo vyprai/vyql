@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding pointerOffsetBoundsCheck115 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "start+len+1>end" and node.token contains "start+=len" and not (node.token contains "buff_size") and not (node.token contains "end-start-1")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "pointer_offset.missing_remaining_size"
   emit issue code.PointerOffsetBoundsCheck at node
 }

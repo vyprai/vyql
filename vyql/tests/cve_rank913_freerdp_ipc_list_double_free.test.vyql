@@ -75,3 +75,38 @@ test "rank913: fallback open frees list only on failure"
       return 0;
   }
   ```
+
+test "rank913: conditional fallback double free generalizes across names"
+  lang c
+  file shadow_server.c
+  expect VYQL-MEM-044
+  expect_review code.ConditionalFallbackListDoubleFree
+  code
+  ```
+  int start_shadow(rdpShadowServer* shadow)
+  {
+      size_t index, total;
+      char** values = CommandLineParseCommaSeparatedValuesEx(NULL, shadow->ipcSocket, &total);
+      if (!values || (total <= 1))
+      {
+          free(values);
+          if (shadow->ipcSocket == NULL)
+          {
+              if (!open_port(shadow, NULL))
+                  return -1;
+          }
+          else
+              return -1;
+      }
+      for (index = 1; index < total; index++)
+      {
+          if (!open_port(shadow, values[index]))
+          {
+              free(values);
+              return -1;
+          }
+      }
+      free(values);
+      return 0;
+  }
+  ```

@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding unparameterizedSqlQueryParser494 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "parse" and node.token contains "query_expr.parseString" and node.token contains "repr(" and node.token contains ".replace(" and node.token contains "__default_field__" and node.token contains "ILIKE"
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unparameterized_sql_query_parser"
   emit issue code.UnparameterizedSqlQueryParser at node
 }

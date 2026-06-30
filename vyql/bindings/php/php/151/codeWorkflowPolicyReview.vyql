@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding workflowPolicyReview151 {
-  query pattern presenceNode where node.kind == "any" and node.path == "__object_literal" and node.token contains "order.customerid" and node.token contains "order.product.attribute.id" and not (node.token contains "order.statuspayment")
+  query pattern presenceNode where node.analysis == "module.context" and node.context.language == "php" and node.context.phpReview == "workflow_policy_order_product_without_status_payment"
   emit issue code.WorkflowPolicyReview at node
 }

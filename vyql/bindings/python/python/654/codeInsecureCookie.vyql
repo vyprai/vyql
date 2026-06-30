@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding insecureCookie654 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "set_cookie" and node.token contains "secure=False"
-  emit issue code.InsecureCookie at node
+  query pattern callExpr where callee.path ~= "set_cookie" and args.any.literal contains "secure=False"
+  emit issue code.InsecureCookie at call
 }

@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding codecovNodeGcovCommandInjection243 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "functionsanitizeVar(arg)" and node.token contains "arg.replace(/&/g,'')" and node.token contains "args.options['gcov-root']" and node.token contains "args.options['gcov-exec']" and node.token contains "args.options['gcov-args']" and node.token contains "execSync(gcov)" and not (node.token contains "execFileSync(gcov)")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "gcov-root" and node.context.literal contains "gcov-exec" and node.context.literal contains "gcov-args" and node.context.callPath contains "arg.replace" and node.context.literal contains "&" and node.context.callPath contains "execSync" and not (node.context.callPath contains "execFileSync")
   emit issue code.CodecovNodeGcovCommandInjection at node
 }

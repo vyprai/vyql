@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding bufferedErrorPageRequestMetadataXss274 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "$out.=" and node.token contains "REQUEST_URI" and node.token contains "print$out" and not (node.token contains "dol_htmlentities") and not (node.token contains "htmlentities($_SERVER") and not (node.token contains "htmlspecialchars($_SERVER") and not (node.token contains "html_escape($_SERVER")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "buffered_error_page_request_metadata_xss"
   emit issue code.BufferedErrorPageRequestMetadataXss at node
 }

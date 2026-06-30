@@ -1,6 +1,6 @@
 module bindings.cpp.generated.m4e783366;
 
 binding protocolListAmplification72 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "inlineCompositeListElementCount" and node.token contains "wordsPerElement" and node.token contains "ListReader" and not (node.token contains "amplifiedRead")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "protocol.list_amplification_missing_charge"
   emit issue code.ProtocolListAmplification at node
 }

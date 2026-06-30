@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding connectCmsCodestudiesPluginCodeExecution134 {
-  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.name contains "CodestudiesPlugin" and node.token contains "$functions['post']=['savecode','run','deletecode']" and node.token contains "$role_ckeck_table[\"run\"]=array('role_reporter')" and node.token contains "$codestudies->code_text=$request->code_text" and node.token contains "Storage::put('codestudy/'" and node.token contains "$codestudy->code_text" and node.token contains "exec(\"$cmd2>&1\",$result)"
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.className contains "CodestudiesPlugin" and node.context.phpReview == "connectcms_codestudies_code_execution"
   emit issue code.ConnectCmsCodestudiesPluginCodeExecution at node
 }

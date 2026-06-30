@@ -1,7 +1,7 @@
 module bindings.java.generated.m420f6b67;
 
 binding integerSizeArithmetic62 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "__binop.shl" and node.token contains "log_rounds" and node.token contains "1" and not (node.token contains "1L")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "integer_size.int_shift"
   emit issue code.IntegerSizeArithmetic at node
   emit sink code.IntegerSizeArithmeticSink at node
 }

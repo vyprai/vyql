@@ -1,6 +1,6 @@
 module bindings.go.generated.m48a985c1;
 
 binding insecureCookie327 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "http.Cookie" and node.token contains "HttpOnly=false"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.insecure_cookie_httponly_false"
   emit issue code.InsecureCookie at node
 }

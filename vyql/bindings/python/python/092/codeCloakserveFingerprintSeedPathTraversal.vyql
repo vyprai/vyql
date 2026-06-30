@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding cloakserveFingerprintSeedPathTraversal92 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "get_or_launch" and node.token contains "os.path.join(self._data_dir,seed_key)" and node.token contains "os.makedirs(user_data_dir" and node.token contains "shutil.rmtree" and not (node.token contains "SAFE_SEED_RE.match(seed)") and not (node.token contains "_safe_rmtree")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "cloakserve_fingerprint_seed_path_traversal"
   emit issue code.CloakserveFingerprintSeedPathTraversal at node
 }

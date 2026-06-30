@@ -1,6 +1,6 @@
 module bindings.go.generated.m48a985c1;
 
 binding certValidationDisabled308 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "tls.Config" and node.token contains "InsecureSkipVerify=true"
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "go.tls_insecure_skip_verify"
   emit issue code.CertValidationDisabled at node
 }

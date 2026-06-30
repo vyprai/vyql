@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -185,6 +186,12 @@ static void merge_param(HashTable *params, zval *zdata) {
 			"index_key:keyName",
 			"assign:tmp=pos",
 			"assign:secret.Data[]=value",
+			"call_arg_shape:Z_TYPE_PP:ID",
+			"call_arg_shape:zend_hash_find:Z_ARRVAL_PP(ID)",
+			"call_arg_shape:zend_hash_find:ID.FIELD",
+			"binary_shape:Z_TYPE_PP(ID)==ID",
+			"index_shape:ID.FIELD[ID]",
+			"assign_shape:ID.FIELD[ID]=ID",
 		} {
 			if !strings.Contains(tokens, want) {
 				t.Fatalf("C function context missing %q; context=%q", want, tokens)
@@ -501,7 +508,7 @@ void fixed(struct Ctx *ctx) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.zero_count.last_index", "guard=missing_nonzero") {
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.zero_count.missing_nonzero_last_index", "guard=missing_nonzero") {
 		t.Fatalf("vulnerable function missing zero-count last-index observation: %#v", prog.Modules[0].Body)
 	}
 	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.zero_count.last_index", "guard=nonzero") {
@@ -599,6 +606,314 @@ func cModuleHasAnalysisCall(stmts []nir.Stmt, path string) bool {
 		call, ok := expr.Value.(nir.Call)
 		if ok && call.Path == path {
 			return true
+		}
+	}
+	return false
+}
+
+func TestCProtocolOversizedBodyDiscardCheckIsScopedToErrorBranch(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "prot.c")
+	src := []byte(`
+#define OP_PUT 1
+#define MSG_JOB_TOO_BIG "JOB_TOO_BIG"
+#define MSG_OUT_OF_MEMORY "OUT_OF_MEMORY"
+unsigned int job_data_size_limit;
+unsigned long strtoul(const char *nptr, char **endptr, int base);
+int reply_msg(void *c, const char *msg);
+int skip(void *c, unsigned int body_size, const char *msg);
+int make_job(unsigned int body_size);
+
+void vulnerable(void *c, int type, char *size_buf) {
+  char *end_buf;
+  unsigned int body_size;
+  switch (type) {
+  case OP_PUT:
+    body_size = strtoul(size_buf, &end_buf, 10);
+    if (body_size > job_data_size_limit) {
+      return reply_msg(c, MSG_JOB_TOO_BIG);
+    }
+    if (!make_job(body_size + 2)) {
+      return skip(c, body_size + 2, MSG_OUT_OF_MEMORY);
+    }
+  }
+}
+
+void fixed(void *c, int type, char *size_buf) {
+  char *end_buf;
+  unsigned int body_size;
+  switch (type) {
+  case OP_PUT:
+    body_size = strtoul(size_buf, &end_buf, 10);
+    if (body_size > job_data_size_limit) {
+      return skip(c, body_size + 2, MSG_JOB_TOO_BIG);
+    }
+  }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable", "analysis.protocol.oversized_body_not_discarded", "guard=missing_body_discard_before_error") {
+		t.Fatalf("vulnerable oversized-body branch missing observation: %#v", prog.Modules[0].Body)
+	}
+	if cFuncHasAnalysisToken(prog.Modules[0].Body, "fixed", "analysis.protocol.oversized_body_not_discarded", "guard=missing_body_discard_before_error") {
+		t.Fatalf("fixed oversized-body branch should not emit observation: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestCRepeatedKeyfileSubstitutionIgnoresSafeFallbackBranch(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "enigmax.c")
+	src := []byte(`
+#define BUFFER_SIZE 16384
+static unsigned char scrambleAsciiTables[16][256];
+extern int fread(char*, int, int, void*);
+extern void rewind(void*);
+extern unsigned char generateNumber(void);
+static unsigned char passPhrase[BUFFER_SIZE];
+static int passIndex;
+
+void scramble(void* keyFile) {
+  for (int j = 0; j < 16; ++j) {
+    char temp = 0;
+    for (int i = 0; i < 256; ++i) {
+      scrambleAsciiTables[j][i] = i;
+    }
+    if (keyFile != 0) {
+      int size;
+      char extractedString[BUFFER_SIZE] = "";
+      while ((size = fread(extractedString, 1, BUFFER_SIZE, keyFile)) > 0) {
+        for (int i = 0; i < size; ++i) {
+          temp = scrambleAsciiTables[j][i % 256];
+          scrambleAsciiTables[j][i % 256] = scrambleAsciiTables[j][(unsigned char)(extractedString[i])];
+          scrambleAsciiTables[j][(unsigned char)(extractedString[i])] = temp;
+        }
+      }
+      rewind(keyFile);
+    } else {
+      unsigned char random256;
+      for (int i = 0; i < 10 * 256; ++i) {
+        random256 = generateNumber() ^ passPhrase[passIndex];
+        temp = scrambleAsciiTables[j][i % 256];
+        scrambleAsciiTables[j][i % 256] = scrambleAsciiTables[j][random256];
+        scrambleAsciiTables[j][random256] = temp;
+      }
+    }
+  }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("modules = %d, want 1", len(prog.Modules))
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "scramble", "analysis.crypto.repeated_keyfile_substitution_tables", "key=direct_keyfile_bytes") {
+		t.Fatalf("repeated keyfile substitution observation missing: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestCPPImproperBlindingSurvivesNamespaceMacro(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "rw.cpp")
+	src := []byte(`
+NAMESPACE_BEGIN(CryptoPP)
+
+Integer InvertibleRWFunction::CalculateInverse(RandomNumberGenerator &rng, const Integer &x) const
+{
+	DoQuickSanityCheck();
+	ModularArithmetic modn(m_n);
+	Integer r, rInv;
+	do { // do this in a loop for people using small numbers for testing
+		r.Randomize(rng, Integer::One(), m_n - Integer::One());
+		rInv = modn.MultiplicativeInverse(r);
+	} while (rInv.IsZero());
+	Integer re = modn.Square(r);
+	re = modn.Multiply(re, x);
+
+	Integer cp=re%m_p, cq=re%m_q;
+	if (Jacobi(cp, m_p) * Jacobi(cq, m_q) != 1) {}
+
+	Integer y = CRT(cq, m_q, cp, m_p, m_u);
+	y = modn.Multiply(y, rInv);
+	return y;
+}
+
+NAMESPACE_END
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractCPP([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "", "analysis.crypto.improper_blinding_inversion", "guard=missing_jacobi_hardened_blind") {
+		t.Fatalf("improper blinding observation missing for namespace macro shape: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestCDrFlacMetadataBlockAllocationBeforeFileBound(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "dr_flac.h")
+	src := []byte(`
+#define DRFLAC_FALSE 0
+#define DRFLAC_TRUE 1
+#define DRFLAC_METADATA_BLOCK_TYPE_APPLICATION 2
+typedef unsigned char drflac_uint8;
+typedef unsigned int drflac_uint32;
+typedef unsigned long long drflac_uint64;
+typedef int drflac_bool32;
+typedef int (*drflac_read_proc)(void*, void*, drflac_uint32);
+typedef int (*drflac_seek_proc)(void*, int, int);
+typedef int (*drflac_tell_proc)(void*, long long*);
+typedef int (*drflac_meta_proc)(void*, void*);
+typedef struct drflac_allocation_callbacks drflac_allocation_callbacks;
+
+drflac_bool32 drflac__read_and_decode_block_header(drflac_read_proc onRead, void* pUserData, drflac_uint8* isLastBlock, drflac_uint8* blockType, drflac_uint32* blockSize);
+void* drflac__malloc_from_callbacks(drflac_uint32 sz, drflac_allocation_callbacks* pAllocationCallbacks);
+void drflac__free_from_callbacks(void* p, drflac_allocation_callbacks* pAllocationCallbacks);
+
+static drflac_bool32 drflac__read_and_decode_metadata(drflac_read_proc onRead, drflac_seek_proc onSeek, drflac_tell_proc onTell, drflac_meta_proc onMeta, void* pUserData, void* pUserDataMD, drflac_uint64* pFirstFramePos, drflac_uint64* pSeektablePos, drflac_uint32* pSeekpointCount, drflac_allocation_callbacks* pAllocationCallbacks)
+{
+    drflac_uint64 runningFilePos = 42;
+    (void)onTell;
+    for (;;) {
+        drflac_uint8 isLastBlock = 0;
+        drflac_uint8 blockType = 0;
+        drflac_uint32 blockSize;
+        if (drflac__read_and_decode_block_header(onRead, pUserData, &isLastBlock, &blockType, &blockSize) == DRFLAC_FALSE) {
+            return DRFLAC_FALSE;
+        }
+        runningFilePos += 4;
+        switch (blockType) {
+        case DRFLAC_METADATA_BLOCK_TYPE_APPLICATION:
+            if (onMeta) {
+                void* pRawData = drflac__malloc_from_callbacks(blockSize, pAllocationCallbacks);
+                if (pRawData == 0) return DRFLAC_FALSE;
+                if (onRead(pUserData, pRawData, blockSize) != blockSize) {
+                    drflac__free_from_callbacks(pRawData, pAllocationCallbacks);
+                    return DRFLAC_FALSE;
+                }
+            }
+            break;
+        }
+        runningFilePos += blockSize;
+    }
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "drflac__read_and_decode_metadata", "analysis.allocation.length_derived_before_file_bound", "guard=missing_remaining_file_size") {
+		t.Fatalf("dr_flac metadata allocation observation missing: %#v", prog.Modules[0].Body)
+	}
+}
+
+func TestCOldStyleRemoteListingDownloadPath(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "scp_legacy.c")
+	src := []byte(`
+#define O_WRONLY 1
+#define O_CREAT 64
+#define NULL ((void*)0)
+int open(const char *path, int flags, int mode);
+int snprintf(char *str, unsigned long size, const char *format, ...);
+unsigned long strlen(const char *s);
+char *strchr(const char *s, int c);
+int strcmp(const char *a, const char *b);
+
+receive_oldstyle(argc, argv)
+int argc;
+char **argv;
+{
+    char *remote_entry, *target_dir, *joined;
+    int mode = 0644;
+    remote_entry = argv[0];
+    target_dir = argv[1];
+    if (strchr(remote_entry, '/') != NULL || strcmp(remote_entry, "..") == 0) {
+        return;
+    }
+    snprintf(joined, strlen(target_dir) + strlen(remote_entry) + 8, "%s/%s", target_dir, remote_entry);
+    open(joined, O_WRONLY|O_CREAT, mode);
+}
+
+receive_fixed(argc, argv)
+int argc;
+char **argv;
+{
+    char *entry, *target, *path;
+    entry = argv[0];
+    target = argv[1];
+    if (*entry == '\0' || strchr(entry, '/') != NULL || strcmp(entry, ".") == 0 || strcmp(entry, "..") == 0) {
+        return;
+    }
+    snprintf(path, strlen(target) + strlen(entry) + 8, "%s/%s", target, entry);
+    open(path, O_WRONLY|O_CREAT, 0644);
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cModuleHasAnalysisToken(prog.Modules[0].Body, "analysis.remote_listing.download_path", "guard=missing_dot_or_empty_name_rejection") {
+		t.Fatalf("old-style remote listing observation missing: %#v", prog.Modules[0].Body)
+	}
+
+	fixed := bytes.ReplaceAll(src, []byte(`receive_oldstyle`), []byte(`receive_also_fixed`))
+	fixed = bytes.Replace(fixed,
+		[]byte(`strchr(remote_entry, '/') != NULL || strcmp(remote_entry, "..") == 0`),
+		[]byte(`*remote_entry == '\0' || strchr(remote_entry, '/') != NULL || strcmp(remote_entry, ".") == 0 || strcmp(remote_entry, "..") == 0`),
+		1)
+	fixedFile := filepath.Join(dir, "scp_legacy_fixed.c")
+	if err := os.WriteFile(fixedFile, fixed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fixedProg, err := ExtractC([]string{fixedFile}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cModuleHasAnalysisToken(fixedProg.Modules[0].Body, "analysis.remote_listing.download_path", "guard=missing_dot_or_empty_name_rejection") {
+		t.Fatalf("fixed old-style remote listing observation should be absent: %#v", fixedProg.Modules[0].Body)
+	}
+}
+
+func cModuleHasAnalysisToken(stmts []nir.Stmt, path, token string) bool {
+	for _, st := range stmts {
+		exprStmt, ok := st.(nir.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := exprStmt.Value.(nir.Call)
+		if !ok || call.Path != path {
+			continue
+		}
+		for _, arg := range call.Args {
+			c, ok := arg.(nir.Const)
+			if ok && c.Value == token {
+				return true
+			}
 		}
 	}
 	return false

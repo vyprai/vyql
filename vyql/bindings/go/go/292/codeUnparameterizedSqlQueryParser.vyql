@@ -1,6 +1,6 @@
 module bindings.go.generated.m48a985c1;
 
 binding unparameterizedSqlQueryParser292 {
-  query pattern presenceNode where node.kind == "any" and node.path == "goqu.L" and node.token contains "group"
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "goqu.L" and node.context.callArg contains "goqu.L:group"
   emit issue code.UnparameterizedSqlQueryParser at node
 }

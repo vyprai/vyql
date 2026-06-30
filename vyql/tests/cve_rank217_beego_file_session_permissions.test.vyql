@@ -1,0 +1,74 @@
+# Rank 217 / CVE-2019-16354: Beego file-backed sessions created session
+# directories and files with world-writable permissions.
+
+test "rank217: file session provider creates session storage with world-writable permissions"
+  lang go
+  file sess_file.go
+  expect VYQL-CFG-008
+  expect_review code.InsecurePermission
+  code
+  ```
+  package session
+
+  import (
+    "io/ioutil"
+    "os"
+    "path"
+  )
+
+  type FileProvider struct {
+    savePath string
+  }
+
+  func (fp *FileProvider) SessionRead(sid string) error {
+    if err := os.MkdirAll(path.Join(fp.savePath, string(sid[0]), string(sid[1])), 0777); err != nil {
+      return err
+    }
+    _, err := os.OpenFile(path.Join(fp.savePath, string(sid[0]), string(sid[1]), sid), os.O_RDWR, 0777)
+    return err
+  }
+
+  func (fp *FileProvider) SessionRegenerate(sid string, b []byte) error {
+    newPath := path.Join(fp.savePath, string(sid[0]), string(sid[1]))
+    if err := os.MkdirAll(newPath, 0777); err != nil {
+      return err
+    }
+    return ioutil.WriteFile(path.Join(newPath, sid), b, 0777)
+  }
+  ```
+
+test "rank217: file session provider uses restrictive session storage permissions"
+  lang go
+  file sess_file.go
+  reject VYQL-CFG-008
+  reject_review code.InsecurePermission
+  code
+  ```
+  package session
+
+  import (
+    "io/ioutil"
+    "os"
+    "path"
+  )
+
+  type FileProvider struct {
+    savePath string
+  }
+
+  func (fp *FileProvider) SessionRead(sid string) error {
+    if err := os.MkdirAll(path.Join(fp.savePath, string(sid[0]), string(sid[1])), 0755); err != nil {
+      return err
+    }
+    _, err := os.OpenFile(path.Join(fp.savePath, string(sid[0]), string(sid[1]), sid), os.O_RDWR, 0600)
+    return err
+  }
+
+  func (fp *FileProvider) SessionRegenerate(sid string, b []byte) error {
+    newPath := path.Join(fp.savePath, string(sid[0]), string(sid[1]))
+    if err := os.MkdirAll(newPath, 0755); err != nil {
+      return err
+    }
+    return ioutil.WriteFile(path.Join(newPath, sid), b, 0600)
+  }
+  ```

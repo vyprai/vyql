@@ -1,6 +1,6 @@
 module bindings.java.generated.m420f6b67;
 
 binding jmxRmiRegistryExposure77 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createJMXServer" and node.token contains "RMIExporter.EXPORTER_ATTRIBUTE" and node.token contains "configureRMIRegistry" and node.token contains "JMXConnectorServerFactory.newJMXConnectorServer" and not (node.token contains "LocateRegistry.createRegistry") and not (node.token contains "RMIJRMPServerImpl")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "createJMXServer" and node.context.selector contains "RMIExporter.EXPORTER_ATTRIBUTE" and node.context.callPath contains "configureRMIRegistry" and node.context.callPath contains "JMXConnectorServerFactory.newJMXConnectorServer" and not (node.context.callPath contains "LocateRegistry.createRegistry") and not (node.context.callPath contains "RMIJRMPServerImpl")
   emit issue code.JmxRmiRegistryExposure at node
 }

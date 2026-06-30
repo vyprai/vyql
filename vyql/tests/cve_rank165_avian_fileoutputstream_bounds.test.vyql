@@ -1,5 +1,6 @@
 test "rank165: Avian FileOutputStream offset plus length bounds check needs overflow review"
   lang java
+  expect VYQL-NUM-017
   expect_review code.IntegerSizeArithmetic
   code
   ```
@@ -26,6 +27,7 @@ test "rank165: Avian FileOutputStream offset plus length bounds check needs over
 
 test "rank165: Avian FileOutputStream non-overflowing range guard is clean"
   lang java
+  reject VYQL-NUM-017
   reject_review code.IntegerSizeArithmetic
   code
   ```

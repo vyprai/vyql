@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding ownedResourceDeleteMissingOwnershipCheck527 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.name contains "delete" and containsAny(node.context.callPath, ["get_image_meta_or_404", "get_resource", "get_object", "get_by_id", "find_by_id"]) and containsAny(node.context.callPath, ["schedule_delete_from_backend", "delete_image_metadata", "delete_resource", "delete_object"]) and containsAny(node.context.selector, ["req.context.read_only", "request.context.read_only"]) and containsAny(node.context.subscript, ["image['protected']", "resource['protected']", "object['protected']"]) and not (containsAny(node.context.selector, ["req.context.is_admin", "request.context.is_admin", "req.context.owner", "request.context.owner", "current_user.id"])) and not (containsAny(node.context.subscript, ["image['owner']", "resource['owner']", "object['owner']"])) and not (containsAny(node.context.callPath, ["check_ownership", "require_owner", "is_owner", "checkPermission", "check_permission"]))
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "owned_resource_delete_missing_ownership_check"
   emit issue code.OwnedResourceDeleteMissingOwnershipCheck at node
 }

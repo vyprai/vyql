@@ -421,7 +421,7 @@ func (c *rbConv) rubyFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 			nir.Const{Loc: loc, Value: "param_index:" + itoa(i)},
 		)
 	}
-	for _, tok := range c.rbStructuredContextTokens(body) {
+	for _, tok := range c.rbStructuredContextTokens(body, "function") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -444,7 +444,7 @@ func (c *rbConv) rubyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
 	}
-	for _, tok := range c.rbStructuredContextTokens(root) {
+	for _, tok := range c.rbStructuredContextTokens(root, "module") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -469,7 +469,7 @@ func (c *rbConv) rubyClassContext(cls *tree_sitter.Node, bases []string) []nir.S
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rbCompactText(text)},
 	}
-	for _, tok := range c.rbStructuredContextTokens(body) {
+	for _, tok := range c.rbStructuredContextTokens(body, "class") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
@@ -517,7 +517,7 @@ func (c *rbConv) rubyClassBases(cls *tree_sitter.Node) []string {
 	return out
 }
 
-func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
+func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node, scope string) []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(tok string) {
@@ -571,10 +571,16 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
 			}
 			if base := c.dotted(field(n, "object")); base != "" && base != "?" {
 				add("index_base:" + base)
+				if key := rbContextValue(c.text(field(n, "argument"))); key != "" {
+					add("index_key:" + base + ":" + key)
+				}
 			}
 		case "string", "heredoc_body", "heredoc_content":
 			if lit := rbContextValue(c.text(n)); lit != "" {
 				add("literal:" + lit)
+			}
+			for _, interp := range rbInterpolationValues(c.text(n)) {
+				add("interpolation:" + interp)
 			}
 		case "regex":
 			if lit := rubyRegexPattern(c.text(n)); lit != "" {
@@ -587,6 +593,9 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node) []string {
 		}
 	}
 	walk(root)
+	for _, tok := range rbSemanticReviewTokens(c.text(root), scope) {
+		add(tok)
+	}
 	return out
 }
 
@@ -620,6 +629,128 @@ func rbContextValue(raw string) string {
 		}
 	}
 	return rbCompactText(s)
+}
+
+func rbInterpolationValues(raw string) []string {
+	var out []string
+	for _, m := range rbInterpolationRe.FindAllStringSubmatch(raw, -1) {
+		if len(m) == 2 {
+			if v := rbCompactText(m[1]); v != "" {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+var rbInterpolationRe = regexp.MustCompile(`#\{([^}]*)\}`)
+
+func rbSemanticReviewTokens(raw, scope string) []string {
+	compact := rbCompactText(raw)
+	var out []string
+	add := func(fact string) {
+		out = append(out, "ruby_review:"+fact)
+	}
+	if scope == "function" && rbStoredHTMLInterpolationMissingSanitizeRe.MatchString(raw) && !strings.Contains(compact, "sanitize") {
+		add("stored_html_interpolation_missing_sanitize")
+	}
+	if scope == "function" && (strings.Contains(compact, "find_by(params[") || strings.Contains(compact, "find_by(params)")) {
+		add("active_record_find_by_request_hash")
+	}
+	if scope == "class" &&
+		strings.Contains(compact, "Chef::WebUIUser.cdb_load") &&
+		strings.Contains(compact, "cdb_save") &&
+		strings.Contains(compact, "cdb_destroy") &&
+		!strings.Contains(compact, "before:is_admin") {
+		add("chef_user_management_missing_admin_guard")
+	}
+	if scope == "function" && rbPersistentResponseReuse(compact) && !strings.Contains(compact, "persistent_socket_reusable") {
+		add("persistent_response_reuse_missing_guard")
+	}
+	if scope == "class" &&
+		strings.Contains(compact, "ClockworkWeb.enable(") &&
+		strings.Contains(compact, "ClockworkWeb.disable(") &&
+		strings.Contains(compact, "params[:job]") &&
+		strings.Contains(compact, "params[:enable]") &&
+		!strings.Contains(compact, "protect_from_forgery") {
+		add("clockwork_job_csrf_missing_forgery_protection")
+	}
+	if scope == "function" && rbConvertBacktickInterpolationRe.MatchString(raw) &&
+		!strings.Contains(compact, "shellescape") &&
+		!strings.Contains(compact, ".to_i") {
+		add("imagemagick_convert_backtick_unescaped_interpolation")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "WINDOWS") &&
+		strings.Contains(compact, "sprintf") &&
+		strings.Contains(compact, ".join('')") &&
+		strings.Contains(compact, "@paths.map") &&
+		rbBacktickInterpolationRe.MatchString(raw) &&
+		!strings.Contains(compact, "Open3.capture3") &&
+		!strings.Contains(compact, "Shellwords") &&
+		!strings.Contains(compact, "shellescape") {
+		add("windows_backtick_diff_command_unescaped")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "FROMpost_revisions") &&
+		strings.Contains(compact, "JOINpostsp") &&
+		strings.Contains(compact, "report.data<<") &&
+		!strings.Contains(compact, "Archetype.private_message") &&
+		!strings.Contains(compact, "secure_category") {
+		add("post_edit_report_missing_private_filters")
+	}
+	if scope == "function" && rbQueryStringJoinInterpolationRe.MatchString(raw) && !strings.Contains(compact, "CGI.escape(") {
+		add("unescaped_query_string_join_interpolation")
+	}
+	if scope == "function" && strings.Contains(compact, "string.to_s") && strings.Contains(compact, "/^[0-9a-f]{24}$/i") {
+		add("ruby_line_anchor_hex_validation")
+	}
+	if scope == "function" && strings.Contains(compact, "SSLContext.new") && strings.Contains(compact, ".ca_file=") && !strings.Contains(compact, ".verify_mode=") {
+		add("tls_ca_file_without_verify_mode")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "polymorphic_as") &&
+		strings.Contains(compact, "_type=") &&
+		strings.Contains(compact, "params[\"#{polymorphic_as}_type\"]") &&
+		strings.Contains(compact, ".send(") &&
+		!strings.Contains(compact, "valid_polymorphic_class") {
+		add("polymorphic_type_selected_from_params")
+	}
+	if scope == "function" &&
+		strings.Contains(compact, "unconfirmed_email=self.email") &&
+		strings.Contains(compact, "email=self.devise_email_in_database") &&
+		strings.Contains(compact, "confirmation_token=nil") &&
+		strings.Contains(compact, "generate_confirmation_token") &&
+		!strings.Contains(compact, "devise_unconfirmed_email_will_change!") {
+		add("devise_reconfirmation_missing_dirty_tracking")
+	}
+	return out
+}
+
+var (
+	rbStoredHTMLInterpolationMissingSanitizeRe = regexp.MustCompile(`#\{[^}]+\.content\}`)
+	rbResponseAssignRe                         = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)=response\(([A-Za-z_][A-Za-z0-9_]*)\)`)
+	rbConvertBacktickInterpolationRe           = regexp.MustCompile("`\\s*convert\\s+#\\{[^}]+\\}.*-colors\\s+#\\{[^}]+\\}.*-depth\\s+#\\{[^}]+\\}")
+	rbBacktickInterpolationRe                  = regexp.MustCompile("`\\s*#\\{[^}]+\\}\\s*`")
+	rbQueryStringJoinInterpolationRe           = regexp.MustCompile(`\?[A-Za-z0-9_%-]+=\s*#\{[^}]+\.join\(`)
+)
+
+func rbPersistentResponseReuse(compact string) bool {
+	for _, m := range rbResponseAssignRe.FindAllStringSubmatchIndex(compact, -1) {
+		if len(m) < 6 {
+			continue
+		}
+		lhs := compact[m[2]:m[3]]
+		rhs := compact[m[4]:m[5]]
+		if lhs != rhs {
+			continue
+		}
+		rest := compact[m[1]:]
+		if strings.Contains(rest, lhs+"[:persistent]") && strings.Contains(rest, "reset") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {

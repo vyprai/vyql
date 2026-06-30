@@ -61,3 +61,31 @@ test "rank539: CROSS signed message length guard prevents underflow copy"
      return ok - 1;
   }
   ```
+
+test "rank539: signed message length underflow generalizes across names"
+  lang c
+  expect VYQL-MEM-031
+  expect_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  typedef unsigned long size_t;
+  typedef unsigned long long uint64_t;
+  typedef struct sig_blob sig_blob;
+  typedef struct verify_key verify_key;
+  int verify_payload(const verify_key *key, const char *msg, uint64_t msg_len, const sig_blob *sig);
+  void *memcpy(void *dest, const void *src, unsigned long n);
+
+  int open_signed_payload(unsigned char *plain,
+                          unsigned long long *plain_len,
+                          const unsigned char *signed_msg,
+                          unsigned long long packet_len,
+                          const unsigned char *key)
+  {
+     *plain_len = packet_len - (unsigned long long) sizeof(sig_blob);
+     memcpy((unsigned char *) plain, (const unsigned char *) signed_msg, (size_t) *plain_len);
+     return verify_payload((const verify_key *const) key,
+                           (const char *const) plain,
+                           (const uint64_t) *plain_len,
+                           (const sig_blob *const) (signed_msg + *plain_len));
+  }
+  ```

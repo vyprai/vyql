@@ -412,6 +412,8 @@ var structuredFlagTokenPrefixes = []string{
 	"param_name:",
 	"param_type:",
 	"prop:",
+	"python_review:",
+	"regex:",
 	"selector:",
 	"shell=",
 	"slice:",

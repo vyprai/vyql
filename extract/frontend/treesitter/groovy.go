@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"strings"
+
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	groovy "github.com/vyprai/vyql/extract/frontend/treesitter/grammars/groovy"
 
@@ -46,17 +48,39 @@ func (c *gvConv) text(n *tree_sitter.Node) string {
 func (c *gvConv) gvModuleContext(n *tree_sitter.Node) []nir.Stmt {
 	loc := c.file + ":1"
 	text := c.text(n)
+	args := []nir.Expr{
+		nir.Const{Loc: loc, Value: "lang=groovy"},
+		nir.Const{Loc: loc, Value: text},
+		nir.Const{Loc: loc, Value: compactNoSpace(text)},
+	}
+	for _, tok := range c.gvSemanticModuleTokens(text) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 		Callee: nir.Name{ID: "analysis.module.context", Loc: loc},
-		Args: []nir.Expr{
-			nir.Const{Loc: loc, Value: "lang=groovy"},
-			nir.Const{Loc: loc, Value: text},
-			nir.Const{Loc: loc, Value: compactNoSpace(text)},
-		},
+		Args:   args,
 		Path:   "analysis.module.context",
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+func (c *gvConv) gvSemanticModuleTokens(text string) []string {
+	if gvHasChecksumErrorLogoutRedirect(text) {
+		return []string{"redirect_flow:checksum_error_uses_default_logout"}
+	}
+	return nil
+}
+
+func gvHasChecksumErrorLogoutRedirect(text string) bool {
+	compact := compactNoSpace(text)
+	if !strings.Contains(compact, "checksumError") || !strings.Contains(compact, "invalid(") {
+		return false
+	}
+	if strings.Contains(compact, `,"",false)`) {
+		return false
+	}
+	return strings.Contains(compact, "redirectClient")
 }
 
 func (c *gvConv) decls(n *tree_sitter.Node) []nir.Stmt {

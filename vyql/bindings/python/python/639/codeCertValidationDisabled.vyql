@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding certValidationDisabled639 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "httpx" and node.token contains "verify=False"
-  emit issue code.CertValidationDisabled at node
+  query pattern callExpr where callee.path ~= "httpx" and args.any.literal contains "verify=False"
+  emit issue code.CertValidationDisabled at call
 }

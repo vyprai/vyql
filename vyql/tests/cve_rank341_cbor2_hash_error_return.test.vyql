@@ -58,3 +58,32 @@ test "rank341: cbor2 CBORTag_hash exits on PyObject_Hash error"
     return ret;
   }
   ```
+
+test "rank341: PyObject_Hash error handling generalizes across names"
+  lang c
+  expect VYQL-DOS-013
+  expect_review code.UncheckedPythonCapiHashError
+  code
+  ```
+  static Py_hash_t widget_hash(WidgetObject *obj) {
+    Py_hash_t result = -1;
+    PyObject *seen = PySet_New(NULL);
+    PyObject *ident = PyLong_FromVoidPtr(obj);
+    PyObject *value = Py_BuildValue("(OO)", obj->name, obj->payload);
+    if (!value) {
+      goto done;
+    }
+    result = PyObject_Hash(value);
+    if (PySet_Discard(seen, ident) == -1) {
+      result = -1;
+      goto done;
+    }
+    Py_ssize_t remaining = PySequence_Length(seen);
+    if (remaining == -1) {
+      result = -1;
+      goto done;
+    }
+  done:
+    return result;
+  }
+  ```

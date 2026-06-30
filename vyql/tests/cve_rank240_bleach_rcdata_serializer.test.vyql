@@ -1,5 +1,6 @@
 test "rank240: HTMLSerializer subclass without RCDATA escaping is mutation-XSS review-visible"
   lang python
+  expect VYQL-INJ-200
   expect_review code.HtmlSanitizerLogicReview
   code
   ```
@@ -16,6 +17,7 @@ test "rank240: HTMLSerializer subclass without RCDATA escaping is mutation-XSS r
 
 test "rank240: HTMLSerializer subclass with RCDATA escaping is clean"
   lang python
+  reject VYQL-INJ-200
   reject_review code.HtmlSanitizerLogicReview
   code
   ```

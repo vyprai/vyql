@@ -199,6 +199,72 @@ func parseGoRequireLine(line string) (Dep, bool) {
 	return Dep{NormalizePackageName(name), version}, true
 }
 
+// ParseCargoLockGit reads git-sourced Cargo.lock packages into the generic git
+// ecosystem. Cargo.lock carries the immutable revision after '#', which is the
+// advisory identity for git dependencies.
+func ParseCargoLockGit(content string) []Dep {
+	var out []Dep
+	var source string
+	flush := func() {
+		if source == "" || !strings.HasPrefix(source, "git+") {
+			return
+		}
+		raw := strings.TrimPrefix(source, "git+")
+		url, rev, ok := strings.Cut(raw, "#")
+		if !ok || strings.TrimSpace(rev) == "" {
+			return
+		}
+		if name := normalizeGitURL(url); name != "" {
+			out = append(out, Dep{NormalizePackageName(name), strings.TrimSpace(rev)})
+		}
+	}
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "[[package]]" {
+			flush()
+			source = ""
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(key) != "source" {
+			continue
+		}
+		source = tomlStringValue(value)
+	}
+	flush()
+	return out
+}
+
+func tomlStringValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 {
+		return ""
+	}
+	quote := raw[0]
+	if quote != '"' && quote != '\'' {
+		return ""
+	}
+	var b strings.Builder
+	escaped := false
+	for i := 1; i < len(raw); i++ {
+		ch := raw[i]
+		if escaped {
+			b.WriteByte(ch)
+			escaped = false
+			continue
+		}
+		if ch == '\\' {
+			escaped = true
+			continue
+		}
+		if ch == quote {
+			return b.String()
+		}
+		b.WriteByte(ch)
+	}
+	return ""
+}
+
 func identifierBoundary(s string, start, end int) bool {
 	isIdent := func(b byte) bool {
 		return b == '_' || ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z') || ('0' <= b && b <= '9')

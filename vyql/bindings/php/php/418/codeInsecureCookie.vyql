@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding insecureCookie418 {
-  query pattern presenceNode where node.kind == "any" and node.path ~= "setcookie" and node.token contains "secure=false"
+  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "cookie_secure_false"
   emit issue code.InsecureCookie at node
 }

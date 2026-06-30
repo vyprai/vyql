@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding collectivesPublicTrashMissingEditPermission170 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "index" and node.token contains "$this->handleErrorResponse(function():array{" and node.token contains "$this->getCollectiveShare()->getOwner()" and node.token contains "$this->service->findAllTrash($collectiveId,$owner)" and node.token contains "$pageInfo->setShareToken($this->getToken())" and not (node.token contains "$this->checkEditPermissions()")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "index" and node.context.phpReview == "collectives_public_trash_missing_edit_permission"
   emit issue code.CollectivesPublicTrashMissingEditPermission at node
 }

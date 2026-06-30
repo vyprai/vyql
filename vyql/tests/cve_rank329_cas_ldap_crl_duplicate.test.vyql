@@ -1,0 +1,47 @@
+# Rank 329 / CVE-2023-28857: duplicate Jasig/CAS LDAP CRL credential reuse.
+# Ledger verification: VYQL-SEC-006 catches copied bind credentials for a new URL.
+
+test "rank329: CAS duplicate LDAP CRL fetcher reuses bind credentials"
+  lang java
+  expect VYQL-SEC-006
+  expect_review code.LdapCrlCredentialReuse
+  code
+  ```
+  import org.ldaptive.ConnectionConfig;
+  import org.ldaptive.ConnectionFactory;
+  import org.ldaptive.DefaultConnectionFactory;
+
+  class LdaptiveResourceCRLFetcher {
+      private final ConnectionConfig connectionConfig = new ConnectionConfig();
+
+      protected ConnectionFactory prepareConnectionFactory(final String ldapURL) {
+          var copiedConfig = ConnectionConfig.copy(this.connectionConfig);
+          copiedConfig.setLdapUrl(ldapURL);
+          return new DefaultConnectionFactory(copiedConfig);
+      }
+  }
+  ```
+
+test "rank329: CAS duplicate LDAP CRL fetcher clears bind initializers"
+  lang java
+  reject VYQL-SEC-006
+  reject_review code.LdapCrlCredentialReuse
+  code
+  ```
+  import org.ldaptive.ConnectionConfig;
+  import org.ldaptive.ConnectionFactory;
+  import org.ldaptive.DefaultConnectionFactory;
+
+  class LdaptiveResourceCRLFetcher {
+      private final ConnectionConfig connectionConfig = new ConnectionConfig();
+
+      protected ConnectionFactory prepareConnectionFactory(final String ldapURL) {
+          var copiedConfig = ConnectionConfig.copy(this.connectionConfig);
+          if (!copiedConfig.getLdapUrl().equals(ldapURL)) {
+              copiedConfig.setConnectionInitializers();
+          }
+          copiedConfig.setLdapUrl(ldapURL);
+          return new DefaultConnectionFactory(copiedConfig);
+      }
+  }
+  ```

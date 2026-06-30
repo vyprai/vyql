@@ -73,7 +73,12 @@ func statWalk(h hash.Hash, root string) {
 		}
 		if d.IsDir() {
 			switch d.Name() {
-			case ".git", "node_modules", "vendor", ".hg", ".svn":
+			case ".git", "node_modules", ".hg", ".svn":
+				return filepath.SkipDir
+			case "vendor":
+				return nil
+			}
+			if vendorFingerprintDirShouldSkip(root, p) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -86,6 +91,35 @@ func statWalk(h hash.Hash, root string) {
 		fmt.Fprintf(h, "|%d|%d\x00", info.Size(), info.ModTime().UnixNano())
 		return nil
 	})
+}
+
+func vendorFingerprintDirShouldSkip(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	for i, part := range parts {
+		if part != "vendor" {
+			continue
+		}
+		if i == len(parts)-1 {
+			return false
+		}
+		rest := strings.Join(parts[i+1:], "/")
+		for _, prefix := range vendoredFingerprintPrefixes {
+			if rest == prefix || strings.HasPrefix(prefix, rest+"/") || strings.HasPrefix(rest, prefix+"/") {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+var vendoredFingerprintPrefixes = []string{
+	"assets",
+	"github.com/containerd/cri",
 }
 
 // statFile folds one file's path+size+mtime into h (skipped silently if it can't be stat'd).

@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding commandLineAssemblyReview248 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "_fork" and node.token contains "path.replace" and node.token contains "href" and node.token contains "os.execv" and node.token contains "\"-c\"" and not (node.token contains "shlex.quote(href)")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "command_line_assembly_review"
   emit issue code.CommandLineAssemblyReview at node
 }

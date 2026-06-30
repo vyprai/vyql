@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding cipherWithoutIntegrityHash188 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "crypto_cipher" and node.token contains "crypto_hash" and node.token contains "tmp_cipher" and node.token contains "tmp_hash" and node.token contains "strcmp(str,\"none\")==0" and not (node.token contains "strcmp(tmp_cipher,\"none\")!=0") and not (node.token contains "strcmp(tmp_hash,\"none\")==0")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "crypto.cipher_without_integrity_hash"
   emit issue code.CipherWithoutIntegrityHash at node
 }

@@ -1754,6 +1754,8 @@ func v2PresenceProperty(defaultSubject, field string) (string, string, bool) {
 		return defaultSubject, "method", true
 	case "token":
 		return defaultSubject, "tokens", true
+	case "arg", "args", "valueToken":
+		return defaultSubject, "tokens", true
 	case "op", "identifier", "key", "any":
 		return defaultSubject, field, true
 	default:
@@ -1803,6 +1805,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "call:"
 	case "callArg":
 		return "call_arg:"
+	case "callArgShape":
+		return "call_arg_shape:"
 	case "callMethod":
 		return "call_method:"
 	case "callOrder":
@@ -1835,6 +1839,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "selector:"
 	case "literal":
 		return "literal:"
+	case "regex":
+		return "regex:"
 	case "identifier":
 		return "identifier:"
 	case "expr":
@@ -1849,10 +1855,22 @@ func v2PresenceValuePrefix(field string) string {
 		return "param_type:"
 	case "binary":
 		return "binary:"
+	case "binaryShape":
+		return "binary_shape:"
 	case "assign":
 		return "assign:"
+	case "assignShape":
+		return "assign_shape:"
+	case "assignOpShape":
+		return "assign_op_shape:"
+	case "appendCopy":
+		return "append_copy:"
 	case "subscript":
 		return "subscript:"
+	case "subscriptShape":
+		return "subscript_shape:"
+	case "slice":
+		return "slice:"
 	case "field":
 		return "field:"
 	case "macroName":
@@ -1865,16 +1883,98 @@ func v2PresenceValuePrefix(field string) string {
 		return "prop:"
 	case "index":
 		return "index:"
+	case "indexBase":
+		return "index_base:"
+	case "indexKind":
+		return "index_kind="
+	case "guard":
+		return "guard="
+	case "indexShape":
+		return "index_shape:"
+	case "lengthCheck":
+		return "length_check:"
 	case "indexKey":
 		return "index_key:"
+	case "globalSubscriptWrite":
+		return "global_subscript_write="
+	case "prototypeNameGuard":
+		return "prototype_name_guard="
+	case "gitCloneArgvMissingDelimiter":
+		return "git_clone_argv_missing_delimiter="
+	case "tlsRejectUnauthorizedDisabledDefault":
+		return "tls_reject_unauthorized_disabled_default="
+	case "tlsRejectUnauthorizedPropagated":
+		return "tls_reject_unauthorized_propagated="
+	case "foldedHeaderCurrentGuard":
+		return "folded_header_current_guard="
+	case "prototypeKeyGuard":
+		return "prototype_key_guard="
+	case "pathSegmentTypeGuard":
+		return "path_segment_type_guard="
+	case "ownPropertyKeyGuard":
+		return "own_property_key_guard="
+	case "forIn":
+		return "for_in="
+	case "objectKeysForEach":
+		return "object_keys_for_each="
+	case "dynamicPropertyWrite":
+		return "dynamic_property_write="
+	case "dynamicPropertyWriteObjectLiteral":
+		return "dynamic_property_write_object_literal="
+	case "dynamicPropertyWriteArrayLiteral":
+		return "dynamic_property_write_array_literal="
+	case "dynamicPropertyWriteFromSubscript":
+		return "dynamic_property_write_from_subscript="
+	case "dynamicPropertyWriteFromCall":
+		return "dynamic_property_write_from_call="
+	case "dynamicPropertyPlainObjectFallback":
+		return "dynamic_property_plain_object_fallback="
+	case "zeroStepSequenceRisk":
+		return "zero_step_sequence_risk="
+	case "convertSvgMultiSvgSanitizerBypass":
+		return "convert_svg_multi_svg_sanitizer_bypass="
+	case "incompleteGeneratedJsIdentifierReservedWords":
+		return "incomplete_generated_js_identifier_reserved_words="
+	case "ajaxBackslashProtocolRelativeUrlXss":
+		return "ajax_backslash_protocol_relative_url_xss="
 	case "return":
 		return "return:"
 	case "returnCallPath":
 		return "return_call_path:"
 	case "returnIdentifier":
 		return "return_identifier:"
+	case "metadataExportAfterSensitiveKey":
+		return "metadata_export_after_sensitive_key:"
+	case "metadataExportAfterSensitiveSource":
+		return "metadata_export_after_sensitive_source:"
+	case "metadataExportWriter":
+		return "metadata_export_writer:"
 	case "advisoryCwe":
 		return "advisory_cwe="
+	case "status":
+		return "status="
+	case "reachable":
+		return "reachable="
+	case "shellBridge":
+		return "shell_bridge:"
+	case "startupOrder":
+		return "startup_order:"
+	case "csrfValidation":
+		return "csrf_validation:"
+	case "redirectFlow":
+		return "redirect_flow:"
+	case "rsaPkcs1":
+		return "rsa_pkcs1:"
+	case "portProtocol":
+		return "port_protocol:"
+	case "rubyReview":
+		return "ruby_review:"
+	case "rustReview":
+		return "rust_review:"
+	case "pythonReview":
+		return "python_review:"
+	case "phpReview":
+		return "php_review:"
 	case "annotationArg":
 		return "annotation_arg:"
 	case "assignCall":
@@ -1889,6 +1989,10 @@ func v2PresenceValuePrefix(field string) string {
 		return "call_before:"
 	case "castCallLiteral":
 		return "cast_call_literal:"
+	case "castShape":
+		return "cast_shape:"
+	case "checkedShape":
+		return "checked_shape:"
 	case "classModifier":
 		return "class_modifier:"
 	case "decoratorMethod":
@@ -1899,6 +2003,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "field_type:"
 	case "functionModifier":
 		return "function_modifier:"
+	case "method":
+		return "method:"
 	case "matchArm":
 		return "match_arm:"
 	case "paramIndex":
@@ -1915,6 +2021,14 @@ func v2PresenceValuePrefix(field string) string {
 		return "resolve_entities:"
 	case "value":
 		return "value:"
+	case "erbValue":
+		return "value="
+	case "template":
+		return "template="
+	case "attr":
+		return "attr="
+	case "const":
+		return "const:"
 	case "switchCase":
 		return "switch_case:"
 	case "varName":

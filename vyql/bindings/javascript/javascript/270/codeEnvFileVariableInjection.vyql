@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding envFileVariableInjection270 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "updateEnvFile" and node.context.callPath contains "Object.entries" and node.context.literal contains "${key}=\"${value}\"" and node.context.callPath contains "fs.writeFileSync" and not (node.context.callPath contains "dotenv.parse") and not (containsAny(node.context.scopeCall, [stringify, JSON.stringify]))
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Object.entries" and node.context.literal contains "${key}=\"${value}\"" and node.context.callPath contains "fs.writeFileSync" and not (node.context.callPath contains "dotenv.parse") and not (containsAny(node.context.scopeCall, [stringify, JSON.stringify]))
   emit issue code.EnvFileVariableInjection at node
 }

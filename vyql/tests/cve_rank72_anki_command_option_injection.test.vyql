@@ -1,0 +1,8 @@
+# Rank 72 / CVE-2024-26020: Anki media filename command option injection.
+
+test "rank72: command option injection is a CVE anchor"
+  expect VYQL-INJ-031
+  graph
+  ```
+  node sink code.CommandOptionInjection
+  ```

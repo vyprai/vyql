@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding incompleteTemplateValidation493 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "get_jinja_env" and node.token contains "Environment(extensions=" and node.token contains "filters.update(get_jinja_filters())" and node.token contains "returnjinja_env" and not (node.token contains "SandboxedEnvironment") and not (node.token contains "ImmutableSandboxedEnvironment")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "jinja_environment_without_sandbox"
   emit issue code.IncompleteTemplateValidation at node
 }

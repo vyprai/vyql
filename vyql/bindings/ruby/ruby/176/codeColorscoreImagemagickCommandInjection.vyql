@@ -1,6 +1,6 @@
 module bindings.ruby.generated.m5a48bf47;
 
 binding colorscoreImagemagickCommandInjection176 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.name contains "initialize" and node.token contains "`convert #{image_path}" and node.token contains "-colors #{colors}" and node.token contains "-depth #{depth}" and not (node.token contains "shellescape") and not (node.token contains "colors.to_i") and not (node.token contains "depth.to_i")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.functionName == "initialize" and node.context.rubyReview == "imagemagick_convert_backtick_unescaped_interpolation"
   emit issue code.ColorscoreImagemagickCommandInjection at node
 }

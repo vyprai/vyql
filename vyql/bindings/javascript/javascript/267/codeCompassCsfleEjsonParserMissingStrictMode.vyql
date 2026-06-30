@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding compassCsfleEjsonParserMissingStrictMode267 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "textToEncryptedFieldConfig" and node.token contains "parseFilter(text)" and not (node.token contains "parseShellStringToEJSON") and not (node.token contains "ParseMode.Strict")
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "parseFilter" and node.context.literal contains "$compass.error" and not (node.context.callPath contains "parseShellStringToEJSON") and not (node.context.selector contains "ParseMode.Strict")
   emit issue code.CompassCsfleEjsonParserMissingStrictMode at node
 }

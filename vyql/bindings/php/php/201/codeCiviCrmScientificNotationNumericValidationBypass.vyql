@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding civiCrmScientificNotationNumericValidationBypass201 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "numeric" and node.token contains "returnpreg_match" and not (node.token contains "!is_numeric($value)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "numeric" and node.context.phpReview == "scientific_notation_numeric_validation_bypass_regex_only"
   emit issue code.CiviCrmScientificNotationNumericValidationBypass at node
 }

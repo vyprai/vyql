@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding unvalidatedNumericSqlInterpolation61 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.name contains "actionDownloadFile" and node.token contains "'model_id'=>$id" and not (node.token contains "(int)$id")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "actionDownloadFile" and node.context.phpReview == "unvalidated_numeric_sql_interpolation_id"
   emit issue code.UnvalidatedNumericSqlInterpolation at node
 }

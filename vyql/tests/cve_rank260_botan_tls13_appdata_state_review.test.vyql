@@ -1,5 +1,6 @@
 test "rank260: Botan TLS 1.3 accepts application data before handshake completion check"
   lang cpp
+  expect VYQL-AUTH-082
   expect_review code.ProtocolStateReview
   code
   ```
@@ -34,8 +35,27 @@ test "rank260: Botan TLS 1.3 accepts application data before handshake completio
   };
   ```
 
+test "rank260: TLS application data state review generalizes across names"
+  lang cpp
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  enum class Record_Type { ApplicationData, Alert };
+  struct Packet { Record_Type type; int seq_no; int fragment; };
+  struct Hooks { void tls_record_received(int seq, int body); };
+  Hooks& callbacks();
+
+  void accept_record(const Packet& pkt) {
+    if (pkt.type == Record_Type::ApplicationData) {
+      callbacks().tls_record_received(pkt.seq_no, pkt.fragment);
+    }
+  }
+  ```
+
 test "rank260: Botan TLS 1.3 checks application traffic decryptability before application data"
   lang cpp
+  reject VYQL-AUTH-082
   reject_review code.ProtocolStateReview
   code
   ```

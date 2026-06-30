@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding pgEscapeStringSqlFilterInjection146 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "freedomrss_search" and node.context.callPath contains "GetHttpVars" and node.context.callPath contains "pg_escape_string" and node.context.callPath contains "SearchDoc" and node.context.callPath contains "addFilter" and not (node.context.callPath contains "pg_escape_literal")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "freedomrss_search" and node.context.callPath contains "GetHttpVars" and node.context.callPath contains "pg_escape_string" and node.context.callPath contains "SearchDoc" and node.context.callPath contains "addFilter" and not (node.context.callPath contains "pg_escape_literal")
   emit issue code.PgEscapeStringSqlFilterInjection at node
 }

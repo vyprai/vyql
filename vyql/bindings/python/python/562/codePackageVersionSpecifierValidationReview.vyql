@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding packageVersionSpecifierValidationReview562 {
-  query pattern presenceNode where node.kind == "any" and node.path == "re.compile" and node.token contains "^black([^A-Z0-9._-]+.*)$"
+  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "package_version_specifier_validation_review"
   emit issue code.PackageVersionSpecifierValidationReview at node
 }

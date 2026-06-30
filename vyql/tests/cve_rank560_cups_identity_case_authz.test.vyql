@@ -114,3 +114,32 @@ test "rank560: cups policy names use canonical passwd name"
     return 0;
   }
   ```
+
+test "rank560: local identity case bypass generalizes across function and variable names"
+  lang c
+  file auth.c
+  expect VYQL-AUTH-032
+  expect_review code.CaseInsensitiveLocalIdentityAuthorizationBypass
+  code
+  ```
+  typedef struct passwd {
+    char *pw_name;
+  } passwd_t;
+
+  typedef struct group {
+    char **members;
+  } group_t;
+
+  extern int _cups_strcasecmp(const char *a, const char *b);
+  extern int strcmp(const char *a, const char *b);
+
+  int authorize_member(const char *login, passwd_t *account, group_t *entry) {
+    int slot;
+
+    for (slot = 0; entry->members[slot]; slot ++) {
+      if (!_cups_strcasecmp(login, entry->members[slot]))
+        return 1;
+    }
+    return 0;
+  }
+  ```

@@ -31,6 +31,29 @@ test "rank210: bcrypt Java int shift for log rounds needs overflow review"
   }
   ```
 
+test "rank210: bcrypt Java int shift generalizes over cost variable naming"
+  lang java
+  expect VYQL-NUM-003
+  expect_review code.IntegerSizeArithmetic
+  code
+  ```
+  class BCrypt {
+    public static void entry() {
+      int cost = Integer.parseInt(System.console().readLine());
+      new BCrypt().crypt_raw(new byte[16], new byte[16], cost);
+    }
+
+    private byte[] crypt_raw(byte password[], byte salt[], int cost) {
+      int rounds;
+      if (cost < 4 || cost > 31) {
+        throw new IllegalArgumentException("Bad number of rounds");
+      }
+      rounds = 1 << cost;
+      return password;
+    }
+  }
+  ```
+
 test "rank210: bcrypt Java long shift helper avoids log rounds overflow"
   lang java
   reject VYQL-NUM-003

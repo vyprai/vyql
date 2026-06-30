@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding relativeOnlyFilenameValidation449 {
-  query pattern presenceNode where node.scope == "function" and node.token contains "'../'in" and node.token contains "re.search" and node.token contains "A-Za-z0-9" and node.token contains "returnTrue" and node.token contains "returnFalse" and not (node.token contains "startswith('/')") and not (node.token contains "os.path.isabs") and not (node.token contains "is_absolute()")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "relative_only_filename_validation"
   emit issue code.RelativeOnlyFilenameValidation at node
 }

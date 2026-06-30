@@ -1,0 +1,8 @@
+# Rank 22 / CVE-2022-38072: admesh field-derived index access.
+
+test "rank22: field-derived index access is a CVE anchor"
+  expect VYQL-MEM-010
+  graph
+  ```
+  node idx code.FieldDerivedIndexAccess
+  ```

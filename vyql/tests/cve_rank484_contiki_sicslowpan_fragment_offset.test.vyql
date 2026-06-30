@@ -100,3 +100,36 @@ test "rank484: Contiki-NG checks offset plus length before reassembly copy"
     return true;
   }
   ```
+
+test "rank484: shifted fragment offset copy generalizes across names"
+  lang c
+  file sicslowpan.c
+  expect VYQL-MEM-028
+  expect_review code.ContikiSicslowpanFragmentOffsetOobWrite
+  code
+  ```
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  void *memcpy(void *dest, const void *src, unsigned long n);
+  enum { FRAG_SLOTS = 4 };
+  uint8_t packet_buf[128];
+
+  struct segment_state {
+    int size;
+    int owner;
+    uint8_t pos;
+    uint8_t payload[128];
+  } segments[FRAG_SLOTS];
+
+  static void rebuild_packet(int owner)
+  {
+    int slot;
+
+    for(slot = 0; slot < FRAG_SLOTS; slot++) {
+      if(segments[slot].size > 0 && segments[slot].owner == owner) {
+        memcpy((uint8_t *)packet_buf + (uint16_t)(segments[slot].pos << 3),
+               (uint8_t *)segments[slot].payload, segments[slot].size);
+      }
+    }
+  }
+  ```

@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding accessPolicyReview164 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "create_shelf" and node.token contains "ub.Shelf()" and node.token contains "create_edit_shelf" and node.token contains "page=\"shelfcreate\"" and not (node.token contains "role_edit_shelfs")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "access_policy_public_shelf_without_role_check"
   emit issue code.AccessPolicyReview at node
 }

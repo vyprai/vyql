@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding collectionExtendPrototypePollution580 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.token contains "_core.Collection.prototype.extend" and node.token contains "forEach((el,key)=>" and node.token contains "_link.byLink" and node.token contains "setVal(data,key,val)" and not (node.token contains "key==='__proto__'")
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "forEach" and node.context.callPath contains "byLink" and node.context.callPath contains "setVal" and not (node.context.prototypeKeyGuard == "true")
   emit issue code.CollectionExtendPrototypePollution at node
 }

@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding fat12SuccessorEntryBoundsBypass84 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "set_fat" and node.token contains "fs->fat_bits" and node.token contains "cluster*3/2" and node.token contains "get_fat(&subseqEntry,fs->fat,cluster+1,fs)" and node.token contains "cluster!=fs->clusters-1" and not (node.token contains "cluster!=fs->clusters+1")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "fat12.successor_entry_bounds_bypass"
   emit issue code.Fat12SuccessorEntryBoundsBypass at node
 }

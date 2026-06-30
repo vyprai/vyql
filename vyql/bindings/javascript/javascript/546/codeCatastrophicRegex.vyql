@@ -1,7 +1,7 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding catastrophicRegex546 {
-  query pattern presenceNode where node.kind == "any" and node.method == "match" and node.token contains "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]" and not (node.token contains "([^*]|\\*(?!\\/))*?")
+  query pattern callExpr where callee.method == "match" and args.any.literal contains "^(\\s|\\/\\*.*?\\*\\/)*[\\[\\(\\w]" and not args.any.literal contains "([^*]|\\*(?!\\/))*?"
   emit issue code.CatastrophicRegex at node
   emit sink code.CatastrophicRegexSink at node
 }

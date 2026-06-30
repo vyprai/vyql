@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding rubyCgiEscapeHtmlLengthOverflow103 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "optimized_escape_html" and node.token contains "HTML_ESCAPE_MAX_LEN" and node.token contains "RSTRING_LEN(str)" and node.token contains "ALLOCV_N(char,vbuf,RSTRING_LEN(str)*HTML_ESCAPE_MAX_LEN)" and not (node.token contains "ALLOCV_N(escape_buf,vbuf,RSTRING_LEN(str))") and not (node.token contains "typedefcharescape_buf[HTML_ESCAPE_MAX_LEN]")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "ruby_cgi.escape_html_length_overflow"
   emit issue code.RubyCgiEscapeHtmlLengthOverflow at node
 }

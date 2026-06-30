@@ -1,6 +1,6 @@
 module bindings.csharp.generated.m1caa8bf2;
 
 binding uncheckedEncodedLengthArithmetic165 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.token contains "value.Length<<1" and not (node.token contains "checked(value.Length*2)")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.binaryShape contains "ID<<INT" and not (node.context.checkedShape contains "ID*INT")
   emit issue code.UncheckedEncodedLengthArithmetic at node
 }

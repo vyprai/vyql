@@ -30,6 +30,31 @@ test "rank288: BusyBox udhcpc6 DNS_SERVERS allocation is one byte short"
   }
   ```
 
+test "rank288: DNS server address-list underallocation generalizes across variable names"
+  lang c
+  expect VYQL-MEM-021
+  code
+  ```
+  static void emit_dns(const unsigned char *raw) {
+      unsigned count;
+      unsigned cursor;
+      char *writer;
+
+      switch (raw[0]) {
+      case D6_OPT_DNS_SERVERS:
+          count = raw[3] >> 4;
+          writer = xmalloc(4 + count * 40 - 1);
+          cursor = 0;
+          while (count--) {
+              sprint_nip6(writer, raw + 4 + cursor);
+              writer += 39;
+              cursor += 16;
+          }
+          break;
+      }
+  }
+  ```
+
 test "rank288: BusyBox udhcpc6 DNS_SERVERS allocation includes the terminator"
   lang c
   reject VYQL-MEM-021

@@ -46,3 +46,20 @@ test "rank623: C web request page is guarded before wiki file helpers"
       unlink(page);
   }
   ```
+
+test "rank623: C web request path traversal generalizes across names"
+  lang c
+  file wiki.c
+  expect VYQL-PATH-029
+  code
+  ```
+  char *http_request_param_get(HttpRequest *req, char *name);
+  char *file_read(char *filename);
+  void file_write(char *filename, char *data);
+
+  void show_page(HttpRequest *request) {
+    char *entry_name = http_request_param_get(request, "page");
+    file_read(entry_name);
+    file_write(entry_name, "body");
+  }
+  ```

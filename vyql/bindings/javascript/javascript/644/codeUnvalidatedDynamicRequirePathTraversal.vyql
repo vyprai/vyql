@@ -1,6 +1,6 @@
 module bindings.javascript.generated.mfb63017a;
 
 binding unvalidatedDynamicRequirePathTraversal644 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.name contains "runWidget" and node.token contains "widgetId" and node.token contains "widget-${widgetId}.js" and node.token contains "path.join(__dirname,file)" and node.token contains "require(path.join(__dirname,file))" and not (node.token contains "resolveWidgetPath") and not (node.token contains "path.relative") and not (node.token contains "widgetIdPattern")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.identifier contains "widgetId" and node.context.literal contains "widget-${widgetId}.js" and node.context.callPath contains "path.join" and node.context.callPath contains "require" and not (node.context.callPath contains "resolveWidgetPath") and not (node.context.callPath contains "path.relative") and not (node.context.identifier contains "widgetIdPattern")
   emit issue code.UnvalidatedDynamicRequirePathTraversal at node
 }

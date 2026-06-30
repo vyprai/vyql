@@ -323,6 +323,19 @@ func (c *conv) moduleContextStmts(gd *ast.GenDecl) []nir.Stmt {
 			if text := compactGoNode(c.fset, value); text != "" {
 				tokens = append(tokens, text)
 			}
+			if lit, ok := value.(*ast.CompositeLit); ok &&
+				c.path(lit.Type) == "tpm2.PCRSelection" &&
+				c.goCompositeFieldPath(lit, "Hash") == "tpm2.AlgSHA1" &&
+				!c.goCompositeIntSliceContains(lit, "PCRs", 14) {
+				out = append(out, c.goAnalysisObservation("analysis.go.tpm_weak_pcr_sealing", "tpm_weak_pcr_sealing", value.Pos(),
+					"lang=go", "type:tpm2.PCRSelection", "field:Hash", "hash:tpm2.AlgSHA1", "field:PCRs", "missing:PCR14"))
+			}
+			if lit, ok := value.(*ast.CompositeLit); ok &&
+				c.goMapValueHasAll(lit, "RoleNetworkManager", "PermBackup", "PermRestore") &&
+				!c.goMapValueHasAll(lit, "RoleAdmin", "PermBackup", "PermRestore") {
+				out = append(out, c.goAnalysisObservation("analysis.go.overbroad_role_permission_grant", "overbroad_role_permission_grant", value.Pos(),
+					"lang=go", "grant:RoleNetworkManager", "permission:PermBackup", "permission:PermRestore"))
+			}
 		}
 		out = append(out, nir.ExprStmt{Value: analysisCall("analysis.module.context", "context", c.loc(vs.Pos()), tokens...)})
 	}
@@ -449,10 +462,535 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 	var body []nir.Stmt
 	if bodyNode != nil {
 		body = c.stmts(bodyNode.List)
+		body = append(body, c.goSecurityObservations(name, params, bodyNode)...)
 	}
 	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
 		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
 		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
+}
+
+func (c *conv) goSecurityObservations(name string, params []string, body *ast.BlockStmt) []nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	if obs, ok := c.goContainerdCRIImageEnvAliasObservation(name, body); ok {
+		out = append(out, obs)
+	}
+	if obs, ok := c.goPowerShellCommandStringWrapperEnvObservation(name, params, body); ok {
+		out = append(out, obs)
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.CompositeLit:
+			switch c.path(x.Type) {
+			case "tls.Config":
+				if c.goCompositeBoolField(x, "InsecureSkipVerify") == "true" {
+					out = append(out, c.goAnalysisObservation("analysis.go.tls_insecure_skip_verify", "tls_insecure_skip_verify", x.Pos(),
+						"lang=go", "function_name:"+name, "type:tls.Config", "field:InsecureSkipVerify", "value:true"))
+				}
+			case "http.Cookie":
+				if c.goCompositeBoolField(x, "Secure") == "false" {
+					out = append(out, c.goAnalysisObservation("analysis.go.insecure_cookie_secure_false", "insecure_cookie_secure_false", x.Pos(),
+						"lang=go", "function_name:"+name, "type:http.Cookie", "field:Secure", "value:false"))
+				}
+				if c.goCompositeBoolField(x, "HttpOnly") == "false" {
+					out = append(out, c.goAnalysisObservation("analysis.go.insecure_cookie_httponly_false", "insecure_cookie_httponly_false", x.Pos(),
+						"lang=go", "function_name:"+name, "type:http.Cookie", "field:HttpOnly", "value:false"))
+				}
+			}
+		case *ast.CallExpr:
+			if goLastSeg(c.path(x.Fun)) == "SetCookie" && len(x.Args) > 5 && c.goBoolLiteral(x.Args[5]) == "false" {
+				out = append(out, c.goAnalysisObservation("analysis.go.insecure_cookie_setcookie_secure_false", "insecure_cookie_setcookie_secure_false", x.Pos(),
+					"lang=go", "function_name:"+name, "call:SetCookie", "arg:secure", "value:false"))
+			}
+			if goLastSeg(c.path(x.Fun)) == "Info" &&
+				goCallHasStringLiteral(x, "fetched manifest") &&
+				goCallHasStructuredField(c, x, "manifest") {
+				out = append(out, c.goAnalysisObservation("analysis.go.coder_manifest_info_log", "coder_manifest_info_log", x.Pos(),
+					"lang=go", "function_name:"+name, "call:Info", "message:fetched manifest", "field:manifest"))
+			}
+		case *ast.BinaryExpr:
+			if c.goCountNonzeroGuard(x) {
+				out = append(out, c.goAnalysisObservation("analysis.go.count_nonzero_guard", "count_nonzero_guard", x.Pos(),
+					"lang=go", "function_name:"+name, "guard:count_nonzero"))
+			}
+		}
+		return true
+	})
+	return out
+}
+
+func (c *conv) goContainerdCRIImageEnvAliasObservation(name string, body *ast.BlockStmt) (nir.Stmt, bool) {
+	type alias struct {
+		source string
+		pos    token.Pos
+	}
+	aliases := map[string]alias{}
+	copies := map[string]bool{}
+	appendsContainerEnv := map[string]bool{}
+	passedToWithEnv := map[string]bool{}
+
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				id, ok := lhs.(*ast.Ident)
+				if !ok || id.Name == "_" || id.Name == "" {
+					continue
+				}
+				if c.goAppendCopyToken(x.Rhs[i]) != "" {
+					copies[id.Name] = true
+					continue
+				}
+				if src := c.path(x.Rhs[i]); strings.HasSuffix(src, ".Env") {
+					aliases[id.Name] = alias{source: src, pos: x.Pos()}
+				}
+			}
+		case *ast.ValueSpec:
+			for i, name := range x.Names {
+				if i >= len(x.Values) || name == nil || name.Name == "_" || name.Name == "" {
+					break
+				}
+				if c.goAppendCopyToken(x.Values[i]) != "" {
+					copies[name.Name] = true
+					continue
+				}
+				if src := c.path(x.Values[i]); strings.HasSuffix(src, ".Env") {
+					aliases[name.Name] = alias{source: src, pos: x.Pos()}
+				}
+			}
+		case *ast.RangeStmt:
+			if c.goRangeLooksContainerEnv(x) {
+				for _, v := range c.goAppendedVarsInBlock(x.Body) {
+					appendsContainerEnv[v] = true
+				}
+			}
+		case *ast.CallExpr:
+			if goLastSeg(c.path(x.Fun)) != "WithEnv" {
+				return true
+			}
+			for _, arg := range x.Args {
+				if id, ok := arg.(*ast.Ident); ok {
+					passedToWithEnv[id.Name] = true
+				}
+			}
+		}
+		return true
+	})
+
+	for envVar, a := range aliases {
+		if copies[envVar] || !appendsContainerEnv[envVar] || !passedToWithEnv[envVar] {
+			continue
+		}
+		return c.goAnalysisObservation("analysis.go.containerd_cri_image_env_alias", "containerd_cri_image_env_alias", a.pos,
+			"lang=go", "function_name:"+name, "source:"+a.source, "flow:alias_append_withenv"), true
+	}
+	return nil, false
+}
+
+func (c *conv) goPowerShellCommandStringWrapperEnvObservation(name string, params []string, body *ast.BlockStmt) (nir.Stmt, bool) {
+	stringVars := map[string]string{}
+	paramSet := map[string]bool{}
+	for _, p := range params {
+		if p != "" && p != "_" {
+			paramSet[p] = true
+		}
+	}
+
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				id, ok := lhs.(*ast.Ident)
+				if !ok || id.Name == "_" || id.Name == "" {
+					continue
+				}
+				if text, ok := c.goStaticStringText(x.Rhs[i], stringVars); ok {
+					stringVars[id.Name] = text
+				}
+			}
+		case *ast.ValueSpec:
+			for i, n := range x.Names {
+				if i >= len(x.Values) || n == nil || n.Name == "_" || n.Name == "" {
+					break
+				}
+				if text, ok := c.goStaticStringText(x.Values[i], stringVars); ok {
+					stringVars[n.Name] = text
+				}
+			}
+		}
+		return true
+	})
+
+	var hit ast.Node
+	ast.Inspect(body, func(n ast.Node) bool {
+		if hit != nil {
+			return false
+		}
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.CallExpr:
+			if !c.goLooksLikePowerShellWrapperCall(x, stringVars) {
+				return true
+			}
+			for _, arg := range x.Args[1:] {
+				if c.goEnvAssignmentFromInput(arg, paramSet) {
+					hit = x
+					return false
+				}
+			}
+		}
+		return true
+	})
+	if hit == nil {
+		return nil, false
+	}
+	return c.goAnalysisObservation("analysis.go.powershell_command_string_wrapper_env", "powershell_command_string_wrapper_env", hit.Pos(),
+		"lang=go", "function_name:"+name, "flow:powershell_command_env_wrapper"), true
+}
+
+func (c *conv) goLooksLikePowerShellWrapperCall(call *ast.CallExpr, stringVars map[string]string) bool {
+	if call == nil || len(call.Args) < 2 {
+		return false
+	}
+	callee := strings.ToLower(c.path(call.Fun))
+	if !strings.Contains(callee, "powershell") {
+		return false
+	}
+	if !strings.Contains(callee, "cmd") && !strings.Contains(callee, "command") {
+		return false
+	}
+	cmd, ok := c.goStaticStringText(call.Args[0], stringVars)
+	if !ok {
+		return false
+	}
+	cmdLower := strings.ToLower(cmd)
+	return strings.Contains(cmdLower, "$env:") || strings.Contains(cmdLower, "${env:")
+}
+
+func (c *conv) goEnvAssignmentFromInput(e ast.Expr, params map[string]bool) bool {
+	switch x := e.(type) {
+	case *ast.CallExpr:
+		if c.path(x.Fun) != "fmt.Sprintf" || len(x.Args) < 2 {
+			return false
+		}
+		format := goStringLiteral(x.Args[0])
+		if !strings.Contains(format, "=") || strings.Count(format, "%") == 0 {
+			return false
+		}
+		for _, arg := range x.Args[1:] {
+			if c.goExprTouchesFunctionInput(arg, params) {
+				return true
+			}
+		}
+	case *ast.BinaryExpr:
+		if x.Op == token.ADD && strings.Contains(c.goStaticStringTextBestEffort(x.X), "=") && c.goExprTouchesFunctionInput(x.Y, params) {
+			return true
+		}
+		if x.Op == token.ADD && strings.Contains(c.goStaticStringTextBestEffort(x.Y), "=") && c.goExprTouchesFunctionInput(x.X, params) {
+			return true
+		}
+	case *ast.ParenExpr:
+		return c.goEnvAssignmentFromInput(x.X, params)
+	}
+	return false
+}
+
+func (c *conv) goExprTouchesFunctionInput(e ast.Expr, params map[string]bool) bool {
+	touched := false
+	ast.Inspect(e, func(n ast.Node) bool {
+		if touched {
+			return false
+		}
+		id, ok := n.(*ast.Ident)
+		if ok && params[id.Name] {
+			touched = true
+			return false
+		}
+		return true
+	})
+	return touched
+}
+
+func (c *conv) goStaticStringText(e ast.Expr, vars map[string]string) (string, bool) {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		if x.Kind != token.STRING {
+			return "", false
+		}
+		v, err := strconv.Unquote(x.Value)
+		if err != nil {
+			return "", false
+		}
+		return v, true
+	case *ast.Ident:
+		v, ok := vars[x.Name]
+		return v, ok
+	case *ast.BinaryExpr:
+		if x.Op != token.ADD {
+			return "", false
+		}
+		left, lok := c.goStaticStringText(x.X, vars)
+		right, rok := c.goStaticStringText(x.Y, vars)
+		return left + right, lok && rok
+	case *ast.ParenExpr:
+		return c.goStaticStringText(x.X, vars)
+	case *ast.CallExpr:
+		if c.path(x.Fun) != "fmt.Sprintf" || len(x.Args) == 0 {
+			return "", false
+		}
+		return c.goStaticStringText(x.Args[0], vars)
+	}
+	return "", false
+}
+
+func (c *conv) goStaticStringTextBestEffort(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		return goStringLiteral(x)
+	case *ast.BinaryExpr:
+		return c.goStaticStringTextBestEffort(x.X) + c.goStaticStringTextBestEffort(x.Y)
+	case *ast.ParenExpr:
+		return c.goStaticStringTextBestEffort(x.X)
+	}
+	return ""
+}
+
+func (c *conv) goRangeLooksContainerEnv(x *ast.RangeStmt) bool {
+	if x == nil {
+		return false
+	}
+	if call, ok := x.X.(*ast.CallExpr); ok && goLastSeg(c.path(call.Fun)) == "GetEnvs" {
+		return true
+	}
+	p := c.path(x.X)
+	return strings.HasSuffix(p, ".Envs") || strings.HasSuffix(p, ".Env")
+}
+
+func (c *conv) goAppendedVarsInBlock(body *ast.BlockStmt) []string {
+	if body == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				id, ok := lhs.(*ast.Ident)
+				if !ok || id.Name == "_" || id.Name == "" || seen[id.Name] {
+					continue
+				}
+				if c.goAppendFirstArgIdent(x.Rhs[i]) == id.Name {
+					seen[id.Name] = true
+					out = append(out, id.Name)
+				}
+			}
+		}
+		return true
+	})
+	return out
+}
+
+func (c *conv) goAppendFirstArgIdent(e ast.Expr) string {
+	call, ok := e.(*ast.CallExpr)
+	if !ok || c.path(call.Fun) != "append" || len(call.Args) == 0 {
+		return ""
+	}
+	id, ok := call.Args[0].(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	return id.Name
+}
+
+func (c *conv) goCompositeBoolField(lit *ast.CompositeLit, field string) string {
+	for _, el := range lit.Elts {
+		kv, ok := el.(*ast.KeyValueExpr)
+		if !ok || c.path(kv.Key) != field {
+			continue
+		}
+		return c.goBoolLiteral(kv.Value)
+	}
+	return ""
+}
+
+func (c *conv) goCompositeFieldPath(lit *ast.CompositeLit, field string) string {
+	for _, el := range lit.Elts {
+		kv, ok := el.(*ast.KeyValueExpr)
+		if !ok || c.path(kv.Key) != field {
+			continue
+		}
+		return c.path(kv.Value)
+	}
+	return ""
+}
+
+func (c *conv) goCompositeIntSliceContains(lit *ast.CompositeLit, field string, want int64) bool {
+	for _, el := range lit.Elts {
+		kv, ok := el.(*ast.KeyValueExpr)
+		if !ok || c.path(kv.Key) != field {
+			continue
+		}
+		slice, ok := kv.Value.(*ast.CompositeLit)
+		if !ok {
+			return false
+		}
+		for _, item := range slice.Elts {
+			raw := ""
+			switch x := item.(type) {
+			case *ast.BasicLit:
+				raw = x.Value
+			case *ast.UnaryExpr:
+				if x.Op == token.SUB {
+					if lit, ok := x.X.(*ast.BasicLit); ok {
+						raw = "-" + lit.Value
+					}
+				}
+			}
+			if raw == "" {
+				continue
+			}
+			v, err := strconv.ParseInt(raw, 0, 64)
+			if err == nil && v == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *conv) goMapValueHasAll(lit *ast.CompositeLit, key string, wants ...string) bool {
+	for _, el := range lit.Elts {
+		kv, ok := el.(*ast.KeyValueExpr)
+		if !ok || c.path(kv.Key) != key {
+			continue
+		}
+		values := map[string]bool{}
+		if seq, ok := kv.Value.(*ast.CompositeLit); ok {
+			for _, item := range seq.Elts {
+				if p := c.path(item); p != "" {
+					values[p] = true
+				}
+			}
+		}
+		for _, want := range wants {
+			if !values[want] {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func (c *conv) goCountNonzeroGuard(x *ast.BinaryExpr) bool {
+	if x == nil || x.Op != token.NEQ {
+		return false
+	}
+	return (c.goCallLastSeg(x.X) == "Count" && c.goIntegerLiteral(x.Y) == "0") ||
+		(c.goCallLastSeg(x.Y) == "Count" && c.goIntegerLiteral(x.X) == "0")
+}
+
+func (c *conv) goCallLastSeg(e ast.Expr) string {
+	call, ok := e.(*ast.CallExpr)
+	if !ok {
+		return ""
+	}
+	return goLastSeg(c.path(call.Fun))
+}
+
+func (c *conv) goIntegerLiteral(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		if x.Kind == token.INT {
+			return x.Value
+		}
+	case *ast.ParenExpr:
+		return c.goIntegerLiteral(x.X)
+	}
+	return ""
+}
+
+func (c *conv) goBoolLiteral(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		if x.Name == "true" || x.Name == "false" {
+			return x.Name
+		}
+	case *ast.ParenExpr:
+		return c.goBoolLiteral(x.X)
+	}
+	return ""
+}
+
+func goStringLiteral(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.BasicLit:
+		if x.Kind != token.STRING {
+			return ""
+		}
+		v, err := strconv.Unquote(x.Value)
+		if err != nil {
+			return ""
+		}
+		return v
+	case *ast.ParenExpr:
+		return goStringLiteral(x.X)
+	}
+	return ""
+}
+
+func goCallHasStringLiteral(call *ast.CallExpr, want string) bool {
+	for _, arg := range call.Args {
+		if goStringLiteral(arg) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func goCallHasStructuredField(c *conv, call *ast.CallExpr, field string) bool {
+	for _, arg := range call.Args {
+		nested, ok := arg.(*ast.CallExpr)
+		if !ok || goLastSeg(c.path(nested.Fun)) != "F" || len(nested.Args) == 0 {
+			continue
+		}
+		if goStringLiteral(nested.Args[0]) == field {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *conv) goAnalysisObservation(path, method string, pos token.Pos, tokens ...string) nir.Stmt {
+	return nir.ExprStmt{Value: analysisCall(path, method, c.loc(pos), tokens...)}
+}
+
+func goLastSeg(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[i+1:]
+	}
+	return path
 }
 
 func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockStmt) []string {
@@ -518,6 +1056,9 @@ func (c *conv) goFunctionTokens(name string, typ *ast.FuncType, body *ast.BlockS
 			}
 			add("literal:" + v)
 		case *ast.Ident:
+			if x.Name != "_" {
+				add("identifier:" + x.Name)
+			}
 			if c.constValues != nil {
 				if v := c.constValues[x.Name]; v != "" {
 					add("const:" + x.Name + "=" + v)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/vyprai/vyql/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/extract/lowering"
+	"github.com/vyprai/vyql/extract/nir"
 	"github.com/vyprai/vyql/usg"
 )
 
@@ -190,6 +191,108 @@ class ThreadPolicy {
 		}
 	}
 	t.Fatalf("analysis.function.context for edit not found")
+}
+
+func TestPHPFunctionContextMarksBpDocsSaveWhenCapabilityCheckIsAfterSave(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Component.php")
+	src := []byte(`<?php
+class BP_Docs_Component {
+  function catch_page_load() {
+    if ( !empty( $_POST['doc-edit-submit'] ) ) {
+      check_admin_referer( 'bp_docs_save' );
+      $this_doc = new BP_Docs_Query;
+      $result = $this_doc->save();
+      bp_core_redirect( $result['redirect_url'] );
+    }
+
+    if ( bp_docs_is_doc_edit() ) {
+      if ( current_user_can( 'bp_docs_edit' ) ) {
+        return;
+      }
+    }
+
+    if ( bp_docs_is_doc_create() ) {
+      if ( ! current_user_can( 'bp_docs_create' ) ) {
+        return;
+      }
+    }
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" && strings.Contains(n.Prop("str_args"), "name=catch_page_load") {
+			args := n.Prop("str_args")
+			if !strings.Contains(args, "php_review:bp_docs_save_missing_access_policy") {
+				t.Fatalf("PHP BP Docs save review token missing when capability checks are after save; context=%q", args)
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.function.context for catch_page_load not found")
+}
+
+func TestPHPFunctionContextDoesNotMarkBpDocsSaveWhenCapabilityCheckPrecedesSave(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Component.php")
+	src := []byte(`<?php
+class BP_Docs_Component {
+  function catch_page_load() {
+    if ( !empty( $_POST['doc-edit-submit'] ) ) {
+      $doc = bp_docs_get_current_doc();
+      if ( $doc && ! current_user_can( 'bp_docs_edit', $doc->ID ) ) {
+        return;
+      } elseif ( ! $doc && ! current_user_can( 'bp_docs_create' ) ) {
+        return;
+      }
+      check_admin_referer( 'bp_docs_save' );
+      $this_doc = new BP_Docs_Query;
+      $result = $this_doc->save();
+      bp_core_redirect( $result['redirect_url'] );
+    }
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.function.context" && strings.Contains(n.Prop("str_args"), "name=catch_page_load") {
+			args := n.Prop("str_args")
+			if strings.Contains(args, "php_review:bp_docs_save_missing_access_policy") {
+				t.Fatalf("PHP BP Docs save review token should be suppressed by prior capability checks; context=%q", args)
+			}
+			return
+		}
+	}
+	t.Fatalf("analysis.function.context for catch_page_load not found")
 }
 
 func TestPHPFunctionContextIncludesAdminerRouteTokens(t *testing.T) {
@@ -489,6 +592,338 @@ class FileService {
 		}
 	}
 	t.Fatalf("analysis.class.context for FileService not found")
+}
+
+func TestPHPReviewContextMarksRenamedGPGOptionDelimiter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "GPG.php")
+	src := []byte(`<?php
+class Crypt_GPG {
+  public function deletePublicKey($fingerprint) {
+    $cmd = '--delete-key ' . escapeshellarg($fingerprint);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramHasContextToken(t, prog, "php_review:gpg_option_arg_missing_delimiter") {
+		t.Fatalf("PHP GPG delimiter review token missing for renamed assignment: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextDoesNotMarkGPGOptionWithDelimiter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "GPG.php")
+	src := []byte(`<?php
+class Crypt_GPG {
+  public function deletePublicKey($fingerprint) {
+    $cmd = '--delete-key -- ' . escapeshellarg($fingerprint);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phpProgramHasContextToken(t, prog, "php_review:gpg_option_arg_missing_delimiter") {
+		t.Fatalf("PHP GPG delimiter review token should not appear for guarded command: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextMarksRenamedAbsolutePathDisclosure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Driver.php")
+	src := []byte(`<?php
+class LocalDriver {
+  public function addFile($source, $folder, $name) {
+    $target = $this->getAbsolutePath($folder . '/' . $name);
+    return rename($source, $target);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramHasContextToken(t, prog, "php_review:absolute_path_disclosure_rename") {
+		t.Fatalf("PHP absolute path disclosure review token missing: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextDoesNotMarkSuppressedAbsolutePathDisclosure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Driver.php")
+	src := []byte(`<?php
+class LocalDriver {
+  public function addFile($source, $folder, $name) {
+    $target = $this->getAbsolutePath($folder . '/' . $name);
+    return @rename($source, $target);
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phpProgramHasContextToken(t, prog, "php_review:absolute_path_disclosure_rename") {
+		t.Fatalf("PHP absolute path disclosure review token should not appear for suppressed call: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextMarksTempPathJoinBeforeSeparatorCheck(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TempLinks.php")
+	src := []byte(`<?php
+class LinkFactory {
+  public function createTemporaryLink($displayName = null) {
+    if ($this->tmpLinkPath) {
+      if (! $displayName) {
+        $displayName = 'temp_' . md5($_SERVER['REMOTE_ADDR'] . microtime(true));
+      } else if (substr($displayName, 0, 5) !== 'temp_') {
+        $displayName = 'temp_' . $displayName;
+      }
+      return array(
+        'path' => $path = $this->tmpLinkPath . DIRECTORY_SEPARATOR . $displayName,
+        'url' => $this->tmpLinkUrl . '/' . $displayName
+      );
+    }
+    return false;
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramHasContextToken(t, prog, "php_review:temp_path_join_before_separator_check") {
+		t.Fatalf("PHP temp path separator review token missing: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextMarksTempPathMethodJoinBeforeSeparatorCheck(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TempArchive.php")
+	src := []byte(`<?php
+function downloadTempArchive($args) {
+  $targets = $args['targets'];
+  $entryName = $targets[1];
+  $path = $volume->getTempPath() . DIRECTORY_SEPARATOR . $entryName;
+  $GLOBALS['tempFiles'][$path] = true;
+  return fopen($path, 'rb');
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramHasContextToken(t, prog, "php_review:temp_path_join_before_separator_check") {
+		t.Fatalf("PHP temp path method review token missing: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextDoesNotMarkTempPathJoinWithSeparatorGuard(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TempLinks.php")
+	src := []byte(`<?php
+class LinkFactory {
+  public function createTemporaryLink($displayName) {
+    if (strpos($displayName, DIRECTORY_SEPARATOR) !== false) {
+      return false;
+    }
+    return $this->tmpLinkPath . DIRECTORY_SEPARATOR . $displayName;
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phpProgramHasContextToken(t, prog, "php_review:temp_path_join_before_separator_check") {
+		t.Fatalf("PHP temp path separator review token should not appear for guarded join: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextDoesNotMarkTempPathJoinWithSeparatorNormalization(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TempLinks.php")
+	src := []byte(`<?php
+class LinkFactory {
+  public function createTemporaryLink($displayName) {
+    $displayName = str_replace(array('/', '\\'), '_', $displayName);
+    return $this->tmpLinkPath . DIRECTORY_SEPARATOR . $displayName;
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phpProgramHasContextToken(t, prog, "php_review:temp_path_join_before_separator_check") {
+		t.Fatalf("PHP temp path separator review token should not appear for normalized join: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextMarksFatFreeClearEvalCompileParam(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Base.php")
+	src := []byte(`<?php
+final class Base {
+  function compile($expr) {
+    return $expr;
+  }
+  function clear($key) {
+    eval('unset('.$this->compile('@this->hive.'.$key).');');
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !phpProgramHasContextToken(t, prog, "php_review:fatfree_clear_eval_compile_without_key_validation") {
+		t.Fatalf("PHP Fat-Free clear eval review token missing: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextDoesNotMarkGuardedFatFreeClearEvalCompileParam(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Base.php")
+	src := []byte(`<?php
+final class Base {
+  function compile($expr) {
+    return $expr;
+  }
+  function clear($key) {
+    $key = preg_replace('/(\)\W*\w+.*$)/', '', $key);
+    eval('unset('.$this->compile('@this->hive.'.$key).');');
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phpProgramHasContextToken(t, prog, "php_review:fatfree_clear_eval_compile_without_key_validation") {
+		t.Fatalf("PHP Fat-Free clear eval review token should not appear for guarded key: %#v", prog.Modules)
+	}
+}
+
+func TestPHPReviewContextMarksCurlAndCorsSemantics(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.php")
+	src := []byte(`<?php
+function configure($ch) {
+  curl_setopt_array($ch, [
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_SSL_VERIFYHOST => 0,
+  ]);
+  header('Access-Control-Allow-Origin: *');
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"php_review:curl_ssl_verifypeer_disabled",
+		"php_review:curl_ssl_verifyhost_disabled",
+		"php_review:permissive_cors_header",
+	} {
+		if !phpProgramHasContextToken(t, prog, want) {
+			t.Fatalf("PHP review token %q missing: %#v", want, prog.Modules)
+		}
+	}
+}
+
+func TestPHPReviewContextMarksAuthCookieAndTemplateSemantics(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "review.php")
+	src := []byte(`<?php
+class BackendController {
+  public function deleteUserAction() {
+    $this->redirect($this->deleteBy($this->request));
+  }
+  public function process() {
+    $this->getRequiredBodyParam('bucket');
+    $this->loadBucketList();
+    return $this->asJson([]);
+  }
+}
+function renderTemplate($type, $language, $name) {
+  return "templates/{$type}/{$language}/{$name}.tpl";
+}
+function boot($x) {
+  setcookie('sid', $x, ['secure' => false, 'httponly' => false]);
+  header('X-Frame-Options: ALLOWALL');
+}
+foreach ($_GET as $key => $value) {
+  $$key = $value;
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"php_review:state_changing_action_missing_method_assertion_delete_by",
+		"php_review:credentialed_endpoint_missing_admin_bucket_list",
+		"php_review:template_path_component_traversal_type",
+		"php_review:template_path_component_traversal_language",
+		"php_review:template_path_component_traversal_name",
+		"php_review:cookie_secure_false",
+		"php_review:cookie_httponly_false",
+		"php_review:missing_frame_protection_allowall",
+		"php_review:request_variable_variable_assignment",
+	} {
+		if !phpProgramHasContextToken(t, prog, want) {
+			t.Fatalf("PHP review token %q missing: %#v", want, prog.Modules)
+		}
+	}
+}
+
+func phpProgramHasContextToken(t *testing.T, prog nir.Program, want string) bool {
+	t.Helper()
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if strings.Contains(n.Prop("str_args"), want) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPHPLegacyScriptLanguageTagParsesStatements(t *testing.T) {

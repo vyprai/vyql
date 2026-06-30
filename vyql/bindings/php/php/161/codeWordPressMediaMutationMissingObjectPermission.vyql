@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding wordPressMediaMutationMissingObjectPermission161 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "$_POST['ID']" and node.token contains "ReplaceController($post_id)" and node.token contains "'remove_background'=>true" and node.token contains "$replaceController->run()" and not (node.token contains "checkImagePermission") and not (node.token contains "current_user_can('edit_post'") and not (node.token contains "current_user_can(\"edit_post\"")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "wordpress_media_post_mutation_missing_object_permission"
   emit issue code.WordPressMediaMutationMissingObjectPermission at node
 }

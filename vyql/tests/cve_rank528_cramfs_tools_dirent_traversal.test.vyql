@@ -104,3 +104,21 @@ test "rank528: cramfsck rejects traversal and separator dirent names"
       }
   }
   ```
+
+test "rank528: image dirent traversal generalizes across names"
+  lang c
+  file cramfsck.c
+  expect VYQL-PATH-026
+  expect_review code.FilesystemImageDirentTraversal
+  code
+  ```
+  void *romfs_read(unsigned long offset);
+  void expand_fs(char *path, void *child);
+  void memcpy(void *dst, void *src, int n);
+
+  void walk_image(char *joined, int prefix_len, int entry_len, unsigned long where, void *node) {
+      memcpy(joined + prefix_len, romfs_read(where), entry_len);
+      joined[prefix_len + entry_len] = 0;
+      expand_fs(joined, node);
+  }
+  ```

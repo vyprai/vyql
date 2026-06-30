@@ -246,6 +246,23 @@ func TestParseGitmodules(t *testing.T) {
 	}
 }
 
+func TestParseCargoLockGitDependencies(t *testing.T) {
+	got := ParseCargoLockGit(`[[package]]
+name = "clash_verge_service_ipc"
+version = "2.0.26"
+source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#37b9964a9bce767b5b95ea2be75613b23400c9f0"
+
+[[package]]
+name = "serde"
+version = "1.0.228"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+`)
+	want := []Dep{{"github.com/clash-verge-rev/clash-verge-service-ipc", "37b9964a9bce767b5b95ea2be75613b23400c9f0"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ParseCargoLockGit() = %+v, want %+v", got, want)
+	}
+}
+
 func TestBuildSBOMAdvisoryMatch(t *testing.T) {
 	g := usg.NewInMemStore()
 	deps := []Dep{{"lodash", "4.17.4"}, {"safe-pkg", "1.0.0"}}

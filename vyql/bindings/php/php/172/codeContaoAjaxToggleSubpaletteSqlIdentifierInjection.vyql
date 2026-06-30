@@ -1,6 +1,6 @@
 module bindings.php.generated.mfbe84119;
 
 binding contaoAjaxToggleSubpaletteSqlIdentifierInjection172 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "toggleSubpalette" and node.token contains "$this->Database->prepare(\"UPDATE\"" and node.token contains "\"SET\".$this->Input->post('field')" and node.token contains "WHEREid=?" and not (node.token contains "__selector__") and not (node.token contains "hasAccess($dc->table.'::'.$this->Input->post('field'),'alexf')")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "contao_toggle_subpalette_sql_identifier"
   emit issue code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection at node
 }

@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding collectiveContactWidgetTitleXss458 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "title" and node.token contains "class_name=TermViewlet" and node.token contains "term-contact" and node.token contains "objpath" and node.token contains "self.title" and not (node.token contains "quote=True") and not (node.token contains "html.escape") and not (node.token contains "markupsafe.escape")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "collective_contact_widget_title_xss"
   emit issue code.CollectiveContactWidgetTitleXss at node
 }

@@ -1,6 +1,6 @@
 module bindings.cpp.generated.m4e783366;
 
 binding jpegSetjmpConstructorEscape79 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.token contains "jpeg_std_error" and node.token contains "jerr_.pub.error_exit=my_error_exit" and node.token contains "setjmp(jerr_.setjmp_buffer)" and node.token contains "jpeg_create_decompress" and not (node.token contains "std::memcpy(jerr_.setjmp_buffer,setjmp_buffer") and not (node.token contains "DIP__DECLARE_JPEG_EXIT")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "jpeg.setjmp_constructor_escape"
   emit issue code.JpegSetjmpConstructorEscape at node
 }

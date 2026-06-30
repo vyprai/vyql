@@ -1,5 +1,6 @@
 test "rank259: bostr noscraper flag bypasses authorized key allowlist"
   lang javascript
+  expect VYQL-AUTH-080
   expect_review code.AccessPolicyReview
   code
   ```
@@ -24,6 +25,7 @@ test "rank259: bostr noscraper flag bypasses authorized key allowlist"
 
 test "rank259: bostr authorized key allowlist rejects unknown pubkeys even with noscraper"
   lang javascript
+  reject VYQL-AUTH-080
   reject_review code.AccessPolicyReview
   code
   ```

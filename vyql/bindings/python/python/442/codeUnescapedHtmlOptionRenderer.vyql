@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding unescapedHtmlOptionRenderer442 {
-  query pattern presenceNode where node.scope == "function" and node.context.name contains "body" and node.token contains "class_name=WaterfallHelp" and node.token contains "request.args" and node.token contains "show_reload_input" and node.token contains "value=\"%s\"" and node.token contains "<td>%s</td>" and not (node.token contains "html.escape(value)") and not (node.token contains "html.escape(name)")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "unescaped_html_option_renderer"
   emit issue code.UnescapedHtmlOptionRenderer at node
 }

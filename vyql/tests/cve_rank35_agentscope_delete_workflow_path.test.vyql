@@ -1,0 +1,26 @@
+# Rank 35 / CVE-2024-8537: AgentScope delete-workflow path traversal.
+# Ledger verification: VYQL-PATH-001 catches request JSON filename to os.remove.
+
+test "rank35: AgentScope deletes request-selected workflow path"
+  lang python
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  def delete_workflow(request):
+      filename = request.json["filename"]
+      os.remove(filename)
+  ```
+
+test "rank35: AgentScope basename normalizes workflow path"
+  lang python
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+  def delete_workflow(request):
+      filename = os.path.basename(request.json["filename"])
+      os.remove(filename)
+  ```

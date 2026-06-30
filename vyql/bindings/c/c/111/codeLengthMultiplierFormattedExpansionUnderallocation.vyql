@@ -1,6 +1,6 @@
 module bindings.c.generated.mce54b166;
 
 binding lengthMultiplierFormattedExpansionUnderallocation111 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.token contains "newSV(strlen(" and node.token contains ")*3)" and node.token contains "sprintf(" and node.token contains "%d" and not (node.token contains "*6+16") and not (node.token contains "snprintf(")
+  query pattern presenceNode where node.kind == "any" and node.analysis ~= "formatted_placeholder.underallocation"
   emit issue code.LengthMultiplierFormattedExpansionUnderallocation at node
 }

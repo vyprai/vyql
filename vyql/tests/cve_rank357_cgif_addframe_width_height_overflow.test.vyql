@@ -66,3 +66,29 @@ test "rank357: CGIF cgif_addframe widens width-height multiplication before loop
     return sameFrame;
   }
   ```
+
+test "rank357: signed frame count overflow generalizes across names"
+  lang c
+  expect VYQL-NUM-010
+  expect_review code.CgifAddframeSignedFrameCountOverflow
+  code
+  ```
+  typedef unsigned char byte;
+  struct FrameConfig { byte *pImageData; };
+  struct Frame { struct FrameConfig config; };
+  struct Size { unsigned short width; unsigned short height; };
+  struct Gif { struct Frame *aFrames[4]; int iHEAD; struct Size config; };
+  int cmpPixel(struct Gif *gif, struct FrameConfig *cur, struct FrameConfig *old, byte a, byte b);
+
+  int add_frame(struct Gif *gif, struct FrameConfig *candidate) {
+    int pos;
+    for (pos = 0; pos < gif->config.width * gif->config.height; pos++) {
+      if (cmpPixel(gif, candidate, &gif->aFrames[gif->iHEAD]->config,
+                   candidate->pImageData[pos],
+                   gif->aFrames[gif->iHEAD]->config.pImageData[pos])) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+  ```

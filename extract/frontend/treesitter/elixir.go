@@ -161,10 +161,15 @@ func (c *exConv) exFunctionContext(name string, n *tree_sitter.Node) []string {
 	tokens := []string{
 		"lang=elixir",
 		"name=" + name,
+		"function_name:" + name,
 		bodyText,
 		strings.Join(strings.Fields(bodyText), ""),
 	}
+	if exMissingPortResponseCorrelation(bodyText) {
+		tokens = append(tokens, "port_protocol:request_response_missing_correlation")
+	}
 	seenCalls := map[string]bool{}
+	seenIdentifiers := map[string]bool{}
 	var walk func(*tree_sitter.Node)
 	walk = func(cur *tree_sitter.Node) {
 		if cur == nil {
@@ -179,12 +184,29 @@ func (c *exConv) exFunctionContext(name string, n *tree_sitter.Node) []string {
 				}
 			}
 		}
+		if cur.Kind() == "identifier" {
+			ident := c.text(cur)
+			if ident != "" && !seenIdentifiers[ident] {
+				seenIdentifiers[ident] = true
+				tokens = append(tokens, "identifier:"+ident)
+			}
+		}
 		for _, ch := range namedChildren(cur) {
 			walk(ch)
 		}
 	}
 	walk(body)
 	return tokens
+}
+
+func exMissingPortResponseCorrelation(body string) bool {
+	compact := strings.Join(strings.Fields(body), "")
+	return strings.Contains(compact, "Port.command") &&
+		strings.Contains(compact, "Jason.encode!") &&
+		strings.Contains(compact, "get_response") &&
+		!strings.Contains(compact, "uid_counter") &&
+		!strings.Contains(compact, "expected_uid") &&
+		!strings.Contains(compact, "extract_uid")
 }
 
 func (c *exConv) exParamEntries(name string, params []string) []nir.ParamEntry {
