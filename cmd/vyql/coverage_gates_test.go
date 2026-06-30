@@ -1452,12 +1452,12 @@ var cve1000AcceptedLedgerCVEMetadataOverrides = map[int]string{
 // runnable cve_rank*.test.vyql spec. Adding a runnable rank spec must remove the
 // rank here; new non-SKIP ledger rows without specs fail the gate.
 var cve1000AcceptedNoSpecRanks = map[int]bool{
-	1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 8: true, 9: true, 10: true, 11: true, 12: true, 13: true, 14: true, 15: true, 18: true, 21: true,
-	23: true, 24: true, 25: true, 27: true, 28: true, 33: true, 37: true, 38: true, 39: true, 40: true, 42: true, 44: true, 45: true, 46: true, 47: true, 48: true,
-	50: true, 52: true, 57: true, 62: true, 63: true, 64: true, 65: true, 66: true, 68: true, 69: true, 70: true, 71: true, 73: true, 75: true, 77: true, 79: true,
-	80: true, 82: true, 83: true, 84: true, 85: true, 86: true, 87: true, 88: true, 89: true, 90: true, 91: true, 92: true, 94: true, 95: true, 96: true, 100: true,
-	101: true, 102: true, 103: true, 105: true, 106: true, 107: true, 109: true, 110: true, 111: true, 112: true, 114: true, 115: true, 116: true, 119: true, 120: true, 121: true,
-	122: true, 123: true, 131: true, 132: true, 133: true, 134: true, 135: true, 136: true, 160: true, 312: true, 342: true, 537: true, 574: true, 588: true, 592: true, 791: true,
+	1: true, 3: true, 6: true, 8: true, 9: true, 10: true, 12: true, 15: true, 18: true, 21: true,
+	23: true, 28: true, 33: true, 37: true, 40: true, 42: true, 44: true, 46: true, 48: true,
+	50: true, 52: true, 57: true, 62: true, 63: true, 66: true, 69: true, 71: true, 73: true, 75: true,
+	82: true, 83: true, 85: true, 87: true, 89: true, 90: true, 91: true, 92: true, 95: true,
+	101: true, 103: true, 105: true, 106: true, 107: true, 109: true, 111: true, 114: true, 115: true, 120: true, 121: true,
+	131: true, 132: true, 133: true, 134: true, 135: true, 136: true, 160: true, 312: true, 342: true, 574: true, 588: true, 592: true,
 	819: true, 829: true,
 }
 

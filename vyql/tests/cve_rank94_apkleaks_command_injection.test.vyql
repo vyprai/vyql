@@ -1,0 +1,12 @@
+# Rank 94 / CVE-2021-21386: APKLeaks decompile command assembled caller-
+# controlled paths/tool values into shell execution.
+
+test "rank94: APK decompile input reaches shell command"
+  expect VYQL-INJ-002
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.CommandExecution
+  edge FLOWS src -> sink
+  ```
+

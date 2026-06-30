@@ -1,0 +1,12 @@
+# Rank 537 / CVE-2021-41269: cron-utils propagated exception text into Bean
+# Validation expression/template evaluation.
+
+test "rank537: exception message reaches expression evaluation"
+  expect VYQL-INJ-016
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.ExpressionEval
+  edge FLOWS src -> sink
+  ```
+
