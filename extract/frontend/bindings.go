@@ -603,7 +603,6 @@ func allContentNeedlesFound(missing map[string]bool) bool {
 type flagMatchIndex struct {
 	built        bool
 	flow         flowTokenIndex
-	nodes        map[string]usg.Node
 	types        map[string][]usg.Node
 	typesByTech  map[string]map[string][]usg.Node // tech -> type -> nodes ("" tech = unknown, kept by every language)
 	typesByFile  map[string]map[string][]usg.Node
@@ -702,7 +701,6 @@ func (idx *flagMatchIndex) ensure(s usg.Store) {
 		return
 	}
 	idx.built = true
-	idx.nodes = map[string]usg.Node{}
 	idx.types = map[string][]usg.Node{}
 	idx.typesByTech = map[string]map[string][]usg.Node{}
 	idx.typesByFile = map[string]map[string][]usg.Node{}
@@ -715,7 +713,6 @@ func (idx *flagMatchIndex) ensure(s usg.Store) {
 	idx.predHitSets = map[string]scopedPredicateHitSet{}
 	fileTech := sharedFileContextTechs(s)
 	rangeNodes(s, func(n usg.Node) bool {
-		idx.nodes[n.ID] = n
 		idx.types[n.Type] = append(idx.types[n.Type], n)
 		tech := nodeTechFromNodeWithFileContext(n, fileTech)
 		if idx.typesByTech[tech] == nil {
@@ -787,8 +784,10 @@ func (idx *flagMatchIndex) binopsInFileForValues(s usg.Store, file string, value
 }
 
 func (idx *flagMatchIndex) node(s usg.Store, id string) (usg.Node, bool) {
-	idx.ensure(s)
-	n, ok := idx.nodes[id]
+	n, ok, err := s.GetNode(id)
+	if err != nil {
+		return usg.Node{}, false
+	}
 	return n, ok
 }
 
