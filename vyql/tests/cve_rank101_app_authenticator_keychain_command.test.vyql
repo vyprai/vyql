@@ -1,0 +1,13 @@
+# Rank 101 / CVE-2026-33874: app-authenticator used macOS keychain names
+# returned by `security list-keychains` inside a later `security
+# find-certificate` execSync command.
+
+test "rank101: keychain name reaches command execution"
+  expect VYQL-INJ-002
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.CommandExecution
+  edge FLOWS src -> sink
+  ```
+

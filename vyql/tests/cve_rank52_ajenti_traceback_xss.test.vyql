@@ -1,0 +1,12 @@
+# Rank 52 / CVE-2014-4301: Ajenti interpolated raw traceback text into an
+# HTML error page before the fix escaped the stack trace.
+
+test "rank52: traceback text reaches html rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+
