@@ -198,6 +198,131 @@ func TestLabelProvenancePriorityIgnoresAdapterName(t *testing.T) {
 	}
 }
 
+func TestTaintFlowCacheKeyCanonicalAndPolicySensitive(t *testing.T) {
+	a := taintFlowCacheKey(
+		map[string]bool{"src.B": true, "src.A": true},
+		map[string]bool{"sink.A": true},
+		map[string]bool{"kind.B": true, "kind.A": true},
+		map[string]bool{"kill.A": true},
+		"<>&",
+		map[string]bool{"char.B": true, "char.A": true},
+	)
+	b := taintFlowCacheKey(
+		map[string]bool{"src.A": true, "src.B": true},
+		map[string]bool{"sink.A": true},
+		map[string]bool{"kind.A": true, "kind.B": true},
+		map[string]bool{"kill.A": true},
+		"<>&",
+		map[string]bool{"char.A": true, "char.B": true},
+	)
+	if a != b {
+		t.Fatalf("cache key depends on map iteration order:\n%s\n%s", a, b)
+	}
+	c := taintFlowCacheKey(
+		map[string]bool{"src.A": true, "src.B": true},
+		map[string]bool{"sink.A": true},
+		map[string]bool{"kind.A": true, "kind.B": true},
+		map[string]bool{"kill.B": true},
+		"<>&",
+		map[string]bool{"char.A": true, "char.B": true},
+	)
+	if c == a {
+		t.Fatal("cache key ignored kill-control policy")
+	}
+	ba := taintFlowBatchKey(
+		map[string]bool{"src.B": true, "src.A": true},
+		map[string]bool{"kind.B": true, "kind.A": true},
+		map[string]bool{"kill.A": true},
+		"<>&",
+		map[string]bool{"char.B": true, "char.A": true},
+	)
+	bb := taintFlowBatchKey(
+		map[string]bool{"src.A": true, "src.B": true},
+		map[string]bool{"kind.A": true, "kind.B": true},
+		map[string]bool{"kill.A": true},
+		"<>&",
+		map[string]bool{"char.A": true, "char.B": true},
+	)
+	if ba != bb {
+		t.Fatalf("batch cache key depends on map iteration order:\n%s\n%s", ba, bb)
+	}
+}
+
+func TestPrecomputeTaintFlowsBatchesUnionSinksWithoutChangingFindings(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module test;
+rule FlowA {
+  meta { id: "TEST-FLOW-A", severity: high }
+  taint custom.Input -> custom.Target
+}
+rule FlowB {
+  meta { id: "TEST-FLOW-B", severity: medium }
+  taint custom.Input -> custom.OtherTarget
+}
+`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	onto := testOntology()
+	compiled, errs := CompileRules(decls, onto)
+	if len(errs) != 0 {
+		t.Fatalf("CompileRules errors: %+v", errs)
+	}
+	build := func(s usg.Store) {
+		label(s, "src", "custom.Input")
+		label(s, "target", "custom.Target")
+		label(s, "other", "custom.OtherTarget")
+		if err := s.AddEdge(usg.Edge{Type: "FLOWS", Src: "src", Dst: "target"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.AddEdge(usg.Edge{Type: "FLOWS", Src: "src", Dst: "other"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	baselineStore := usg.NewInMemStore()
+	build(baselineStore)
+	baseline := evalSignatures(t, New(onto, baselineStore), compiled)
+
+	batchedStore := usg.NewInMemStore()
+	build(batchedStore)
+	batchedEngine := New(onto, batchedStore)
+	if err := batchedEngine.PrecomputeTaintFlows(compiled); err != nil {
+		t.Fatalf("PrecomputeTaintFlows: %v", err)
+	}
+	if got := len(batchedEngine.taintFlowCache); got != 2 {
+		t.Fatalf("precompute cache entries = %d, want one exact entry per rule", got)
+	}
+	if got := evalSignatures(t, batchedEngine, compiled); strings.Join(got, "\n") != strings.Join(baseline, "\n") {
+		t.Fatalf("batched findings changed:\nbase=%v\n got=%v", baseline, got)
+	}
+}
+
+func evalSignatures(t *testing.T, eng *Engine, rules []*CompiledRule) []string {
+	t.Helper()
+	var out []string
+	for _, cr := range rules {
+		fs, err := eng.Evaluate(cr)
+		if err != nil {
+			t.Fatalf("Evaluate(%s): %v", cr.Rule.QualifiedName(), err)
+		}
+		for _, f := range fs {
+			sink := ""
+			source := ""
+			for _, b := range f.Bindings {
+				switch b.Name {
+				case "source":
+					source = b.NodeID + ":" + b.Concept
+				case "sink":
+					sink = b.NodeID + ":" + b.Concept
+				}
+			}
+			out = append(out, f.RuleID+"|"+source+"|"+sink+"|"+f.Confidence)
+		}
+	}
+	return out
+}
+
 func ontologyVocabularyNeedles(t *testing.T) []string {
 	t.Helper()
 	seen := map[string]bool{}

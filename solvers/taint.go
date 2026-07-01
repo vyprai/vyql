@@ -178,11 +178,13 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	// rule's source concept), which is all a per-(rule,sink) finding needs.
 	tainted := make(map[string]bool, len(srcs)*8)
 	pred := make(map[string]string, len(srcs)*8)
+	dist := make(map[string]int, len(srcs)*8)
 	var nearMiss [][2]string
 	queue := make([]string, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			dist[s] = 0
 			queue = append(queue, s)
 		}
 	}
@@ -194,10 +196,24 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			continue
 		}
 		forEachSucc(node, func(dst string) {
+			ndist := dist[node] + 1
 			if !tainted[dst] {
 				tainted[dst] = true
 				pred[dst] = node
+				dist[dst] = ndist
 				queue = append(queue, dst)
+				return
+			}
+			if old, ok := dist[dst]; !ok || ndist < old {
+				pred[dst] = node
+				dist[dst] = ndist
+				queue = append(queue, dst)
+				return
+			}
+			if ndist == dist[dst] {
+				if p := pred[dst]; p == "" || node < p {
+					pred[dst] = node
+				}
 			}
 		})
 	}
@@ -315,14 +331,17 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 
 	tainted := make([]bool, n)
 	pred := make([]int32, n)
+	dist := make([]int32, n)
 	for i := range pred {
 		pred[i] = -1
+		dist[i] = -1
 	}
 	var nearMiss [][2]string
 	queue := make([]int32, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			dist[s] = 0
 			queue = append(queue, s)
 		}
 	}
@@ -334,10 +353,22 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			continue
 		}
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
+			ndist := dist[node] + 1
 			if !tainted[dst] {
 				tainted[dst] = true
 				pred[dst] = node
+				dist[dst] = ndist
 				queue = append(queue, dst)
+				return true
+			}
+			if dist[dst] < 0 || ndist < dist[dst] {
+				pred[dst] = node
+				dist[dst] = ndist
+				queue = append(queue, dst)
+				return true
+			}
+			if ndist == dist[dst] && (pred[dst] < 0 || node < pred[dst]) {
+				pred[dst] = node
 			}
 			return true
 		})

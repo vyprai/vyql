@@ -13,6 +13,7 @@
 package lowering
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -613,7 +614,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 			}
 		}
 	}
+	var vars []string
 	for v := range changed {
+		vars = append(vars, v)
+	}
+	sort.Strings(vars)
+	for _, v := range vars {
 		phi := l.node("Phi", "?:0", nil)
 		srcs := map[string]bool{}
 		for _, br := range branches {
@@ -628,7 +634,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 		if before[v] != "" {
 			srcs[before[v]] = true // the branch(es) may not run — keep the pre-branch value
 		}
+		var srcIDs []string
 		for s := range srcs {
+			srcIDs = append(srcIDs, s)
+		}
+		sort.Strings(srcIDs)
+		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
 		sc.node[v] = phi

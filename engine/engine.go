@@ -36,6 +36,7 @@ type Engine struct {
 	sameReceiverGuards     map[string]map[string]bool
 	sameScopeGuards        map[string]map[string]bool
 	globalGuards           map[string]bool
+	taintFlowCache         map[string][]solvers.TaintFlow
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
@@ -54,6 +55,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 		sameReceiverGuards:     map[string]map[string]bool{},
 		sameScopeGuards:        map[string]map[string]bool{},
 		globalGuards:           map[string]bool{},
+		taintFlowCache:         map[string][]solvers.TaintFlow{},
 	}
 }
 
@@ -65,6 +67,59 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 	return e.applyConfidenceFloor(cr, resultpolicy.Dedup(fs)), nil
+}
+
+// PrecomputeTaintFlows batches compatible taint solver calls across the active
+// rules for this Engine. It is deliberately conservative: only rules with the
+// same propagation policy (source concepts, taint kinds, kill controls,
+// excluded characters, and char-filter concepts) share a solver run. The shared
+// run uses the union of their sink concepts, then seeds each rule's exact cache
+// entry with flows filtered back to that rule's own sink set. Rule-specific
+// coverage, confidence, review, and finding identity still run in Evaluate.
+func (e *Engine) PrecomputeTaintFlows(rules []*CompiledRule) error {
+	charFilters := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter)
+	groups := map[string][]*CompiledRule{}
+	for _, cr := range rules {
+		if cr == nil || cr.Rule == nil {
+			continue
+		}
+		body, ok := cr.Rule.Body.(*parser.FlowStmt)
+		if !ok || body.Verb != "taint" {
+			continue
+		}
+		srcConcepts, sinkConcepts, taintKinds, killControls, excluded := e.taintPolicy(cr)
+		exactKey := taintFlowCacheKey(srcConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+		if _, ok := e.taintFlowCache[exactKey]; ok {
+			continue
+		}
+		batchKey := taintFlowBatchKey(srcConcepts, taintKinds, killControls, excluded, charFilters)
+		groups[batchKey] = append(groups[batchKey], cr)
+	}
+	for _, group := range groups {
+		if len(group) == 0 {
+			continue
+		}
+		srcConcepts, _, taintKinds, killControls, excluded := e.taintPolicy(group[0])
+		unionSinks := map[string]bool{}
+		for _, cr := range group {
+			_, sinkConcepts, _, _, _ := e.taintPolicy(cr)
+			for c, ok := range sinkConcepts {
+				if ok {
+					unionSinks[c] = true
+				}
+			}
+		}
+		flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, unionSinks, taintKinds, killControls, excluded, charFilters)
+		if err != nil {
+			return err
+		}
+		for _, cr := range group {
+			src, sinks, kinds, kills, excl := e.taintPolicy(cr)
+			exactKey := taintFlowCacheKey(src, sinks, kinds, kills, excl, charFilters)
+			e.taintFlowCache[exactKey] = e.filterFlowsForSinks(flows, sinks)
+		}
+	}
+	return nil
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -575,27 +630,10 @@ func (e *Engine) rangeFlowOut(id string, fn func(dst string) bool) {
 }
 
 func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
-	body := cr.Rule.Body.(*parser.FlowStmt)
-	srcConcepts := cr.SourceConcepts
-	if srcConcepts == nil {
-		srcConcepts = e.Onto.Descendants(body.Src.Concept)
-	}
-	sinkConcepts := cr.SinkConcepts
-	if sinkConcepts == nil {
-		sinkConcepts = e.Onto.Descendants(body.Dst.Concept)
-	}
-	taintKinds := cr.TaintKinds
-	if taintKinds == nil {
-		taintKinds = taintKindsFor(e.Onto, srcConcepts)
-	}
-	excluded := cr.ExcludedChars
-	if cr.SinkConcepts == nil {
-		// excluded characters for this sink threat (declared on the sink concept(s) via
-		// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
-		excluded = excludedCharsFor(e.Onto, sinkConcepts)
-	}
+	srcConcepts, sinkConcepts, taintKinds, killControls, excluded := e.taintPolicy(cr)
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter))
+	charFilters := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter)
+	flows, err := e.taintFlowsFor(srcConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
 	if err != nil {
 		return nil, err
 	}
@@ -766,6 +804,101 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 }
 
 // --- helpers -------------------------------------------------------------
+
+func (e *Engine) taintFlowsFor(sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) ([]solvers.TaintFlow, error) {
+	key := taintFlowCacheKey(sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+	if flows, ok := e.taintFlowCache[key]; ok {
+		return flows, nil
+	}
+	flows, err := solvers.FindTaintFlows(e.Store, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+	if err != nil {
+		return nil, err
+	}
+	e.taintFlowCache[key] = flows
+	return flows, nil
+}
+
+func (e *Engine) taintPolicy(cr *CompiledRule) (sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string) {
+	body := cr.Rule.Body.(*parser.FlowStmt)
+	sourceConcepts = cr.SourceConcepts
+	if sourceConcepts == nil {
+		sourceConcepts = e.Onto.Descendants(body.Src.Concept)
+	}
+	sinkConcepts = cr.SinkConcepts
+	if sinkConcepts == nil {
+		sinkConcepts = e.Onto.Descendants(body.Dst.Concept)
+	}
+	taintKinds = cr.TaintKinds
+	if taintKinds == nil {
+		taintKinds = taintKindsFor(e.Onto, sourceConcepts)
+	}
+	killControls = cr.KillControls
+	if killControls == nil {
+		killControls = map[string]bool{}
+	}
+	excluded = cr.ExcludedChars
+	if cr.SinkConcepts == nil {
+		// excluded characters for this sink threat (declared on the sink concept(s) via
+		// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
+		excluded = excludedCharsFor(e.Onto, sinkConcepts)
+	}
+	return sourceConcepts, sinkConcepts, taintKinds, killControls, excluded
+}
+
+func (e *Engine) filterFlowsForSinks(flows []solvers.TaintFlow, sinkConcepts map[string]bool) []solvers.TaintFlow {
+	if len(flows) == 0 {
+		return nil
+	}
+	out := make([]solvers.TaintFlow, 0, len(flows))
+	for _, fl := range flows {
+		if e.conceptIn(fl.SinkID, sinkConcepts) != "" {
+			out = append(out, fl)
+		}
+	}
+	return out
+}
+
+func taintFlowBatchKey(sourceConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) string {
+	var b strings.Builder
+	writeSetKey(&b, "src", sourceConcepts)
+	writeSetKey(&b, "kind", taintKinds)
+	writeSetKey(&b, "kill", killControls)
+	writeSetKey(&b, "char", charFilters)
+	b.WriteString("excluded=")
+	b.WriteString(excluded)
+	return b.String()
+}
+
+func taintFlowCacheKey(sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) string {
+	var b strings.Builder
+	writeSetKey(&b, "src", sourceConcepts)
+	writeSetKey(&b, "sink", sinkConcepts)
+	writeSetKey(&b, "kind", taintKinds)
+	writeSetKey(&b, "kill", killControls)
+	writeSetKey(&b, "char", charFilters)
+	b.WriteString("excluded=")
+	b.WriteString(excluded)
+	return b.String()
+}
+
+func writeSetKey(b *strings.Builder, name string, set map[string]bool) {
+	b.WriteString(name)
+	b.WriteByte('=')
+	if len(set) > 0 {
+		keys := make([]string, 0, len(set))
+		for k, ok := range set {
+			if ok {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			b.WriteString(k)
+			b.WriteByte('\x00')
+		}
+	}
+	b.WriteByte('\x1f')
+}
 
 func (e *Engine) ruleID(cr *CompiledRule) string {
 	if id, ok := cr.Rule.Meta["id"].(string); ok {

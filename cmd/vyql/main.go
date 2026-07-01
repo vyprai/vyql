@@ -327,10 +327,17 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	var all []*findings.Finding
 	tk := newTimer()
 	ruleTimingOn := os.Getenv("VYQL_RULE_TIMING") != ""
+	var activeRules []*engine.CompiledRule
 	for _, cr := range rules.compiled {
 		if !ruleActiveForProfile(cr, profileName) {
 			continue
 		}
+		activeRules = append(activeRules, cr)
+	}
+	if err := eng.PrecomputeTaintFlows(activeRules); err != nil {
+		return nil, stats, g, err
+	}
+	for _, cr := range activeRules {
 		start := time.Now()
 		got, err := eng.Evaluate(cr)
 		if err != nil {
