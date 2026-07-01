@@ -25,8 +25,10 @@ type IntStore struct {
 	vkind      []string
 	props      []map[string]string // index -> extras (usually nil)
 
-	out [][]iedge         // index -> outgoing edges
-	in  map[int32][]iedge // reverse edges, ONLY for inIndexedTypes (sparse)
+	out     [][]iedge         // index -> outgoing non-compact edges
+	in      map[int32][]iedge // reverse non-compact edges, ONLY for inIndexedTypes (sparse)
+	flowOut [][]int32         // compact prop-less FLOWS adjacency
+	flowIn  map[int32][]int32 // compact prop-less reverse FLOWS adjacency
 
 	byType     map[string][]int32
 	typeIDs    map[string][]string
@@ -178,6 +180,8 @@ func NewIntStore(nodeHint int) *IntStore {
 		props:      make([]map[string]string, 0, nodeHint),
 		out:        make([][]iedge, 0, nodeHint),
 		in:         map[int32][]iedge{},
+		flowOut:    make([][]int32, 0, nodeHint),
+		flowIn:     map[int32][]int32{},
 		byType:     map[string][]int32{},
 		typeIDs:    map[string][]string{},
 		byConcept:  map[string][]int32{},
@@ -206,6 +210,7 @@ func (s *IntStore) intern(id string) int32 {
 	s.vkind = append(s.vkind, "")
 	s.props = append(s.props, nil)
 	s.out = append(s.out, nil)
+	s.flowOut = append(s.flowOut, nil)
 	return i
 }
 
@@ -280,6 +285,12 @@ func (s *IntStore) removeFromType(t string, i int32) {
 func (s *IntStore) AddEdge(e Edge) error {
 	si, di := s.intern(e.Src), s.intern(e.Dst)
 	typ := edgeTypeIDFor(e.Type)
+	if typ == edgeTypeFlows && len(e.Props) == 0 {
+		s.flowOut[si] = append(s.flowOut[si], di)
+		s.flowIn[di] = append(s.flowIn[di], si)
+		s.epoch = nextStructEpoch()
+		return nil
+	}
 	s.out[si] = append(s.out[si], iedge{typ: typ, dst: di, props: e.Props})
 	if edgeTypeInIndexed(typ) {
 		s.in[di] = append(s.in[di], iedge{typ: typ, dst: si, props: e.Props})
@@ -321,6 +332,11 @@ func (s *IntStore) OutEdges(src, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range s.flowOut[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: src, Dst: s.ids[dst]})
+		}
+	}
 	for _, e := range s.out[i] {
 		if edgeTypeMatches(e.typ, edgeType) {
 			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: src, Dst: s.ids[e.dst], Props: e.props})
@@ -335,6 +351,11 @@ func (s *IntStore) InEdges(dst, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range s.flowIn[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: s.ids[src], Dst: dst})
+		}
+	}
 	for _, e := range s.in[i] {
 		if edgeTypeMatches(e.typ, edgeType) {
 			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: s.ids[e.dst], Dst: dst, Props: e.props})
@@ -347,6 +368,13 @@ func (s *IntStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) 
 	i, ok := s.idx[dst]
 	if !ok {
 		return
+	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range s.flowIn[i] {
+			if !fn(s.ids[src]) {
+				return
+			}
+		}
 	}
 	for _, e := range s.in[i] {
 		if edgeTypeMatches(e.typ, edgeType) {
@@ -442,6 +470,13 @@ func (s *IntStore) RangeOutEdges(src, edgeType string, fn func(dst string) bool)
 	if !ok {
 		return
 	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range s.flowOut[i] {
+			if !fn(s.ids[dst]) {
+				return
+			}
+		}
+	}
 	for _, e := range s.out[i] {
 		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(s.ids[e.dst]) {
@@ -472,6 +507,13 @@ func (s *IntStore) ConceptNodes(concept string) []int32 { return s.byConcept[con
 func (s *IntStore) RangeOut(src int32, edgeType string, fn func(dst int32) bool) {
 	if int(src) >= len(s.out) {
 		return
+	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range s.flowOut[src] {
+			if !fn(dst) {
+				return
+			}
+		}
 	}
 	for _, e := range s.out[src] {
 		if edgeTypeMatches(e.typ, edgeType) {

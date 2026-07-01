@@ -110,6 +110,88 @@ func TestStoreEquivalence(t *testing.T) {
 	}
 }
 
+func TestCompactFlowEdgesPreserveStoreAPI(t *testing.T) {
+	makeStores := func(t *testing.T) []struct {
+		name string
+		s    Store
+		g    IntGraph
+		done func()
+	} {
+		t.Helper()
+		intStore := NewIntStore(0)
+		bdg, err := OpenBadgerGraph(":memory:", 0)
+		if err != nil {
+			t.Fatalf("OpenBadgerGraph: %v", err)
+		}
+		return []struct {
+			name string
+			s    Store
+			g    IntGraph
+			done func()
+		}{
+			{name: "intstore", s: intStore, g: intStore, done: func() {}},
+			{name: "badgergraph", s: bdg, g: bdg, done: func() { _ = bdg.Close() }},
+		}
+	}
+
+	for _, tc := range makeStores(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			defer tc.done()
+			for _, id := range []string{"a", "b", "c", "d"} {
+				if err := tc.s.AddNode(Node{ID: id, Type: "code.Node"}); err != nil {
+					t.Fatalf("AddNode(%s): %v", id, err)
+				}
+			}
+			if err := tc.s.AddEdge(Edge{Type: "FLOWS", Src: "a", Dst: "b"}); err != nil {
+				t.Fatalf("AddEdge compact flow: %v", err)
+			}
+			if err := tc.s.AddEdge(Edge{Type: "FLOWS", Src: "a", Dst: "c", Props: map[string]string{"kind": "decorated"}}); err != nil {
+				t.Fatalf("AddEdge prop flow: %v", err)
+			}
+			if err := tc.s.AddEdge(Edge{Type: "NET", Src: "a", Dst: "d", Props: map[string]string{"rule": "net"}}); err != nil {
+				t.Fatalf("AddEdge net: %v", err)
+			}
+
+			flows, _ := tc.s.OutEdges("a", "FLOWS")
+			if got, want := dsts(flows), []string{"b", "c"}; !equal(got, want) {
+				t.Fatalf("OutEdges(FLOWS) dsts=%v want %v; edges=%+v", got, want, flows)
+			}
+			var sawDecorated bool
+			for _, e := range flows {
+				if e.Dst == "c" && e.Props["kind"] == "decorated" {
+					sawDecorated = true
+				}
+			}
+			if !sawDecorated {
+				t.Fatalf("prop-bearing FLOWS edge lost props: %+v", flows)
+			}
+
+			all, _ := tc.s.OutEdges("a", "")
+			if got, want := dsts(all), []string{"b", "c", "d"}; !equal(got, want) {
+				t.Fatalf("OutEdges(all) dsts=%v want %v; edges=%+v", got, want, all)
+			}
+
+			inB, _ := tc.s.InEdges("b", "FLOWS")
+			if len(inB) != 1 || inB[0].Src != "a" || inB[0].Dst != "b" {
+				t.Fatalf("compact InEdges(FLOWS) mismatch: %+v", inB)
+			}
+			inC, _ := tc.s.InEdges("c", "FLOWS")
+			if len(inC) != 1 || inC[0].Src != "a" || inC[0].Props["kind"] != "decorated" {
+				t.Fatalf("prop InEdges(FLOWS) mismatch: %+v", inC)
+			}
+
+			var ranged []string
+			tc.g.RangeOut(0, "FLOWS", func(dst int32) bool {
+				ranged = append(ranged, tc.g.NodeID(dst))
+				return true
+			})
+			if got, want := sorted(ranged), []string{"b", "c"}; !equal(got, want) {
+				t.Fatalf("RangeOut(FLOWS)=%v want %v", got, want)
+			}
+		})
+	}
+}
+
 // TestBasicOps: point lookups, labels, in-edges round-trip through Badger.
 func TestBasicOps(t *testing.T) {
 	bdg, err := OpenBadger(":memory:")
