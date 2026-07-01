@@ -2789,7 +2789,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		litFirst := ""
 		if sv, ok := l.constStrVal(a, sc); ok {
 			litFirst = sv
-			toks = append(toks, sv)
+			if !containsString(toks, sv) {
+				toks = append(toks, sv)
+			}
 		}
 		if litFirst == "" && len(toks) > 0 {
 			litFirst = toks[0]
@@ -3010,6 +3012,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	l.applyCallEffects(call, argVals, result, recvNode, sc)
 	return result
+}
+
+func containsString(vals []string, want string) bool {
+	for _, v := range vals {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNode string) {
