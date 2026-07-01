@@ -534,18 +534,25 @@ const scaPackageEvent = "analysis.sca.package"
 // explicit advisories map. Used where advisories come from an explicit set rather than
 // the loaded JSON feed (the entrypoint projector, tests).
 func MarkVulnerable(g usg.Store, advisories map[PkgKey]string) error {
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return err
+	type tokenUpdate struct {
+		id     string
+		tokens []string
 	}
-	for _, n := range nodes {
+	var updates []tokenUpdate
+	if err := rangeStoreNodes(g, func(n usg.Node) bool {
 		if n.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
 		if adv := advisories[PkgKey{n.Prop("name"), n.Prop("version")}]; adv != "" {
-			if err := addPackageTokens(g, n.ID, "status=vulnerable", "advisory="+adv); err != nil {
-				return err
-			}
+			updates = append(updates, tokenUpdate{n.ID, []string{"status=vulnerable", "advisory=" + adv}})
+		}
+		return true
+	}); err != nil {
+		return err
+	}
+	for _, update := range updates {
+		if err := addPackageTokens(g, update.id, update.tokens...); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -592,33 +599,36 @@ func normalizeSpecifier(v string) string {
 // code node's callee_path rooted at the package name) with a neutral reachability token.
 // It reuses the import-resolved call graph the SAST frontend already produced.
 func LinkReachability(g usg.Store) error {
-	nodes, err := g.AllNodes()
+	used, err := packageUsage(g)
 	if err != nil {
 		return err
 	}
-	used := packageUsage(nodes)
-	pkgsByID := map[string]usg.Node{}
-	for _, n := range nodes {
+	reachable := map[string]bool{}
+	if err := rangeStoreNodes(g, func(n usg.Node) bool {
 		if n.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
-		pkgsByID[n.ID] = n
 		for _, imp := range used.imports {
 			if packageNodeMatches(n, imp) {
 				_ = g.AddEdge(usg.Edge{Type: "DEPENDS_ON", Src: imp.id, Dst: n.ID})
-				used.reachable[n.ID] = true
+				reachable[n.ID] = true
 			}
 		}
 		for callRoot := range used.callRoots {
 			if PackageMatches(callRoot, n.Prop("name")) || PackageMatches(callRoot, n.Prop("package")) {
-				used.reachable[n.ID] = true
+				reachable[n.ID] = true
 			}
 		}
+		return true
+	}); err != nil {
+		return err
 	}
-	for id := range used.reachable {
-		if _, ok := pkgsByID[id]; !ok {
-			continue
-		}
+	var ids []string
+	for id := range reachable {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
 		if err := addPackageTokens(g, id, "reachable=true"); err != nil {
 			return err
 		}
@@ -678,12 +688,11 @@ type importUse struct {
 type usageEvidence struct {
 	imports   []importUse
 	callRoots map[string]bool
-	reachable map[string]bool
 }
 
-func packageUsage(nodes []usg.Node) usageEvidence {
-	used := usageEvidence{callRoots: map[string]bool{}, reachable: map[string]bool{}}
-	for _, n := range nodes {
+func packageUsage(g usg.Store) (usageEvidence, error) {
+	used := usageEvidence{callRoots: map[string]bool{}}
+	err := rangeStoreNodes(g, func(n usg.Node) bool {
 		switch n.Type {
 		case "code.Import":
 			module := n.Prop("module")
@@ -700,8 +709,9 @@ func packageUsage(nodes []usg.Node) usageEvidence {
 				used.callRoots[root] = true
 			}
 		}
-	}
-	return used
+		return true
+	})
+	return used, err
 }
 
 func packageNodeMatches(n usg.Node, imp importUse) bool {

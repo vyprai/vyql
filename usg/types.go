@@ -169,6 +169,18 @@ func BFS(s Store, start, edgeType string, maxHops int) (map[string]bool, error) 
 		if cur.hops >= maxHops {
 			continue
 		}
+		if rg, ok := s.(interface {
+			RangeOutEdges(string, string, func(string) bool)
+		}); ok {
+			rg.RangeOutEdges(cur.id, edgeType, func(dst string) bool {
+				if !seen[dst] {
+					seen[dst] = true
+					queue = append(queue, item{dst, cur.hops + 1})
+				}
+				return true
+			})
+			continue
+		}
 		edges, err := s.OutEdges(cur.id, edgeType)
 		if err != nil {
 			return nil, err

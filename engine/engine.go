@@ -16,38 +16,44 @@ import (
 
 // Engine evaluates compiled rules against a USG store.
 type Engine struct {
-	Onto               *ontology.Ontology
-	Store              usg.Store
-	conceptRole        map[string]map[string]bool
-	contextReach       []contextReachSource
-	contextReachSet    bool
-	contextAssets      []contextAssetConcept
-	contextAssetsSet   bool
-	contextConfirms    []contextConfirmation
-	contextConfirmsSet bool
-	cfg                map[string]bool
-	labelsByNode       map[string][]usg.Label
-	nodesByConcept     map[string][]string
-	flowGuards         map[string][]string
-	dominanceGuards    map[string][]string
-	sameReceiverGuards map[string]map[string]bool
-	sameScopeGuards    map[string]map[string]bool
-	globalGuards       map[string]bool
+	Onto                   *ontology.Ontology
+	Store                  usg.Store
+	conceptRole            map[string]map[string]bool
+	contextReach           []contextReachSource
+	contextReachSet        bool
+	contextAssets          []contextAssetConcept
+	contextAssetsSet       bool
+	contextConfirms        []contextConfirmation
+	contextConfirmsSet     bool
+	cfg                    map[string]bool
+	labelsByNode           map[string][]usg.Label
+	nodesByConcept         map[string][]string
+	reviewByNodeConcept    map[string][]findings.ReviewCondition
+	contextBySink          map[string][]string
+	contextConfirmByTarget map[string][]string
+	flowGuards             map[string][]string
+	dominanceGuards        map[string][]string
+	sameReceiverGuards     map[string]map[string]bool
+	sameScopeGuards        map[string]map[string]bool
+	globalGuards           map[string]bool
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{
-		Onto:               onto,
-		Store:              store,
-		conceptRole:        map[string]map[string]bool{},
-		cfg:                map[string]bool{},
-		labelsByNode:       map[string][]usg.Label{},
-		nodesByConcept:     map[string][]string{},
-		flowGuards:         map[string][]string{},
-		dominanceGuards:    map[string][]string{},
-		sameReceiverGuards: map[string]map[string]bool{},
-		sameScopeGuards:    map[string]map[string]bool{},
-		globalGuards:       map[string]bool{},
+		Onto:                   onto,
+		Store:                  store,
+		conceptRole:            map[string]map[string]bool{},
+		cfg:                    map[string]bool{},
+		labelsByNode:           map[string][]usg.Label{},
+		nodesByConcept:         map[string][]string{},
+		reviewByNodeConcept:    map[string][]findings.ReviewCondition{},
+		contextBySink:          map[string][]string{},
+		contextConfirmByTarget: map[string][]string{},
+		flowGuards:             map[string][]string{},
+		dominanceGuards:        map[string][]string{},
+		sameReceiverGuards:     map[string]map[string]bool{},
+		sameScopeGuards:        map[string]map[string]bool{},
+		globalGuards:           map[string]bool{},
 	}
 }
 
@@ -242,6 +248,9 @@ func mergeWhere(existing, next parser.Expr) parser.Expr {
 // Concepts define which sink properties point to related graph nodes and how
 // evidence should be rendered; the engine only follows those links.
 func (e *Engine) crossDomainContext(sinkID string) []string {
+	if ctx, ok := e.contextBySink[sinkID]; ok {
+		return append([]string(nil), ctx...)
+	}
 	n, ok, _ := e.Store.GetNode(sinkID)
 	if !ok {
 		return nil
@@ -284,6 +293,7 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 			ctx = append(ctx, renderContextLabel(ac.Label, target, kinds))
 		}
 	}
+	e.contextBySink[sinkID] = append([]string(nil), ctx...)
 	return ctx
 }
 
@@ -357,6 +367,9 @@ func renderContextLabel(template, target string, kinds []string) string {
 }
 
 func (e *Engine) contextConfirmations(target string) []string {
+	if out, ok := e.contextConfirmByTarget[target]; ok {
+		return append([]string(nil), out...)
+	}
 	var out []string
 	for _, c := range e.contextConfirmationSpecs() {
 		ids := e.nodesWithConcept(c.Concept)
@@ -371,6 +384,7 @@ func (e *Engine) contextConfirmations(target string) []string {
 			out = append(out, c.Label)
 		}
 	}
+	e.contextConfirmByTarget[target] = append([]string(nil), out...)
 	return out
 }
 
@@ -520,11 +534,9 @@ func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkC
 	if e.hasCFG(sinkID) {
 		guarded := map[string]bool{}
 		for _, pid := range path {
-			edges, _ := e.Store.OutEdges(pid, "FLOWS")
-			for _, ed := range edges {
-				gid := ed.Dst
+			e.rangeFlowOut(pid, func(gid string) bool {
 				if gid == sinkID || guarded[gid] || !e.hasCFG(gid) {
-					continue
+					return true
 				}
 				guarded[gid] = true
 				for _, l := range e.labels(gid) {
@@ -540,10 +552,26 @@ func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkC
 						add("guard", l.Detail["pattern"])
 					}
 				}
-			}
+				return true
+			})
 		}
 	}
 	return out
+}
+
+func (e *Engine) rangeFlowOut(id string, fn func(dst string) bool) {
+	if rg, ok := e.Store.(interface {
+		RangeOutEdges(string, string, func(string) bool)
+	}); ok {
+		rg.RangeOutEdges(id, "FLOWS", fn)
+		return
+	}
+	edges, _ := e.Store.OutEdges(id, "FLOWS")
+	for _, ed := range edges {
+		if !fn(ed.Dst) {
+			return
+		}
+	}
 }
 
 func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -687,6 +715,16 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
+		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
+			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
+			if resultpolicy.ConfidenceRank(conf) > resultpolicy.ConfidenceRank(ceil) {
+				conf = ceil
+			}
+		}
+		if idx, seen := bySink[fl.SinkID]; seen &&
+			resultpolicy.ConfidenceRank(conf) <= resultpolicy.ConfidenceRank(out[idx].Confidence) {
+			continue
+		}
 		review := e.reviewConditions(fl.SinkID, snkC)
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
@@ -701,10 +739,6 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				Assumption: srcMeta.SourceAssumption,
 				Confidence: firstNonEmpty(srcMeta.SourceConfidence, "medium"),
 			})
-			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
-			if resultpolicy.ConfidenceRank(conf) > resultpolicy.ConfidenceRank(ceil) {
-				conf = ceil
-			}
 		}
 		f := &findings.Finding{
 			RuleID:   e.ruleID(cr),
@@ -722,11 +756,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			ReviewConditions: review,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
-			// same sink already reported for this rule — keep whichever source gives the
-			// higher-confidence witness (strict, so ties keep the earlier/deterministic one).
-			if resultpolicy.ConfidenceRank(f.Confidence) > resultpolicy.ConfidenceRank(out[idx].Confidence) {
-				out[idx] = f
-			}
+			out[idx] = f
 			continue
 		}
 		bySink[fl.SinkID] = len(out)
@@ -857,6 +887,10 @@ func labelProvenancePriority(l usg.Label) int {
 }
 
 func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondition {
+	cacheKey := nodeID + "\x00" + concept
+	if out, ok := e.reviewByNodeConcept[cacheKey]; ok {
+		return append([]findings.ReviewCondition(nil), out...)
+	}
 	var out []findings.ReviewCondition
 	seen := map[string]bool{}
 	for _, l := range e.labels(nodeID) {
@@ -884,6 +918,7 @@ func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondi
 			out = append(out, ec)
 		}
 	}
+	e.reviewByNodeConcept[cacheKey] = append([]findings.ReviewCondition(nil), out...)
 	return out
 }
 
@@ -1315,14 +1350,14 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 		seen[id] = true
 		out = append(out, id)
 	}
-	edges, _ := e.Store.OutEdges(nodeID, "FLOWS")
-	for _, ed := range edges {
-		add(ed.Dst)
-		midEdges, _ := e.Store.OutEdges(ed.Dst, "FLOWS")
-		for _, mid := range midEdges {
-			add(mid.Dst)
-		}
-	}
+	e.rangeFlowOut(nodeID, func(dst string) bool {
+		add(dst)
+		e.rangeFlowOut(dst, func(mid string) bool {
+			add(mid)
+			return true
+		})
+		return true
+	})
 	e.flowGuards[key] = out
 	return out
 }

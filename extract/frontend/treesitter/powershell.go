@@ -16,9 +16,26 @@ import (
 // (cmdlet name -> path, elements -> args); expandable strings ("ping $x")
 // propagate taint.
 type psConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *psConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // psWrappers are single-child expression-precedence nodes to peel through.
@@ -61,7 +78,7 @@ func (c *psConv) text(n *tree_sitter.Node) string {
 // psUnwrap peels single-child precedence wrappers to the meaningful node.
 func (c *psConv) psUnwrap(n *tree_sitter.Node) *tree_sitter.Node {
 	for n != nil && psWrappers[n.Kind()] {
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) != 1 {
 			break
 		}
@@ -73,7 +90,7 @@ func (c *psConv) psUnwrap(n *tree_sitter.Node) *tree_sitter.Node {
 func (c *psConv) program(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	// Top-level param() block entries are emitted as neutral parameter-entry events.
-	for _, ch := range namedChildren(root) {
+	for _, ch := range c.namedChildren(root) {
 		if ch.Kind() == "param_block" {
 			for _, p := range c.paramNames(ch) {
 				out = append(out, nir.Assign{Targets: []string{p},
@@ -98,7 +115,7 @@ func (c *psConv) stmtList(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			switch ch.Kind() {
 			case "statement_list", "script_block", "script_block_body", "named_block":
 				walk(ch)
@@ -123,14 +140,14 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		// a pipeline of commands
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
 	case "assignment_expression":
 		left := c.psUnwrap(field(n, "left"))
 		if left == nil {
-			if k := namedChildren(n); len(k) > 0 {
+			if k := c.namedChildren(n); len(k) > 0 {
 				left = c.psUnwrap(k[0])
 			}
 		}
@@ -218,14 +235,14 @@ func (c *psConv) psIf(n *tree_sitter.Node) nir.Stmt {
 	if cond := field(n, "condition"); cond != nil {
 		it.Cond = c.expr(cond)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "statement_block":
 			if it.Then == nil {
 				it.Then = c.psBlock(ch)
 			}
 		case "else_clause":
-			for _, e := range namedChildren(ch) {
+			for _, e := range c.namedChildren(ch) {
 				if e.Kind() == "statement_block" {
 					it.Else = append(it.Else, c.psBlock(e)...)
 				}
@@ -243,7 +260,7 @@ func (c *psConv) psIf(n *tree_sitter.Node) nir.Stmt {
 func (c *psConv) psSwitch(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
 	if cond := lastChildKind(n, "switch_condition"); cond != nil {
-		if k := namedChildren(cond); len(k) > 0 {
+		if k := c.namedChildren(cond); len(k) > 0 {
 			sw.Subject = c.expr(k[0])
 		}
 	}
@@ -255,7 +272,7 @@ func (c *psConv) psSwitch(n *tree_sitter.Node) nir.Stmt {
 	if clauses == nil {
 		return sw
 	}
-	for _, cl := range namedChildren(clauses) {
+	for _, cl := range c.namedChildren(clauses) {
 		if cl.Kind() != "switch_clause" {
 			continue
 		}
@@ -276,7 +293,7 @@ func (c *psConv) psBlock(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			switch ch.Kind() {
 			case "statement_block", "statement_list", "named_block", "script_block", "script_block_body":
 				walk(ch)
@@ -312,7 +329,7 @@ func (c *psConv) paramNames(n *tree_sitter.Node) []string {
 	var out []string
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			if ch.Kind() == "variable" {
 				out = append(out, c.varName(ch))
 			} else {
@@ -342,14 +359,14 @@ func (c *psConv) paramTypes(n *tree_sitter.Node) map[string]string {
 			}
 			putParamType(out, name, typ)
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			if ch.Kind() == "parameter" || ch.Kind() == "parameter_declaration" || ch.Kind() == "variable" {
 				name := ""
 				if v := field(ch, "name"); v != nil {
 					name = c.varName(v)
 				}
 				if name == "" {
-					for _, cc := range namedChildren(ch) {
+					for _, cc := range c.namedChildren(ch) {
 						if cc.Kind() == "variable" {
 							name = c.varName(cc)
 							break
@@ -375,7 +392,7 @@ func (c *psConv) functionName(n *tree_sitter.Node) string {
 	if name := c.text(field(n, "name")); name != "" {
 		return name
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "command_name", "function_name", "identifier":
 			return c.text(ch)
@@ -394,7 +411,7 @@ func (c *psConv) findParamBlock(n *tree_sitter.Node) *tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "param_block" {
 			return ch
 		}
@@ -412,7 +429,7 @@ func (c *psConv) directVarName(n *tree_sitter.Node) string {
 	if n.Kind() == "variable" {
 		return c.varName(n)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "variable" {
 			return c.varName(ch)
 		}
@@ -440,7 +457,7 @@ func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 	}
 	var args []nir.Expr
 	if el := field(n, "command_elements"); el != nil {
-		for _, ch := range namedChildren(el) {
+		for _, ch := range c.namedChildren(el) {
 			if ch.Kind() == "command_argument_sep" || ch.Kind() == "command_name" {
 				continue
 			}
@@ -481,7 +498,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		var walk func(m *tree_sitter.Node)
 		walk = func(m *tree_sitter.Node) {
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if ch.Kind() == "variable" || ch.Kind() == "sub_expression" {
 					parts = append(parts, c.expr(ch))
 				} else {
@@ -496,7 +513,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: psLiteralValue(c.text(n))}
 	case "additive_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		parts = c.psRecoverGeneratedPayload(parts, c.text(n), L)
@@ -505,7 +522,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		// reached only with 2 operands (single-child wrappers are peeled by psUnwrap);
 		// map PowerShell's `-gt`/`-lt`/… to C-style operators so const-eval can fold.
 		// The operator may itself be a named child, so take the first and last operands.
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) >= 2 {
 			if op := c.psWordOperator(n); op == "-replace" || op == "-creplace" || op == "-ireplace" {
 				return nir.Call{
@@ -519,7 +536,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.BinOp{Op: c.psCmpToken(n), Left: c.expr(k[0]), Right: c.expr(k[len(k)-1]), Loc: L}
 		}
 	case "unary_expression":
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) >= 1 {
 			op := "?"
 			for i := uint(0); i < n.ChildCount(); i++ {
@@ -533,16 +550,16 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "command":
 		return c.command(n)
 	case "command_invokation_operator", "sub_expression", "parenthesized_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return c.expr(k[len(k)-1])
 		}
 	case "member_access":
-		base := namedChildren(n)
+		base := c.namedChildren(n)
 		if len(base) > 0 {
 			return nir.Attr{Base: c.expr(base[0]), Attr: c.psMemberName(n), Path: c.dotted(n), Loc: L}
 		}
 	case "invokation_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			path := c.dotted(k[0])
 			if invokePath := c.psInvokePathFromText(n); invokePath != "" {
 				path = invokePath
@@ -556,7 +573,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	if len(parts) == 1 {
@@ -643,7 +660,7 @@ func psLiteralValue(raw string) string {
 func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {
 	var out []nir.Expr
 	if a := field(n, "arguments"); a != nil {
-		for _, ch := range namedChildren(a) {
+		for _, ch := range c.namedChildren(a) {
 			out = append(out, c.expr(ch))
 		}
 		return out
@@ -651,13 +668,13 @@ func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {
 	if parsed := c.psInvokeArgsFromText(n); len(parsed) > 0 {
 		return parsed
 	}
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	for i, ch := range kids {
 		if i == 0 {
 			continue
 		}
 		if ch.Kind() == "argument_list" {
-			for _, arg := range namedChildren(ch) {
+			for _, arg := range c.namedChildren(ch) {
 				out = append(out, c.expr(arg))
 			}
 			continue
@@ -765,7 +782,7 @@ func (c *psConv) psMemberName(n *tree_sitter.Node) string {
 	if i := strings.LastIndex(raw, "."); i >= 0 && i+1 < len(raw) {
 		return strings.TrimSpace(raw[i+1:])
 	}
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) > 1 {
 		return strings.TrimSpace(c.text(kids[len(kids)-1]))
 	}
@@ -781,7 +798,7 @@ func (c *psConv) dotted(n *tree_sitter.Node) string {
 	case "variable":
 		return c.varName(n)
 	case "member_access":
-		base := namedChildren(n)
+		base := c.namedChildren(n)
 		if len(base) > 0 {
 			return c.dotted(base[0]) + "." + c.psMemberName(n)
 		}

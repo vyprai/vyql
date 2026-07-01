@@ -10,6 +10,8 @@ package treesitter
 import (
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tspython "github.com/tree-sitter/tree-sitter-python/bindings/go"
@@ -27,6 +29,7 @@ type pyConv struct {
 	classContext  []string
 	decorators    []string
 	childCache    map[uintptr][]*tree_sitter.Node
+	allChildCache map[uintptr][]*tree_sitter.Node
 }
 
 func (c *pyConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
@@ -42,6 +45,22 @@ func (c *pyConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 	}
 	kids := namedChildren(n)
 	c.childCache[id] = kids
+	return kids
+}
+
+func (c *pyConv) children(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.allChildCache == nil {
+		c.allChildCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.allChildCache[id]; ok {
+		return kids
+	}
+	kids := children(n)
+	c.allChildCache[id] = kids
 	return kids
 }
 
@@ -176,7 +195,7 @@ func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
 		if n == nil {
 			return
 		}
-		for _, ch := range children(n) {
+		for _, ch := range c.children(n) {
 			if ch.Kind() == "comment" {
 				for _, tok := range vyqlMarkerTokens(c.text(ch)) {
 					out = append(out, nir.ResultEntry{Tokens: []string{tok}})
@@ -210,15 +229,15 @@ func vyqlMarkerTokens(comment string) []string {
 
 // firstIdent returns the first identifier at or under n (e.g. the target name inside a
 // with-statement `as` alias, which may be wrapped in an as_pattern_target).
-func firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
+func (c *pyConv) firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
 	if n.Kind() == "identifier" {
 		return n
 	}
-	for _, ch := range children(n) {
-		if r := firstIdent(ch); r != nil {
+	for _, ch := range c.children(n) {
+		if r := c.firstIdent(ch); r != nil {
 			return r
 		}
 	}
@@ -249,7 +268,7 @@ func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 // default, literal patterns (and unions of literals) yield label expressions, and anything
 // else (capture, class, value, guard) returns literal=false so the match is left unprunable.
 func (c *pyConv) matchPatternLabels(caseClause *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
-	for _, ch := range children(caseClause) {
+	for _, ch := range c.children(caseClause) {
 		if ch.Kind() == "case_pattern" {
 			if kids := c.namedChildren(ch); len(kids) > 0 {
 				return c.patternLabels(kids[0])
@@ -413,7 +432,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var pre []nir.Stmt
 		var walkWith func(node *tree_sitter.Node)
 		walkWith = func(node *tree_sitter.Node) {
-			for _, ch := range children(node) {
+			for _, ch := range c.children(node) {
 				switch ch.Kind() {
 				case "with_clause":
 					walkWith(ch)
@@ -429,7 +448,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						}
 						expr := c.expr(kids[0])
 						if alias := field(val, "alias"); alias != nil {
-							if id := firstIdent(alias); id != nil {
+							if id := c.firstIdent(alias); id != nil {
 								pre = append(pre, nir.Assign{Targets: []string{c.text(id)}, Value: expr})
 								continue
 							}
@@ -459,7 +478,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if body == nil {
 			body = n
 		}
-		for _, cl := range children(body) {
+		for _, cl := range c.children(body) {
 			if cl.Kind() != "case_clause" {
 				continue
 			}
@@ -493,7 +512,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 // trailing else becomes a plain block. Returns nil when there is no else/elif.
 func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	var alts []*tree_sitter.Node
-	for _, ch := range children(n) {
+	for _, ch := range c.children(n) {
 		if ch.Kind() == "elif_clause" || ch.Kind() == "else_clause" {
 			alts = append(alts, ch)
 		}
@@ -527,7 +546,7 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
-		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
+		nir.Const{Loc: loc, Value: pyContextCompactUnbounded(bodyText)},
 		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
 	for _, tok := range c.classContext {
@@ -578,7 +597,7 @@ func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	args := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: text},
-		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		nir.Const{Loc: loc, Value: pyContextCompactUnbounded(text)},
 	}
 	for _, tok := range c.pyStructuredContextTokens(root, "module") {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
@@ -593,8 +612,8 @@ func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
-	seen := map[string]bool{}
-	var out []string
+	seen := make(map[string]bool, 64)
+	out := make([]string, 0, 64)
 	add := func(tok string) {
 		if tok == "" || seen[tok] || len(out) >= 512 {
 			return
@@ -624,7 +643,11 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 					add("assign:" + lhs + "=" + rhs)
 				}
 				for _, item := range c.pyContextAssignmentItems(right) {
-					add("assign_item:" + lhs + ":" + item)
+					assignItem := lhs + ":" + item
+					add("assign_item:" + assignItem)
+					if pyOverbroadRolePermissionGrantItem(assignItem) {
+						add("python_review:overbroad_role_permission_grant")
+					}
 				}
 				if right != nil && right.Kind() == "call" {
 					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
@@ -717,6 +740,29 @@ func pySemanticReviewTokens(raw, name string) []string {
 	var out []string
 	add := func(fact string) {
 		out = append(out, "python_review:"+fact)
+	}
+	if strings.Contains(compact, "forurlinurls:") &&
+		strings.Contains(compact, "requests.get(url") &&
+		!strings.Contains(compact, "validate_url(url") &&
+		!strings.Contains(compact, "_validate_url(url") {
+		add("loop_requests_get_url_without_validation")
+	}
+	if strings.Contains(compact, "traceback.format_exc") &&
+		!strings.Contains(compact, "cgi.escape") &&
+		!strings.Contains(compact, "html.escape") &&
+		!strings.Contains(compact, "markupsafe.escape") {
+		if strings.Contains(compact, "<pre") {
+			add("traceback_format_exc_pre_unescaped")
+		}
+		if strings.Contains(compact, "<html") {
+			add("traceback_format_exc_html_unescaped")
+		}
+	}
+	if pyRequestPathPercentSLogInjection(compact) {
+		add("request_path_percent_s_log_injection")
+	}
+	if pyCredentialAttributeLogExposure(compact) {
+		add("credential_attribute_log_exposure")
 	}
 	if strings.Contains(compact, "app.config[\"SECRET_KEY\"]=") || strings.Contains(compact, "app.config['SECRET_KEY']=") {
 		if !strings.Contains(compact, "os.environ") &&
@@ -1005,6 +1051,9 @@ func pySemanticReviewTokens(raw, name string) []string {
 		!strings.Contains(compact, "UNSUPPORTED_MEDIA_TYPE") {
 		add("request_selected_deserialization_format")
 	}
+	if pyPickleLoadsJoblibModelLoader(compact, name) {
+		add("pickle_loads_joblib_model_loader")
+	}
 	if strings.Contains(compact, "QueryRequest(") &&
 		strings.Contains(compact, "sql=") &&
 		strings.Contains(compact, ".execute_query(") &&
@@ -1191,6 +1240,77 @@ func pySemanticReviewTokens(raw, name string) []string {
 	return out
 }
 
+func pyRequestPathPercentSLogInjection(compact string) bool {
+	if !strings.Contains(compact, "request.path") {
+		return false
+	}
+	if !pyCompactContainsAny(compact, "LOG.debug(", "logger.debug(", "logging.debug(", "log.debug(") {
+		return false
+	}
+	if !pyCompactContainsAny(compact,
+		"LOG.debug(\"Requestto'%s",
+		"LOG.debug('Requestto\\'%s",
+		"logger.debug(\"requestpath%s",
+		"logger.debug('requestpath%s",
+		"logging.debug(\"path%s",
+		"logging.debug('path%s",
+		"log.debug(\"path%s",
+		"log.debug('path%s",
+	) {
+		return false
+	}
+	if pyCompactContainsAny(compact,
+		"LOG.debug(\"Requestto'%r",
+		"LOG.debug('Requestto\\'%r",
+		"logger.debug(\"requestpath%r",
+		"logger.debug('requestpath%r",
+		"logging.debug(\"path%r",
+		"logging.debug('path%r",
+		"log.debug(\"path%r",
+		"log.debug('path%r",
+	) {
+		return false
+	}
+	return !pyCompactContainsAny(compact, "repr(", "escape(", "sanitize(")
+}
+
+func pyCredentialAttributeLogExposure(compact string) bool {
+	if !pyCompactContainsAny(compact, "LOG.debug(", "logger.debug(", "logging.debug(") {
+		return false
+	}
+	if !pyCompactContainsAny(compact, "loc.accesskey", "loc.secretkey") {
+		return false
+	}
+	return pyCompactContainsAny(compact, "accesskey", "access_key", "secretkey", "secret_key")
+}
+
+func pyPickleLoadsJoblibModelLoader(compact, name string) bool {
+	switch name {
+	case "load", "load_model", "from_pretrained", "restore":
+	default:
+		return false
+	}
+	if !strings.Contains(compact, "pickle.loads(") || !strings.Contains(compact, "joblib.load(") {
+		return false
+	}
+	return !pyCompactContainsAny(compact, "RestrictedUnpickler", "safe_load")
+}
+
+func pyOverbroadRolePermissionGrantItem(item string) bool {
+	switch item {
+	case "viewer_scopes:CONFIG_READ",
+		"viewer_scopes:CONFIG_UPDATE",
+		"viewer_scopes:ADMIN",
+		"read_only_scopes:CONFIG_READ",
+		"read_only_scopes:CONFIG_UPDATE",
+		"guest_scopes:CONFIG_READ",
+		"public_scopes:CONFIG_READ":
+		return true
+	default:
+		return false
+	}
+}
+
 func pyWaterfallReloadOptionUnescaped(compactBody string) bool {
 	if !strings.Contains(compactBody, ".args") {
 		return false
@@ -1218,7 +1338,7 @@ func pyWaterfallReloadOptionUnescaped(compactBody string) bool {
 }
 
 func pyContextCompactUnbounded(raw string) string {
-	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	return pyCompactWhitespace(raw, 0)
 }
 
 func pyCompactContainsAny(compact string, needles ...string) bool {
@@ -1327,11 +1447,53 @@ func pyContextValue(raw string) string {
 }
 
 func pyContextCompact(raw string) string {
-	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
-	if len(s) > 160 {
+	return pyCompactWhitespace(raw, 160)
+}
+
+func pyCompactWhitespace(raw string, maxBytes int) string {
+	if raw == "" {
 		return ""
 	}
-	return s
+	var b strings.Builder
+	changed := false
+	last := 0
+	kept := 0
+	for i := 0; i < len(raw); {
+		r, size := utf8.DecodeRuneInString(raw[i:])
+		if unicode.IsSpace(r) {
+			if !changed {
+				b.Grow(len(raw))
+				changed = true
+			}
+			if i > last {
+				part := raw[last:i]
+				kept += len(part)
+				if maxBytes > 0 && kept > maxBytes {
+					return ""
+				}
+				b.WriteString(part)
+			}
+			i += size
+			last = i
+			continue
+		}
+		i += size
+	}
+	if !changed {
+		if maxBytes > 0 && len(raw) > maxBytes {
+			return ""
+		}
+		return raw
+	}
+	if last < len(raw) {
+		part := raw[last:]
+		kept += len(part)
+		if maxBytes > 0 && kept > maxBytes {
+			return ""
+		}
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
@@ -1341,7 +1503,7 @@ func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string
 		"class_name:" + name,
 		"class_bases=" + strings.Join(bases, ","),
 		body,
-		strings.Join(strings.Fields(body), ""),
+		pyContextCompactUnbounded(body),
 	}
 	for _, base := range bases {
 		if base != "" {
@@ -1372,7 +1534,7 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 
 // clauseBlock returns the lowered statements of a clause's `block` child.
 func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
-	for _, cc := range children(clause) {
+	for _, cc := range c.children(clause) {
 		if cc.Kind() == "block" {
 			return c.block(cc)
 		}
@@ -1382,12 +1544,12 @@ func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
 
 func (c *pyConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range children(n) {
+	for _, ch := range c.children(n) {
 		switch ch.Kind() {
 		case "block":
 			out = append(out, c.block(ch)...)
 		case "elif_clause", "else_clause", "except_clause", "finally_clause", "with_clause":
-			for _, cc := range children(ch) {
+			for _, cc := range c.children(ch) {
 				if cc.Kind() == "block" {
 					out = append(out, c.block(cc)...)
 				}

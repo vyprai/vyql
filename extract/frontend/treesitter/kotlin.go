@@ -15,6 +15,23 @@ type ktConv struct {
 	file             string
 	key              string
 	classParamTokens []string
+	childCache       map[uintptr][]*tree_sitter.Node
+}
+
+func (c *ktConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractKotlin parses Kotlin files into one NIR Program (one module per file).
@@ -45,7 +62,7 @@ func (c *ktConv) text(n *tree_sitter.Node) string {
 
 func (c *ktConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -81,7 +98,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "assignment":
 		left := field(n, "left")
 		if left == nil {
-			if k := namedChildren(n); len(k) > 0 {
+			if k := c.namedChildren(n); len(k) > 0 {
 				left = k[0]
 			}
 		}
@@ -109,7 +126,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// code inside scope functions is actually analyzed (it was being dropped).
 		return append(out, c.trailingLambdaStmts(n)...)
 	case "jump_expression", "return_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
 		return []nir.Stmt{nir.Return{}}
@@ -117,7 +134,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "if_expression":
 		var cond nir.Expr
 		var bodies []*tree_sitter.Node
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			// a then/else body is a `{…}` block or a brace-less control_structure_body; the
 			// first remaining child is the condition. (Only control_structure_body was matched
 			// before, so braced `if (c) { sink(x) }` dropped its body → no CFG region.)
@@ -152,10 +169,10 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 // reassignment mask a live arm's taint).
 func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "when_subject":
-			if k := namedChildren(ch); len(k) > 0 {
+			if k := c.namedChildren(ch); len(k) > 0 {
 				sw.Subject = c.expr(k[len(k)-1])
 			}
 		case "when_entry":
@@ -271,7 +288,7 @@ func isKtStmt(k string) bool {
 // --- node accessors (Kotlin uses positional children more than named fields) ---
 
 func (c *ktConv) declName(n *tree_sitter.Node) string {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "identifier" || ch.Kind() == "type_identifier" {
 			return c.text(ch)
 		}
@@ -280,7 +297,7 @@ func (c *ktConv) declName(n *tree_sitter.Node) string {
 }
 
 func (c *ktConv) classBody(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "class_body" || ch.Kind() == "enum_class_body" {
 			return ch
 		}
@@ -289,7 +306,7 @@ func (c *ktConv) classBody(n *tree_sitter.Node) *tree_sitter.Node {
 }
 
 func (c *ktConv) funcBody(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "function_body" {
 			return ch
 		}
@@ -302,7 +319,7 @@ func (c *ktConv) block(body *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, ch := range namedChildren(body) {
+	for _, ch := range c.namedChildren(body) {
 		if ch.Kind() == "block" || ch.Kind() == "statements" {
 			out = append(out, c.decls(ch)...)
 		} else {
@@ -314,11 +331,11 @@ func (c *ktConv) block(body *tree_sitter.Node) []nir.Stmt {
 
 func (c *ktConv) params(n *tree_sitter.Node) []string {
 	var out []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "function_value_parameters" {
-			for _, p := range namedChildren(ch) {
+			for _, p := range c.namedChildren(ch) {
 				if p.Kind() == "parameter" {
-					for _, id := range namedChildren(p) {
+					for _, id := range c.namedChildren(p) {
 						if id.Kind() == "identifier" {
 							out = append(out, c.text(id))
 							break
@@ -333,16 +350,16 @@ func (c *ktConv) params(n *tree_sitter.Node) []string {
 
 func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
 	out := map[string]string{}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() != "function_value_parameters" {
 			continue
 		}
-		for _, p := range namedChildren(ch) {
+		for _, p := range c.namedChildren(ch) {
 			if p.Kind() != "parameter" {
 				continue
 			}
 			name := ""
-			for _, id := range namedChildren(p) {
+			for _, id := range c.namedChildren(p) {
 				if id.Kind() == "identifier" {
 					name = c.text(id)
 					break
@@ -355,9 +372,9 @@ func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
 }
 
 func (c *ktConv) propName(n *tree_sitter.Node) string {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "variable_declaration" {
-			for _, id := range namedChildren(ch) {
+			for _, id := range c.namedChildren(ch) {
 				if id.Kind() == "identifier" {
 					return c.text(id)
 				}
@@ -368,7 +385,7 @@ func (c *ktConv) propName(n *tree_sitter.Node) string {
 }
 
 func (c *ktConv) propValue(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "variable_declaration", "modifiers", "type_annotation":
 			continue
@@ -380,7 +397,7 @@ func (c *ktConv) propValue(n *tree_sitter.Node) *tree_sitter.Node {
 }
 
 func (c *ktConv) lastExpr(n *tree_sitter.Node) nir.Expr {
-	k := namedChildren(n)
+	k := c.namedChildren(n)
 	if len(k) == 0 {
 		return nir.Const{Loc: c.loc(n)}
 	}
@@ -392,7 +409,7 @@ func (c *ktConv) lastExpr(n *tree_sitter.Node) nir.Expr {
 func (c *ktConv) branchValue(n *tree_sitter.Node) nir.Expr {
 	cur := n
 	for cur != nil {
-		k := namedChildren(cur)
+		k := c.namedChildren(cur)
 		if len(k) == 0 {
 			return nir.Const{Loc: c.loc(cur)}
 		}
@@ -423,11 +440,11 @@ func (c *ktConv) ktAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		if k := m.Kind(); k == "identifier" || k == "type_identifier" {
 			add(c.text(m))
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			deep(ch)
 		}
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "modifiers" {
 			deep(ch)
 		}
@@ -456,9 +473,9 @@ func (c *ktConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		if a.Kind() == "value_argument" {
-			if k := namedChildren(a); len(k) > 0 {
+			if k := c.namedChildren(a); len(k) > 0 {
 				out = append(out, c.expr(k[len(k)-1]))
 			}
 		} else {
@@ -486,18 +503,18 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "real_literal", "character_literal", "long_literal", "hex_literal", "number_literal":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "comparison_expression", "equality_expression":
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) >= 2 {
 			return nir.BinOp{Op: c.opToken(n), Left: c.expr(k[0]), Right: c.expr(k[len(k)-1]), Loc: L}
 		}
 	case "string_literal":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "interpolation" || k == "interpolated_expression" || k == "interpolated_identifier" {
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
-				if len(namedChildren(ch)) == 0 {
+				if len(c.namedChildren(ch)) == 0 {
 					parts = append(parts, nir.Name{ID: c.text(ch), Loc: L})
 				}
 			}
@@ -514,7 +531,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		path := c.dotted(fn)
 		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.valueArgs(n)), Path: path, Method: lastSeg(path), Loc: L}
 	case "indexing_expression":
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(k) > 0 {
 			base = c.expr(k[0])
@@ -527,7 +544,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		l := field(n, "left")
 		r := field(n, "right")
 		if l == nil || r == nil {
-			k := namedChildren(n)
+			k := c.namedChildren(n)
 			if len(k) >= 2 {
 				l, r = k[0], k[len(k)-1]
 			}
@@ -535,12 +552,12 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		// "+" string concat (and Kotlin has no other taint-relevant binary) → Format
 		return nir.Format{Parts: []nir.Expr{c.expr(l), c.expr(r)}, Loc: L}
 	case "parenthesized_expression", "as_expression", "postfix_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
 	case "prefix_expression":
 		var operand nir.Expr = nir.Const{Loc: L}
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			operand = c.expr(k[len(k)-1])
 		}
 		return nir.Unary{Op: c.opToken(n), Operand: operand, Loc: L}
@@ -549,7 +566,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		// values into a Phi (a tainted branch then taints the result).
 		var cond nir.Expr
 		var branches []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "control_structure_body", "block", "statements":
 				branches = append(branches, c.branchValue(ch))
@@ -571,20 +588,20 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: []nir.Expr{cond}, Loc: L}
 	case "elvis_expression":
 		// `a ?: b` — value is `a` unless null, else `b`; merge both as a Phi.
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) == 2 {
 			return nir.Ternary{Cond: c.expr(k[0]), Then: c.expr(k[0]), Else: c.expr(k[1]), Loc: L}
 		}
 		fallthrough
 	case "when_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -592,7 +609,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 
 // navBase/navSuffix split a navigation_expression a.b into base (a) and member (b).
 func (c *ktConv) navBase(n *tree_sitter.Node) *tree_sitter.Node {
-	k := namedChildren(n)
+	k := c.namedChildren(n)
 	if len(k) > 0 {
 		return k[0]
 	}
@@ -600,7 +617,7 @@ func (c *ktConv) navBase(n *tree_sitter.Node) *tree_sitter.Node {
 }
 
 func (c *ktConv) navSuffix(n *tree_sitter.Node) string {
-	k := namedChildren(n)
+	k := c.namedChildren(n)
 	if len(k) >= 2 {
 		return c.text(k[len(k)-1])
 	}
@@ -609,7 +626,7 @@ func (c *ktConv) navSuffix(n *tree_sitter.Node) string {
 
 // callee returns the function part of a call_expression (the child before value_arguments).
 func (c *ktConv) callee(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "value_arguments" || ch.Kind() == "call_suffix" || ch.Kind() == "annotated_lambda" {
 			break
 		}
@@ -619,12 +636,12 @@ func (c *ktConv) callee(n *tree_sitter.Node) *tree_sitter.Node {
 }
 
 func (c *ktConv) valueArgs(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "value_arguments" {
 			return ch
 		}
 		if ch.Kind() == "call_suffix" {
-			for _, s := range namedChildren(ch) {
+			for _, s := range c.namedChildren(ch) {
 				if s.Kind() == "value_arguments" {
 					return s
 				}
@@ -646,7 +663,7 @@ func (c *ktConv) dotted(n *tree_sitter.Node) string {
 	case "call_expression":
 		return c.dotted(c.callee(n))
 	case "indexing_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return c.dotted(k[0]) + "[]"
 		}
 	}

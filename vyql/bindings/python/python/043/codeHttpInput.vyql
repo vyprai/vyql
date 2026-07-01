@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding httpInput43 {
-  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "traceback.format_exc" and args.any.literal contains "<html" and not args.any.literal contains "cgi.escape" and not args.any.literal contains "html.escape" and not args.any.literal contains "markupsafe.escape"
+  query pattern callExpr where callee.analysis ~= "function.context.source" and args.any.literal contains "python_review:traceback_format_exc_html_unescaped"
   emit source code.HttpInput at call.result
 }

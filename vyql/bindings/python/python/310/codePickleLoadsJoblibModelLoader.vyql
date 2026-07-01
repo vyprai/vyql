@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding pickleLoadsJoblibModelLoader310 {
-  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["load", "load_model", "from_pretrained", "restore"]) and node.context.callPath contains "pickle.loads" and node.context.callPath contains "joblib.load" and not (node.context.callPath contains "RestrictedUnpickler") and not (node.context.callPath contains "safe_load")
+  query pattern presenceNode where node.scope == "function" and node.context.pythonReview == "pickle_loads_joblib_model_loader"
   emit issue code.PickleLoadsJoblibModelLoader at node
 }

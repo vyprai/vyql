@@ -1141,7 +1141,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:        prog.Self(),
 		resolveImports:  resolveImports,
 		ctorTypes:       ctorTypes,
-		g:               newGraphStore(0),
+		g:               newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:          map[string]int{},
 		modOrder:        map[string]int{},
 		modBranch:       map[string]int{},
@@ -1160,6 +1160,115 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		derivedChildren: map[string][]string{},
 		membersOfShort:  map[string]map[string]bool{},
 		allMembersMemo:  map[string]map[string]bool{},
+	}
+}
+
+func estimateGraphNodeHint(prog nir.Program) int {
+	hint := len(prog.Modules) * 4
+	for _, m := range prog.Modules {
+		hint += len(m.Imports)
+		hint += estimateStmtListNodes(m.Body)
+	}
+	if hint <= 0 {
+		return 0
+	}
+	return hint + hint/3
+}
+
+func estimateStmtListNodes(stmts []nir.Stmt) int {
+	n := 0
+	for _, st := range stmts {
+		n += estimateStmtNodes(st)
+	}
+	return n
+}
+
+func estimateStmtNodes(st nir.Stmt) int {
+	switch s := st.(type) {
+	case nil:
+		return 0
+	case nir.Assign:
+		return 1 + len(s.Targets) + estimateExprNodes(s.Value)
+	case nir.AugAssign:
+		return 2 + estimateExprNodes(s.Value)
+	case nir.Return:
+		return 1 + estimateExprNodes(s.Value)
+	case nir.ExprStmt:
+		return estimateExprNodes(s.Value)
+	case nir.FuncDef:
+		return 2 + len(s.Params) + len(s.ParamEntries) + len(s.ResultEntries) + estimateStmtListNodes(s.Body)
+	case nir.ClassDef:
+		return 1 + estimateStmtListNodes(s.Body)
+	case nir.Block:
+		return estimateStmtListNodes(s.Stmts)
+	case nir.If:
+		return 2 + estimateExprNodes(s.Cond) + estimateStmtListNodes(s.Then) + estimateStmtListNodes(s.Else)
+	case nir.Loop:
+		return 2 + len(s.Vars) + estimateExprNodes(s.Cond) + estimateExprNodes(s.Iter) + estimateStmtListNodes(s.Body)
+	case nir.Switch:
+		total := 2 + estimateExprNodes(s.Subject) + estimateStmtListNodes(s.Default)
+		for _, labels := range s.Labels {
+			for _, label := range labels {
+				total += estimateExprNodes(label)
+			}
+		}
+		for _, arm := range s.Cases {
+			total += estimateStmtListNodes(arm)
+		}
+		return total
+	case nir.Try:
+		total := 2 + len(s.HandlerParams) + estimateStmtListNodes(s.Body) + estimateStmtListNodes(s.Finally)
+		for _, h := range s.Handlers {
+			total += estimateStmtListNodes(h)
+		}
+		return total
+	default:
+		return 1
+	}
+}
+
+func estimateExprNodes(ex nir.Expr) int {
+	switch e := ex.(type) {
+	case nil:
+		return 0
+	case nir.Name, nir.Const:
+		return 1
+	case nir.Attr:
+		return 1 + estimateExprNodes(e.Base)
+	case nir.Index:
+		return 1 + estimateExprNodes(e.Base) + estimateExprNodes(e.Key)
+	case nir.Call:
+		total := 2 + len(e.Args) + estimateExprNodes(e.Callee)
+		for _, a := range e.Args {
+			total += estimateExprNodes(a)
+		}
+		return total
+	case nir.Format:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Seq:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Pair:
+		return 1 + estimateExprNodes(e.Value)
+	case nir.Lambda:
+		return 2 + len(e.Params) + len(e.ParamEntries) + estimateStmtListNodes(e.Body)
+	case nir.Thru:
+		return estimateExprNodes(e.Inner)
+	case nir.BinOp:
+		return 1 + estimateExprNodes(e.Left) + estimateExprNodes(e.Right)
+	case nir.Unary:
+		return 1 + estimateExprNodes(e.Operand)
+	case nir.Ternary:
+		return 1 + estimateExprNodes(e.Cond) + estimateExprNodes(e.Then) + estimateExprNodes(e.Else)
+	default:
+		return 1
 	}
 }
 
@@ -1223,10 +1332,18 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	return l.nodeWithID(l.nid(kind), kind, loc, props)
 }
 
+func (l *lowerer) nodeInline(kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
+	return l.nodeInlineWithID(l.nid(kind), kind, loc, props, method, calleePath, strArgs, vkind)
+}
+
 // nodeWithID creates a node with an explicit id — used for signature nodes (Param/Return)
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
+	return l.nodeInlineWithID(id, kind, loc, props, "", "", "", "")
+}
+
+func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
 	ord := l.modOrder[l.curNS]
 	l.modOrder[l.curNS]++
 	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
@@ -1235,9 +1352,35 @@ func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) stri
 	if len(props) > 0 {
 		extras = props
 	}
+	if _, ok := l.g.(*usg.IntStore); !ok {
+		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
+	}
 	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
-		Order: int32(ord), HasOrder: true, Props: extras})
+		Order: int32(ord), HasOrder: true, Props: extras,
+		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind})
 	return id
+}
+
+func propsWithInline(props map[string]string, method, calleePath, strArgs, vkind string) map[string]string {
+	if method == "" && calleePath == "" && strArgs == "" && vkind == "" {
+		return props
+	}
+	if props == nil {
+		props = map[string]string{}
+	}
+	if method != "" {
+		props["method"] = method
+	}
+	if calleePath != "" {
+		props["callee_path"] = calleePath
+	}
+	if strArgs != "" {
+		props["str_args"] = strArgs
+	}
+	if vkind != "" {
+		props["vkind"] = vkind
+	}
+	return props
 }
 
 // sigID is the stable, name-derived id of a function's signature node (a Param or Return).
@@ -2597,23 +2740,36 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// e.g. call(input_value).
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
+	if len(call.Args) > 0 {
+		args = make([]string, 0, len(call.Args))
+		argVals = make([]string, 0, len(call.Args))
+	}
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
+	argLitFirst := make([]string, 0, len(call.Args))
 	for _, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink binding applicators can
 		// distinguish a string-building position (Format/Const/Name/...) from a
 		// collection literal (Seq).
-		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
+		an := l.nodeInline("Arg", call.Loc, nil, "", "", "", nirKind(a))
 		l.flow(av, an)
 		args = append(args, an)
-		collectValTokens(a, "", &valToks)
+		var toks []string
+		collectValTokens(a, "", &toks)
 		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
 		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
 		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
+		litFirst := ""
 		if sv, ok := l.constStrVal(a, sc); ok {
-			valToks = append(valToks, sv)
+			litFirst = sv
+			toks = append(toks, sv)
 		}
+		if litFirst == "" && len(toks) > 0 {
+			litFirst = toks[0]
+		}
+		valToks = append(valToks, toks...)
+		argLitFirst = append(argLitFirst, litFirst)
 	}
 	// A bare call to a `from mod import sym` alias is matched by bindings under its
 	// resolved dotted path, so imported binding targets (e.g. `normalize` from
@@ -2633,7 +2789,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	props := map[string]string{"callee_path": calleePath, "method": call.Method}
+	props := make(map[string]string, 2+len(args)+len(argLitFirst)+2)
+	props["callee_path"] = calleePath
+	props["method"] = call.Method
 	if len(valToks) > 0 {
 		props["str_args"] = strings.Join(valToks, "\x00")
 	}
@@ -2642,14 +2800,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	// per-arg literal value (first literal token) — lets a `filter` directive read the
 	// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
-	for i, a := range call.Args {
-		var toks []string
-		collectValTokens(a, "", &toks)
-		if sv, ok := l.constStrVal(a, sc); ok {
-			toks = append([]string{sv}, toks...)
-		}
-		if len(toks) > 0 {
-			props["lit"+strconv.Itoa(i)] = toks[0]
+	for i, first := range argLitFirst {
+		if first != "" {
+			props["lit"+strconv.Itoa(i)] = first
 		}
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,

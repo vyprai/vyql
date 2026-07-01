@@ -21,10 +21,27 @@ import (
 // are modeled as an assignment to their destination argument, and reader
 // functions (fgets/gets/...) seed their destination buffer from the call result.
 type ccConv struct {
-	src  []byte
-	file string
-	key  string
-	lang string
+	src        []byte
+	file       string
+	key        string
+	lang       string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *ccConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -253,7 +270,7 @@ func (c *ccConv) ccLifetimeReleaseReturnObservations(root *tree_sitter.Node) []n
 				}})
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -307,7 +324,7 @@ func (c *ccConv) ccReallocFailureInputFreeObservations(root *tree_sitter.Node) [
 				}})
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -350,7 +367,7 @@ func (c *ccConv) ccMysqlConnectErrorUseAfterFreeObservations(root *tree_sitter.N
 			})
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -631,7 +648,7 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				add("call:" + lastSeg(path))
-				for i, arg := range namedChildren(field(n, "arguments")) {
+				for i, arg := range c.namedChildren(field(n, "arguments")) {
 					if a := atom(arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 						add(fmt.Sprintf("call_arg_at:%s:%d:%s", path, i, a))
@@ -695,7 +712,7 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 				add("literal:" + lit)
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -792,7 +809,7 @@ func (c *ccConv) ccCallPaths(root *tree_sitter.Node) []string {
 				out = append(out, path)
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -802,7 +819,7 @@ func (c *ccConv) ccCallPaths(root *tree_sitter.Node) []string {
 
 func (c *ccConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -813,7 +830,7 @@ func (c *ccConv) objcMethod(n *tree_sitter.Node) (string, []string, *tree_sitter
 	var name string
 	var params []string
 	var body *tree_sitter.Node
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "identifier":
 			if name == "" {
@@ -822,7 +839,7 @@ func (c *ccConv) objcMethod(n *tree_sitter.Node) (string, []string, *tree_sitter
 				name += ":" + c.text(ch)
 			}
 		case "method_parameter":
-			for _, p := range namedChildren(ch) {
+			for _, p := range c.namedChildren(ch) {
 				if p.Kind() == "identifier" {
 					params = append(params, c.text(p))
 				}
@@ -970,7 +987,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		"category_interface", "protocol_declaration", "implementation_definition",
 		"interface_declaration_list", "protocol_declaration_list":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
@@ -1000,7 +1017,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				typeName = lastSeg(c.dotted(t))
 			}
 		}
-		for _, d := range namedChildren(n) {
+		for _, d := range c.namedChildren(n) {
 			switch d.Kind() {
 			case "init_declarator":
 				name := c.declName(field(d, "declarator"))
@@ -1021,13 +1038,13 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
 		return c.exprStmt(kids[0])
 	case "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -1056,14 +1073,14 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *ccConv) ccAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
 	for n != nil && n.Kind() == "parenthesized_expression" {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) != 1 {
 			return "", nil, false
 		}
 		n = kids[0]
 	}
 	if n == nil || n.Kind() != "assignment_expression" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if target, val, ok := c.ccAssignmentExpr(ch); ok {
 				return target, val, true
 			}
@@ -1091,11 +1108,11 @@ func (c *ccConv) vexingCtorArgs(params *tree_sitter.Node) ([]nir.Expr, bool) {
 		return nil, false
 	}
 	var args []nir.Expr
-	for _, p := range namedChildren(params) {
+	for _, p := range c.namedChildren(params) {
 		if p.Kind() != "parameter_declaration" {
 			return nil, false // variadic, optional, etc. — not a clear ctor
 		}
-		kids := namedChildren(p)
+		kids := c.namedChildren(p)
 		// a real parameter has a type plus a declarator (name); a vexing arg is a single
 		// bare identifier/type_identifier standing in for a value reference.
 		if len(kids) != 1 {
@@ -1130,7 +1147,7 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return c.assignmentFallback(left, right)
 	case "call_expression":
 		name := lastSeg(c.dotted(field(inner, "function")))
-		args := namedChildren(field(inner, "arguments"))
+		args := c.namedChildren(field(inner, "arguments"))
 		if len(args) > 0 {
 			if cPropagators[name] {
 				if dst := c.destName(args[0]); dst != "" {
@@ -1229,13 +1246,13 @@ func (c *ccConv) cBranch(b *tree_sitter.Node) []nir.Stmt {
 	switch b.Kind() {
 	case "compound_statement":
 		var out []nir.Stmt
-		for _, st := range namedChildren(b) {
+		for _, st := range c.namedChildren(b) {
 			out = append(out, c.stmt(st)...)
 		}
 		return out
 	case "else_clause":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(b) {
+		for _, ch := range c.namedChildren(b) {
 			out = append(out, c.cBranch(ch)...)
 		}
 		return out
@@ -1255,7 +1272,7 @@ func (c *ccConv) cSwitch(n *tree_sitter.Node) nir.Stmt {
 		for _, cs := range c.cSwitchCases(b) {
 			lv := field(cs, "value")
 			var stmts []nir.Stmt
-			for _, ch := range namedChildren(cs) {
+			for _, ch := range c.namedChildren(cs) {
 				if lv != nil && ch.StartByte() == lv.StartByte() {
 					continue
 				}
@@ -1283,7 +1300,7 @@ func (c *ccConv) cSwitchCases(body *tree_sitter.Node) []*tree_sitter.Node {
 		if n == nil {
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch {
 			case ch.Kind() == "case_statement":
 				out = append(out, ch)
@@ -1323,7 +1340,7 @@ func (c *ccConv) block(block *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, st := range namedChildren(block) {
+	for _, st := range c.namedChildren(block) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -1335,7 +1352,7 @@ func (c *ccConv) params(decl *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(pl) {
+	for _, ch := range c.namedChildren(pl) {
 		if isCParamDecl(ch.Kind()) {
 			if nm := c.declName(field(ch, "declarator")); nm != "" {
 				out = append(out, nm)
@@ -1351,7 +1368,7 @@ func (c *ccConv) paramTypes(decl *tree_sitter.Node) map[string]string {
 	if pl == nil {
 		return out
 	}
-	for _, ch := range namedChildren(pl) {
+	for _, ch := range c.namedChildren(pl) {
 		if isCParamDecl(ch.Kind()) {
 			if nm := c.declName(field(ch, "declarator")); nm != "" {
 				putParamType(out, nm, paramTypeFromField(c, ch))
@@ -1365,7 +1382,7 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 	if pl := field(decl, "parameters"); pl != nil {
 		return pl
 	}
-	for _, ch := range namedChildren(decl) {
+	for _, ch := range c.namedChildren(decl) {
 		if ch.Kind() == "parameter_list" {
 			return ch
 		}
@@ -1423,7 +1440,7 @@ func isCParamDecl(kind string) bool {
 
 func (c *ccConv) objcParamTypes(n *tree_sitter.Node, params []string) map[string]string {
 	out := map[string]string{}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "method_parameter" {
 			name := ""
 			if nm := field(ch, "name"); nm != nil {
@@ -1473,7 +1490,7 @@ func (c *ccConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		out = append(out, c.expr(a))
 	}
 	return out
@@ -1521,7 +1538,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		path := c.dotted(recv) + "." + method
 		var args []nir.Expr
 		// every named child except the receiver and the method selector is an arg
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if sameCNode(ch, recv) || sameCNode(ch, methN) || ch.Kind() == "selector" {
 				continue
 			}
@@ -1533,7 +1550,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "parenthesized_expression", "cast_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "pointer_expression":
@@ -1557,7 +1574,7 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -1634,7 +1651,7 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 				}})
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -1861,7 +1878,7 @@ func (c *ccConv) ccBinarySearchEndpointGuardObservations(fn *tree_sitter.Node) [
 		case "binary_expression":
 			c.ccRecordBinarySearchComparison(n, &comparisons, loGuards, hiGuards)
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -2069,7 +2086,7 @@ func (c *ccConv) ccStructPointerOOBWriteObservations(fn *tree_sitter.Node) []nir
 		case "call_expression":
 			c.ccRecordStructPointerCall(n, writePointers, containedPointers)
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -2110,7 +2127,7 @@ func (c *ccConv) ccPointerDerivedFromReadIndexedBuffer(n *tree_sitter.Node) bool
 
 func (c *ccConv) ccRecordStructPointerCall(n *tree_sitter.Node, writePointers, containedPointers map[string]bool) {
 	path := strings.ToLower(c.dotted(field(n, "function")))
-	args := namedChildren(field(n, "arguments"))
+	args := c.namedChildren(field(n, "arguments"))
 	if strings.Contains(path, "writeint32") && len(args) > 0 {
 		if ptr, ok := c.ccPointerPlusOffsetBase(args[0]); ok {
 			writePointers[ptr] = true
@@ -2156,7 +2173,7 @@ func (c *ccConv) ccExprContainsCallName(n *tree_sitter.Node, needle string) bool
 			found = true
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -2175,7 +2192,7 @@ func (c *ccConv) ccExprContainsSubscript(n *tree_sitter.Node) bool {
 			found = true
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -2212,7 +2229,7 @@ func (c *ccConv) ccSignedLengthUnderflowCopyObservations(fn *tree_sitter.Node) [
 			}
 		case "call_expression":
 			if lastSeg(c.dotted(field(n, "function"))) == "memcpy" {
-				args := namedChildren(field(n, "arguments"))
+				args := c.namedChildren(field(n, "arguments"))
 				if len(args) >= 3 {
 					if out := ccDerefIdentifierText(c, args[2]); out != "" {
 						memcpyLens[out] = true
@@ -2224,7 +2241,7 @@ func (c *ccConv) ccSignedLengthUnderflowCopyObservations(fn *tree_sitter.Node) [
 				guards[input+"\x00"+sizeofText] = true
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -2320,7 +2337,7 @@ func (c *ccConv) ccPythonHashErrorObservations(fn *tree_sitter.Node) []nir.Stmt 
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -2382,7 +2399,7 @@ func (c *ccConv) ccCaseInsensitiveLocalIdentityObservations(fn *tree_sitter.Node
 		}
 		if n.Kind() == "call_expression" {
 			name := strings.ToLower(lastSeg(c.dotted(field(n, "function"))))
-			args := namedChildren(field(n, "arguments"))
+			args := c.namedChildren(field(n, "arguments"))
 			if len(args) >= 2 {
 				switch {
 				case strings.Contains(name, "strcasecmp"):
@@ -2392,7 +2409,7 @@ func (c *ccConv) ccCaseInsensitiveLocalIdentityObservations(fn *tree_sitter.Node
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -4662,7 +4679,7 @@ func (c *ccConv) ccExprShape(n *tree_sitter.Node) string {
 			path = "CALL"
 		}
 		var args []string
-		for _, arg := range namedChildren(field(n, "arguments")) {
+		for _, arg := range c.namedChildren(field(n, "arguments")) {
 			if shape := c.ccExprShape(arg); shape != "" {
 				args = append(args, shape)
 			}
@@ -4685,7 +4702,7 @@ func (c *ccConv) ccExprShape(n *tree_sitter.Node) string {
 		}
 		return left + op + right
 	case "parenthesized_expression", "cast_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.ccExprShape(kids[len(kids)-1])
 		}
 	case "pointer_expression", "unary_expression":
@@ -4790,7 +4807,7 @@ func (c *ccConv) dotted(n *tree_sitter.Node) string {
 	case "subscript_expression":
 		return c.dotted(field(n, "argument")) + "[]"
 	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0])
 		}
 	}

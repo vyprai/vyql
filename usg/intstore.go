@@ -288,6 +288,26 @@ func (s *IntStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
 	}
 }
 
+// RangeNodeIndexes streams dense node indexes with their materialized node payload.
+// It is for hot in-memory analysis paths that need to retain compact references
+// without converting through string ids.
+func (s *IntStore) RangeNodeIndexes(fn func(int32, Node) bool) {
+	for i := range s.ids {
+		idx := int32(i)
+		if !fn(idx, s.nodeAt(idx)) {
+			return
+		}
+	}
+}
+
+// NodeAtIndex returns the node at a dense IntStore index.
+func (s *IntStore) NodeAtIndex(i int32) (Node, bool) {
+	if i < 0 || int(i) >= len(s.ids) {
+		return Node{}, false
+	}
+	return s.nodeAt(i), true
+}
+
 func (s *IntStore) AllNodes() ([]Node, error) {
 	out := make([]Node, len(s.ids))
 	for i := range s.ids {

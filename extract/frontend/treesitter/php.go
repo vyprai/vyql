@@ -15,10 +15,11 @@ import (
 // namespace (module key ""), like Ruby; `echo`/`print`/`include`/`require` are
 // modeled as calls so they can be sinks.
 type phConv struct {
-	src      []byte
-	root     string
-	file     string
-	funcName string
+	src        []byte
+	root       string
+	file       string
+	funcName   string
+	childCache map[uintptr][]*tree_sitter.Node
 }
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
@@ -105,9 +106,25 @@ func (c *phConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
+func (c *phConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
+}
+
 func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	for i, st := range kids {
 		if i > 0 && c.phpOpensShorthandEcho(kids[i-1]) && st.Kind() == "expression_statement" {
 			out = append(out, c.phpEchoExprStmt(st)...)
@@ -191,7 +208,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body = append(body, c.phpClassContext(n, name)...)
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
@@ -199,7 +216,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "echo_statement", "print_intrinsic", "unset_statement":
 		// model echo/print as a sink-able call
 		var args []nir.Expr
-		for _, a := range namedChildren(n) {
+		for _, a := range c.namedChildren(n) {
 			args = append(args, c.expr(a))
 		}
 		name := "echo"
@@ -208,7 +225,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: args, Path: name, Method: name, Loc: L}}}
 	case "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			value := c.expr(kids[0])
 			if phpIsWPListTableColumn(c.funcName) {
@@ -234,7 +251,7 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.collectBlocks(n)
 		bodyNode := field(n, "body")
 		var nonBody []*tree_sitter.Node
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if bodyNode != nil && ch.StartByte() == bodyNode.StartByte() {
 				continue
 			}
@@ -268,7 +285,7 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	switch inner.Kind() {
 	case "print_intrinsic":
 		var args []nir.Expr
-		for _, a := range namedChildren(inner) {
+		for _, a := range c.namedChildren(inner) {
 			args = append(args, c.expr(a))
 		}
 		L := c.loc(inner)
@@ -297,7 +314,7 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		// subscript write ($arr[$k] = v) — emit a synthetic __setitem__ call so lowering can
 		// track constant-key array slots precisely while still tainting whole-array reads.
 		if left != nil && left.Kind() == "subscript_expression" {
-			if kids := namedChildren(left); len(kids) > 0 {
+			if kids := c.namedChildren(left); len(kids) > 0 {
 				base := kids[0]
 				var key nir.Expr = nir.Const{Loc: c.loc(left)}
 				if len(kids) > 1 {
@@ -319,7 +336,7 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
 		// model include/require as a file-inclusion sink call
-		kids := namedChildren(inner)
+		kids := c.namedChildren(inner)
 		var args []nir.Expr
 		if len(kids) > 0 {
 			args = append(args, c.expr(kids[0]))
@@ -331,7 +348,7 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *phConv) phpEchoExprStmt(n *tree_sitter.Node) []nir.Stmt {
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) == 0 {
 		return nil
 	}
@@ -349,7 +366,7 @@ func (c *phConv) phpOpensShorthandEcho(n *tree_sitter.Node) bool {
 	if n == nil || n.Kind() != "text_interpolation" {
 		return false
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "php_tag" && strings.TrimSpace(c.text(ch)) == "<?=" {
 			return true
 		}
@@ -502,7 +519,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 			}
 			add("call_path:" + name)
 			add("call:" + name)
-			for _, arg := range namedChildren(cur) {
+			for _, arg := range c.namedChildren(cur) {
 				argText := phpCompactText(c.text(arg))
 				if argText != "" {
 					add("call_arg:" + name + ":" + argText)
@@ -521,7 +538,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 				add("annotation_text:" + text)
 			}
 			if args := field(cur, "parameters"); args != nil {
-				for _, arg := range namedChildren(args) {
+				for _, arg := range c.namedChildren(args) {
 					argText := phpCompactText(c.text(arg))
 					if argText == "" {
 						continue
@@ -579,7 +596,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 				add("call:" + method)
 			}
 			if args := field(cur, "arguments"); args != nil {
-				for _, arg := range namedChildren(args) {
+				for _, arg := range c.namedChildren(args) {
 					argText := phpCompactText(c.text(arg))
 					if argText == "" {
 						continue
@@ -593,7 +610,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 		case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
 			add("call_path:include")
 			add("call:include")
-			for _, arg := range namedChildren(cur) {
+			for _, arg := range c.namedChildren(cur) {
 				argText := phpCompactText(c.text(arg))
 				if argText == "" {
 					continue
@@ -609,7 +626,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 		case "subscript_expression":
 			add("subscript:" + phpCompactText(c.text(cur)))
 		case "return_statement":
-			kids := namedChildren(cur)
+			kids := c.namedChildren(cur)
 			if len(kids) > 0 {
 				if ret := phpCompactText(c.text(kids[0])); ret != "" {
 					add("return:" + ret)
@@ -625,7 +642,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 				break
 			}
 			add("cast:" + castType)
-			kids := namedChildren(cur)
+			kids := c.namedChildren(cur)
 			if len(kids) == 0 {
 				break
 			}
@@ -641,7 +658,7 @@ func (c *phConv) phpAstContextTokens(n *tree_sitter.Node) []string {
 				}
 			}
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -676,7 +693,7 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 		case "print_intrinsic":
 			calls["print"] = true
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			collectSpecialCalls(ch)
 		}
 	}
@@ -1485,7 +1502,7 @@ func (c *phConv) phpAttributeName(n *tree_sitter.Node) (string, string) {
 	if n == nil || n.Kind() != "attribute" {
 		return "", ""
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "arguments" {
 			continue
 		}
@@ -1544,7 +1561,7 @@ func (c *phConv) phpCallPaths(n *tree_sitter.Node) []string {
 				out = append(out, path)
 			}
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -1574,7 +1591,7 @@ func (c *phConv) phpLiteralTokens(n *tree_sitter.Node) []string {
 		case "string", "encapsed_string", "integer", "float", "boolean", "name", "qualified_name":
 			add(strings.Trim(phpCompactText(c.text(cur)), `"'`))
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -1599,7 +1616,7 @@ func (c *phConv) phpBranch(b *tree_sitter.Node) []nir.Stmt {
 	}
 	if b.Kind() == "compound_statement" {
 		var out []nir.Stmt
-		for _, st := range namedChildren(b) {
+		for _, st := range c.namedChildren(b) {
 			out = append(out, c.stmt(st)...)
 		}
 		return out
@@ -1636,12 +1653,12 @@ func (c *phConv) phpSwitch(n *tree_sitter.Node) nir.Stmt {
 	var deflt []nir.Stmt
 	var pending []nir.Expr
 	if b := field(n, "body"); b != nil {
-		for _, cs := range namedChildren(b) {
+		for _, cs := range c.namedChildren(b) {
 			switch cs.Kind() {
 			case "case_statement":
 				lv := field(cs, "value")
 				var stmts []nir.Stmt
-				for _, ch := range namedChildren(cs) {
+				for _, ch := range c.namedChildren(cs) {
 					if lv != nil && ch.StartByte() == lv.StartByte() {
 						continue
 					}
@@ -1656,7 +1673,7 @@ func (c *phConv) phpSwitch(n *tree_sitter.Node) nir.Stmt {
 					pending = nil
 				}
 			case "default_statement":
-				for _, ch := range namedChildren(cs) {
+				for _, ch := range c.namedChildren(cs) {
 					deflt = append(deflt, c.stmt(ch)...)
 				}
 			}
@@ -1705,12 +1722,12 @@ func (c *phConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "simple_parameter" || ch.Kind() == "variadic_parameter" || ch.Kind() == "property_promotion_parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
 			} else {
-				for _, cc := range namedChildren(ch) {
+				for _, cc := range c.namedChildren(ch) {
 					if cc.Kind() == "variable_name" {
 						out = append(out, c.text(cc))
 						break
@@ -1727,13 +1744,13 @@ func (c *phConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params == nil {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "simple_parameter" || ch.Kind() == "variadic_parameter" || ch.Kind() == "property_promotion_parameter" {
 			name := ""
 			if nm := field(ch, "name"); nm != nil {
 				name = c.text(nm)
 			} else {
-				for _, cc := range namedChildren(ch) {
+				for _, cc := range c.namedChildren(ch) {
 					if cc.Kind() == "variable_name" {
 						name = c.text(cc)
 						break
@@ -1751,9 +1768,9 @@ func (c *phConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		if a.Kind() == "argument" {
-			if k := namedChildren(a); len(k) > 0 {
+			if k := c.namedChildren(a); len(k) > 0 {
 				out = append(out, c.expr(k[len(k)-1]))
 			}
 		} else {
@@ -1811,7 +1828,7 @@ func (c *phConv) foreachVarNames(n *tree_sitter.Node, out *[]string) {
 	case "variable_name":
 		*out = append(*out, c.text(n))
 	case "by_ref", "list_literal", "pair":
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			c.foreachVarNames(ch, out)
 		}
 	}
@@ -1826,7 +1843,7 @@ func (c *phConv) phpInterpolatedParts(n *tree_sitter.Node, out *[]nir.Expr) {
 		*out = append(*out, c.expr(n))
 		return
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		c.phpInterpolatedParts(ch, out)
 	}
 }
@@ -1859,7 +1876,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "member_access_expression":
 		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "name")), Path: c.dotted(n), Loc: L}
 	case "subscript_expression":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
@@ -1884,7 +1901,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "object_creation_expression":
 		var typ string
 		var argsNode *tree_sitter.Node
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "name" || ch.Kind() == "qualified_name" {
 				typ = c.text(ch)
 			}
@@ -1906,20 +1923,20 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary_op_expression":
 		operand := field(n, "operand")
 		if operand == nil {
-			if kids := namedChildren(n); len(kids) > 0 {
+			if kids := c.namedChildren(n); len(kids) > 0 {
 				operand = kids[len(kids)-1]
 			}
 		}
 		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(operand), Loc: L}
 	case "parenthesized_expression", "cast_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "array_creation_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "array_element_initializer" {
-				k := namedChildren(ch)
+				k := c.namedChildren(ch)
 				switch {
 				case len(k) >= 2: // key => value (named-value matching)
 					key := c.keyName(k[0])
@@ -1951,7 +1968,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 			Body: []nir.Stmt{nir.Return{Value: c.expr(field(n, "body"))}}, Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -2011,7 +2028,7 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	case "function_call_expression":
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0])
 		}
 	}

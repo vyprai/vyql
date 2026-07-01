@@ -11,9 +11,10 @@ import (
 
 // rsConv walks a tree-sitter Rust CST into NIR.
 type rsConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -48,11 +49,27 @@ func (c *rsConv) text(n *tree_sitter.Node) string {
 	return string(c.src[n.StartByte():n.EndByte()])
 }
 
+func (c *rsConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
+}
+
 // decls walks a list, tracking preceding attribute_item syntax for the next item.
 func (c *rsConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var attrs []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "attribute_item" {
 			attrs = append(attrs, c.rsAttrTokens(ch)...)
 			continue
@@ -87,7 +104,7 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		if m.Kind() == "attribute" {
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if ch.Kind() == "identifier" || ch.Kind() == "scoped_identifier" {
 					path := c.dotted(ch)
 					add("attr_path:" + path)
@@ -96,7 +113,7 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 			}
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -147,7 +164,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		// `let _ = expr;` binds no name, but the call still matters for sinks/marks.
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(val)}}
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
@@ -249,7 +266,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 		}
 		if m.Kind() == "field_declaration_list" {
 			var pendingAttrs []string
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if ch.Kind() == "attribute_item" {
 					pendingAttrs = append(pendingAttrs, c.rsAttrTokens(ch)...)
 					pendingAttrs = append(pendingAttrs, rsSerdeTokens(c.text(ch))...)
@@ -273,7 +290,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 			}
 			return
 		}
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			walk(ch)
 		}
 	}
@@ -284,7 +301,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pendingAttrs []string) (nir.Stmt, bool) {
 	name := c.text(field(n, "name"))
 	if name == "" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "field_identifier" || ch.Kind() == "identifier" {
 				name = c.text(ch)
 				break
@@ -296,7 +313,7 @@ func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pe
 	}
 	typ := c.text(field(n, "type"))
 	fieldAttrs := append([]string{}, pendingAttrs...)
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "attribute_item" {
 			fieldAttrs = append(fieldAttrs, c.rsAttrTokens(ch)...)
 			fieldAttrs = append(fieldAttrs, rsSerdeTokens(c.text(ch))...)
@@ -551,7 +568,7 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				add("call:" + lastSeg(path))
-				for _, arg := range namedChildren(field(n, "arguments")) {
+				for _, arg := range c.namedChildren(field(n, "arguments")) {
 					if a := atom(arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 					}
@@ -568,7 +585,7 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -785,8 +802,10 @@ func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
 	return nil
 }
 
+var rustCompactTextReplacer = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "")
+
 func rustCompactText(s string) string {
-	return strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(s)
+	return rustCompactTextReplacer.Replace(s)
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
@@ -812,7 +831,7 @@ func (c *rsConv) block(block *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, st := range namedChildren(block) {
+	for _, st := range c.namedChildren(block) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -840,7 +859,7 @@ func (c *rsConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := c.patName(field(ch, "pattern")); nm != "" {
 				out = append(out, nm)
@@ -855,7 +874,7 @@ func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params == nil {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		if ch.Kind() == "parameter" {
 			if nm := c.patName(field(ch, "pattern")); nm != "" {
 				putParamType(out, nm, paramTypeFromField(c, ch))
@@ -872,7 +891,7 @@ func (c *rsConv) patName(p *tree_sitter.Node) string {
 		case "identifier":
 			return c.text(p)
 		case "ref_pattern", "mut_pattern", "reference_pattern":
-			kids := namedChildren(p)
+			kids := c.namedChildren(p)
 			if len(kids) == 0 {
 				return ""
 			}
@@ -889,7 +908,7 @@ func (c *rsConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	var out []nir.Expr
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		out = append(out, c.expr(a))
 	}
 	return out
@@ -912,7 +931,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "field_expression":
 		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
@@ -929,7 +948,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		name := lastSeg(c.dotted(field(n, "macro")))
 		var parts []nir.Expr
 		if tt := lastChildKind(n, "token_tree"); tt != nil {
-			for _, ch := range namedChildren(tt) {
+			for _, ch := range c.namedChildren(tt) {
 				if isRustExprTok(ch.Kind()) {
 					parts = append(parts, c.expr(ch))
 				}
@@ -949,7 +968,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "reference_expression", "try_expression", "await_expression",
 		"parenthesized_expression", "type_cast_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "unary_expression":
@@ -962,7 +981,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		var operand nir.Expr = nir.Const{Loc: L}
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			operand = c.expr(kids[len(kids)-1])
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
@@ -972,7 +991,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		then := c.blockTail(field(n, "consequence"))
 		var els nir.Expr
 		if alt := field(n, "alternative"); alt != nil {
-			if k := namedChildren(alt); len(k) > 0 {
+			if k := c.namedChildren(alt); len(k) > 0 {
 				if k[0].Kind() == "block" {
 					els = c.blockTail(k[0])
 				} else {
@@ -988,7 +1007,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -1061,7 +1080,7 @@ func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.rsIf(alt)}
 	case "else_clause":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(alt) {
+		for _, ch := range c.namedChildren(alt) {
 			out = append(out, c.rsElse(ch)...)
 		}
 		return out
@@ -1077,7 +1096,7 @@ func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
 	if body == nil {
 		return sw
 	}
-	for _, arm := range namedChildren(body) {
+	for _, arm := range c.namedChildren(body) {
 		if arm.Kind() != "match_arm" {
 			continue
 		}
@@ -1088,7 +1107,7 @@ func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
 			continue
 		}
 		label := pat // unwrap match_pattern -> the inner literal so labels are foldable
-		if k := namedChildren(pat); len(k) == 1 {
+		if k := c.namedChildren(pat); len(k) == 1 {
 			label = k[0]
 		}
 		sw.Cases = append(sw.Cases, stmts)
@@ -1113,7 +1132,7 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 	if block == nil || block.Kind() != "block" {
 		return nil
 	}
-	kids := namedChildren(block)
+	kids := c.namedChildren(block)
 	if len(kids) == 0 {
 		return nil
 	}
@@ -1127,7 +1146,7 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 
 func (c *rsConv) blockValues(n *tree_sitter.Node) []nir.Expr {
 	var out []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.expr(ch))
 	}
 	return out
@@ -1156,7 +1175,7 @@ func (c *rsConv) dotted(n *tree_sitter.Node) string {
 	case "generic_type":
 		return c.dotted(field(n, "type"))
 	case "index_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0]) + "[]"
 		}
 	}

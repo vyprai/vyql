@@ -23,6 +23,23 @@ type rbConv struct {
 	root       string
 	file       string
 	visibility string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *rbConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -265,7 +282,7 @@ func (c *rbConv) text(n *tree_sitter.Node) string {
 }
 
 func (c *rbConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
-	return c.rbStmtList(namedChildren(n))
+	return c.rbStmtList(c.namedChildren(n))
 }
 
 func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
@@ -330,7 +347,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if left != nil && left.Kind() == "element_reference" {
 			base := field(left, "object")
 			if base == nil {
-				if kids := namedChildren(left); len(kids) > 0 {
+				if kids := c.namedChildren(left); len(kids) > 0 {
 					base = kids[0]
 				}
 			}
@@ -352,7 +369,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(n, "right"))}}
 	case "return", "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -588,7 +605,7 @@ func (c *rbConv) rbStructuredContextTokens(root *tree_sitter.Node, scope string)
 				add("literal:" + rbCompactText(lit))
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -779,14 +796,14 @@ func (c *rbConv) rbParamEntries(name string, params []string) []nir.ParamEntry {
 
 func (c *rbConv) rbAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
 	for n != nil && n.Kind() == "parenthesized_statements" {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) != 1 {
 			return "", nil, false
 		}
 		n = kids[0]
 	}
 	if n == nil || n.Kind() != "assignment" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if target, val, ok := c.rbAssignmentExpr(ch); ok {
 				return target, val, true
 			}
@@ -819,7 +836,7 @@ func (c *rbConv) rubyBody(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	if n.Kind() == "then" || n.Kind() == "else" || n.Kind() == "body_statement" {
-		return c.rbStmtList(namedChildren(n))
+		return c.rbStmtList(c.namedChildren(n))
 	}
 	return c.stmt(n)
 }
@@ -842,15 +859,15 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 	var cases [][]nir.Stmt
 	var labels [][]nir.Expr
 	var deflt []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "when":
 			var labs []nir.Expr
 			var body []nir.Stmt
-			for _, w := range namedChildren(ch) {
+			for _, w := range c.namedChildren(ch) {
 				switch w.Kind() {
 				case "pattern":
-					if k := namedChildren(w); len(k) > 0 {
+					if k := c.namedChildren(w); len(k) > 0 {
 						labs = append(labs, c.expr(k[0]))
 					}
 				case "then":
@@ -870,7 +887,7 @@ func (c *rbConv) rubyCase(n *tree_sitter.Node) nir.Stmt {
 // (flow-approximate).
 func (c *rbConv) collectBodies(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
 		switch ch.Kind() {
@@ -954,14 +971,14 @@ func (c *rbConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
 			out = append(out, c.text(ch))
 		case "optional_parameter", "keyword_parameter", "splat_parameter", "typed_parameter":
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
-			} else if kids := namedChildren(ch); len(kids) > 0 && kids[0].Kind() == "identifier" {
+			} else if kids := c.namedChildren(ch); len(kids) > 0 && kids[0].Kind() == "identifier" {
 				out = append(out, c.text(kids[0]))
 			}
 		}
@@ -1005,7 +1022,7 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.call(n, L)
 	case "element_reference":
 		var key nir.Expr
-		if kids := namedChildren(n); len(kids) > 1 {
+		if kids := c.namedChildren(n); len(kids) > 1 {
 			key = c.expr(kids[1])
 		}
 		return nir.Index{Base: c.expr(field(n, "object")), Key: key, Path: c.dotted(field(n, "object")), Loc: L}
@@ -1022,18 +1039,18 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary":
 		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(field(n, "operand")), Loc: L}
 	case "parenthesized_statements":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[len(kids)-1])
 		}
 	case "array", "argument_list":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "hash":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "pair" {
 				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
 			}
@@ -1048,7 +1065,7 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.dotted(n)}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -1165,9 +1182,9 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 	var parts []nir.Expr
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		for _, ch := range namedChildren(m) {
+		for _, ch := range c.namedChildren(m) {
 			if ch.Kind() == "interpolation" {
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
 			} else {
@@ -1195,7 +1212,7 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 	}
 	var args []nir.Expr
 	if al := field(n, "arguments"); al != nil {
-		for _, a := range namedChildren(al) {
+		for _, a := range c.namedChildren(al) {
 			args = append(args, c.expr(a))
 		}
 	}
@@ -1230,7 +1247,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 	if b := field(n, "block"); b != nil {
 		blk = b
 	} else {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "block" || k == "do_block" {
 				blk = ch
 				break
@@ -1248,7 +1265,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 				Value: nir.Format{Parts: []nir.Expr{rv}, Loc: c.loc(blk)}})
 		}
 	}
-	for _, ch := range namedChildren(blk) {
+	for _, ch := range c.namedChildren(blk) {
 		switch ch.Kind() {
 		case "block_parameters", "parameters":
 			// bound above
@@ -1264,7 +1281,7 @@ func (c *rbConv) callBlockStmts(n *tree_sitter.Node) []nir.Stmt {
 // blockParams returns the identifier names of a block's |params|.
 func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
 	var bp *tree_sitter.Node
-	for _, ch := range namedChildren(blk) {
+	for _, ch := range c.namedChildren(blk) {
 		if k := ch.Kind(); k == "block_parameters" || k == "parameters" {
 			bp = ch
 			break
@@ -1274,7 +1291,7 @@ func (c *rbConv) blockParams(blk *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(bp) {
+	for _, ch := range c.namedChildren(bp) {
 		if ch.Kind() == "identifier" {
 			out = append(out, c.text(ch))
 		}
