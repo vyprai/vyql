@@ -177,6 +177,10 @@ func NewIntStore(nodeHint int) *IntStore {
 		order:      make([]int32, 0, nodeHint),
 		hasOrder:   make([]bool, 0, nodeHint),
 		scope:      make([]string, 0, nodeHint),
+		method:     make([]string, 0, nodeHint),
+		calleePath: make([]string, 0, nodeHint),
+		strArgs:    make([]string, 0, nodeHint),
+		vkind:      make([]string, 0, nodeHint),
 		props:      make([]map[string]string, 0, nodeHint),
 		out:        make([][]iedge, 0, nodeHint),
 		in:         map[int32][]iedge{},
@@ -186,7 +190,7 @@ func NewIntStore(nodeHint int) *IntStore {
 		typeIDs:    map[string][]string{},
 		byConcept:  map[string][]int32{},
 		conceptHas: map[string]map[int32]bool{},
-		labels:     nil,
+		labels:     make([][]Label, 0, nodeHint),
 	}
 }
 
@@ -211,6 +215,7 @@ func (s *IntStore) intern(id string) int32 {
 	s.props = append(s.props, nil)
 	s.out = append(s.out, nil)
 	s.flowOut = append(s.flowOut, nil)
+	s.labels = append(s.labels, nil)
 	return i
 }
 
@@ -319,9 +324,6 @@ func (s *IntStore) AddFlowEdgeIfPresent(src, dst string) bool {
 
 func (s *IntStore) AddLabel(nodeID string, l Label) error {
 	i := s.intern(nodeID)
-	for int(i) >= len(s.labels) {
-		s.labels = append(s.labels, nil)
-	}
 	s.labels[i] = append(s.labels[i], l)
 	seen := s.conceptHas[l.Concept]
 	if seen == nil {

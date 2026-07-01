@@ -95,6 +95,23 @@ func TestBoundaryValuePredicatesMatchTokenSegments(t *testing.T) {
 	}
 }
 
+func TestLowerStringPreservesSemantics(t *testing.T) {
+	cases := []string{
+		"already-lower\x00tokens",
+		"MixedCASE\x00HTTPInput",
+		"Straße",
+		"ASCII-then-É",
+	}
+	for _, input := range cases {
+		if got, want := lowerString(input), strings.ToLower(input); got != want {
+			t.Fatalf("lowerString(%q)=%q want %q", input, got, want)
+		}
+	}
+	if got := lowerString("already-lower"); got != "already-lower" {
+		t.Fatalf("lowerString should leave lowercase ASCII unchanged, got %q", got)
+	}
+}
+
 func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	tokens := "function_name:validateRedirect\x00literal:/admin.html"
 	if !contextTokenValuePredicate("starts_with", []string{"function_name:validate"}, tokens) {
