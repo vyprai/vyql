@@ -58,6 +58,33 @@ var inlinedPropKeys = map[string]bool{
 	"method": true, "callee_path": true, "str_args": true, "vkind": true,
 }
 
+var (
+	argPropKeys = [...]string{
+		"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7",
+		"arg8", "arg9", "arg10", "arg11", "arg12", "arg13", "arg14", "arg15",
+	}
+	litPropKeys = [...]string{
+		"lit0", "lit1", "lit2", "lit3", "lit4", "lit5", "lit6", "lit7",
+		"lit8", "lit9", "lit10", "lit11", "lit12", "lit13", "lit14", "lit15",
+	}
+)
+
+// ArgPropKey returns the canonical property key for the i-th call argument.
+func ArgPropKey(i int) string {
+	if uint(i) < uint(len(argPropKeys)) {
+		return argPropKeys[i]
+	}
+	return "arg" + strconv.Itoa(i)
+}
+
+// LitPropKey returns the canonical property key for the i-th literal call argument.
+func LitPropKey(i int) string {
+	if uint(i) < uint(len(litPropKeys)) {
+		return litPropKeys[i]
+	}
+	return "lit" + strconv.Itoa(i)
+}
+
 // PropsOnlyInlined reports whether every key in m is one a store copies into an inline Node
 // field, so the store can drop the map entirely after copying the values into columns.
 func PropsOnlyInlined(m map[string]string) bool {

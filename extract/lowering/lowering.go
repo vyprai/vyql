@@ -2767,12 +2767,21 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
 	if len(call.Args) > 0 {
-		args = make([]string, 0, len(call.Args))
-		argVals = make([]string, 0, len(call.Args))
+		var argsBuf [4]string
+		var argValsBuf [4]string
+		if len(call.Args) <= len(argsBuf) {
+			args = argsBuf[:0]
+			argVals = argValsBuf[:0]
+		} else {
+			args = make([]string, 0, len(call.Args))
+			argVals = make([]string, 0, len(call.Args))
+		}
 	}
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
-	argLitFirst := make([]string, 0, len(call.Args))
-	for _, a := range call.Args {
+	var argLitFirst []string
+	var argLitFirstBuf [4]string
+	litCount := 0
+	for argIndex, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink binding applicators can
@@ -2797,7 +2806,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			litFirst = toks[0]
 		}
 		valToks = append(valToks, toks...)
-		argLitFirst = append(argLitFirst, litFirst)
+		if litFirst != "" {
+			if argLitFirst == nil {
+				if len(call.Args) <= len(argLitFirstBuf) {
+					argLitFirst = argLitFirstBuf[:len(call.Args)]
+				} else {
+					argLitFirst = make([]string, len(call.Args))
+				}
+			}
+			argLitFirst[argIndex] = litFirst
+			litCount++
+		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by bindings under its
 	// resolved dotted path, so imported binding targets (e.g. `normalize` from
@@ -2838,11 +2857,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		recvType = l.recvType(recvNode)
 	}
 	propCount := len(args)
-	for _, first := range argLitFirst {
-		if first != "" {
-			propCount++
-		}
-	}
+	propCount += litCount
 	if recvNode != "" {
 		propCount++
 	}
@@ -2853,13 +2868,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if propCount > 0 {
 		props = make(map[string]string, propCount)
 		for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
-			props["arg"+strconv.Itoa(i)] = a
+			props[usg.ArgPropKey(i)] = a
 		}
 		// per-arg literal value (first literal token) — lets a `filter` directive read the
 		// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
 		for i, first := range argLitFirst {
 			if first != "" {
-				props["lit"+strconv.Itoa(i)] = first
+				props[usg.LitPropKey(i)] = first
 			}
 		}
 		if recvNode != "" {
@@ -2940,7 +2955,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
 	}
-	mapped := make([]bool, len(args))
+	var mapped []bool
+	if len(args) > 0 {
+		var mappedBuf [4]bool
+		if len(args) <= len(mappedBuf) {
+			mapped = mappedBuf[:len(args)]
+		} else {
+			mapped = make([]bool, len(args))
+		}
+	}
 	for _, target := range targets {
 		if dynamicCallback {
 			for i, a := range args {

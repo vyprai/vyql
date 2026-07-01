@@ -1762,7 +1762,7 @@ func nodeDirectValueTokens(n usg.Node) string {
 
 func callArgCount(n usg.Node) int {
 	for i := 0; ; i++ {
-		if n.Prop("arg"+strconv.Itoa(i)) == "" {
+		if n.Prop(usg.ArgPropKey(i)) == "" {
 			return i
 		}
 	}
