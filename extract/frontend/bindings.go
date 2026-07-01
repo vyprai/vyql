@@ -313,7 +313,22 @@ func valCondsLowerNeedles(lowerTokens string, valsLower, nvalsLower []string) bo
 	return true
 }
 
+func valCondsFoldedNeedles(tokens string, valsLower, nvalsLower []string) bool {
+	for _, v := range valsLower {
+		if !valContainsFoldedNeedle(tokens, v) {
+			return false
+		}
+	}
+	for _, nv := range nvalsLower {
+		if valContainsFoldedNeedle(tokens, nv) {
+			return false
+		}
+	}
+	return true
+}
+
 type valueTokenCache struct {
+	shared              *flagMatchIndex
 	textLower           map[string]string
 	strArgsLower        map[string]string
 	directLower         map[string]string
@@ -324,9 +339,19 @@ type valueTokenCache struct {
 	directLowerContains map[string]bool
 }
 
+func newValueTokenCache(s usg.Store) *valueTokenCache {
+	if s == nil {
+		return &valueTokenCache{}
+	}
+	return &valueTokenCache{shared: sharedFlagIndex(s)}
+}
+
 func (c *valueTokenCache) lowerText(text string) string {
 	if text == "" {
 		return ""
+	}
+	if c != nil && c.shared != nil {
+		return c.shared.lowerTextValue(text)
 	}
 	if c.textLower == nil {
 		c.textLower = map[string]string{}
@@ -2606,7 +2631,7 @@ func (spec bindingSpec) advisoryNeutralizerApplicator() bindings.Applicator {
 				valAbsentsLower[i] = lowerStrings(spec.AdvisoryNeutralizers[i].ValAbsents)
 			}
 			var out []bindings.Mapping
-			valCache := &valueTokenCache{}
+			valCache := newValueTokenCache(s)
 			scopeIdx := sharedFlagIndex(s)
 			scopeIdx.rangeTechNodes(s, spec.Technology, spec.crossLang, func(n usg.Node) bool {
 				id := n.ID
@@ -3177,7 +3202,7 @@ func (spec bindingSpec) sourceApplicator() bindings.Applicator {
 				valAbsentsLower[i] = lowerStrings(spec.Inputs[i].ValAbsents)
 			}
 			var out []bindings.Mapping
-			valCache := &valueTokenCache{}
+			valCache := newValueTokenCache(s)
 			needsScope := inputSpecsNeedScope(spec.Inputs)
 			var scopeIdx *flagMatchIndex
 			if needsScope {
@@ -3306,7 +3331,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 				sinkProgress.Last = sinkProgress.Start
 			}
 			var out []bindings.Mapping
-			valCache := &valueTokenCache{}
+			valCache := newValueTokenCache(s)
 			flowIdx := sharedFlowIndex(s)
 			var collectionIdx collectionFlowIndex
 			needsScope := sinkSpecsNeedScope(spec.Sinks)
@@ -3681,7 +3706,7 @@ func (spec bindingSpec) checkApplicator() bindings.Applicator {
 				valAbsentsLower[i] = lowerStrings(spec.Controls[i].ValAbsents)
 			}
 			var out []bindings.Mapping
-			valCache := &valueTokenCache{}
+			valCache := newValueTokenCache(s)
 			var collectionIdx collectionFlowIndex
 			needsScope := controlSpecsNeedScope(spec.Controls)
 			var scopeIdx *flagMatchIndex
@@ -6541,10 +6566,7 @@ func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []s
 	if len(values) == 0 {
 		return false
 	}
-	match := strings.HasPrefix
-	if op == "ends_with" {
-		match = strings.HasSuffix
-	}
+	suffix := op == "ends_with"
 	if len(values) == 1 {
 		prefix, want, ok := splitContextTokenPredicateValue(values[0])
 		if !ok {
@@ -6557,7 +6579,7 @@ func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []s
 			}
 		}
 		return contextTokenValueMatch(text, prefix, func(got string) bool {
-			return match(lowerString(got), wantLower)
+			return foldedBoundaryMatch(got, wantLower, suffix)
 		})
 	}
 	tokens := contextTokensByPrefix(text)
@@ -6573,7 +6595,7 @@ func contextTokenBoundaryPredicateLowerValues(op string, values, valuesLower []s
 			}
 		}
 		for _, got := range tokens[prefix] {
-			if match(lowerString(got), wantLower) {
+			if foldedBoundaryMatch(got, wantLower, suffix) {
 				return true
 			}
 		}
@@ -6659,7 +6681,7 @@ func contextTokenContainsLower(prefix, got, want, wantLower string) bool {
 	if prefix == "class_base:" {
 		return classBaseTokenMatches(got, want)
 	}
-	return valContainsLowerNeedle(lowerString(got), wantLower)
+	return valContainsFoldedNeedle(got, wantLower)
 }
 
 func classBaseTokenMatches(got, want string) bool {
@@ -6713,7 +6735,7 @@ func valuePredicateLowerValues(op string, values, valuesLower []string, text str
 		if len(values) == 0 {
 			return text != ""
 		}
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
+		return textTokenBoundaryPredicate(valuesLower, text, false)
 	case "equals":
 		for _, v := range values {
 			if text == v {
@@ -6724,19 +6746,18 @@ func valuePredicateLowerValues(op string, values, valuesLower []string, text str
 	case "equals_any":
 		return containsStr(values, text)
 	case "contains_any":
-		lowerText := lowerString(text)
 		for _, v := range valuesLower {
-			if valContainsLowerNeedle(lowerText, v) {
+			if valContainsFoldedNeedle(text, v) {
 				return true
 			}
 		}
 		return false
 	case "starts_with":
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
+		return textTokenBoundaryPredicate(valuesLower, text, false)
 	case "ends_with":
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasSuffix)
+		return textTokenBoundaryPredicate(valuesLower, text, true)
 	default:
-		return valCondsLowerNeedles(lowerString(text), valuesLower, nil)
+		return valCondsFoldedNeedles(text, valuesLower, nil)
 	}
 }
 
@@ -6746,7 +6767,7 @@ func valuePredicateLowerValuesWithLowerText(op string, values, valuesLower []str
 		if len(values) == 0 {
 			return text != ""
 		}
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
+		return textTokenBoundaryPredicate(valuesLower, text, false)
 	case "equals":
 		for _, v := range values {
 			if text == v {
@@ -6764,15 +6785,15 @@ func valuePredicateLowerValuesWithLowerText(op string, values, valuesLower []str
 		}
 		return false
 	case "starts_with":
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasPrefix)
+		return textTokenBoundaryPredicate(valuesLower, text, false)
 	case "ends_with":
-		return textTokenBoundaryPredicate(valuesLower, text, strings.HasSuffix)
+		return textTokenBoundaryPredicate(valuesLower, text, true)
 	default:
 		return valCondsLowerNeedles(lowerText, valuesLower, nil)
 	}
 }
 
-func textTokenBoundaryPredicate(valuesLower []string, text string, match func(string, string) bool) bool {
+func textTokenBoundaryPredicate(valuesLower []string, text string, suffix bool) bool {
 	if len(valuesLower) == 0 {
 		return false
 	}
@@ -6786,14 +6807,60 @@ func textTokenBoundaryPredicate(valuesLower []string, text string, match func(st
 			tok = text[start : start+end]
 			start += end + 1
 		}
-		lowerTok := lowerString(tok)
 		for _, value := range valuesLower {
-			if match(lowerTok, value) {
+			if foldedBoundaryMatch(tok, value, suffix) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func foldedBoundaryMatch(text, lowerWant string, suffix bool) bool {
+	if lowerWant == "" {
+		return true
+	}
+	if len(lowerWant) > len(text) {
+		return false
+	}
+	for i := 0; i < len(lowerWant); i++ {
+		if lowerWant[i] >= 0x80 {
+			lowerText := lowerString(text)
+			if suffix {
+				return strings.HasSuffix(lowerText, lowerWant)
+			}
+			return strings.HasPrefix(lowerText, lowerWant)
+		}
+	}
+	if suffix {
+		offset := len(text) - len(lowerWant)
+		for i := 0; i < len(lowerWant); i++ {
+			ch := text[offset+i]
+			if ch >= 0x80 {
+				return strings.HasSuffix(lowerString(text), lowerWant)
+			}
+			if ch >= 'A' && ch <= 'Z' {
+				ch += 'a' - 'A'
+			}
+			if ch != lowerWant[i] {
+				return false
+			}
+		}
+		return true
+	}
+	for i := 0; i < len(lowerWant); i++ {
+		ch := text[i]
+		if ch >= 0x80 {
+			return strings.HasPrefix(lowerString(text), lowerWant)
+		}
+		if ch >= 'A' && ch <= 'Z' {
+			ch += 'a' - 'A'
+		}
+		if ch != lowerWant[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func nodeSearchText(n usg.Node) string {
@@ -6857,7 +6924,7 @@ func (spec bindingSpec) matchPresenceApplicator() bindings.Applicator {
 			if needsScope {
 				scopeIdx = sharedFlagIndex(s)
 			}
-			valCache := &valueTokenCache{}
+			valCache := newValueTokenCache(s)
 			rangeMarks := func(fn func(usg.Node) bool) {
 				if needsScope {
 					scopeIdx.rangeTechNodes(s, spec.Technology, crossLang, fn, nodeTypes...)

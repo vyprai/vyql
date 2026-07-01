@@ -42,9 +42,109 @@ type IntStore struct {
 func (s *IntStore) StructEpoch() uint64 { return s.epoch }
 
 type iedge struct {
-	typ   string
+	typ   edgeTypeID
 	dst   int32
 	props map[string]string
+}
+
+type edgeTypeID uint16
+
+const (
+	edgeTypeUnknown edgeTypeID = iota
+	edgeTypeFlows
+	edgeTypeProtects
+	edgeTypeChecks
+	edgeTypeControl
+	edgeTypeStep
+	edgeTypeNet
+	edgeTypeDependsOn
+)
+
+var (
+	dynamicEdgeTypeMu     sync.RWMutex
+	dynamicEdgeTypeNext   edgeTypeID = 100
+	dynamicEdgeTypeByName            = map[string]edgeTypeID{}
+	dynamicEdgeTypeNames             = map[edgeTypeID]string{}
+)
+
+func knownEdgeTypeID(name string) (edgeTypeID, bool) {
+	switch name {
+	case "FLOWS":
+		return edgeTypeFlows, true
+	case "PROTECTS":
+		return edgeTypeProtects, true
+	case "CHECKS":
+		return edgeTypeChecks, true
+	case "CONTROL":
+		return edgeTypeControl, true
+	case "STEP":
+		return edgeTypeStep, true
+	case "NET":
+		return edgeTypeNet, true
+	case "DEPENDS_ON":
+		return edgeTypeDependsOn, true
+	default:
+		return edgeTypeUnknown, false
+	}
+}
+
+func edgeTypeIDFor(name string) edgeTypeID {
+	if id, ok := knownEdgeTypeID(name); ok {
+		return id
+	}
+	dynamicEdgeTypeMu.RLock()
+	id, ok := dynamicEdgeTypeByName[name]
+	dynamicEdgeTypeMu.RUnlock()
+	if ok {
+		return id
+	}
+	dynamicEdgeTypeMu.Lock()
+	defer dynamicEdgeTypeMu.Unlock()
+	if id, ok := dynamicEdgeTypeByName[name]; ok {
+		return id
+	}
+	id = dynamicEdgeTypeNext
+	dynamicEdgeTypeNext++
+	dynamicEdgeTypeByName[name] = id
+	dynamicEdgeTypeNames[id] = name
+	return id
+}
+
+func edgeTypeName(id edgeTypeID) string {
+	switch id {
+	case edgeTypeFlows:
+		return "FLOWS"
+	case edgeTypeProtects:
+		return "PROTECTS"
+	case edgeTypeChecks:
+		return "CHECKS"
+	case edgeTypeControl:
+		return "CONTROL"
+	case edgeTypeStep:
+		return "STEP"
+	case edgeTypeNet:
+		return "NET"
+	case edgeTypeDependsOn:
+		return "DEPENDS_ON"
+	}
+	dynamicEdgeTypeMu.RLock()
+	name := dynamicEdgeTypeNames[id]
+	dynamicEdgeTypeMu.RUnlock()
+	return name
+}
+
+func edgeTypeMatches(id edgeTypeID, want string) bool {
+	if want == "" {
+		return true
+	}
+	if wantID, ok := knownEdgeTypeID(want); ok {
+		return id == wantID
+	}
+	return edgeTypeName(id) == want
+}
+
+func edgeTypeInIndexed(id edgeTypeID) bool {
+	return id == edgeTypeFlows || id == edgeTypeProtects || id == edgeTypeChecks
 }
 
 // IntGraph is the int-indexed fast path for hot-loop analysis (taint/reach): nodes are addressed
@@ -179,9 +279,10 @@ func (s *IntStore) removeFromType(t string, i int32) {
 
 func (s *IntStore) AddEdge(e Edge) error {
 	si, di := s.intern(e.Src), s.intern(e.Dst)
-	s.out[si] = append(s.out[si], iedge{typ: e.Type, dst: di, props: e.Props})
-	if inIndexedTypes[e.Type] {
-		s.in[di] = append(s.in[di], iedge{typ: e.Type, dst: si, props: e.Props})
+	typ := edgeTypeIDFor(e.Type)
+	s.out[si] = append(s.out[si], iedge{typ: typ, dst: di, props: e.Props})
+	if edgeTypeInIndexed(typ) {
+		s.in[di] = append(s.in[di], iedge{typ: typ, dst: si, props: e.Props})
 	}
 	s.epoch = nextStructEpoch()
 	return nil
@@ -221,8 +322,8 @@ func (s *IntStore) OutEdges(src, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	for _, e := range s.out[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: src, Dst: s.ids[e.dst], Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: src, Dst: s.ids[e.dst], Props: e.props})
 		}
 	}
 	return out, nil
@@ -235,8 +336,8 @@ func (s *IntStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	for _, e := range s.in[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: s.ids[e.dst], Dst: dst, Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: s.ids[e.dst], Dst: dst, Props: e.props})
 		}
 	}
 	return out, nil
@@ -248,7 +349,7 @@ func (s *IntStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) 
 		return
 	}
 	for _, e := range s.in[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(s.ids[e.dst]) {
 				return
 			}
@@ -342,7 +443,7 @@ func (s *IntStore) RangeOutEdges(src, edgeType string, fn func(dst string) bool)
 		return
 	}
 	for _, e := range s.out[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(s.ids[e.dst]) {
 				return
 			}
@@ -373,7 +474,7 @@ func (s *IntStore) RangeOut(src int32, edgeType string, fn func(dst int32) bool)
 		return
 	}
 	for _, e := range s.out[src] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(e.dst) {
 				return
 			}

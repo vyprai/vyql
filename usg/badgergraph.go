@@ -152,9 +152,10 @@ func (g *BadgerGraph) AddEdge(e Edge) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	si, di := g.intern(e.Src), g.intern(e.Dst)
-	g.out[si] = append(g.out[si], iedge{typ: e.Type, dst: di, props: e.Props})
-	if inIndexedTypes[e.Type] {
-		g.in[di] = append(g.in[di], iedge{typ: e.Type, dst: si, props: e.Props})
+	typ := edgeTypeIDFor(e.Type)
+	g.out[si] = append(g.out[si], iedge{typ: typ, dst: di, props: e.Props})
+	if edgeTypeInIndexed(typ) {
+		g.in[di] = append(g.in[di], iedge{typ: typ, dst: si, props: e.Props})
 	}
 	return nil
 }
@@ -255,8 +256,8 @@ func (g *BadgerGraph) OutEdges(src, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: src, Dst: g.ids[e.dst], Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: src, Dst: g.ids[e.dst], Props: e.props})
 		}
 	}
 	return out, nil
@@ -269,8 +270,8 @@ func (g *BadgerGraph) InEdges(dst, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	for _, e := range g.in[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: g.ids[e.dst], Dst: dst, Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: g.ids[e.dst], Dst: dst, Props: e.props})
 		}
 	}
 	return out, nil
@@ -282,7 +283,7 @@ func (g *BadgerGraph) RangeInEdges(dst, edgeType string, fn func(src string) boo
 		return
 	}
 	for _, e := range g.in[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(g.ids[e.dst]) {
 				return
 			}
@@ -432,7 +433,7 @@ func (g *BadgerGraph) RangeOut(src int32, edgeType string, fn func(dst int32) bo
 		return
 	}
 	for _, e := range g.out[src] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(e.dst) {
 				return
 			}
@@ -446,7 +447,7 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 		return
 	}
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(g.ids[e.dst]) {
 				return
 			}
