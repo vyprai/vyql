@@ -1363,13 +1363,24 @@ func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string
 	if len(props) > 0 {
 		extras = props
 	}
-	if _, ok := l.g.(*usg.IntStore); !ok {
+	if !storeUsesInlineNodeProps(l.g) {
 		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
 	}
 	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
 		Order: int32(ord), HasOrder: true, Props: extras,
 		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind})
 	return id
+}
+
+func storeUsesInlineNodeProps(s usg.Store) bool {
+	switch st := s.(type) {
+	case *usg.IntStore:
+		return true
+	case *recordingStore:
+		return storeUsesInlineNodeProps(st.Store)
+	default:
+		return false
+	}
 }
 
 func propsWithInline(props map[string]string, method, calleePath, strArgs, vkind string) map[string]string {
@@ -2804,25 +2815,14 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	props := make(map[string]string, 2+len(args)+len(argLitFirst)+2)
-	props["callee_path"] = calleePath
-	props["method"] = call.Method
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
-	}
-	for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
-		props["arg"+strconv.Itoa(i)] = a
-	}
-	// per-arg literal value (first literal token) — lets a `filter` directive read the
-	// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
-	for i, first := range argLitFirst {
-		if first != "" {
-			props["lit"+strconv.Itoa(i)] = first
-		}
+		strArgs = strings.Join(valToks, "\x00")
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
 	// stamp recv_type so type-constrained sink binding applicators can reason about it.
 	var recvNode string
+	var recvType string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
@@ -2833,14 +2833,41 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 		recvNode = l.eval(attr.Base, sc)
+		recvType = l.recvType(recvNode)
+	}
+	propCount := len(args)
+	for _, first := range argLitFirst {
+		if first != "" {
+			propCount++
+		}
+	}
+	if recvNode != "" {
+		propCount++
+	}
+	if recvType != "" {
+		propCount++
+	}
+	var props map[string]string
+	if propCount > 0 {
+		props = make(map[string]string, propCount)
+		for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
+			props["arg"+strconv.Itoa(i)] = a
+		}
+		// per-arg literal value (first literal token) — lets a `filter` directive read the
+		// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
+		for i, first := range argLitFirst {
+			if first != "" {
+				props["lit"+strconv.Itoa(i)] = first
+			}
+		}
 		if recvNode != "" {
 			props["recv"] = recvNode
 		}
-		if t := l.recvType(recvNode); t != "" {
-			props["recv_type"] = t
+		if recvType != "" {
+			props["recv_type"] = recvType
 		}
 	}
-	result := l.node("Call", call.Loc, props)
+	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
 	if recvNode != "" { // receiver taint (chained calls)
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
