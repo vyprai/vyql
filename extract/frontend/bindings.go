@@ -6327,37 +6327,41 @@ func flagContextTokenValuePredicateWithLowerText(pred flagPredicate, text, lower
 }
 
 func flagContextTokenValuePredicateCached(idx *flagMatchIndex, pred flagPredicate, text string) bool {
-	return contextTokenValuePredicateLowerValuesWithCache(pred.Op, pred.Values, pred.lowerValues(), text, idx.lowerTextValue(text), idx.contextFacts(text))
+	return contextTokenValuePredicateLowerValuesWithCache(pred.Op, pred.Values, pred.lowerValues(), text, idx)
 }
 
 func contextTokenValuePredicateLowerValues(op string, values, valuesLower []string, text string) bool {
 	return contextTokenValuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerString(text))
 }
 
-func contextTokenValuePredicateLowerValuesWithCache(op string, values, valuesLower []string, text, lowerText string, facts *contextTokenFacts) bool {
-	if facts == nil {
-		return contextTokenValuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText)
-	}
+func contextTokenValuePredicateLowerValuesWithCache(op string, values, valuesLower []string, text string, idx *flagMatchIndex) bool {
 	if op == "exists" {
+		facts := idx.contextFacts(text)
 		return contextTokenExistsPredicateCached(values, text, facts)
 	}
 	if op == "equals" || op == "equals_any" {
+		facts := idx.contextFacts(text)
 		if contextTokenEqualsPredicateCached(op, values, text, facts) {
 			return true
 		}
+		return valuePredicateLowerValues(op, values, valuesLower, text)
 	}
 	if op == "contains" || op == "" || op == "contains_any" {
+		lowerText := idx.lowerTextValue(text)
 		if valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText) {
 			return true
 		}
+		facts := idx.contextFacts(text)
 		return contextTokenContainsPredicateCached(op, values, valuesLower, facts)
 	}
 	if op == "starts_with" || op == "ends_with" {
+		facts := idx.contextFacts(text)
 		if contextTokenBoundaryPredicateCached(op, values, valuesLower, facts) {
 			return true
 		}
+		return valuePredicateLowerValues(op, values, valuesLower, text)
 	}
-	return valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, lowerText)
+	return valuePredicateLowerValuesWithLowerText(op, values, valuesLower, text, idx.lowerTextValue(text))
 }
 
 func contextTokenValuePredicateLowerValuesWithLowerText(op string, values, valuesLower []string, text, lowerText string) bool {
