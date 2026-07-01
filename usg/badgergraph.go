@@ -42,7 +42,7 @@ type BadgerGraph struct {
 	out        [][]iedge
 	in         map[int32][]iedge
 	flowOut    [][]int32
-	flowIn     map[int32][]int32
+	flowIn     [][]int32
 	labels     [][]Label
 	byType     map[string][]int32
 	byConcept  map[string][]int32
@@ -95,7 +95,7 @@ func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 func NewBadgerGraphDB(db *badger.DB, owned bool) *BadgerGraph {
 	return &BadgerGraph{
 		db: db, owned: owned,
-		idx: map[string]int32{}, in: map[int32][]iedge{}, flowIn: map[int32][]int32{},
+		idx: map[string]int32{}, in: map[int32][]iedge{},
 		byType: map[string][]int32{}, byConcept: map[string][]int32{},
 		conceptHas: map[string]map[int32]bool{}, detBuf: map[int32][]byte{},
 	}
@@ -110,6 +110,7 @@ func (g *BadgerGraph) intern(id string) int32 {
 	g.ids = append(g.ids, id)
 	g.out = append(g.out, nil)
 	g.flowOut = append(g.flowOut, nil)
+	g.flowIn = append(g.flowIn, nil)
 	g.labels = append(g.labels, nil)
 	return i
 }

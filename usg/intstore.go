@@ -28,7 +28,7 @@ type IntStore struct {
 	out     [][]iedge         // index -> outgoing non-compact edges
 	in      map[int32][]iedge // reverse non-compact edges, ONLY for inIndexedTypes (sparse)
 	flowOut [][]int32         // compact prop-less FLOWS adjacency
-	flowIn  map[int32][]int32 // compact prop-less reverse FLOWS adjacency
+	flowIn  [][]int32         // compact prop-less reverse FLOWS adjacency
 
 	byType     map[string][]int32
 	typeIDs    map[string][]string
@@ -185,7 +185,7 @@ func NewIntStore(nodeHint int) *IntStore {
 		out:        make([][]iedge, 0, nodeHint),
 		in:         map[int32][]iedge{},
 		flowOut:    make([][]int32, 0, nodeHint),
-		flowIn:     map[int32][]int32{},
+		flowIn:     make([][]int32, 0, nodeHint),
 		byType:     map[string][]int32{},
 		typeIDs:    map[string][]string{},
 		byConcept:  map[string][]int32{},
@@ -215,6 +215,7 @@ func (s *IntStore) intern(id string) int32 {
 	s.props = append(s.props, nil)
 	s.out = append(s.out, nil)
 	s.flowOut = append(s.flowOut, nil)
+	s.flowIn = append(s.flowIn, nil)
 	s.labels = append(s.labels, nil)
 	return i
 }
