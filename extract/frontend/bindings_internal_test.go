@@ -239,24 +239,24 @@ func TestFlagContextOnlyPredicateChoosesSelectivePlainContextToken(t *testing.T)
 	if got := pyCallPred.Values[0]; got != "call_path:LOG.debug" {
 		t.Fatalf("expected python call_path prefilter, got %q", got)
 	}
-	if !flagContextOnlyPredicateMaybePresent(pred, "lang=python\x00python_review:archive_symlink_filter_bypass", "lang=python\x00python_review:archive_symlink_filter_bypass") {
+	if !flagContextOnlyPredicateMaybePresent(pred, "lang=python\x00python_review:archive_symlink_filter_bypass") {
 		t.Fatal("present context-only predicate should pass the prefilter")
 	}
-	if flagContextOnlyPredicateMaybePresent(pred, "lang=python", "lang=python") {
+	if flagContextOnlyPredicateMaybePresent(pred, "lang=python") {
 		t.Fatal("absent context-only predicate should fail the prefilter")
 	}
 	eqPred := newFlagPredicate("node", "tokens", "equals", []string{"python_review:archive_symlink_filter_bypass"}, false, false)
-	if !flagContextOnlyPredicateMaybePresent(eqPred, "lang=python\x00python_review:archive_symlink_filter_bypass", "lang=python\x00python_review:archive_symlink_filter_bypass") {
+	if !flagContextOnlyPredicateMaybePresent(eqPred, "lang=python\x00python_review:archive_symlink_filter_bypass") {
 		t.Fatal("present equality-shaped review predicate should pass the prefilter")
 	}
-	if flagContextOnlyPredicateMaybePresent(eqPred, "lang=python", "lang=python") {
+	if flagContextOnlyPredicateMaybePresent(eqPred, "lang=python") {
 		t.Fatal("absent equality-shaped review predicate should fail the prefilter")
 	}
 	fnPred := newFlagPredicate("node", "tokens", "contains_any", []string{"function_name:load", "function_name:restore"}, false, false)
-	if !flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:safe_load", "lang=python\x00function_name:safe_load") {
+	if !flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:safe_load") {
 		t.Fatal("function_name shortcut should search token payload")
 	}
-	if flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:validate", "lang=python\x00function_name:validate") {
+	if flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:validate") {
 		t.Fatal("function_name shortcut should reject absent payload")
 	}
 }

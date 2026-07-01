@@ -4764,8 +4764,6 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 					rangeTechNodesDirect(s, spec.Technology, spec.crossLang, fn, nodeType)
 				}
 				rangeFlagNodes(func(n usg.Node) bool {
-					var contextOnlyLower string
-					contextOnlyLowerSet := false
 					for _, i := range flagIdx.candidates(n.Prop("method"), n.Prop("callee_path")) {
 						if !effects[i].Allowed {
 							continue
@@ -4779,11 +4777,7 @@ func (spec bindingSpec) presenceApplicator() bindings.Applicator {
 						}
 						if contextOnlyOK[i] {
 							text := n.Prop("str_args")
-							if !contextOnlyLowerSet {
-								contextOnlyLower = lowerString(text)
-								contextOnlyLowerSet = true
-							}
-							if !flagContextOnlyPredicateMaybePresent(contextOnlyPreds[i], text, contextOnlyLower) {
+							if !flagContextOnlyPredicateMaybePresent(contextOnlyPreds[i], text) {
 								continue
 							}
 						}
@@ -5557,7 +5551,7 @@ func flagContextOnlyPredicate(fl flagSpec, tech string) (flagPredicate, bool) {
 	return flagPredicate{}, false
 }
 
-func flagContextOnlyPredicateMaybePresent(pred flagPredicate, text, lowerText string) bool {
+func flagContextOnlyPredicateMaybePresent(pred flagPredicate, text string) bool {
 	if structuredContextPredicateTokenFamilyMissing(pred, text) {
 		return true
 	}
@@ -5572,7 +5566,7 @@ func flagContextOnlyPredicateMaybePresent(pred flagPredicate, text, lowerText st
 	for i, value := range pred.Values {
 		prefix, want, ok := splitContextTokenPredicateValue(value)
 		if !ok {
-			return valuePredicateLowerValuesWithLowerText(op, pred.Values, pred.lowerValues(), text, lowerText)
+			return valuePredicateLowerValuesWithLowerText(op, pred.Values, pred.lowerValues(), text, lowerString(text))
 		}
 		wantLower := lowerString(want)
 		valuesLower := pred.lowerValues()
