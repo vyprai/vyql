@@ -299,6 +299,24 @@ func (s *IntStore) AddEdge(e Edge) error {
 	return nil
 }
 
+// AddFlowEdgeIfPresent appends a prop-less FLOWS edge only when both endpoints already exist.
+// It is the lowering hot path: lowerer.flow already treats missing endpoints as a no-op, so this
+// avoids two existence checks plus AddEdge's generic type/props/intern work.
+func (s *IntStore) AddFlowEdgeIfPresent(src, dst string) bool {
+	si, ok := s.idx[src]
+	if !ok {
+		return false
+	}
+	di, ok := s.idx[dst]
+	if !ok {
+		return false
+	}
+	s.flowOut[si] = append(s.flowOut[si], di)
+	s.flowIn[di] = append(s.flowIn[di], si)
+	s.epoch = nextStructEpoch()
+	return true
+}
+
 func (s *IntStore) AddLabel(nodeID string, l Label) error {
 	i := s.intern(nodeID)
 	for int(i) >= len(s.labels) {

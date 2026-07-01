@@ -151,6 +151,12 @@ func TestCompactFlowEdgesPreserveStoreAPI(t *testing.T) {
 			if err := tc.s.AddEdge(Edge{Type: "NET", Src: "a", Dst: "d", Props: map[string]string{"rule": "net"}}); err != nil {
 				t.Fatalf("AddEdge net: %v", err)
 			}
+			if ok := tc.s.(interface{ AddFlowEdgeIfPresent(string, string) bool }).AddFlowEdgeIfPresent("a", "missing"); ok {
+				t.Fatal("AddFlowEdgeIfPresent should report missing destination")
+			}
+			if ok := tc.s.(interface{ AddFlowEdgeIfPresent(string, string) bool }).AddFlowEdgeIfPresent("b", "d"); !ok {
+				t.Fatal("AddFlowEdgeIfPresent should append existing endpoints")
+			}
 
 			flows, _ := tc.s.OutEdges("a", "FLOWS")
 			if got, want := dsts(flows), []string{"b", "c"}; !equal(got, want) {
@@ -187,6 +193,14 @@ func TestCompactFlowEdgesPreserveStoreAPI(t *testing.T) {
 			})
 			if got, want := sorted(ranged), []string{"b", "c"}; !equal(got, want) {
 				t.Fatalf("RangeOut(FLOWS)=%v want %v", got, want)
+			}
+			var rangedB []string
+			tc.g.RangeOut(1, "FLOWS", func(dst int32) bool {
+				rangedB = append(rangedB, tc.g.NodeID(dst))
+				return true
+			})
+			if got, want := sorted(rangedB), []string{"d"}; !equal(got, want) {
+				t.Fatalf("RangeOut fast-added flow=%v want %v", got, want)
 			}
 		})
 	}

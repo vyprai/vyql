@@ -168,6 +168,23 @@ func (g *BadgerGraph) AddEdge(e Edge) error {
 	return nil
 }
 
+// AddFlowEdgeIfPresent appends a prop-less FLOWS edge only when both endpoints already exist.
+func (g *BadgerGraph) AddFlowEdgeIfPresent(src, dst string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	si, ok := g.idx[src]
+	if !ok {
+		return false
+	}
+	di, ok := g.idx[dst]
+	if !ok {
+		return false
+	}
+	g.flowOut[si] = append(g.flowOut[si], di)
+	g.flowIn[di] = append(g.flowIn[di], si)
+	return true
+}
+
 func (g *BadgerGraph) AddLabel(nodeID string, l Label) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()

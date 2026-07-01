@@ -1405,6 +1405,10 @@ func (l *lowerer) flow(a, b string) {
 	if a == "" || b == "" {
 		return
 	}
+	if g, ok := l.g.(interface{ AddFlowEdgeIfPresent(string, string) bool }); ok {
+		g.AddFlowEdgeIfPresent(a, b)
+		return
+	}
 	if !l.exists(a) || !l.exists(b) {
 		return
 	}
