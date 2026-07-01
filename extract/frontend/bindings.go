@@ -334,6 +334,7 @@ type valueTokenCache struct {
 	directLower         map[string]string
 	flowLower           map[string]string
 	sinkLower           map[string]string
+	sinkRaw             map[string]string
 	directSinkSegments  map[string]directSinkSegments
 	directRawContains   map[string]bool
 	directLowerContains map[string]bool
@@ -432,6 +433,67 @@ func (c *valueTokenCache) sinkValueLower(s usg.Store, idx *flowTokenIndex, call 
 		return lower
 	}
 	return c.buildSinkValueLower(s, idx, call, argIndex, includeFlow)
+}
+
+func (c *valueTokenCache) sinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
+	if call.ID != "" {
+		if c.sinkRaw == nil {
+			c.sinkRaw = map[string]string{}
+		}
+		key := call.ID + "\x00" + strconv.Itoa(argIndex)
+		if includeFlow {
+			key += "\x00flow"
+		} else {
+			key += "\x00direct"
+		}
+		if raw, ok := c.sinkRaw[key]; ok {
+			return raw
+		}
+		raw := buildSinkValueRaw(s, idx, call, argIndex, includeFlow)
+		c.sinkRaw[key] = raw
+		return raw
+	}
+	return buildSinkValueRaw(s, idx, call, argIndex, includeFlow)
+}
+
+func buildSinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
+	var b strings.Builder
+	addRaw := func(text string) {
+		if text == "" {
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteByte(0)
+		}
+		b.WriteString(text)
+	}
+	addRaw(call.Prop("str_args"))
+	addArg := func(arg string) {
+		if arg == "" {
+			return
+		}
+		if n, ok, err := s.GetNode(arg); err == nil && ok {
+			addRaw(n.Prop("str_args"))
+			if includeFlow {
+				addRaw(flowingStringTokens(s, idx, n.ID, n.Prop("str_args")))
+			}
+		}
+	}
+	if argIndex >= 0 {
+		addArg(call.Prop("arg" + strconv.Itoa(argIndex)))
+	} else {
+		for ai := 0; ; ai++ {
+			arg := call.Prop("arg" + strconv.Itoa(ai))
+			if arg == "" {
+				break
+			}
+			addArg(arg)
+		}
+	}
+	if includeFlow {
+		addRaw(flowingStringTokens(s, idx, call.ID, call.Prop("str_args")))
+	}
+	return b.String()
 }
 
 func (c *valueTokenCache) buildSinkValueLower(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex int, includeFlow bool) string {
@@ -1663,7 +1725,7 @@ func valCondsDirectForNodeCached(cache *valueTokenCache, n usg.Node, valsLower, 
 			return false
 		}
 	}
-	return valCondsLowerNeedles(cache.directNodeLower(n), valsLower, nvalsLower)
+	return valCondsFoldedNeedles(nodeDirectValueTokens(n), valsLower, nvalsLower)
 }
 
 var nodeDirectValuePropKeys = []string{
@@ -1761,7 +1823,7 @@ func valCondsForSinkCached(s usg.Store, idx *flowTokenIndex, cache *valueTokenCa
 	if functionReturnDecoratorAbsent(s, cache, call, sk.ArgIndex, valsLower) {
 		return false
 	}
-	return valCondsLowerNeedles(cache.sinkValueLower(s, idx, call, sk.ArgIndex, len(valsLower) > 0), valsLower, nvalsLower)
+	return valCondsFoldedNeedles(cache.sinkValueRaw(s, idx, call, sk.ArgIndex, len(valsLower) > 0), valsLower, nvalsLower)
 }
 
 func functionReturnDecoratorAbsent(s usg.Store, cache *valueTokenCache, call usg.Node, argIndex int, valsLower []string) bool {
@@ -1795,12 +1857,8 @@ func valCondsForSinkDirectSegments(s usg.Store, cache *valueTokenCache, call usg
 		}
 	}
 
-	segments := []string{cache.nodeStrArgsLower(call)}
-	for _, n := range direct.nodes {
-		segments = append(segments, cache.nodeStrArgsLower(n))
-	}
 	contains := func(needle string) bool {
-		return cache.directContainsLower(call, argIndex, segments, needle)
+		return cache.directRawContainsFolded(call, argIndex, direct.raw, needle)
 	}
 	for _, v := range valsLower {
 		if !contains(v) {
