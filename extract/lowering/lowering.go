@@ -1183,7 +1183,7 @@ func estimateGraphNodeHint(prog nir.Program) int {
 	if hint <= 0 {
 		return 0
 	}
-	return hint + hint/3
+	return hint
 }
 
 func estimateStmtListNodes(stmts []nir.Stmt) int {
