@@ -1466,6 +1466,37 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
+	case "field_definition", "public_field_definition":
+		// a class field whose value is an object literal of methods, e.g.
+		// `static events = { paste(event){ … } }` (input-handler maps, the common
+		// "handler dictionary" pattern). Lower each method so its body is analyzed —
+		// otherwise the whole object, and any source→sink flow inside it, is dead code.
+		val := field(n, "value")
+		if val == nil {
+			for _, ch := range namedChildren(n) {
+				if ch.Kind() == "object" {
+					val = ch
+					break
+				}
+			}
+		}
+		if val != nil && val.Kind() == "object" {
+			var out []nir.Stmt
+			for _, pr := range namedChildren(val) {
+				switch pr.Kind() {
+				case "method_definition":
+					out = append(out, c.stmt(pr)...)
+				case "pair":
+					if v := field(pr, "value"); isJsFuncNode(v) {
+						out = append(out, nir.FuncDef{Name: c.keyName(field(pr, "key")),
+							Params: c.funcParams(v), ParamTypes: c.funcParamTypes(v),
+							Body: c.funcBody(v), Loc: c.loc(pr)})
+					}
+				}
+			}
+			return out
+		}
+		return nil
 	case "lexical_declaration", "variable_declaration":
 		var out []nir.Stmt
 		for _, d := range namedChildren(n) {
