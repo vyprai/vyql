@@ -178,11 +178,27 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	// rule's source concept), which is all a per-(rule,sink) finding needs.
 	tainted := make(map[string]bool, len(srcs)*8)
 	pred := make(map[string]string, len(srcs)*8)
+	// srcFid mirrors the int path: the fidelity rank of the source rooting each
+	// node's witness path, so a higher-fidelity source can re-relax the witness
+	// (presentation-only; the tainted set — and thus recall — is unchanged).
+	srcFid := make(map[string]int, len(srcs)*8)
+	nodeSrcFid := func(id string) int {
+		best := 0
+		for _, l := range labelsOf(id) {
+			if sourceConcepts[l.Concept] {
+				if r := fidelityWitnessRank(l.Provenance.Fidelity); r > best {
+					best = r
+				}
+			}
+		}
+		return best
+	}
 	var nearMiss [][2]string
 	queue := make([]string, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			srcFid[s] = nodeSrcFid(s)
 			queue = append(queue, s)
 		}
 	}
@@ -193,10 +209,17 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			nearMiss = append(nearMiss, [2]string{node, c})
 			continue
 		}
+		nodeFid := srcFid[node]
 		forEachSucc(node, func(dst string) {
-			if !tainted[dst] {
+			switch {
+			case !tainted[dst]:
 				tainted[dst] = true
 				pred[dst] = node
+				srcFid[dst] = nodeFid
+				queue = append(queue, dst)
+			case nodeFid > srcFid[dst]:
+				pred[dst] = node
+				srcFid[dst] = nodeFid
 				queue = append(queue, dst)
 			}
 		})
@@ -318,11 +341,32 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	for i := range pred {
 		pred[i] = -1
 	}
+	// srcFid[i] is the fidelity rank of the source rooting node i's witness path.
+	// The witness path (pred chain) is presentation-only and does not affect which
+	// sinks are tainted (recall), but WHICH source is reported matters: a resolved
+	// HttpInput read is a truer witness than the syntactic per-parameter
+	// ExternalEntryInput fallback that labels every function param and often sits
+	// fewer hops from the sink. We let a higher-fidelity source route re-relax a
+	// node's witness even after it is first tainted; fidelity only increases and is
+	// bounded, so each node is re-queued at most a couple of times.
+	srcFid := make([]int, n)
+	nodeSrcFid := func(i int32) int {
+		best := 0
+		for _, l := range g.LabelsAt(i) {
+			if sourceConcepts[l.Concept] {
+				if r := fidelityWitnessRank(l.Provenance.Fidelity); r > best {
+					best = r
+				}
+			}
+		}
+		return best
+	}
 	var nearMiss [][2]string
 	queue := make([]int32, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
 			tainted[s] = true
+			srcFid[s] = nodeSrcFid(s)
 			queue = append(queue, s)
 		}
 	}
@@ -333,10 +377,20 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			nearMiss = append(nearMiss, [2]string{g.NodeID(node), c})
 			continue
 		}
+		nodeFid := srcFid[node]
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
-			if !tainted[dst] {
+			switch {
+			case !tainted[dst]:
 				tainted[dst] = true
 				pred[dst] = node
+				srcFid[dst] = nodeFid
+				queue = append(queue, dst)
+			case nodeFid > srcFid[dst]:
+				// a higher-fidelity source route reaches an already-tainted node —
+				// prefer it as the witness and re-propagate so the improvement flows
+				// on to the sink.
+				pred[dst] = node
+				srcFid[dst] = nodeFid
 				queue = append(queue, dst)
 			}
 			return true
@@ -369,6 +423,22 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		out = append(out, TaintFlow{SourceID: path[0], SinkID: g.NodeID(sink), Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out
+}
+
+// fidelityWitnessRank ranks a label's match fidelity for witness selection: a
+// higher rank is a more trustworthy source to report. An empty/unknown fidelity
+// is treated as resolved (docs/07), matching the confidence machinery, so only
+// an explicitly syntactic source (e.g. the cross-language ExternalEntryInput
+// param fallback) ranks below a resolved read.
+func fidelityWitnessRank(fid string) int {
+	switch fid {
+	case "syntactic":
+		return 1
+	case "semantic":
+		return 3
+	default: // "resolved" and unknown
+		return 2
+	}
 }
 
 func dedupPairs(ps [][2]string) [][2]string {
