@@ -1,0 +1,82 @@
+test "python html precision: direct html escape protects only its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  import html
+  from flask import request, make_response
+
+  def page():
+      safe = html.escape(request.args.get("name", ""))
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: imported Django escape protects its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.utils.html import escape
+
+  def page(request):
+      safe = escape(request.GET.get("name", ""))
+      return HttpResponse("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: escaped sibling does not hide unresolved raw helper"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from django.http import HttpResponse
+  from django.utils.html import escape
+
+  def page(request):
+      raw = request.GET.get("name", "")
+      safe = escape(raw)
+      status = unresolved_check(safe, raw)
+      return HttpResponse("<p>{}</p>".format(status))
+  ```
+
+test "python html precision: imported MarkupSafe escape protects its result"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from flask import request, make_response
+  from markupsafe import escape
+
+  def page():
+      safe = escape(request.args.get("name", ""))
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: rebinding an escaped alias to raw input clears protection"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  import html
+  from flask import request, make_response
+
+  def page():
+      raw = request.args.get("name", "")
+      safe = html.escape(raw)
+      safe = raw
+      return make_response("<p>{}</p>".format(safe))
+  ```
+
+test "python html precision: HTML escape does not neutralize SQL"
+  lang python
+  expect VYQL-INJ-001
+  code
+  ```
+  import html
+  import sqlite3
+  from flask import request
+
+  def page():
+      value = html.escape(request.args.get("name", ""))
+      return sqlite3.connect("app.db").execute("SELECT * FROM users WHERE name='" + value + "'")
+  ```
