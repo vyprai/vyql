@@ -84,6 +84,23 @@ test "python authz: walrus rebinding invalidates session principal"
       return document
   ```
 
+test "python authz: embedded walrus rebinding invalidates session principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      audit(principal_id := request.args.get("owner_id"))
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return document
+  ```
+
 test "python authz: request fallback mixed with session is not a trusted principal"
   lang python
   expect VYQL-AUTH-095

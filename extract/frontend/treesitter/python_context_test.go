@@ -783,6 +783,45 @@ def use_only_condition(document_id):
 	}
 }
 
+func TestPythonFunctionLocalEndEmbeddedWalrusInvalidatesWithoutClearingDirectAssignmentsOrReads(t *testing.T) {
+	src := `def embedded_walrus(document_id):
+    principal_id = session.get("user_id")
+    audit(principal_id := request.args.get("owner_id"))
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def direct_assignment(document_id):
+    principal_id = session.get("user_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def ordinary_read(document_id):
+    principal_id = session.get("user_id")
+    audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+`
+	embedded := pythonFunctionLocalEndTokens(t, src, "embedded_walrus")
+	embeddedPrefix := "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;"
+	embeddedToken := tokenWithPrefix(embedded, embeddedPrefix)
+	if embeddedToken == "" || !strings.Contains(embeddedToken, "counterpart_source=unknown;guard_counterpart=principal_id") {
+		t.Fatalf("embedded walrus retained earlier session provenance: %q", strings.Join(embedded, " | "))
+	}
+	sessionPrefix := "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;guard_counterpart=principal_id;terminal=abort"
+	for _, name := range []string{"direct_assignment", "ordinary_read"} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		if tokenWithPrefix(tokens, sessionPrefix) == "" {
+			t.Fatalf("%s cleared direct assignment provenance without a rebind: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+}
+
 func TestPythonFunctionLocalEndSessionProvenanceRequiresEveryIdentityAlternative(t *testing.T) {
 	src := `def all_session_boolean(document_id):
     principal_id = session.get("primary_id") or session["backup_id"]

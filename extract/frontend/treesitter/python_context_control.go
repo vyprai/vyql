@@ -202,9 +202,8 @@ func (a *pyControlContextAnalyzer) updateProvenance(statement *tree_sitter.Node,
 }
 
 func (a *pyControlContextAnalyzer) invalidateCompoundBindings(provenance map[string]pyContextProvenance, statement *tree_sitter.Node, blocks []*tree_sitter.Node) {
-	if len(blocks) == 0 {
-		return
-	}
+	directAssignment := pyDirectContextAssignment(statement)
+	directAugmented := pyDirectContextAugmentedAssignment(statement)
 	assigned := map[string]bool{}
 	var walk func(*tree_sitter.Node, bool)
 	walk = func(node *tree_sitter.Node, skipBlocks bool) {
@@ -216,7 +215,9 @@ func (a *pyControlContextAnalyzer) invalidateCompoundBindings(provenance map[str
 		}
 		switch node.Kind() {
 		case "assignment", "augmented_assignment":
-			a.collectContextBindingTarget(field(node, "left"), assigned)
+			if !pySameContextNode(node, directAssignment) && !pySameContextNode(node, directAugmented) {
+				a.collectContextBindingTarget(field(node, "left"), assigned)
+			}
 		case "named_expression":
 			a.collectContextBindingTarget(field(node, "name"), assigned)
 		case "for_statement":
@@ -241,6 +242,11 @@ func (a *pyControlContextAnalyzer) invalidateCompoundBindings(provenance map[str
 	for target := range assigned {
 		delete(provenance, target)
 	}
+}
+
+func pySameContextNode(left, right *tree_sitter.Node) bool {
+	return left != nil && right != nil && left.Kind() == right.Kind() &&
+		left.StartByte() == right.StartByte() && left.EndByte() == right.EndByte()
 }
 
 func (a *pyControlContextAnalyzer) collectContextBindingTarget(target *tree_sitter.Node, assigned map[string]bool) {
