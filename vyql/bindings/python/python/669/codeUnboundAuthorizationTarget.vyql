@@ -1,0 +1,29 @@
+module bindings.python.authorization;
+
+binding decodedPrincipalTargetMutation669 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "call_path:jwt.decode"
+    and args.any.literal contains "call_path:payload.get"
+    and args.any.literal contains "literal:sub"
+    and args.any.literal contains "reachable_call_method:commit"
+    and (
+      (args.any.literal contains "param_name:company_id"
+        and args.any.literal contains "get_company(db,company_id)"
+        and args.any.literal contains "assign:company."
+        and not (containsAny(args.any.literal, ["iftoken_company_id!=company_id:raise", "ifcompany_id!=token_company_id:raise"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains "get_account(db,account_id)"
+        and args.any.literal contains "assign:account."
+        and not (containsAny(args.any.literal, ["iftoken_account_id!=account_id:raise", "ifaccount_id!=token_account_id:raise"])))
+      or (args.any.literal contains "param_name:tenant_id"
+        and args.any.literal contains "get_tenant(db,tenant_id)"
+        and args.any.literal contains "assign:tenant."
+        and not (containsAny(args.any.literal, ["iftoken_tenant_id!=tenant_id:raise", "iftenant_id!=token_tenant_id:raise"])))
+      or (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains "get_user(db,user_id)"
+        and args.any.literal contains "assign:user."
+        and not (containsAny(args.any.literal, ["iftoken_user_id!=user_id:raise", "ifuser_id!=token_user_id:raise"])))
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}

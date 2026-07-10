@@ -4,6 +4,6 @@ binding deserialization59 {
   requires {
     dependency("jsonpickle")
   }
-  query pattern callExpr where callee.path ~= "jsonpickle.decode"
+  query pattern callExpr where callee.path == "jsonpickle.decode"
   emit sink code.Deserialization at args[0]
 }

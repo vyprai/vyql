@@ -889,3 +889,123 @@ test "python authz: internal credential helper is outside endpoint detector"
           session["account_id"] = request.form["account_id"]
       return account
   ```
+
+test "python authz: decoded principal must bind a route target before mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name, is_admin):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      company = crud.get_company(db, company_id)
+      company.name = name
+      company.is_admin = is_admin
+      db.add(company)
+      db.commit()
+      return company
+  ```
+
+test "python authz: decoded principal relation covers route-target mutation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name, is_admin):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      if token_company_id != company_id:
+          raise Forbidden()
+      company = crud.get_company(db, company_id)
+      company.name = name
+      company.is_admin = is_admin
+      db.add(company)
+      db.commit()
+      return company
+  ```
+
+test "python authz: decoded-principal denial in a sibling function does not authorize mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from jose import jwt
+
+  def verify_other_route(token_company_id, other_company_id):
+      if token_company_id != other_company_id:
+          raise Forbidden()
+
+  @app.post("/edit/{company_id}")
+  def update_profile(company_id, token, db, name):
+      payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+      token_company_id = int(payload.get("sub"))
+      company = crud.get_company(db, company_id)
+      company.name = name
+      db.commit()
+      return company
+  ```
+
+test "python authz: GraphQL identity argument requires current-principal scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  class Query(graphene.ObjectType):
+      def resolve_documents(self, info, user_id):
+          return Document.query.filter_by(user_id=user_id).all()
+  ```
+
+test "python authz: GraphQL principal comparison and admin override cover lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class Query(graphene.ObjectType):
+      def resolve_documents(self, info, user_id):
+          if info.context.user.id != user_id and info.context.user.username != "admin":
+              return []
+          return Document.query.filter_by(user_id=user_id).all()
+  ```
+
+test "python authz: GraphQL mutation identity argument requires principal scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  class AddDocument(graphene.Mutation):
+      def mutate(self, info, user_id, title):
+          document = Document(user_id=user_id, title=title)
+          db.session.add(document)
+          db.session.commit()
+          return AddDocument(document=document)
+  ```
+
+test "python authz: GraphQL principal guard covers object creation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class AddDocument(graphene.Mutation):
+      def mutate(self, info, user_id, title):
+          if info.context.user.id != user_id and info.context.user.username != "admin":
+              return None
+          document = Document(user_id=user_id, title=title)
+          db.session.add(document)
+          db.session.commit()
+          return AddDocument(document=document)
+  ```
+
+test "python authz: internal filter helper is outside GraphQL endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  def load_documents(user_id):
+      return Document.query.filter_by(user_id=user_id).all()
+  ```
