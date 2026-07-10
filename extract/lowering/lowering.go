@@ -410,6 +410,9 @@ func (l *lowerer) seqOf(e nir.Expr) ([]nir.Expr, bool) {
 }
 
 func (l *lowerer) constBool(e nir.Expr, sc *scope) (bool, bool) {
+	if fact, ok := l.nonNegativeLenFact(e, sc); ok {
+		return fact, true
+	}
 	switch v := e.(type) {
 	case nir.Thru:
 		return l.constBool(v.Inner, sc)
@@ -774,6 +777,10 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 		}
 		collectExprNames(s.Value, used)
 	case nir.Return:
+		collectExprNames(s.Value, used)
+	case nir.Validation:
+		collectExprNames(s.Evidence, used)
+	case nir.Terminate:
 		collectExprNames(s.Value, used)
 	case nir.ExprStmt:
 		collectExprNames(s.Value, used)
@@ -1585,7 +1592,11 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 
 func (l *lowerer) block(stmts []nir.Stmt, sc *scope) {
 	for _, s := range stmts {
+		exits := l.stmtDefinitelyExits(s, sc)
 		l.stmt(s, sc)
+		if exits {
+			break
+		}
 	}
 }
 
@@ -1787,6 +1798,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		retTokens := append([]string{}, l.curDecorators...)
 		collectValTokens(st.Value, "", &retTokens)
 		l.functionReturnAnalysisEvent(rv, "", retTokens)
+	case nir.Terminate:
+		l.eval(st.Value, sc)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		// Builder/accumulator calls fold their args into the object/buffer you
@@ -2287,6 +2300,8 @@ func branchDefinitelyExits(stmts []nir.Stmt) bool {
 	for i := len(stmts) - 1; i >= 0; i-- {
 		switch st := stmts[i].(type) {
 		case nir.Return:
+			return true
+		case nir.Terminate:
 			return true
 		case nir.Block:
 			if branchDefinitelyExits(st.Stmts) {
@@ -2940,6 +2955,10 @@ func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
 		case nir.AugAssign:
 			l.addrTakenExpr(st.Value)
 		case nir.Return:
+			l.addrTakenExpr(st.Value)
+		case nir.Validation:
+			l.addrTakenExpr(st.Evidence)
+		case nir.Terminate:
 			l.addrTakenExpr(st.Value)
 		case nir.FuncDef:
 			l.addrTakenStmts(st.Body)
