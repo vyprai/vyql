@@ -27,7 +27,7 @@ func init() {
 		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
 		BinOp{}, Unary{}, Ternary{},
 		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
-		Loop{}, Switch{}, Try{},
+		Loop{}, Switch{}, Try{}, Validation{}, Terminate{},
 	} {
 		gob.Register(v)
 	}
@@ -113,9 +113,10 @@ type Seq struct {
 // through Value. Used by named-value matching (`val "key=value"`); frontends that
 // don't emit Pair keep flattening such entries to their Value (no key).
 type Pair struct {
-	Key   string
-	Value Expr
-	Loc   string
+	Key        string
+	Value      Expr
+	Loc        string
+	DynamicKey bool // true when Key names an evaluated expression rather than a literal key
 }
 
 // Lambda is an inline anonymous function (e.g. an Express arrow handler).
@@ -192,6 +193,23 @@ type AugAssign struct {
 
 // Return returns Value from the enclosing function.
 type Return struct{ Value Expr }
+
+// Validation records a frontend-proven postcondition on Target. Evidence is
+// deliberately domain-neutral; bindings decide what security concept it means.
+type Validation struct {
+	Target   string
+	Evidence Expr
+	Kind     string
+	Loc      string
+}
+
+// Terminate evaluates Value and then exits the current function without a
+// normal return. Kind records syntax such as "raise" or framework "abort".
+type Terminate struct {
+	Value Expr
+	Kind  string
+	Loc   string
+}
 
 // ExprStmt is an expression evaluated for effect.
 type ExprStmt struct{ Value Expr }
@@ -299,6 +317,8 @@ type Try struct {
 func (Assign) isStmt()    {}
 func (AugAssign) isStmt() {}
 func (Return) isStmt()    {}
+func (Validation) isStmt() {}
+func (Terminate) isStmt()  {}
 func (ExprStmt) isStmt()  {}
 func (FuncDef) isStmt()   {}
 func (ClassDef) isStmt()  {}

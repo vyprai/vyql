@@ -366,6 +366,9 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 			return nil
 		default:
+			if inner.Kind() == "call" && lastSeg(c.dotted(field(inner, "function"))) == "abort" {
+				return []nir.Stmt{nir.Terminate{Value: c.expr(inner), Kind: "abort", Loc: L}}
+			}
 			return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 		}
 	case "return_statement":
@@ -374,6 +377,12 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
+	case "raise_statement":
+		var value nir.Expr
+		if kids := namedChildren(n); len(kids) > 0 {
+			value = c.expr(kids[0])
+		}
+		return []nir.Stmt{nir.Terminate{Value: value, Kind: "raise", Loc: L}}
 	case "if_statement", "while_statement":
 		// branch-structured (B1). Cond carries the predicate (python evaluated it before,
 		// and the flatten lowering still does, so this is byte-identical). collectBlocks
@@ -391,13 +400,13 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// path overwrites it (`if c: p = src()` / `else: p = "safe"`).
 		return []nir.Stmt{nir.If{Cond: cond, Then: c.block(field(n, "consequence")), Else: c.pyIfElse(n)}}
 	case "for_statement":
-		var inner []nir.Stmt
 		left, right := field(n, "left"), field(n, "right")
-		if left != nil && left.Kind() == "identifier" && right != nil {
-			inner = append(inner, nir.Assign{Targets: []string{c.text(left)}, Value: c.expr(right)})
+		loop := nir.Loop{Iter: c.expr(right), Vars: c.targets(left), Body: c.block(field(n, "body")), Loc: L}
+		stmts := []nir.Stmt{loop}
+		if validation, ok := c.pyTerminalRejectValidation(n); ok {
+			stmts = append(stmts, validation)
 		}
-		// the loop-var assign runs before the loop body; flatten lowers assign then body.
-		return []nir.Stmt{nir.Block{Stmts: append(inner, nir.Loop{Body: c.collectBlocks(n)})}}
+		return []nir.Stmt{nir.Block{Stmts: stmts}}
 	case "with_statement":
 		// `with EXPR as VAR:` — lower each context-manager EXPR (commonly an open()/file sink)
 		// and bind VAR to it, then the body. Previously the with-clause expression was dropped,
@@ -1739,7 +1748,11 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		for _, ch := range namedChildren(n) {
 			if ch.Kind() == "pair" {
-				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
+				keyNode := field(ch, "key")
+				parts = append(parts, nir.Pair{
+					Key: c.keyName(keyNode), Value: c.expr(field(ch, "value")), Loc: L,
+					DynamicKey: keyNode == nil || keyNode.Kind() != "string",
+				})
 			}
 		}
 		return nir.Seq{Parts: parts, Loc: L}
