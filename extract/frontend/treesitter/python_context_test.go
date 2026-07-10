@@ -693,6 +693,96 @@ def nested_scope_does_not_reassign(document_id):
 	}
 }
 
+func TestPythonFunctionLocalEndCompoundHeaderBindingsInvalidateOuterProvenance(t *testing.T) {
+	src := `def for_target_reassigned(document_id):
+    principal_id = session.get("user_id")
+    for principal_id in request.args.getlist("owner_id"):
+        audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def tuple_for_target_reassigned(document_id, claims):
+    principal_id = session.get("user_id")
+    for ignored, principal_id in claims:
+        audit(ignored)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def walrus_reassigned(document_id):
+    principal_id = session.get("user_id")
+    if (principal_id := request.args.get("owner_id")):
+        audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def with_alias_reassigned(document_id):
+    principal_id = session.get("user_id")
+    with authorization_context() as principal_id:
+        audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def except_alias_reassigned(document_id):
+    principal_id = session.get("user_id")
+    try:
+        authorize()
+    except AuthorizationError as principal_id:
+        audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def match_capture_reassigned(document_id, claim):
+    principal_id = session.get("user_id")
+    match claim:
+        case {"owner_id": principal_id}:
+            audit(principal_id)
+        case _:
+            audit()
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def use_only_condition(document_id):
+    principal_id = session.get("user_id")
+    if principal_id:
+        audit(principal_id)
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+`
+	unknownPrefix := "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;"
+	for _, name := range []string{
+		"for_target_reassigned",
+		"tuple_for_target_reassigned",
+		"walrus_reassigned",
+		"with_alias_reassigned",
+		"except_alias_reassigned",
+		"match_capture_reassigned",
+	} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		token := tokenWithPrefix(tokens, unknownPrefix)
+		if token == "" || !strings.Contains(token, "counterpart_source=unknown;guard_counterpart=principal_id") {
+			t.Fatalf("%s retained provenance rebound by a compound header: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+	useOnly := pythonFunctionLocalEndTokens(t, src, "use_only_condition")
+	if tokenWithPrefix(useOnly, "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;guard_counterpart=principal_id;terminal=abort") == "" {
+		t.Fatalf("ordinary condition use cleared trusted provenance: %q", strings.Join(useOnly, " | "))
+	}
+}
+
 func TestPythonFunctionLocalEndSessionProvenanceRequiresEveryIdentityAlternative(t *testing.T) {
 	src := `def all_session_boolean(document_id):
     principal_id = session.get("primary_id") or session["backup_id"]

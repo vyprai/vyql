@@ -95,10 +95,14 @@ func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenanc
 
 			blocks := pyDirectContextBlocks(statement)
 			if a.c.pyConditionAlwaysTrue(condition) {
+				reachableBlocks := blocks
+				if len(reachableBlocks) > 1 {
+					reachableBlocks = reachableBlocks[:1]
+				}
 				if len(blocks) > 0 {
 					a.visitBlock(blocks[0], clonePyProvenance(provenance))
-					a.invalidateBlockAssignments(provenance, blocks[:1])
 				}
+				a.invalidateCompoundBindings(provenance, statement, reachableBlocks)
 				if terminal {
 					return
 				}
@@ -106,7 +110,7 @@ func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenanc
 				for _, nested := range blocks {
 					a.visitBlock(nested, clonePyProvenance(provenance))
 				}
-				a.invalidateBlockAssignments(provenance, blocks)
+				a.invalidateCompoundBindings(provenance, statement, blocks)
 			}
 			continue
 		}
@@ -116,7 +120,7 @@ func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenanc
 		for _, nested := range blocks {
 			a.visitBlock(nested, clonePyProvenance(provenance))
 		}
-		a.invalidateBlockAssignments(provenance, blocks)
+		a.invalidateCompoundBindings(provenance, statement, blocks)
 		if _, terminal := a.c.pyUnconditionalTerminalKind(statement); terminal {
 			return
 		}
@@ -197,31 +201,108 @@ func (a *pyControlContextAnalyzer) updateProvenance(statement *tree_sitter.Node,
 	}
 }
 
-func (a *pyControlContextAnalyzer) invalidateBlockAssignments(provenance map[string]pyContextProvenance, blocks []*tree_sitter.Node) {
+func (a *pyControlContextAnalyzer) invalidateCompoundBindings(provenance map[string]pyContextProvenance, statement *tree_sitter.Node, blocks []*tree_sitter.Node) {
 	if len(blocks) == 0 {
 		return
 	}
 	assigned := map[string]bool{}
-	var walk func(*tree_sitter.Node)
-	walk = func(node *tree_sitter.Node) {
+	var walk func(*tree_sitter.Node, bool)
+	walk = func(node *tree_sitter.Node, skipBlocks bool) {
 		if node == nil || pyIsNestedContextScope(node) {
+			return
+		}
+		if skipBlocks && node.Kind() == "block" {
 			return
 		}
 		switch node.Kind() {
 		case "assignment", "augmented_assignment":
-			for _, target := range a.c.targets(field(node, "left")) {
-				assigned[target] = true
+			a.collectContextBindingTarget(field(node, "left"), assigned)
+		case "named_expression":
+			a.collectContextBindingTarget(field(node, "name"), assigned)
+		case "for_statement":
+			a.collectContextBindingTarget(field(node, "left"), assigned)
+		case "as_pattern_target":
+			a.collectContextBindingTarget(node, assigned)
+		case "case_clause":
+			for _, child := range namedChildren(node) {
+				if child.Kind() == "case_pattern" {
+					a.collectMatchCaptureTargets(child, assigned)
+				}
 			}
 		}
 		for _, child := range namedChildren(node) {
-			walk(child)
+			walk(child, skipBlocks)
 		}
 	}
+	walk(statement, true)
 	for _, block := range blocks {
-		walk(block)
+		walk(block, false)
 	}
 	for target := range assigned {
 		delete(provenance, target)
+	}
+}
+
+func (a *pyControlContextAnalyzer) collectContextBindingTarget(target *tree_sitter.Node, assigned map[string]bool) {
+	if target == nil {
+		return
+	}
+	switch target.Kind() {
+	case "identifier", "keyword_identifier":
+		assigned[a.c.text(target)] = true
+	case "as_pattern_target", "pattern_list", "expression_list", "tuple_pattern", "list_pattern", "tuple", "list", "parenthesized_expression", "list_splat_pattern", "dictionary_splat_pattern":
+		for _, child := range namedChildren(target) {
+			a.collectContextBindingTarget(child, assigned)
+		}
+	}
+}
+
+func (a *pyControlContextAnalyzer) collectMatchCaptureTargets(pattern *tree_sitter.Node, assigned map[string]bool) {
+	if pattern == nil {
+		return
+	}
+	children := namedChildren(pattern)
+	switch pattern.Kind() {
+	case "case_pattern", "list_pattern", "tuple_pattern", "union_pattern":
+		for _, child := range children {
+			a.collectMatchCaptureTargets(child, assigned)
+		}
+	case "as_pattern":
+		for _, child := range children {
+			if child.Kind() == "identifier" {
+				assigned[a.c.text(child)] = true
+				continue
+			}
+			a.collectMatchCaptureTargets(child, assigned)
+		}
+	case "dotted_name":
+		if len(children) == 1 && children[0].Kind() == "identifier" {
+			assigned[a.c.text(children[0])] = true
+		}
+	case "splat_pattern":
+		for _, child := range children {
+			if child.Kind() == "identifier" && a.c.text(child) != "_" {
+				assigned[a.c.text(child)] = true
+			}
+		}
+	case "dict_pattern":
+		for _, child := range children {
+			if child.Kind() == "case_pattern" || child.Kind() == "splat_pattern" {
+				a.collectMatchCaptureTargets(child, assigned)
+			}
+		}
+	case "class_pattern":
+		for _, child := range children {
+			if child.Kind() == "case_pattern" {
+				a.collectMatchCaptureTargets(child, assigned)
+			}
+		}
+	case "keyword_pattern":
+		if len(children) > 1 {
+			for _, child := range children[1:] {
+				a.collectMatchCaptureTargets(child, assigned)
+			}
+		}
 	}
 }
 
