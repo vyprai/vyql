@@ -2820,9 +2820,9 @@ func mergeV2CallShapes(binding string, left, right v2CallShape) (v2CallShape, er
 			out.ArgCountMax = right.ArgCountMax
 		}
 	}
-	out.ValMatches = append(out.ValMatches, right.ValMatches...)
-	out.ValAbsents = append(out.ValAbsents, right.ValAbsents...)
-	out.ScopePreds = append(out.ScopePreds, right.ScopePreds...)
+	out.ValMatches = append(append([]string(nil), left.ValMatches...), right.ValMatches...)
+	out.ValAbsents = append(append([]string(nil), left.ValAbsents...), right.ValAbsents...)
+	out.ScopePreds = append(append([]BindingPresencePredicate(nil), left.ScopePreds...), right.ScopePreds...)
 	return out, nil
 }
 

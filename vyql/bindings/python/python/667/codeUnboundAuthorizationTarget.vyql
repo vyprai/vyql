@@ -1,10 +1,64 @@
 module bindings.python.authorization;
 
-binding routeTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.context.end"
-    and args.any.literal contains "param_index:0"
+binding routeOrderTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:order_id"
     and args.any.literal contains ".commit()"
-    and containsAny(args.any.literal, ["==order_id).first_or_404()", "==record_id).first_or_404()", "==resource_id).first_or_404()", "==object_id).first_or_404()", "==item_id).first_or_404()", "==document_id).first_or_404()", "==invoice_id).first_or_404()", "==account_id).first_or_404()"])
+    and args.any.literal contains "==order_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeRecordTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:record_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==record_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeResourceTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:resource_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==resource_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeObjectTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:object_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==object_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeItemTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:item_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==item_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeDocumentTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:document_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==document_id).first_or_404()"
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeInvoiceTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:invoice_id"
+    and args.any.literal contains ".commit()"
+    and args.any.literal contains "==invoice_id).first_or_404()"
     and not (args.any.literal contains ">=0:return")
   emit issue code.UnboundAuthorizationTarget at call
 }

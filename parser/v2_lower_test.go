@@ -1749,6 +1749,49 @@ binding sqlLiteralKinds {
 	}
 }
 
+func TestV2CallPredicateContainsAnyRetainsAlternativesWithSharedValueConstraints(t *testing.T) {
+	decls, err := parseV2DefinitionsForTest(`
+module bindings.python.authorization;
+binding correlatedOwnerRelation {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:target_id"
+    and args.any.literal contains ".query.get(target_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["target.owner", "target.owner_id", "target.company_id"])
+    and not (containsAny(args.any.literal, ["abort(", "raise "]))
+  emit issue code.SecretComparisonReview at call
+}
+`)
+	if err != nil {
+		t.Fatalf("ParseV2Definitions: %v", err)
+	}
+	adapter := decls[0].(*BindingSet)
+	if adapter.Name != "python" || len(adapter.Mappings) != 3 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	seen := map[string]bool{}
+	for _, got := range adapter.Mappings {
+		if got.Kind != "issue" || got.Pattern != "analysis.function.local.end" || !got.Exact {
+			t.Fatalf("call issue mapping wrong: %+v", got)
+		}
+		if len(got.ValMatches) != 4 || got.ValMatches[0] != "param_name:target_id" || got.ValMatches[1] != ".query.get(target_id)" || got.ValMatches[2] != "call_path:session.get" {
+			t.Fatalf("shared value constraints missing: %+v", got.ValMatches)
+		}
+		seen[got.ValMatches[3]] = true
+		if len(got.ValAbsents) != 2 || got.ValAbsents[0] != "abort(" || got.ValAbsents[1] != "raise " {
+			t.Fatalf("shared value absences missing: %+v", got.ValAbsents)
+		}
+		if got.Requirement != nil {
+			t.Fatalf("regular call mapping acquired a content requirement: %+v", got.Requirement)
+		}
+	}
+	for _, want := range []string{"target.owner", "target.owner_id", "target.company_id"} {
+		if !seen[want] {
+			t.Fatalf("containsAny alternative %q missing from mappings: %+v", want, seen)
+		}
+	}
+}
+
 func TestV2CallPredicateNegatedContainsAnyLowersValueAbsents(t *testing.T) {
 	decls, err := parseV2DefinitionsForTest(`
 module bindings.java.sql;

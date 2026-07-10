@@ -538,6 +538,7 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
 	endLoc := c.endLoc(body)
 	endArgs := append([]nir.Expr(nil), args...)
+	localEndArgs := append([]nir.Expr(nil), args...)
 	for _, tok := range c.moduleTokens {
 		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: "module_" + tok})
 	}
@@ -567,6 +568,13 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 			Callee: nir.Name{ID: "analysis.function.context.end", Loc: endLoc},
 			Args:   endArgs,
 			Path:   "analysis.function.context.end",
+			Method: "end",
+			Loc:    endLoc,
+		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "analysis.function.local.end", Loc: endLoc},
+			Args:   localEndArgs,
+			Path:   "analysis.function.local.end",
 			Method: "end",
 			Loc:    endLoc,
 		}},

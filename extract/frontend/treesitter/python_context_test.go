@@ -233,3 +233,60 @@ def authenticate(password, digest):
 	}
 	t.Fatal("authenticate function-end context not found")
 }
+
+func TestPythonFunctionLocalEndContextExcludesModuleFacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.py")
+	src := []byte(`import base64
+
+def issue_token(identity):
+    return base64.b64encode(identity.encode()).decode()
+
+def authenticate(password, digest):
+    if not verify_password(password, digest):
+        return None
+    return {"ok": True}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.local.end" {
+			continue
+		}
+		args := n.Prop("str_args")
+		tokens := make(map[string]bool)
+		for _, token := range strings.Split(args, "\x00") {
+			tokens[token] = true
+			if strings.HasPrefix(token, "module_") {
+				t.Fatalf("function-local end context unexpectedly includes module token %q in %q", token, args)
+			}
+		}
+		if !tokens["name=authenticate"] {
+			continue
+		}
+		if got := n.Prop("loc"); got != "auth.py:9" {
+			t.Fatalf("function-local end loc = %q, want auth.py:9", got)
+		}
+		if !tokens["call_path:verify_password"] {
+			t.Fatalf("function-local end context missing %q in %q", "call_path:verify_password", args)
+		}
+		if tokens["call_path:base64.b64encode"] {
+			t.Fatalf("function-local end context unexpectedly includes prior function call fact in %q", args)
+		}
+		return
+	}
+	t.Fatal("authenticate function-local end context not found")
+}

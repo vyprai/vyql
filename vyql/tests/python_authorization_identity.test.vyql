@@ -61,3 +61,113 @@ test "python authz: owner-scoped ORM mutation is clean"
       db.session.commit()
       return redirect("/records")
   ```
+
+test "python authz: session lookup in another function does not protect a public label"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  def load_principal():
+      return Account.query.get(session.get("user_id"))
+
+  @app.route("/labels/<int:document_id>")
+  def public_label(document_id):
+      document = Document.query.get(document_id)
+      return document.public_label
+  ```
+
+test "python authz: commit in another function does not turn a target lookup into a mutation"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.route("/records/<int:record_id>/label")
+  def record_label(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      return record.public_label
+
+  def save_metric(metric):
+      db.session.add(metric)
+      db.session.commit()
+  ```
+
+test "python authz: dashboard parameter is unrelated to principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/dashboard/<tab>")
+  def dashboard(tab):
+      user_id = session.get("user_id")
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", tab=tab, user=user)
+  ```
+
+test "python authz: log-only owner comparison does not deny document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          app.logger.info("document owner differs from principal")
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: unrelated profile owner denial does not guard document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      profile = Profile.query.get(session.get("profile_id"))
+      document = Document.query.get(document_id)
+      if profile.owner_id != principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: document owner relation with terminal denial is clean"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal = Account.query.get(session.get("user_id"))
+      document = Document.query.get(document_id)
+      if document.owner != principal:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: non-owner extra filter is outside bounded target-only mutation shape"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).filter(Record.deleted == False).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```

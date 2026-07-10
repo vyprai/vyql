@@ -1,12 +1,134 @@
 module bindings.python.authorization;
 
-binding routeTargetDirectLookup666 {
-  query pattern callExpr where callee.analysis == "function.context.end"
-    and args.any.literal contains "param_index:0"
-    and args.any.literal contains ".query.get("
-    and containsAny(args.any.literal, [".query.get(order_id)", ".query.get(record_id)", ".query.get(resource_id)", ".query.get(object_id)", ".query.get(item_id)", ".query.get(document_id)", ".query.get(invoice_id)", ".query.get(account_id)", ".query.get(company_id)", ".query.get(user_id)"])
+binding routeOrderDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:order_id"
+    and args.any.literal contains ".query.get(order_id)"
     and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, [".owner_id!=", ".owner_id==", ".user_id!=", ".user_id==", ".tenant_id!=", ".tenant_id==", ".company_id!=", ".company_id=="]))
-    and not (args.any.literal contains "!=Noneor")
+    and not (containsAny(args.any.literal, ["order.owner", "order.owner_id", "order.user_id", "order.tenant_id", "order.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeOrderDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:order_id"
+    and args.any.literal contains ".query.get(order_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["order.owner", "order.owner_id", "order.user_id", "order.tenant_id", "order.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeRecordDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:record_id"
+    and args.any.literal contains ".query.get(record_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["record.owner", "record.owner_id", "record.user_id", "record.tenant_id", "record.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeRecordDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:record_id"
+    and args.any.literal contains ".query.get(record_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["record.owner", "record.owner_id", "record.user_id", "record.tenant_id", "record.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeResourceDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:resource_id"
+    and args.any.literal contains ".query.get(resource_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["resource.owner", "resource.owner_id", "resource.user_id", "resource.tenant_id", "resource.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeResourceDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:resource_id"
+    and args.any.literal contains ".query.get(resource_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["resource.owner", "resource.owner_id", "resource.user_id", "resource.tenant_id", "resource.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeObjectDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:object_id"
+    and args.any.literal contains ".query.get(object_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["object.owner", "object.owner_id", "object.user_id", "object.tenant_id", "object.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeObjectDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:object_id"
+    and args.any.literal contains ".query.get(object_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["object.owner", "object.owner_id", "object.user_id", "object.tenant_id", "object.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeItemDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:item_id"
+    and args.any.literal contains ".query.get(item_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["item.owner", "item.owner_id", "item.user_id", "item.tenant_id", "item.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeItemDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:item_id"
+    and args.any.literal contains ".query.get(item_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["item.owner", "item.owner_id", "item.user_id", "item.tenant_id", "item.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeDocumentDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:document_id"
+    and args.any.literal contains ".query.get(document_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["document.owner", "document.owner_id", "document.user_id", "document.tenant_id", "document.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeDocumentDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:document_id"
+    and args.any.literal contains ".query.get(document_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["document.owner", "document.owner_id", "document.user_id", "document.tenant_id", "document.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeInvoiceDirectLookupMissingRelation666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:invoice_id"
+    and args.any.literal contains ".query.get(invoice_id)"
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, ["invoice.owner", "invoice.owner_id", "invoice.user_id", "invoice.tenant_id", "invoice.company_id"]))
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeInvoiceDirectLookupRelationWithoutDenial666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "param_name:invoice_id"
+    and args.any.literal contains ".query.get(invoice_id)"
+    and args.any.literal contains "call_path:session.get"
+    and containsAny(args.any.literal, ["invoice.owner", "invoice.owner_id", "invoice.user_id", "invoice.tenant_id", "invoice.company_id"])
+    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
   emit issue code.UnboundAuthorizationTarget at call
 }
