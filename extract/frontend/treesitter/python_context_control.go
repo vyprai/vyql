@@ -27,6 +27,7 @@ type pyContextProvenance uint8
 const (
 	pyProvenanceUnknown pyContextProvenance = iota
 	pyProvenanceSession
+	pyProvenanceLiteral
 )
 
 type pyGuardComparison struct {
@@ -96,6 +97,7 @@ func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenanc
 			if a.c.pyConditionAlwaysTrue(condition) {
 				if len(blocks) > 0 {
 					a.visitBlock(blocks[0], clonePyProvenance(provenance))
+					a.invalidateBlockAssignments(provenance, blocks[:1])
 				}
 				if terminal {
 					return
@@ -104,14 +106,17 @@ func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenanc
 				for _, nested := range blocks {
 					a.visitBlock(nested, clonePyProvenance(provenance))
 				}
+				a.invalidateBlockAssignments(provenance, blocks)
 			}
 			continue
 		}
 
 		a.updateProvenance(statement, provenance)
-		for _, nested := range pyDirectContextBlocks(statement) {
+		blocks := pyDirectContextBlocks(statement)
+		for _, nested := range blocks {
 			a.visitBlock(nested, clonePyProvenance(provenance))
 		}
+		a.invalidateBlockAssignments(provenance, blocks)
 		if _, terminal := a.c.pyUnconditionalTerminalKind(statement); terminal {
 			return
 		}
@@ -172,24 +177,51 @@ func (a *pyControlContextAnalyzer) updateProvenance(statement *tree_sitter.Node,
 	assignment := pyDirectContextAssignment(statement)
 	if assignment == nil {
 		if augmented := pyDirectContextAugmentedAssignment(statement); augmented != nil {
-			if left := field(augmented, "left"); left != nil && left.Kind() == "identifier" {
-				delete(provenance, a.c.text(left))
+			for _, target := range a.c.targets(field(augmented, "left")) {
+				delete(provenance, target)
 			}
 		}
 		return
 	}
 	left, right := field(assignment, "left"), field(assignment, "right")
+	source := a.c.pyExpressionProvenance(right, provenance)
+	for _, target := range a.c.targets(left) {
+		delete(provenance, target)
+	}
 	if left == nil || left.Kind() != "identifier" {
 		return
 	}
 	target := a.c.text(left)
-	delete(provenance, target)
-	if a.c.pyExpressionContainsSessionSource(right) {
+	if source == pyProvenanceSession {
 		provenance[target] = pyProvenanceSession
+	}
+}
+
+func (a *pyControlContextAnalyzer) invalidateBlockAssignments(provenance map[string]pyContextProvenance, blocks []*tree_sitter.Node) {
+	if len(blocks) == 0 {
 		return
 	}
-	if right != nil && right.Kind() == "identifier" && provenance[a.c.text(right)] == pyProvenanceSession {
-		provenance[target] = pyProvenanceSession
+	assigned := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(node *tree_sitter.Node) {
+		if node == nil || pyIsNestedContextScope(node) {
+			return
+		}
+		switch node.Kind() {
+		case "assignment", "augmented_assignment":
+			for _, target := range a.c.targets(field(node, "left")) {
+				assigned[target] = true
+			}
+		}
+		for _, child := range namedChildren(node) {
+			walk(child)
+		}
+	}
+	for _, block := range blocks {
+		walk(block)
+	}
+	for target := range assigned {
+		delete(provenance, target)
 	}
 }
 
@@ -227,33 +259,132 @@ func pyDirectContextAugmentedAssignment(statement *tree_sitter.Node) *tree_sitte
 	return nil
 }
 
-func (c *pyConv) pyExpressionContainsSessionSource(expression *tree_sitter.Node) bool {
-	found := false
-	var walk func(*tree_sitter.Node)
-	walk = func(node *tree_sitter.Node) {
-		if node == nil || found || pyIsNestedContextScope(node) {
-			return
+func (c *pyConv) pyExpressionProvenance(expression *tree_sitter.Node, provenance map[string]pyContextProvenance) pyContextProvenance {
+	if expression == nil || pyIsNestedContextScope(expression) {
+		return pyProvenanceUnknown
+	}
+	if pyIsStableContextLiteral(expression) {
+		return pyProvenanceLiteral
+	}
+	switch expression.Kind() {
+	case "identifier":
+		if provenance[c.text(expression)] == pyProvenanceSession {
+			return pyProvenanceSession
 		}
-		switch node.Kind() {
-		case "call":
-			path := c.dotted(field(node, "function"))
-			if path == "session.get" || strings.HasSuffix(path, ".session.get") {
-				found = true
-				return
-			}
-		case "subscript":
-			path := c.dotted(field(node, "value"))
-			if path == "session" || strings.HasSuffix(path, ".session") {
-				found = true
-				return
+	case "parenthesized_expression":
+		children := namedChildren(expression)
+		if len(children) == 1 {
+			return c.pyExpressionProvenance(children[0], provenance)
+		}
+	case "boolean_operator":
+		if c.pyExpressionProvenance(field(expression, "left"), provenance) == pyProvenanceSession &&
+			c.pyExpressionProvenance(field(expression, "right"), provenance) == pyProvenanceSession {
+			return pyProvenanceSession
+		}
+	case "conditional_expression":
+		children := namedChildren(expression)
+		if len(children) == 3 &&
+			c.pyExpressionProvenance(children[0], provenance) == pyProvenanceSession &&
+			c.pyExpressionProvenance(children[2], provenance) == pyProvenanceSession {
+			return pyProvenanceSession
+		}
+	case "subscript":
+		path := c.dotted(field(expression, "value"))
+		if path == "session" || strings.HasSuffix(path, ".session") {
+			children := namedChildren(expression)
+			if len(children) == 2 && pyIsStableContextLiteral(children[1]) {
+				return pyProvenanceSession
 			}
 		}
-		for _, child := range namedChildren(node) {
-			walk(child)
+	case "call":
+		path := c.dotted(field(expression, "function"))
+		argumentsNode := field(expression, "arguments")
+		var arguments []*tree_sitter.Node
+		if argumentsNode == nil {
+			arguments = nil
+		} else if argumentsNode.Kind() == "argument_list" {
+			arguments = namedChildren(argumentsNode)
+		} else {
+			arguments = []*tree_sitter.Node{argumentsNode}
+		}
+		if path == "session.get" || strings.HasSuffix(path, ".session.get") {
+			if len(arguments) == 0 {
+				return pyProvenanceUnknown
+			}
+			for _, argument := range arguments {
+				if c.pyCallArgumentProvenance(argument, provenance) != pyProvenanceLiteral {
+					return pyProvenanceUnknown
+				}
+			}
+			return pyProvenanceSession
+		}
+		if path == "" || pyContextPathContainsSegment(path, "request") {
+			return pyProvenanceUnknown
+		}
+		hasSessionArgument := false
+		for _, argument := range arguments {
+			source := c.pyCallArgumentProvenance(argument, provenance)
+			switch source {
+			case pyProvenanceSession:
+				hasSessionArgument = true
+			case pyProvenanceLiteral:
+			default:
+				return pyProvenanceUnknown
+			}
+		}
+		if hasSessionArgument {
+			return pyProvenanceSession
 		}
 	}
-	walk(expression)
-	return found
+	return pyProvenanceUnknown
+}
+
+func pyContextPathContainsSegment(path, segment string) bool {
+	for _, candidate := range strings.Split(path, ".") {
+		if candidate == segment {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *pyConv) pyCallArgumentProvenance(argument *tree_sitter.Node, provenance map[string]pyContextProvenance) pyContextProvenance {
+	if argument == nil {
+		return pyProvenanceUnknown
+	}
+	if argument.Kind() == "keyword_argument" {
+		return c.pyExpressionProvenance(field(argument, "value"), provenance)
+	}
+	return c.pyExpressionProvenance(argument, provenance)
+}
+
+func pyIsStableContextLiteral(expression *tree_sitter.Node) bool {
+	if expression == nil {
+		return false
+	}
+	switch expression.Kind() {
+	case "integer", "float", "true", "false", "none", "ellipsis":
+		return true
+	case "string":
+		for _, child := range namedChildren(expression) {
+			if child.Kind() == "interpolation" {
+				return false
+			}
+		}
+		return true
+	case "concatenated_string":
+		children := namedChildren(expression)
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !pyIsStableContextLiteral(child) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (a *pyControlContextAnalyzer) recordGuardCorrelations(condition *tree_sitter.Node, terminalKind string, laterStatements []*tree_sitter.Node, provenance map[string]pyContextProvenance) {

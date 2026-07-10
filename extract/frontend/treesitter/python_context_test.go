@@ -591,6 +591,211 @@ def branch_local(document_id, enabled):
 	}
 }
 
+func TestPythonFunctionLocalEndCompoundAssignmentsInvalidateOuterProvenance(t *testing.T) {
+	src := `def if_reassigned(document_id, use_claimed):
+    principal_id = session.get("user_id")
+    if use_claimed:
+        principal_id = request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def elif_reassigned(document_id, first, use_claimed):
+    principal_id = session.get("user_id")
+    if first:
+        audit()
+    elif use_claimed:
+        principal_id = request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def else_reassigned(document_id, preserve):
+    principal_id = session.get("user_id")
+    if preserve:
+        audit()
+    else:
+        principal_id = request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def loop_reassigned(document_id, claimed_ids):
+    principal_id = session.get("user_id")
+    for claimed_id in claimed_ids:
+        principal_id = claimed_id
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def try_reassigned(document_id):
+    principal_id = session.get("user_id")
+    try:
+        principal_id = request.args.get("owner_id")
+    except LookupError:
+        audit()
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def with_reassigned(document_id):
+    principal_id = session.get("user_id")
+    with authorization_context():
+        principal_id = request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def augmented_in_branch(document_id, mutate):
+    principal_id = session.get("user_id")
+    if mutate:
+        principal_id += request.args.get("suffix")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def nested_scope_does_not_reassign(document_id):
+    principal_id = session.get("user_id")
+    def unused():
+        principal_id = request.args.get("owner_id")
+        return principal_id
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+`
+	unknownPrefix := "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;"
+	for _, name := range []string{
+		"if_reassigned",
+		"elif_reassigned",
+		"else_reassigned",
+		"loop_reassigned",
+		"try_reassigned",
+		"with_reassigned",
+		"augmented_in_branch",
+	} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		token := tokenWithPrefix(tokens, unknownPrefix)
+		if token == "" || !strings.Contains(token, "counterpart_source=unknown") {
+			t.Fatalf("%s retained provenance assigned in a potentially reachable compound block: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+	nestedScope := pythonFunctionLocalEndTokens(t, src, "nested_scope_does_not_reassign")
+	if tokenWithPrefix(nestedScope, "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;guard_counterpart=principal_id;terminal=abort") == "" {
+		t.Fatalf("nested function assignment invalidated the enclosing provenance: %q", strings.Join(nestedScope, " | "))
+	}
+}
+
+func TestPythonFunctionLocalEndSessionProvenanceRequiresEveryIdentityAlternative(t *testing.T) {
+	src := `def all_session_boolean(document_id):
+    principal_id = session.get("primary_id") or session["backup_id"]
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def all_session_conditional(document_id, use_primary):
+    principal_id = session.get("primary_id") if use_primary else session["backup_id"]
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def wrapped_with_literal_ancillary(document_id):
+    principal = Account.query.get(session.get("user_id"), cache=True)
+    document = Document.query.get(document_id)
+    if document.owner != principal:
+        abort(403)
+    return document
+
+def request_or_session(document_id):
+    principal_id = request.args.get("owner_id") or session.get("user_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def session_and_request(document_id):
+    principal_id = session.get("user_id") and request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def mixed_conditional(document_id, use_claimed):
+    principal_id = session.get("user_id") if not use_claimed else request.args.get("owner_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def dynamic_session_key(document_id):
+    principal_id = session.get(request.args.get("session_key"))
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def dynamic_session_subscript(document_id, session_key):
+    principal_id = session[session_key]
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def mixed_container(document_id):
+    principal_id = [session.get("user_id"), request.args.get("owner_id")]
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+
+def mixed_wrapper(document_id):
+    principal = Account.query.get(session.get("user_id"), request.args.get("tenant_id"))
+    document = Document.query.get(document_id)
+    if document.owner != principal:
+        abort(403)
+    return document
+`
+	for _, name := range []string{"all_session_boolean", "all_session_conditional"} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		if tokenWithPrefix(tokens, "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;guard_counterpart=principal_id;terminal=abort") == "" {
+			t.Fatalf("%s lost all-session alternative provenance: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+	wrapped := pythonFunctionLocalEndTokens(t, src, "wrapped_with_literal_ancillary")
+	if tokenWithPrefix(wrapped, "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner;counterpart_source=session;guard_counterpart=principal;terminal=abort") == "" {
+		t.Fatalf("literal-only wrapper ancillary argument lost session provenance: %q", strings.Join(wrapped, " | "))
+	}
+	for _, testCase := range []struct {
+		name   string
+		target string
+		other  string
+	}{
+		{name: "request_or_session", target: "document.owner_id", other: "principal_id"},
+		{name: "session_and_request", target: "document.owner_id", other: "principal_id"},
+		{name: "mixed_conditional", target: "document.owner_id", other: "principal_id"},
+		{name: "dynamic_session_key", target: "document.owner_id", other: "principal_id"},
+		{name: "dynamic_session_subscript", target: "document.owner_id", other: "principal_id"},
+		{name: "mixed_container", target: "document.owner_id", other: "principal_id"},
+		{name: "mixed_wrapper", target: "document.owner", other: "principal"},
+	} {
+		tokens := pythonFunctionLocalEndTokens(t, src, testCase.name)
+		prefix := "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=" + testCase.target + ";"
+		token := tokenWithPrefix(tokens, prefix)
+		if token == "" || !strings.Contains(token, "counterpart_source=unknown;guard_counterpart="+testCase.other) {
+			t.Fatalf("%s trusted a mixed or dynamic identity expression: %q", testCase.name, strings.Join(tokens, " | "))
+		}
+	}
+}
+
 func TestPythonFunctionLocalEndOperationCorrelationsRespectOrderAndPolarity(t *testing.T) {
 	src := `def inverted_guard(document_id):
     principal_id = session.get("user_id")
