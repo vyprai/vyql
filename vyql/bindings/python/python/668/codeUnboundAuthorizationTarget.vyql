@@ -1,0 +1,8 @@
+module bindings.python.authorization;
+
+binding headerSelectedStoredPrincipal668 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "assignment_flow_reaches_operation:source_category=request;source=request.headers.get;previous_source=session;operation_category=query;operation=query."
+  emit issue code.UnboundAuthorizationTarget at call
+}

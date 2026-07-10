@@ -1073,6 +1073,86 @@ func TestPythonFunctionLocalEndReachableCommitSurvivesSeparateUnreachableCommit(
 	}
 }
 
+func TestPythonFunctionLocalEndCorrelatesRequestIdentityFlows(t *testing.T) {
+	src := `def header_replacement():
+    principal_id = session.get("user_id")
+    requested_id = request.headers.get("X-User-Id")
+    if requested_id:
+        principal_id = requested_id
+    principal = User.query.get(principal_id)
+    return principal
+
+def unreachable_header_replacement():
+    principal_id = session.get("user_id")
+    requested_id = request.headers.get("X-User-Id")
+    if requested_id:
+        if User.query.get(requested_id):
+            principal_id = requested_id
+        else:
+            return ""
+        if principal_id:
+            return ""
+    if len(principal_id) or len(requested_id):
+        return ""
+    principal = User.query.get(principal_id)
+    return principal
+
+def header_validation_only():
+    principal_id = session.get("user_id")
+    requested_id = request.headers.get("X-User-Id")
+    if requested_id != principal_id:
+        abort(403)
+    principal = User.query.get(principal_id)
+    return principal
+
+def subscript_header_replacement():
+    account_id = session["account_id"]
+    requested_id = request.headers.get("X-Account-Id")
+    if requested_id:
+        account_id = requested_id
+    account = Account.query.get(account_id)
+    return account
+
+def request_selected_session(username):
+    password = request.form["password"]
+    account = Account.query.filter_by(username=username, password=password).first()
+    if account:
+        if Account.query.get(request.form["account_id"]):
+            session["account_id"] = request.form["account_id"]
+
+def authenticated_record_session(username):
+    password = request.form["password"]
+    account = Account.query.filter_by(username=username, password=password).first()
+    if account:
+        session["account_id"] = account.id
+`
+
+	header := pythonFunctionLocalEndTokens(t, src, "header_replacement")
+	if tokenWithPrefix(header, "assignment_flow_reaches_operation:source_category=request;source=request.headers.get;previous_source=session;operation_category=query;operation=query.get;target=principal_id;args=principal_id;callee=User.query.get") == "" {
+		t.Fatalf("reachable header-selected principal lookup was not correlated: %q", strings.Join(header, " | "))
+	}
+	subscriptHeader := pythonFunctionLocalEndTokens(t, src, "subscript_header_replacement")
+	if tokenWithPrefix(subscriptHeader, "assignment_flow_reaches_operation:source_category=request;source=request.headers.get;previous_source=session;operation_category=query;operation=query.get;target=account_id;args=account_id;callee=Account.query.get") == "" {
+		t.Fatalf("subscript-loaded server value replacement was not correlated: %q", strings.Join(subscriptHeader, " | "))
+	}
+
+	for _, name := range []string{"unreachable_header_replacement", "header_validation_only"} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		if tokenWithPrefix(tokens, "assignment_flow_reaches_operation:") != "" {
+			t.Fatalf("%s emitted a request-principal replacement flow: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+
+	requestSession := pythonFunctionLocalEndTokens(t, src, "request_selected_session")
+	if tokenWithPrefix(requestSession, "assignment_flow_reaches_store:source_category=request;store=session;source=request.form;key=account_id;value=request.form[\"account_id\"]") == "" {
+		t.Fatalf("request-selected session identity was not correlated: %q", strings.Join(requestSession, " | "))
+	}
+	authenticatedSession := pythonFunctionLocalEndTokens(t, src, "authenticated_record_session")
+	if tokenWithPrefix(authenticatedSession, "assignment_flow_reaches_store:") != "" {
+		t.Fatalf("authenticated record identity was classified as request-selected: %q", strings.Join(authenticatedSession, " | "))
+	}
+}
+
 func TestPythonFunctionLocalEndControlEvidenceHasReservedBudgets(t *testing.T) {
 	var saturated strings.Builder
 	saturated.WriteString("def saturated_handler(document_id):\n")

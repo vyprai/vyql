@@ -18,8 +18,9 @@ const (
 )
 
 type pyControlContextFacts struct {
-	terminal  []string
-	reachable []string
+	terminal       []string
+	reachable      []string
+	assignmentFlow []string
 }
 
 type pyContextProvenance uint8
@@ -67,7 +68,11 @@ func (c *pyConv) pyControlFlowContextFacts(body *tree_sitter.Node) pyControlCont
 		reachableSeen: map[string]bool{},
 	}
 	analyzer.visitBlock(body, map[string]pyContextProvenance{})
-	return pyControlContextFacts{terminal: analyzer.terminalFacts, reachable: analyzer.reachable}
+	return pyControlContextFacts{
+		terminal:       analyzer.terminalFacts,
+		reachable:      analyzer.reachable,
+		assignmentFlow: c.pyAssignmentFlowFacts(body),
+	}
 }
 
 func (a *pyControlContextAnalyzer) visitBlock(block *tree_sitter.Node, provenance map[string]pyContextProvenance) {

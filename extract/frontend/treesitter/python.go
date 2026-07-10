@@ -846,6 +846,12 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 			out = append(out, tok)
 		}
 	}
+	for _, tok := range controlFacts.assignmentFlow {
+		if tok != "" && !seen[tok] {
+			seen[tok] = true
+			out = append(out, tok)
+		}
+	}
 	return out
 }
 

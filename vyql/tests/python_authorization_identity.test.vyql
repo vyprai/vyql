@@ -649,3 +649,243 @@ test "python authz: nested unreachable commit does not hide reachable branch com
           return ""
           database.session.commit()
   ```
+
+test "python authz: request header cannot replace the server-side user principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id:
+          if User.query.get(requested_user_id):
+              user_id = requested_user_id
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", user=user)
+  ```
+
+test "python authz: request header cannot replace an account principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @accounts.get("/account")
+  def account_dashboard():
+      account_id = session["account_id"]
+      selected_account_id = request.headers.get("X-Account-Id")
+      if selected_account_id:
+          account_id = selected_account_id
+      account = Account.query.get(account_id)
+      return account
+  ```
+
+test "python authz: request header cannot replace a company principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @companies.post("/switch")
+  def company_switch():
+      company_id = session.get("company_id")
+      claimed_company_id = request.headers.get("X-Company-Id")
+      if claimed_company_id:
+          company_id = claimed_company_id
+      company = Company.query.get(company_id)
+      return company
+  ```
+
+test "python authz: request header cannot replace a tenant principal"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @tenant_api.patch("/tenant-context")
+  def tenant_context():
+      tenant_id = session.get("tenant_id")
+      requested_tenant_id = request.headers.get("X-Tenant-Id")
+      if requested_tenant_id:
+          tenant_id = requested_tenant_id
+      tenant = Tenant.query.get(tenant_id)
+      return tenant
+  ```
+
+test "python authz: mismatched request header is denied without principal replacement"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id and requested_user_id != user_id:
+          abort(403)
+      user = User.query.get(user_id)
+      return render_template("dashboard.html", user=user)
+  ```
+
+test "python authz: terminal length guard blocks a header-selected principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/dashboard")
+  def dashboard():
+      user_id = session.get("user_id")
+      requested_user_id = request.headers.get("X-User-Id")
+      if requested_user_id:
+          if User.query.get(requested_user_id):
+              user_id = requested_user_id
+          else:
+              return ""
+          if user_id:
+              return ""
+      if len(user_id) or len(requested_user_id):
+          return ""
+      user = User.query.get(user_id)
+      return user
+  ```
+
+test "python authz: internal header context helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  def load_selected_account():
+      account_id = session.get("account_id")
+      selected_account_id = request.headers.get("X-Account-Id")
+      if selected_account_id:
+          account_id = selected_account_id
+      return Account.query.get(account_id)
+  ```
+
+test "python authz: authenticated credentials cannot select a different form session identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.route("/password/<username>", methods=["POST"])
+  def password(username):
+      password = request.form["password"]
+      user = User.query.filter_by(username=username, password=password).first()
+      if user:
+          if User.query.get(request.form["user_id"]):
+              session["user_id"] = request.form["user_id"]
+              return redirect("/dashboard")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different JSON account identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @accounts.post("/login")
+  def account_login():
+      password = request.json["password"]
+      account = Account.query.filter_by(email=request.json["email"], password=password).first()
+      if account:
+          session["account_id"] = request.json["account_id"]
+          return redirect("/account")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different query tenant identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @tenants.put("/login")
+  def tenant_login():
+      password = request.form["password"]
+      tenant = Tenant.query.filter_by(slug=request.form["slug"], password=password).first()
+      if tenant:
+          session["tenant_id"] = request.args.get("tenant_id")
+          return redirect("/tenant")
+      return redirect("/login")
+  ```
+
+test "python authz: authenticated credentials cannot select a different parsed JSON company identity"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @companies.post("/login")
+  def company_login():
+      payload = request.get_json()
+      password = payload["password"]
+      company = Company.query.filter_by(name=payload["name"], password=password).first()
+      if company:
+          session["company_id"] = payload["company_id"]
+          return redirect("/company")
+      return redirect("/login")
+  ```
+
+test "python authz: successful credential lookup establishes its own session identity"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.post("/password/<username>")
+  def password(username):
+      password = request.form["password"]
+      user = User.query.filter_by(username=username, password=password).first()
+      if user:
+          session["user_id"] = user.id
+          return redirect("/dashboard")
+      return redirect("/login")
+  ```
+
+test "python authz: request-selected session identity without credential authentication is outside detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  @app.post("/preferences")
+  def preferences():
+      session["user_id"] = request.form["user_id"]
+      return redirect("/preferences")
+  ```
+
+test "python authz: internal credential helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import request, session
+
+  def authenticate_account(email):
+      password = request.form["password"]
+      account = Account.query.filter_by(email=email, password=password).first()
+      if account:
+          session["account_id"] = request.form["account_id"]
+      return account
+  ```
