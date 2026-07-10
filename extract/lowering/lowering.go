@@ -91,6 +91,7 @@ type lowerer struct {
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
+	templates  map[string]templateInfo
 
 	// lambdaParams maps a lowered function-value node (a passed callback) to its parameter
 	// node ids, so a higher-order call (arr.map(cb), p.then(cb)) can route the receiver's
@@ -1154,6 +1155,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		moduleTech:      map[string]string{},
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
+		templates:       map[string]templateInfo{},
 		lambdaParams:    map[string][]string{},
 		directMembers:   map[string]map[string]bool{},
 		classBaseNames:  map[string][]string{},
@@ -2034,6 +2036,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Seq", ex.Loc, props)
+		ci := l.cinfo(n)
 		for i, p := range ex.Parts {
 			elem := l.node("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
@@ -2041,6 +2044,15 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			})
 			l.flow(l.eval(p, sc), elem)
 			l.flow(elem, n)
+			key := strconv.Itoa(i)
+			if pair, ok := p.(nir.Pair); ok {
+				if pair.DynamicKey {
+					ci.dirty = true
+				} else if pair.Key != "" {
+					key = pair.Key
+				}
+			}
+			ci.elems[key] = elem
 		}
 		return n
 	case nir.BinOp:
@@ -2670,6 +2682,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 	}
 	result := l.node("Call", call.Loc, props)
+	l.rememberTemplate(call, result, sc)
 	if recvNode != "" { // receiver taint (chained calls)
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
@@ -2740,7 +2753,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
 	}
-	mapped := make([]bool, len(args))
+	mapped := l.flowTemplateRender(call, argVals, recvNode, result)
 	for _, target := range targets {
 		if dynamicCallback {
 			for i, a := range args {
