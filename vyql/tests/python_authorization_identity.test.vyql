@@ -1,0 +1,63 @@
+test "python authz: route target reaches direct ORM lookup without owner relation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if principal_id:
+          document = Document.query.get(document_id)
+          return render_template("document.html", document=document)
+      return redirect("/login")
+  ```
+
+test "python authz: owner guard covers direct ORM lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: target-only ORM mutation lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: owner-scoped ORM mutation is clean"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      principal = Account.query.get(session.get("user_id"))
+      record = Record.query.filter(Record.id == record_id).filter(Record.owner == principal).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```

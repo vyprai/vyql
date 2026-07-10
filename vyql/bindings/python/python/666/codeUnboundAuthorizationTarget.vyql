@@ -1,0 +1,12 @@
+module bindings.python.authorization;
+
+binding routeTargetDirectLookup666 {
+  query pattern callExpr where callee.analysis == "function.context.end"
+    and args.any.literal contains "param_index:0"
+    and args.any.literal contains ".query.get("
+    and containsAny(args.any.literal, [".query.get(order_id)", ".query.get(record_id)", ".query.get(resource_id)", ".query.get(object_id)", ".query.get(item_id)", ".query.get(document_id)", ".query.get(invoice_id)", ".query.get(account_id)", ".query.get(company_id)", ".query.get(user_id)"])
+    and args.any.literal contains "call_path:session.get"
+    and not (containsAny(args.any.literal, [".owner_id!=", ".owner_id==", ".user_id!=", ".user_id==", ".tenant_id!=", ".tenant_id==", ".company_id!=", ".company_id=="]))
+    and not (args.any.literal contains "!=Noneor")
+  emit issue code.UnboundAuthorizationTarget at call
+}

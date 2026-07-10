@@ -1,0 +1,10 @@
+module bindings.python.authorization;
+
+binding routeTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.context.end"
+    and args.any.literal contains "param_index:0"
+    and args.any.literal contains ".commit()"
+    and containsAny(args.any.literal, ["==order_id).first_or_404()", "==record_id).first_or_404()", "==resource_id).first_or_404()", "==object_id).first_or_404()", "==item_id).first_or_404()", "==document_id).first_or_404()", "==invoice_id).first_or_404()", "==account_id).first_or_404()"])
+    and not (args.any.literal contains ">=0:return")
+  emit issue code.UnboundAuthorizationTarget at call
+}
