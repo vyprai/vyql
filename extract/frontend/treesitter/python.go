@@ -155,10 +155,39 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 // blockChildren lowers the statements of a node's named children.
 func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	statements := namedChildren(n)
+	for i, st := range statements {
 		out = append(out, c.stmt(st)...)
+		if c.pyLengthGuardDefinitelyTerminates(st, statements[:i]) {
+			break
+		}
 	}
 	return out
+}
+
+func (c *pyConv) pyLengthGuardDefinitelyTerminates(statement *tree_sitter.Node, previous []*tree_sitter.Node) bool {
+	if statement == nil || statement.Kind() != "if_statement" || !c.pyConditionAlwaysTrue(field(statement, "condition")) {
+		return false
+	}
+	for _, prior := range previous {
+		assignment := prior
+		if assignment.Kind() == "expression_statement" {
+			children := namedChildren(assignment)
+			if len(children) != 1 || children[0].Kind() != "assignment" {
+				continue
+			}
+			assignment = children[0]
+		}
+		if assignment.Kind() != "assignment" {
+			continue
+		}
+		left := field(assignment, "left")
+		if left != nil && left.Kind() == "identifier" && c.text(left) == "len" {
+			return false
+		}
+	}
+	_, terminal := c.pyTerminalBranchKind(field(statement, "consequence"))
+	return terminal
 }
 
 // vyqlResultEntries extracts `# vyql: ...` function markers without interpreting them.

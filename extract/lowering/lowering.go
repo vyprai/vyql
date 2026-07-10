@@ -645,11 +645,12 @@ type scope struct {
 	node map[string]string
 	typ  map[string][2]string
 	cnst map[string]string // variable -> its string-constant value (lightweight const-prop)
-	lex  map[string]bool   // JS/TS captured lexical bindings shared across nested functions
+	iter map[string][]string
+	lex  map[string]bool // JS/TS captured lexical bindings shared across nested functions
 }
 
 func newScope() *scope {
-	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, lex: map[string]bool{}}
+	return &scope{node: map[string]string{}, typ: map[string][2]string{}, cnst: map[string]string{}, iter: map[string][]string{}, lex: map[string]bool{}}
 }
 
 func (s *scope) clone() *scope {
@@ -662,6 +663,9 @@ func (s *scope) clone() *scope {
 	}
 	for k, v := range s.cnst {
 		c.cnst[k] = v
+	}
+	for k, v := range s.iter {
+		c.iter[k] = append([]string(nil), v...)
 	}
 	for k, v := range s.lex {
 		c.lex[k] = v
@@ -1592,11 +1596,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 
 func (l *lowerer) block(stmts []nir.Stmt, sc *scope) {
 	for _, s := range stmts {
-		exits := l.stmtDefinitelyExits(s, sc)
 		l.stmt(s, sc)
-		if exits {
-			break
-		}
 	}
 }
 
@@ -1705,6 +1705,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				cv = sv
 			}
 		}
+		iterValues, iterOK := l.constIterationValues(st.Value, sc)
+		for _, target := range st.Targets {
+			if iterOK {
+				sc.iter[target] = append([]string(nil), iterValues...)
+			} else {
+				delete(sc.iter, target)
+			}
+		}
 		for _, t := range st.Targets {
 			localDecl := st.Decl && l.region != ""
 			targetTyp, targetHasTyp := typ, hasTyp
@@ -1800,6 +1808,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionReturnAnalysisEvent(rv, "", retTokens)
 	case nir.Terminate:
 		l.eval(st.Value, sc)
+	case nir.Validation:
+		l.applyValidation(st, sc)
 	case nir.ExprStmt:
 		callNode := l.eval(st.Value, sc)
 		// Builder/accumulator calls fold their args into the object/buffer you
@@ -1844,6 +1854,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		l.inRegion("if"+b+".t", func() {
 			if name, ok := allowlistMembershipVar(st.Cond); ok && before[name] != "" {
 				loc := st.Loc
@@ -1858,10 +1869,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.block(st.Then, sc)
 		})
 		thenB := cloneStrMap(sc.node)
+		thenIter := cloneIterationFacts(sc.iter)
 		sc.node = cloneStrMap(before)
+		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 		elseB := cloneStrMap(sc.node)
+		elseIter := cloneIterationFacts(sc.iter)
 		sc.node = before
+		sc.iter = stableIterationFacts(thenIter, elseIter)
 		l.mergeBindings(sc, before, []map[string]string{thenB, elseB})
 		if name, ok := zeroExitGuardName(st.Cond, st.Then, st.Else); ok {
 			if observed := before[name]; observed != "" {
@@ -1872,6 +1887,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.Loop:
 		l.eval(st.Cond, sc)
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		iterNode := l.eval(st.Iter, sc)
 		if iterNode != "" {
 			for _, name := range st.Vars {
@@ -1884,7 +1900,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyB := cloneStrMap(sc.node)
+		bodyIter := cloneIterationFacts(sc.iter)
 		sc.node = before
+		sc.iter = stableIterationFacts(beforeIter, bodyIter)
 		l.mergeBindings(sc, before, []map[string]string{bodyB})
 	case nir.Switch:
 		subject := l.eval(st.Subject, sc)
@@ -1916,16 +1934,23 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		b := l.nextBranch()
 		before := cloneStrMap(sc.node)
+		beforeIter := cloneIterationFacts(sc.iter)
 		var branches []map[string]string
+		var iterBranches []map[string][]string
 		for i, c := range st.Cases {
 			sc.node = cloneStrMap(before)
+			sc.iter = cloneIterationFacts(beforeIter)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
 			branches = append(branches, cloneStrMap(sc.node))
+			iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
 		}
 		sc.node = cloneStrMap(before)
+		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 		branches = append(branches, cloneStrMap(sc.node))
+		iterBranches = append(iterBranches, cloneIterationFacts(sc.iter))
 		sc.node = before
+		sc.iter = stableIterationFacts(iterBranches...)
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
@@ -1943,6 +1968,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		l.inRegion("try"+b+".f", func() { l.block(st.Finally, sc) })
+		sc.iter = map[string][]string{}
 	}
 }
 
@@ -2049,7 +2075,13 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			props["str_args"] = strings.Join(valToks, "\x00")
 		}
 		n := l.node("Seq", ex.Loc, props)
-		ci := l.cinfo(n)
+		var ci *containerInfo
+		for _, part := range ex.Parts {
+			if _, ok := part.(nir.Pair); ok {
+				ci = l.cinfo(n)
+				break
+			}
+		}
 		for i, p := range ex.Parts {
 			elem := l.node("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
@@ -2057,6 +2089,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			})
 			l.flow(l.eval(p, sc), elem)
 			l.flow(elem, n)
+			if ci == nil {
+				continue
+			}
 			key := strconv.Itoa(i)
 			if pair, ok := p.(nir.Pair); ok {
 				if pair.DynamicKey {

@@ -314,19 +314,19 @@ type Try struct {
 	Loc           string
 }
 
-func (Assign) isStmt()    {}
-func (AugAssign) isStmt() {}
-func (Return) isStmt()    {}
+func (Assign) isStmt()     {}
+func (AugAssign) isStmt()  {}
+func (Return) isStmt()     {}
 func (Validation) isStmt() {}
 func (Terminate) isStmt()  {}
-func (ExprStmt) isStmt()  {}
-func (FuncDef) isStmt()   {}
-func (ClassDef) isStmt()  {}
-func (Block) isStmt()     {}
-func (If) isStmt()        {}
-func (Loop) isStmt()      {}
-func (Switch) isStmt()    {}
-func (Try) isStmt()       {}
+func (ExprStmt) isStmt()   {}
+func (FuncDef) isStmt()    {}
+func (ClassDef) isStmt()   {}
+func (Block) isStmt()      {}
+func (If) isStmt()         {}
+func (Loop) isStmt()       {}
+func (Switch) isStmt()     {}
+func (Try) isStmt()        {}
 
 // Import is one import binding. Module is the target module key (source-root
 // key) or file path; Symbol is set for `from m import s` (empty for plain module

@@ -116,3 +116,35 @@ func TestPythonTerminalSyntaxUsesTerminateNIR(t *testing.T) {
 		t.Fatalf("abort=%#v", fn.Body)
 	}
 }
+
+func TestPythonTrueLengthGuardStopsSuffixWithoutStoppingBranches(t *testing.T) {
+	fn := extractPythonFunction(t, `def f(value):
+    if len(value) >= 0:
+        return ""
+    return render(value)
+`, "f")
+	if len(fn.Body) < 2 {
+		t.Fatalf("body=%#v, want terminal guard plus context metadata", fn.Body)
+	}
+	if _, ok := fn.Body[1].(nir.Return); ok {
+		t.Fatalf("unreachable return survived: %#v", fn.Body)
+	}
+}
+
+func TestPythonShadowedLengthDoesNotStopSuffix(t *testing.T) {
+	fn := extractPythonFunction(t, `def f(value):
+    len = custom_len
+    if len(value) >= 0:
+        return ""
+    return render(value)
+`, "f")
+	foundReturn := false
+	for _, stmt := range fn.Body {
+		if _, ok := stmt.(nir.Return); ok {
+			foundReturn = true
+		}
+	}
+	if !foundReturn {
+		t.Fatalf("body=%#v, want shadowed length suffix preserved", fn.Body)
+	}
+}

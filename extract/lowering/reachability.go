@@ -1,6 +1,10 @@
 package lowering
 
-import "github.com/vyprai/vyql/extract/nir"
+import (
+	"strings"
+
+	"github.com/vyprai/vyql/extract/nir"
+)
 
 func (l *lowerer) builtinLenCall(expr nir.Expr, sc *scope) bool {
 	call, ok := expr.(nir.Call)
@@ -52,7 +56,7 @@ func (l *lowerer) stmtDefinitelyExits(stmt nir.Stmt, sc *scope) bool {
 	case nir.Return, nir.Terminate:
 		return true
 	case nir.Block:
-		return l.blockDefinitelyExits(st.Stmts, sc)
+		return false
 	case nir.If:
 		if live, ok := l.constBool(st.Cond, sc); ok {
 			if live {
@@ -60,8 +64,12 @@ func (l *lowerer) stmtDefinitelyExits(stmt nir.Stmt, sc *scope) bool {
 			}
 			return l.blockDefinitelyExits(st.Else, sc)
 		}
-		return len(st.Then) > 0 && len(st.Else) > 0 &&
-			l.blockDefinitelyExits(st.Then, sc) && l.blockDefinitelyExits(st.Else, sc)
+		return false
 	}
 	return false
+}
+
+func (l *lowerer) atFunctionRoot() bool {
+	marker := strings.Index(l.region, "/fn")
+	return marker >= 0 && !strings.Contains(l.region[marker+3:], "/")
 }

@@ -41,12 +41,12 @@ func TestReachabilityPrunesOnlyDefiniteExits(t *testing.T) {
 		prefix        []nir.Stmt
 		wantReachable bool
 	}{
-		{"return", []nir.Stmt{nir.Return{Value: nir.Const{Value: "safe", Loc: "app.py:2"}}}, false},
-		{"raise", []nir.Stmt{nir.Terminate{Kind: "raise", Loc: "app.py:2"}}, false},
+		{"return", []nir.Stmt{nir.Return{Value: nir.Const{Value: "safe", Loc: "app.py:2"}}}, true},
+		{"raise", []nir.Stmt{nir.Terminate{Kind: "raise", Loc: "app.py:2"}}, true},
 		{"true length guard", []nir.Stmt{nir.If{
 			Cond: nir.BinOp{Op: ">=", Left: nir.Call{Callee: nir.Name{ID: "len"}, Args: []nir.Expr{nir.Name{ID: "source"}}, Path: "len", Method: "len"}, Right: nir.Const{Value: "0"}},
 			Then: []nir.Stmt{nir.Return{}},
-		}}, false},
+		}}, true},
 		{"unknown numeric guard", []nir.Stmt{nir.If{
 			Cond: nir.BinOp{Op: ">=", Left: nir.Name{ID: "source"}, Right: nir.Const{Value: "0"}},
 			Then: []nir.Stmt{nir.Return{}},
@@ -85,5 +85,22 @@ func TestReachabilityPrunesOnlyDefiniteExits(t *testing.T) {
 				t.Fatalf("reachable=%v, want %v", reachable, test.wantReachable)
 			}
 		})
+	}
+}
+
+func TestNonNegativeLengthFactIsSoundAndBuiltinOnly(t *testing.T) {
+	l := newLowerer(nir.Program{}, true, nil)
+	sc := newScope()
+	expr := nir.BinOp{
+		Op:    ">=",
+		Left:  nir.Call{Callee: nir.Name{ID: "len"}, Args: []nir.Expr{nir.Name{ID: "value"}}, Path: "len", Method: "len"},
+		Right: nir.Const{Value: "0"},
+	}
+	if got, ok := l.constBool(expr, sc); !ok || !got {
+		t.Fatalf("builtin length fact=(%v,%v), want (true,true)", got, ok)
+	}
+	sc.node["len"] = "custom"
+	if got, ok := l.constBool(expr, sc); ok || got {
+		t.Fatalf("shadowed length fact=(%v,%v), want (false,false)", got, ok)
 	}
 }
