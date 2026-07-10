@@ -3,8 +3,7 @@ module bindings.python.authorization;
 binding routeTargetMutation667 {
   query pattern callExpr where callee.analysis == "function.local.end"
     and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
-    and args.any.literal contains ".commit()"
-    and not (args.any.literal contains "unreachable_call:db.session.commit()")
+    and args.any.literal contains "reachable_call_method:commit"
     and (
       (args.any.literal contains "param_name:order_id" and args.any.literal contains "==order_id).first_or_404()")
       or (args.any.literal contains "param_name:record_id" and args.any.literal contains "==record_id).first_or_404()")

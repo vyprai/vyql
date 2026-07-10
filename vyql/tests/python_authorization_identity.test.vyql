@@ -322,3 +322,227 @@ test "python authz: account target-only mutation lacks owner scope"
       db.session.commit()
       return redirect("/accounts")
   ```
+
+test "python authz: sibling class method commit does not mutate endpoint target"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  class RecordRoutes:
+      @app.get("/records/<int:record_id>/label")
+      def record_label(self, record_id):
+          record = Record.query.filter(Record.id == record_id).first_or_404()
+          return record.public_label
+
+      def save_metric(self, metric):
+          db.session.add(metric)
+          db.session.commit()
+  ```
+
+test "python authz: unused nested scopes do not supply principal lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/documents/<int:document_id>/label")
+  def public_document_label(document_id):
+      document = Document.query.get(document_id)
+
+      def unused_principal():
+          return session.get("user_id")
+
+      class UnusedPrincipal:
+          def load(self):
+              return session["user_id"]
+
+      callback = lambda: session.get("lambda-user")
+      return document.public_label
+  ```
+
+test "python authz: unused nested scopes do not supply reachable commit"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.get("/records/<int:record_id>/label")
+  def record_label(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+
+      def unused_save():
+          db.commit()
+
+      class UnusedSave:
+          def save(self):
+              database.session.commit()
+
+      callback = lambda: db.session.commit()
+      return record.public_label
+  ```
+
+test "python authz: request-claimed owner mismatch is not principal authorization"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, request, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      authenticated_id = session.get("user_id")
+      claimed_owner_id = request.args.get("owner_id")
+      document = Document.query.get(document_id)
+      if document.owner_id != claimed_owner_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: session-derived target ID mismatch guards later user lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/users/<int:user_id>")
+  def view_user(user_id):
+      principal_id = session.get("user_id")
+      if principal_id != user_id:
+          abort(403)
+      user = User.query.get(user_id)
+      return user
+  ```
+
+test "python authz: unconditional session alias guards target return"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      session_principal = session.get("user_id")
+      principal_alias = session_principal
+      document = Document.query.get(document_id)
+      if principal_alias != document.owner_id:
+          abort(403)
+      return document
+  ```
+
+test "python authz: later unrelated owner use does not guard earlier protected use"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.get("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      send_to_client(document)
+      if document.owner_id != principal_id:
+          abort(403)
+      audit(document)
+      return "public"
+  ```
+
+test "python authz: db commit receiver is a reachable target mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: database session commit receiver is a reachable target mutation"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      database.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: unreachable commit does not hide separate reachable commit"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      if len(user_id) >= 0:
+          return ""
+      db.session.commit()
+  ```
+
+test "python authz: length guard makes db commit unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id):
+      if len(user_id) >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.commit()
+  ```
+
+test "python authz: unconditional return makes later commit unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      return ""
+      database.session.commit()
+  ```
+
+test "python authz: not-equal-None target guard blocks later direct lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/invoices/<int:invoice_id>")
+  def view_invoice(invoice_id):
+      principal_id = session.get("user_id")
+      if invoice_id != None:
+          return ""
+      invoice = Invoice.query.get(invoice_id)
+      return invoice
+  ```
+
+test "python authz: nested unreachable commit does not hide reachable branch commit"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, user_id, enabled):
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      if enabled:
+          db.commit()
+      if len(user_id) >= 0:
+          return ""
+          database.session.commit()
+  ```
