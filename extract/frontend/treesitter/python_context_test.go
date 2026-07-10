@@ -211,16 +211,23 @@ def authenticate(password, digest):
 			continue
 		}
 		args := n.Prop("str_args")
-		if !strings.Contains(args, "name=authenticate") {
+		tokens := make(map[string]bool)
+		for _, token := range strings.Split(args, "\x00") {
+			tokens[token] = true
+		}
+		if !tokens["name=authenticate"] {
 			continue
 		}
 		if got := n.Prop("loc"); got != "auth.py:9" {
 			t.Fatalf("function-end loc = %q, want auth.py:9", got)
 		}
 		for _, want := range []string{"call_path:verify_password", "module_call_path:base64.b64encode", "module_function_name:module"} {
-			if !strings.Contains(args, want) {
+			if !tokens[want] {
 				t.Fatalf("function-end context missing %q in %q", want, args)
 			}
+		}
+		if tokens["call_path:base64.b64encode"] {
+			t.Fatalf("function-end context unexpectedly includes prior function's unprefixed call fact in %q", args)
 		}
 		return
 	}
