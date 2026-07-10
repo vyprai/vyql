@@ -1,134 +1,40 @@
 module bindings.python.authorization;
 
-binding routeOrderDirectLookupMissingRelation666 {
+binding routeTargetDirectLookup666 {
   query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:order_id"
-    and args.any.literal contains ".query.get(order_id)"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
     and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["order.owner", "order.owner_id", "order.user_id", "order.tenant_id", "order.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeOrderDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:order_id"
-    and args.any.literal contains ".query.get(order_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["order.owner", "order.owner_id", "order.user_id", "order.tenant_id", "order.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeRecordDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:record_id"
-    and args.any.literal contains ".query.get(record_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["record.owner", "record.owner_id", "record.user_id", "record.tenant_id", "record.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeRecordDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:record_id"
-    and args.any.literal contains ".query.get(record_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["record.owner", "record.owner_id", "record.user_id", "record.tenant_id", "record.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeResourceDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:resource_id"
-    and args.any.literal contains ".query.get(resource_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["resource.owner", "resource.owner_id", "resource.user_id", "resource.tenant_id", "resource.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeResourceDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:resource_id"
-    and args.any.literal contains ".query.get(resource_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["resource.owner", "resource.owner_id", "resource.user_id", "resource.tenant_id", "resource.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeObjectDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:object_id"
-    and args.any.literal contains ".query.get(object_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["object.owner", "object.owner_id", "object.user_id", "object.tenant_id", "object.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeObjectDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:object_id"
-    and args.any.literal contains ".query.get(object_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["object.owner", "object.owner_id", "object.user_id", "object.tenant_id", "object.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeItemDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:item_id"
-    and args.any.literal contains ".query.get(item_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["item.owner", "item.owner_id", "item.user_id", "item.tenant_id", "item.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeItemDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:item_id"
-    and args.any.literal contains ".query.get(item_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["item.owner", "item.owner_id", "item.user_id", "item.tenant_id", "item.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeDocumentDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:document_id"
-    and args.any.literal contains ".query.get(document_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["document.owner", "document.owner_id", "document.user_id", "document.tenant_id", "document.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeDocumentDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:document_id"
-    and args.any.literal contains ".query.get(document_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["document.owner", "document.owner_id", "document.user_id", "document.tenant_id", "document.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeInvoiceDirectLookupMissingRelation666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:invoice_id"
-    and args.any.literal contains ".query.get(invoice_id)"
-    and args.any.literal contains "call_path:session.get"
-    and not (containsAny(args.any.literal, ["invoice.owner", "invoice.owner_id", "invoice.user_id", "invoice.tenant_id", "invoice.company_id"]))
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeInvoiceDirectLookupRelationWithoutDenial666 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:invoice_id"
-    and args.any.literal contains ".query.get(invoice_id)"
-    and args.any.literal contains "call_path:session.get"
-    and containsAny(args.any.literal, ["invoice.owner", "invoice.owner_id", "invoice.user_id", "invoice.tenant_id", "invoice.company_id"])
-    and not (containsAny(args.any.literal, ["call_path:abort", "abort(", "raise ", ":raise", "returnNone", "return[]", "return{}", "returnredirect(", "status=401", "status=403"]))
+    and (
+      (args.any.literal contains "param_name:order_id"
+        and args.any.literal contains ".query.get(order_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=order;guard_mismatch=order.owner;", "terminal_guard_before:later_use=order;guard_mismatch=order.owner_id;", "terminal_guard_before:later_use=order;guard_mismatch=order.user_id;", "terminal_guard_before:later_use=order;guard_mismatch=order.tenant_id;", "terminal_guard_before:later_use=order;guard_mismatch=order.company_id;", "terminal_guard_before:later_use=order_id;guard_non_null=order_id;"])))
+      or (args.any.literal contains "param_name:record_id"
+        and args.any.literal contains ".query.get(record_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=record;guard_mismatch=record.owner;", "terminal_guard_before:later_use=record;guard_mismatch=record.owner_id;", "terminal_guard_before:later_use=record;guard_mismatch=record.user_id;", "terminal_guard_before:later_use=record;guard_mismatch=record.tenant_id;", "terminal_guard_before:later_use=record;guard_mismatch=record.company_id;", "terminal_guard_before:later_use=record_id;guard_non_null=record_id;"])))
+      or (args.any.literal contains "param_name:resource_id"
+        and args.any.literal contains ".query.get(resource_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=resource;guard_mismatch=resource.owner;", "terminal_guard_before:later_use=resource;guard_mismatch=resource.owner_id;", "terminal_guard_before:later_use=resource;guard_mismatch=resource.user_id;", "terminal_guard_before:later_use=resource;guard_mismatch=resource.tenant_id;", "terminal_guard_before:later_use=resource;guard_mismatch=resource.company_id;", "terminal_guard_before:later_use=resource_id;guard_non_null=resource_id;"])))
+      or (args.any.literal contains "param_name:object_id"
+        and args.any.literal contains ".query.get(object_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=object;guard_mismatch=object.owner;", "terminal_guard_before:later_use=object;guard_mismatch=object.owner_id;", "terminal_guard_before:later_use=object;guard_mismatch=object.user_id;", "terminal_guard_before:later_use=object;guard_mismatch=object.tenant_id;", "terminal_guard_before:later_use=object;guard_mismatch=object.company_id;", "terminal_guard_before:later_use=object_id;guard_non_null=object_id;"])))
+      or (args.any.literal contains "param_name:item_id"
+        and args.any.literal contains ".query.get(item_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=item;guard_mismatch=item.owner;", "terminal_guard_before:later_use=item;guard_mismatch=item.owner_id;", "terminal_guard_before:later_use=item;guard_mismatch=item.user_id;", "terminal_guard_before:later_use=item;guard_mismatch=item.tenant_id;", "terminal_guard_before:later_use=item;guard_mismatch=item.company_id;", "terminal_guard_before:later_use=item_id;guard_non_null=item_id;"])))
+      or (args.any.literal contains "param_name:document_id"
+        and args.any.literal contains ".query.get(document_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=document;guard_mismatch=document.owner;", "terminal_guard_before:later_use=document;guard_mismatch=document.owner_id;", "terminal_guard_before:later_use=document;guard_mismatch=document.user_id;", "terminal_guard_before:later_use=document;guard_mismatch=document.tenant_id;", "terminal_guard_before:later_use=document;guard_mismatch=document.company_id;", "terminal_guard_before:later_use=document_id;guard_non_null=document_id;"])))
+      or (args.any.literal contains "param_name:invoice_id"
+        and args.any.literal contains ".query.get(invoice_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=invoice;guard_mismatch=invoice.owner;", "terminal_guard_before:later_use=invoice;guard_mismatch=invoice.owner_id;", "terminal_guard_before:later_use=invoice;guard_mismatch=invoice.user_id;", "terminal_guard_before:later_use=invoice;guard_mismatch=invoice.tenant_id;", "terminal_guard_before:later_use=invoice;guard_mismatch=invoice.company_id;", "terminal_guard_before:later_use=invoice_id;guard_non_null=invoice_id;"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains ".query.get(account_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=account;guard_mismatch=account.owner;", "terminal_guard_before:later_use=account;guard_mismatch=account.owner_id;", "terminal_guard_before:later_use=account;guard_mismatch=account.user_id;", "terminal_guard_before:later_use=account;guard_mismatch=account.tenant_id;", "terminal_guard_before:later_use=account;guard_mismatch=account.company_id;", "terminal_guard_before:later_use=account_id;guard_non_null=account_id;"])))
+      or (args.any.literal contains "param_name:company_id"
+        and args.any.literal contains ".query.get(company_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=company;guard_mismatch=company.owner;", "terminal_guard_before:later_use=company;guard_mismatch=company.owner_id;", "terminal_guard_before:later_use=company;guard_mismatch=company.user_id;", "terminal_guard_before:later_use=company;guard_mismatch=company.tenant_id;", "terminal_guard_before:later_use=company;guard_mismatch=company.company_id;", "terminal_guard_before:later_use=company_id;guard_non_null=company_id;"])))
+      or (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains ".query.get(user_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_before:later_use=user;guard_mismatch=user.owner;", "terminal_guard_before:later_use=user;guard_mismatch=user.owner_id;", "terminal_guard_before:later_use=user;guard_mismatch=user.user_id;", "terminal_guard_before:later_use=user;guard_mismatch=user.tenant_id;", "terminal_guard_before:later_use=user;guard_mismatch=user.company_id;", "terminal_guard_before:later_use=user_id;guard_non_null=user_id;"])))
+    )
   emit issue code.UnboundAuthorizationTarget at call
 }

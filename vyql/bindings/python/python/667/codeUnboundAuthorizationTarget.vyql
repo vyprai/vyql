@@ -1,64 +1,21 @@
 module bindings.python.authorization;
 
-binding routeOrderTargetMutation667 {
+binding routeTargetMutation667 {
   query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:order_id"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
     and args.any.literal contains ".commit()"
-    and args.any.literal contains "==order_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeRecordTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:record_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==record_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeResourceTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:resource_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==resource_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeObjectTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:object_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==object_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeItemTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:item_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==item_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeDocumentTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:document_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==document_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
-  emit issue code.UnboundAuthorizationTarget at call
-}
-
-binding routeInvoiceTargetMutation667 {
-  query pattern callExpr where callee.analysis == "function.local.end"
-    and args.any.literal contains "param_name:invoice_id"
-    and args.any.literal contains ".commit()"
-    and args.any.literal contains "==invoice_id).first_or_404()"
-    and not (args.any.literal contains ">=0:return")
+    and not (args.any.literal contains "unreachable_call:db.session.commit()")
+    and (
+      (args.any.literal contains "param_name:order_id" and args.any.literal contains "==order_id).first_or_404()")
+      or (args.any.literal contains "param_name:record_id" and args.any.literal contains "==record_id).first_or_404()")
+      or (args.any.literal contains "param_name:resource_id" and args.any.literal contains "==resource_id).first_or_404()")
+      or (args.any.literal contains "param_name:object_id" and args.any.literal contains "==object_id).first_or_404()")
+      or (args.any.literal contains "param_name:item_id" and args.any.literal contains "==item_id).first_or_404()")
+      or (args.any.literal contains "param_name:document_id" and args.any.literal contains "==document_id).first_or_404()")
+      or (args.any.literal contains "param_name:invoice_id" and args.any.literal contains "==invoice_id).first_or_404()")
+      or (args.any.literal contains "param_name:account_id" and args.any.literal contains "==account_id).first_or_404()")
+      or (args.any.literal contains "param_name:company_id" and args.any.literal contains "==company_id).first_or_404()")
+      or (args.any.literal contains "param_name:user_id" and args.any.literal contains "==user_id).first_or_404()")
+    )
   emit issue code.UnboundAuthorizationTarget at call
 }

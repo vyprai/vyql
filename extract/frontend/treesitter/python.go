@@ -515,21 +515,27 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	name := c.text(field(fn, "name"))
 	bodyText := c.text(body)
 	loc := c.loc(fn)
-	args := []nir.Expr{
+	localEndArgs := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
 		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
-		nir.Const{Loc: loc, Value: c.moduleContext},
+	}
+	args := append([]nir.Expr(nil), localEndArgs...)
+	args = append(args, nir.Const{Loc: loc, Value: c.moduleContext})
+	appendLocalFact := func(token string) {
+		fact := nir.Const{Loc: loc, Value: token}
+		args = append(args, fact)
+		localEndArgs = append(localEndArgs, fact)
 	}
 	for _, tok := range c.classContext {
-		args = append(args, nir.Const{Loc: loc, Value: tok})
+		appendLocalFact(tok)
 	}
 	for _, tok := range decorators {
-		args = append(args, nir.Const{Loc: loc, Value: tok})
+		appendLocalFact(tok)
 	}
 	for _, tok := range c.pyStructuredContextTokens(fn, name) {
-		args = append(args, nir.Const{Loc: loc, Value: tok})
+		appendLocalFact(tok)
 	}
 	contextPath := "analysis.function.context"
 	sourcePath := "analysis.function.context.source"
@@ -538,7 +544,6 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
 	endLoc := c.endLoc(body)
 	endArgs := append([]nir.Expr(nil), args...)
-	localEndArgs := append([]nir.Expr(nil), args...)
 	for _, tok := range c.moduleTokens {
 		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: "module_" + tok})
 	}
@@ -687,6 +692,9 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 		body = fn
 	}
 	walk(body)
+	for _, tok := range c.pyTerminalGuardContextTokens(body) {
+		add(tok)
+	}
 	for _, tok := range pySemanticReviewTokens(c.text(body), name) {
 		add(tok)
 	}
@@ -722,6 +730,327 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 		}
 	}
 	return out
+}
+
+type pyGuardAtom struct {
+	kind  string
+	value string
+}
+
+type pyLaterOperation struct {
+	text   string
+	uses   []string
+	isCall bool
+}
+
+const pyContextEvidenceFieldLimit = 160
+
+func pyContextEvidenceCompact(raw string) string {
+	compact := pyContextCompactUnbounded(raw)
+	if len(compact) <= pyContextEvidenceFieldLimit {
+		return compact
+	}
+	const suffix = "..."
+	cut := pyContextEvidenceFieldLimit - len(suffix)
+	return strings.ToValidUTF8(compact[:cut], "") + suffix
+}
+
+// pyTerminalGuardContextTokens records generic, function-local control-flow evidence. A direct
+// sibling if-guard dominates every later sibling in the same block; when its taken branch
+// terminates, the condition blocks those later operations. Security policy remains in VyQL: the
+// frontend records normalized conditions, terminal actions, later operations, and correlated
+// operands without deciding whether any particular guard authorizes an operation.
+func (c *pyConv) pyTerminalGuardContextTokens(body *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(token string) {
+		if token == "" || seen[token] || len(out) >= 512 {
+			return
+		}
+		seen[token] = true
+		out = append(out, token)
+	}
+	var visitBlock func(*tree_sitter.Node)
+	visitBlock = func(block *tree_sitter.Node) {
+		statements := pyContextStatements(block)
+		for i, statement := range statements {
+			if statement.Kind() == "if_statement" {
+				condition := field(statement, "condition")
+				terminal, terminalOK := c.pyTerminalBranch(field(statement, "consequence"))
+				if condition != nil && terminalOK {
+					conditionText := pyContextEvidenceCompact(c.text(condition))
+					atoms := c.pySufficientGuardAtoms(condition)
+					alwaysTrue := c.pyConditionAlwaysTrue(condition)
+					for _, laterStatement := range statements[i+1:] {
+						for _, operation := range c.pyLaterOperations(laterStatement) {
+							add("terminal_guard_before:condition=" + conditionText + ";terminal=" + terminal + ";later_op=" + operation.text)
+							if alwaysTrue && operation.isCall {
+								add("unreachable_call:" + strings.TrimPrefix(operation.text, "call:"))
+							}
+							for _, use := range operation.uses {
+								for _, atom := range atoms {
+									if pyGuardSubject(atom.value) != use {
+										continue
+									}
+									add("terminal_guard_before:later_use=" + use + ";guard_" + atom.kind + "=" + atom.value + ";condition=" + conditionText + ";terminal=" + terminal + ";later_op=" + operation.text)
+								}
+							}
+						}
+					}
+				}
+			}
+			c.pyVisitNestedContextBlocks(statement, visitBlock)
+		}
+	}
+	visitBlock(body)
+	return out
+}
+
+func pyContextStatements(block *tree_sitter.Node) []*tree_sitter.Node {
+	if block == nil {
+		return nil
+	}
+	var out []*tree_sitter.Node
+	for _, child := range namedChildren(block) {
+		if child.Kind() != "comment" {
+			out = append(out, child)
+		}
+	}
+	return out
+}
+
+func (c *pyConv) pyVisitNestedContextBlocks(node *tree_sitter.Node, visit func(*tree_sitter.Node)) {
+	if node == nil {
+		return
+	}
+	switch node.Kind() {
+	case "function_definition", "class_definition", "decorated_definition", "lambda":
+		return
+	}
+	for _, child := range namedChildren(node) {
+		if child.Kind() == "block" {
+			visit(child)
+			continue
+		}
+		c.pyVisitNestedContextBlocks(child, visit)
+	}
+}
+
+func (c *pyConv) pyTerminalBranch(block *tree_sitter.Node) (string, bool) {
+	statements := pyContextStatements(block)
+	if len(statements) == 0 {
+		return "", false
+	}
+	last := statements[len(statements)-1]
+	compact := pyContextEvidenceCompact(c.text(last))
+	switch last.Kind() {
+	case "return_statement":
+		return "return:" + strings.TrimPrefix(compact, "return"), true
+	case "raise_statement":
+		return "raise:" + strings.TrimPrefix(compact, "raise"), true
+	case "expression_statement":
+		children := namedChildren(last)
+		if len(children) != 1 || children[0].Kind() != "call" {
+			return "", false
+		}
+		call := children[0]
+		if lastSeg(c.dotted(field(call, "function"))) == "abort" {
+			return "call:" + pyContextEvidenceCompact(c.text(call)), true
+		}
+	}
+	return "", false
+}
+
+func (c *pyConv) pyLaterOperations(node *tree_sitter.Node) []pyLaterOperation {
+	seen := map[string]bool{}
+	var out []pyLaterOperation
+	var walk func(*tree_sitter.Node)
+	walk = func(current *tree_sitter.Node) {
+		if current == nil {
+			return
+		}
+		switch current.Kind() {
+		case "function_definition", "class_definition", "decorated_definition", "lambda":
+			return
+		case "return_statement":
+			compact := pyContextEvidenceCompact(c.text(current))
+			text := "return:" + strings.TrimPrefix(compact, "return")
+			if !seen[text] {
+				seen[text] = true
+				out = append(out, pyLaterOperation{text: text, uses: c.pyContextIdentifiers(current)})
+			}
+		case "call":
+			text := "call:" + pyContextEvidenceCompact(c.text(current))
+			if !seen[text] {
+				seen[text] = true
+				out = append(out, pyLaterOperation{text: text, uses: c.pyContextIdentifiers(current), isCall: true})
+			}
+		}
+		for _, child := range namedChildren(current) {
+			walk(child)
+		}
+	}
+	walk(node)
+	return out
+}
+
+func (c *pyConv) pyContextIdentifiers(node *tree_sitter.Node) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(current *tree_sitter.Node) {
+		if current == nil {
+			return
+		}
+		switch current.Kind() {
+		case "function_definition", "class_definition", "decorated_definition", "lambda":
+			return
+		case "identifier":
+			identifier := pyContextEvidenceCompact(c.text(current))
+			if identifier != "" && !seen[identifier] {
+				seen[identifier] = true
+				out = append(out, identifier)
+			}
+			return
+		}
+		for _, child := range namedChildren(current) {
+			walk(child)
+		}
+	}
+	walk(node)
+	return out
+}
+
+func (c *pyConv) pySufficientGuardAtoms(condition *tree_sitter.Node) []pyGuardAtom {
+	if condition == nil {
+		return nil
+	}
+	if condition.Kind() == "parenthesized_expression" {
+		children := namedChildren(condition)
+		if len(children) == 1 {
+			return c.pySufficientGuardAtoms(children[0])
+		}
+	}
+	if condition.Kind() == "boolean_operator" {
+		operator := pyContextCompactUnbounded(c.text(field(condition, "operator")))
+		if operator != "or" {
+			return nil
+		}
+		return append(c.pySufficientGuardAtoms(field(condition, "left")), c.pySufficientGuardAtoms(field(condition, "right"))...)
+	}
+	leftNode, operator, rightNode, ok := c.pySimpleComparison(condition)
+	if !ok {
+		return nil
+	}
+	left := pyContextCompactUnbounded(c.text(leftNode))
+	right := pyContextCompactUnbounded(c.text(rightNode))
+	if operator == "!=" || operator == "isnot" {
+		if strings.EqualFold(left, "none") {
+			if value := pyGuardOperand(rightNode, right); value != "" {
+				return []pyGuardAtom{{kind: "non_null", value: value}}
+			}
+		}
+		if strings.EqualFold(right, "none") {
+			if value := pyGuardOperand(leftNode, left); value != "" {
+				return []pyGuardAtom{{kind: "non_null", value: value}}
+			}
+		}
+	}
+	var kind string
+	switch operator {
+	case "!=":
+		kind = "mismatch"
+	case "==":
+		kind = "equal"
+	default:
+		return nil
+	}
+	var out []pyGuardAtom
+	if value := pyGuardOperand(leftNode, left); value != "" {
+		out = append(out, pyGuardAtom{kind: kind, value: value})
+	}
+	if value := pyGuardOperand(rightNode, right); value != "" {
+		out = append(out, pyGuardAtom{kind: kind, value: value})
+	}
+	return out
+}
+
+func (c *pyConv) pySimpleComparison(condition *tree_sitter.Node) (*tree_sitter.Node, string, *tree_sitter.Node, bool) {
+	if condition == nil || condition.Kind() != "comparison_operator" {
+		return nil, "", nil, false
+	}
+	children := namedChildren(condition)
+	if len(children) != 2 {
+		return nil, "", nil, false
+	}
+	left := pyContextCompactUnbounded(c.text(children[0]))
+	right := pyContextCompactUnbounded(c.text(children[1]))
+	whole := pyContextCompactUnbounded(c.text(condition))
+	if !strings.HasPrefix(whole, left) || !strings.HasSuffix(whole, right) || len(whole) < len(left)+len(right) {
+		return nil, "", nil, false
+	}
+	operator := strings.TrimSuffix(strings.TrimPrefix(whole, left), right)
+	return children[0], operator, children[1], operator != ""
+}
+
+func pyGuardOperand(node *tree_sitter.Node, compact string) string {
+	if node == nil || compact == "" {
+		return ""
+	}
+	switch node.Kind() {
+	case "identifier", "attribute", "subscript":
+		return pyContextEvidenceCompact(compact)
+	default:
+		return ""
+	}
+}
+
+func pyGuardSubject(value string) string {
+	if i := strings.IndexAny(value, ".[ "); i >= 0 {
+		return value[:i]
+	}
+	return value
+}
+
+func (c *pyConv) pyConditionAlwaysTrue(condition *tree_sitter.Node) bool {
+	if condition == nil {
+		return false
+	}
+	if condition.Kind() == "parenthesized_expression" {
+		children := namedChildren(condition)
+		return len(children) == 1 && c.pyConditionAlwaysTrue(children[0])
+	}
+	if condition.Kind() == "boolean_operator" {
+		operator := pyContextCompactUnbounded(c.text(field(condition, "operator")))
+		left := c.pyConditionAlwaysTrue(field(condition, "left"))
+		right := c.pyConditionAlwaysTrue(field(condition, "right"))
+		if operator == "or" {
+			return left || right
+		}
+		if operator == "and" {
+			return left && right
+		}
+		return false
+	}
+	left, operator, right, ok := c.pySimpleComparison(condition)
+	if !ok {
+		return false
+	}
+	return operator == ">=" && pyIsLenCall(c, left) && pyIsZeroLiteral(c, right) ||
+		operator == "<=" && pyIsZeroLiteral(c, left) && pyIsLenCall(c, right)
+}
+
+func pyIsLenCall(c *pyConv, node *tree_sitter.Node) bool {
+	if node == nil || node.Kind() != "call" {
+		return false
+	}
+	function := field(node, "function")
+	arguments := field(node, "arguments")
+	return function != nil && function.Kind() == "identifier" && c.text(function) == "len" && len(namedChildren(arguments)) == 1
+}
+
+func pyIsZeroLiteral(c *pyConv, node *tree_sitter.Node) bool {
+	return node != nil && node.Kind() == "integer" && pyContextCompactUnbounded(c.text(node)) == "0"
 }
 
 func pySemanticReviewTokens(raw, name string) []string {

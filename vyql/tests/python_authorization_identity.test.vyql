@@ -171,3 +171,154 @@ test "python authz: non-owner extra filter is outside bounded target-only mutati
       db.session.commit()
       return redirect("/records")
   ```
+
+test "python authz: inverted owner equality denial does not authorize document access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      if document.owner_id == principal_id:
+          abort(403)
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: unrelated authentication abort and owner log do not authorize access"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import abort, session
+
+  @app.route("/documents/<int:document_id>")
+  def view_document(document_id):
+      principal_id = session.get("user_id")
+      if not principal_id:
+          abort(401)
+      document = Document.query.get(document_id)
+      if document.owner_id != principal_id:
+          app.logger.warning("document owner differs from principal")
+      return render_template("document.html", document=document)
+  ```
+
+test "python authz: internal direct lookup helper is outside endpoint detector"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  def load_document(document_id):
+      principal_id = session.get("user_id")
+      document = Document.query.get(document_id)
+      return document
+  ```
+
+test "python authz: reachable retry-count mutation still lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id, retry_count):
+      if retry_count >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: provably terminal length guard makes later mutation unreachable"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.post("/records/<int:record_id>/archive")
+  def archive_record(record_id):
+      user_id = session.get("user_id")
+      if len(user_id) >= 0:
+          return ""
+      record = Record.query.filter(Record.id == record_id).first_or_404()
+      record.archived = True
+      db.session.commit()
+      return redirect("/records")
+  ```
+
+test "python authz: dominating request-target non-null guard blocks direct lookup"
+  lang python
+  reject VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/orders/<int:order_id>")
+  def order_receipt(order_id):
+      user_id = session.get("user_id")
+      if user_id != None or order_id is not None:
+          return ""
+      order = Order.query.get(order_id)
+      return render_template("receipt.html", order=order)
+  ```
+
+test "python authz: account route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/accounts/<int:account_id>")
+  def view_account(account_id):
+      principal_id = session.get("user_id")
+      account = Account.query.get(account_id)
+      return render_template("account.html", account=account)
+  ```
+
+test "python authz: company route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.route("/companies/<int:company_id>")
+  def view_company(company_id):
+      principal_id = session.get("user_id")
+      company = Company.query.get(company_id)
+      return render_template("company.html", company=company)
+  ```
+
+test "python authz: user route target is correlated with direct lookup"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  from flask import session
+
+  @app.get("/users/<int:user_id>")
+  def view_user(user_id):
+      principal_id = session.get("principal_id")
+      user = User.query.get(user_id)
+      return render_template("user.html", user=user)
+  ```
+
+test "python authz: account target-only mutation lacks owner scope"
+  lang python
+  expect VYQL-AUTH-095
+  code
+  ```
+  @app.post("/accounts/<int:account_id>/disable")
+  def disable_account(account_id):
+      account = Account.query.filter(Account.id == account_id).first_or_404()
+      account.disabled = True
+      db.session.commit()
+      return redirect("/accounts")
+  ```
