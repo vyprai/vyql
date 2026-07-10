@@ -177,3 +177,52 @@ viewer_scopes = [
 	}
 	t.Fatalf("python module context not found; nodes=%#v", nodes)
 }
+
+func TestPythonFunctionEndContextIncludesPrefixedModuleFacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.py")
+	src := []byte(`import base64
+
+def issue_token(identity):
+    return base64.b64encode(identity.encode()).decode()
+
+def authenticate(password, digest):
+    if not verify_password(password, digest):
+        return None
+    return {"ok": True}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPython([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context.end" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if !strings.Contains(args, "name=authenticate") {
+			continue
+		}
+		if got := n.Prop("loc"); got != "auth.py:9" {
+			t.Fatalf("function-end loc = %q, want auth.py:9", got)
+		}
+		for _, want := range []string{"call_path:verify_password", "module_call_path:base64.b64encode", "module_function_name:module"} {
+			if !strings.Contains(args, want) {
+				t.Fatalf("function-end context missing %q in %q", want, args)
+			}
+		}
+		return
+	}
+	t.Fatal("authenticate function-end context not found")
+}

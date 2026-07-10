@@ -24,6 +24,7 @@ type pyConv struct {
 	file          string // current file (display path, relative to root)
 	key           string // current module key (source-root dotted)
 	moduleContext string
+	moduleTokens  []string
 	classContext  []string
 	decorators    []string
 }
@@ -41,6 +42,7 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			root0 := tree.RootNode()
 			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			c.moduleContext = c.pyModuleLiteralContext(root0)
+			c.moduleTokens = c.pyStructuredContextTokens(root0, "module")
 			body := append(c.pyModuleContext(root0), c.blockChildren(root0)...)
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 		})
@@ -49,6 +51,13 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 
 func (c *pyConv) loc(n *tree_sitter.Node) string {
 	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+}
+
+func (c *pyConv) endLoc(n *tree_sitter.Node) string {
+	if n == nil {
+		return c.file + ":1"
+	}
+	return c.file + ":" + itoa(int(n.EndPosition().Row)+1)
 }
 
 func (c *pyConv) text(n *tree_sitter.Node) string {
@@ -527,6 +536,11 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	sinkPath := "analysis.function.context.sink"
 	tmp := "__vyql_function_context"
 	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
+	endLoc := c.endLoc(body)
+	endArgs := append([]nir.Expr(nil), args...)
+	for _, tok := range c.moduleTokens {
+		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: "module_" + tok})
+	}
 	return []nir.Stmt{
 		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
 			Callee: nir.Name{ID: sourcePath, Loc: loc},
@@ -549,6 +563,13 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 			Method: "sink",
 			Loc:    loc,
 		}},
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: "analysis.function.context.end", Loc: endLoc},
+			Args:   endArgs,
+			Path:   "analysis.function.context.end",
+			Method: "end",
+			Loc:    endLoc,
+		}},
 	}
 }
 
@@ -563,7 +584,7 @@ func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
 	}
-	for _, tok := range c.pyStructuredContextTokens(root, "module") {
+	for _, tok := range c.moduleTokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
