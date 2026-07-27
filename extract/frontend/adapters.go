@@ -1371,6 +1371,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 			})
 			var out []adapters.Mapping
 			var flowIdx flowTokenIndex
+			scopeIdx := newScopeCandidateIndex(s)
 			nodeTypes := []string{"code.Call", "code.Attr", "code.Seq", "code.Subscript", "code.BinOp", "code.Unary", "code.Name"}
 			if spec.crossLang {
 				nodeTypes = append(nodeTypes, "sbom.PackageVersion")
@@ -1393,7 +1394,7 @@ func (spec adapterSpec) flagAdapter() adapters.Adapter {
 						if !flagNodeKindAllows(fl, n) {
 							continue
 						}
-						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang, fileTech) {
+						if !flagMatchesNode(s, &flowIdx, fl, n, spec.Technology, spec.crossLang, fileTech, scopeIdx) {
 							continue
 						}
 						detail, conf := reviewDetail(fl.Concept, flagPattern(fl))
@@ -1454,12 +1455,12 @@ func flagNodeKindAllows(fl flagSpec, n usg.Node) bool {
 	}
 }
 
-func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+func flagMatchesNode(s usg.Store, idx *flowTokenIndex, fl flagSpec, n usg.Node, tech string, crossLang bool, fileTech map[string]string, scopeIdx *scopeCandidateIndex) bool {
 	if fl.Scope != "" && n.Prop("callee_path") != "analysis."+strings.ToLower(fl.Scope)+".context" {
 		return false
 	}
 	for _, pred := range fl.Predicates {
-		if !flagPredicateMatches(s, idx, pred, n, tech, crossLang, fileTech) {
+		if !flagPredicateMatches(s, idx, pred, n, tech, crossLang, fileTech, scopeIdx) {
 			return false
 		}
 	}
@@ -1555,7 +1556,7 @@ func flagOperandMatches(spec flagOperandSpec, nodes []usg.Node) bool {
 	return true
 }
 
-func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string) bool {
+func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n usg.Node, tech string, crossLang bool, fileTech map[string]string, scopeIdx *scopeCandidateIndex) bool {
 	if pred.Subject == "flow_to" {
 		hit := flagFlowToNodeHit(s, idx, pred, n, tech, crossLang, fileTech)
 		if pred.Negative {
@@ -1564,7 +1565,7 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 		return hit
 	}
 	if pred.Subject == "scope_call" {
-		hit := flagScopeNodeHit(s, pred, n, []string{"code.Call"}, tech, crossLang)
+		hit := flagScopeNodeHit(s, pred, n, []string{"code.Call"}, tech, crossLang, scopeIdx)
 		if pred.Negative {
 			return !hit
 		}
@@ -1573,7 +1574,7 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 	if n.Prop("callee_path") == "analysis.function.context" ||
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
-		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang); ok {
+		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang, scopeIdx); ok {
 			if !flagPredicateUsesCallArg(pred) {
 				probe := pred
 				probe.Negative = false
@@ -1644,7 +1645,7 @@ func flagFlowToNodeHit(s usg.Store, idx *flowTokenIndex, pred flagPredicate, n u
 	return false
 }
 
-func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) (bool, bool) {
+func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) (bool, bool) {
 	if pred.Property != "tokens" || len(pred.Values) == 0 {
 		return false, false
 	}
@@ -1695,7 +1696,7 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 			return false, false
 		}
 	}
-	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang)
+	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang, scopeIdx)
 }
 
 func flagScopeBinopHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
@@ -2046,7 +2047,66 @@ func normalizeSubscriptFlagValues(values []string) []string {
 	return out
 }
 
-func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool) bool {
+// scopeCandidateIndex buckets a store's nodes by (type, file) for flagScopeNodeHit.
+//
+// That function only ever accepts a candidate located in the SAME FILE as its anchor node, but
+// it scanned every node of the type for every anchor — making flag matching quadratic in graph
+// size. Bucketing by file makes each lookup proportional to one file's nodes instead of the
+// whole graph. Built once per adapter Apply pass and filled lazily per node type, so a spec that
+// never asks about a type never pays for it.
+//
+// The node set is fixed during Apply (adapters attach labels, they do not add nodes), so the
+// buckets cannot go stale within an index's lifetime.
+type scopeCandidateIndex struct {
+	s          usg.Store
+	byTypeFile map[string]map[string][]usg.Node
+}
+
+func newScopeCandidateIndex(s usg.Store) *scopeCandidateIndex {
+	return &scopeCandidateIndex{s: s, byTypeFile: map[string]map[string][]usg.Node{}}
+}
+
+// nodesInFile returns the nodes of nodeType whose loc is in file, building that type's buckets on
+// first use. A nil index (tests, direct calls) reports miss so callers fall back to a full scan.
+func (x *scopeCandidateIndex) nodesInFile(nodeType, file string) ([]usg.Node, bool) {
+	if x == nil {
+		return nil, false
+	}
+	byFile, built := x.byTypeFile[nodeType]
+	if !built {
+		byFile = map[string][]usg.Node{}
+		rangeNodesOfType(x.s, nodeType, func(n usg.Node) bool {
+			f := locFile(n.Prop("loc"))
+			byFile[f] = append(byFile[f], n)
+			return true
+		})
+		x.byTypeFile[nodeType] = byFile
+	}
+	return byFile[file], true
+}
+
+// rangeNodesOfType streams the nodes of a type via the store's fast path when available, else
+// falls back to NodesOfType + GetNode.
+func rangeNodesOfType(s usg.Store, nodeType string, fn func(usg.Node) bool) {
+	if fast, ok := s.(interface {
+		RangeNodesOfType(nodeType string, fn func(usg.Node) bool)
+	}); ok {
+		fast.RangeNodesOfType(nodeType, fn)
+		return
+	}
+	ids, _ := s.NodesOfType(nodeType)
+	for _, id := range ids {
+		n, ok, err := s.GetNode(id)
+		if err != nil || !ok {
+			continue
+		}
+		if !fn(n) {
+			return
+		}
+	}
+}
+
+func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) bool {
 	probe := pred
 	probe.Negative = false
 	prefix := locFile(n.Prop("loc"))
@@ -2078,34 +2138,29 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 		return flagPredicateMatchesNodeOnly(probe, cand)
 	}
 
-	// This runs once per candidate node per predicate, so it is quadratic in graph size; stream
-	// the type's nodes when the store supports it, avoiding NodesOfType's []string copy and a
-	// string-keyed GetNode per candidate. Other stores keep the portable path below.
-	if fast, ok := s.(interface {
-		RangeNodesOfType(nodeType string, fn func(usg.Node) bool)
-	}); ok {
-		for _, nodeType := range nodeTypes {
-			hit := false
-			fast.RangeNodesOfType(nodeType, func(cand usg.Node) bool {
-				hit = qualifies(cand)
-				return !hit // stop at the first qualifying candidate
-			})
-			if hit {
-				return true
-			}
-		}
-		return false
-	}
+	// A candidate can only qualify if it is in the anchor's file (the prefix guard above), so when
+	// the anchor HAS a file, consult the per-file bucket instead of scanning every node of the
+	// type — that scan is what made flag matching quadratic in graph size. An anchor with no loc
+	// (prefix == "") genuinely has to consider every candidate, and so does a caller without an
+	// index; both fall through to the full stream.
 	for _, nodeType := range nodeTypes {
-		ids, _ := s.NodesOfType(nodeType)
-		for _, id := range ids {
-			cand, ok, err := s.GetNode(id)
-			if err != nil || !ok {
+		if prefix != "" {
+			if bucket, ok := scopeIdx.nodesInFile(nodeType, prefix); ok {
+				for _, cand := range bucket {
+					if qualifies(cand) {
+						return true
+					}
+				}
 				continue
 			}
-			if qualifies(cand) {
-				return true
-			}
+		}
+		hit := false
+		rangeNodesOfType(s, nodeType, func(cand usg.Node) bool {
+			hit = qualifies(cand)
+			return !hit // stop at the first qualifying candidate
+		})
+		if hit {
+			return true
 		}
 	}
 	return false

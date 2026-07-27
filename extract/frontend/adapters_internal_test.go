@@ -1598,7 +1598,7 @@ adapter javascript {
 	if !flagNodeKindAllows(spec.Flags[0], debug) {
 		t.Fatalf("debug node kind was not allowed by flag: %+v", spec.Flags[0])
 	}
-	if !flagMatchesNode(store, &flowTokenIndex{}, spec.Flags[0], debug, "javascript", false, nil) {
+	if !flagMatchesNode(store, &flowTokenIndex{}, spec.Flags[0], debug, "javascript", false, nil, newScopeCandidateIndex(store)) {
 		t.Fatalf("call operand flag did not match transitive URL flow into debug call")
 	}
 
