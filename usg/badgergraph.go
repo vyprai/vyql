@@ -62,9 +62,14 @@ type nodeDetail struct {
 	props                   map[string]string
 }
 
-// OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger) with a cache
-// budget in bytes (block + value cache; 0 = Badger defaults).
-func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
+// OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger).
+//
+// cacheBytes is badger's OFF-HEAP budget (block + index cache; 0 = badger defaults).
+// detailBufBytes is the separate ON-HEAP budget for the node-detail write-back buffer, which
+// spills to badger once it is exceeded (0 = unbounded, the in-memory-fast path). These are two
+// different pools in two different places; sizing both from one figure double-counted the
+// caller's budget, so they are passed independently.
+func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGraph, error) {
 	var opts badger.Options
 	if path == ":memory:" {
 		opts = badger.DefaultOptions("").WithInMemory(true)
@@ -85,7 +90,7 @@ func OpenBadgerGraph(path string, cacheBytes int64) (*BadgerGraph, error) {
 		return nil, err
 	}
 	g := NewBadgerGraphDB(db, true)
-	g.detCapByte = cacheBytes // 0 = unbounded; else spill detail to badger past this many bytes
+	g.detCapByte = detailBufBytes // 0 = unbounded; else spill detail to badger past this many bytes
 	return g, nil
 }
 

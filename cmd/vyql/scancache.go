@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"strconv"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -44,6 +45,8 @@ func scanFingerprint(salt []byte, paths []string, rulesSrc, profile string) stri
 		io.WriteString(h, e)
 		io.WriteString(h, "\x00")
 	}
+	io.WriteString(h, "\x00max-file-bytes\x00")
+	io.WriteString(h, strconv.FormatInt(treesitter.MaxFileBytes(), 10))
 	io.WriteString(h, "\x00data\x00")
 	statWalk(h, datadir.Root())
 	if overlay := scanAdapterOverlay; overlay != "" {

@@ -177,7 +177,8 @@ func decodeInt(raw []byte) int { return (&bufReader{b: raw}).uvar() }
 var (
 	UseIntStore    bool
 	DiskStorePath  string
-	DiskCacheBytes int64
+	DiskCacheBytes int64 // badger's off-heap block+index cache
+	DiskDetailBuf  int64 // on-heap node-detail write-back buffer before it spills to badger
 )
 
 // newGraphStore creates the analysis graph store. BadgerDB is used ONLY when a RAM ceiling is
@@ -194,7 +195,7 @@ var (
 // hint>0 presizes it. UseIntStore forces this store even when a ceiling is configured.
 func newGraphStore(hint int) usg.Store {
 	if !UseIntStore && DiskStorePath != "" {
-		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
+		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes, DiskDetailBuf); err == nil {
 			return g
 		}
 		// badger unavailable → fall through to the in-RAM store.

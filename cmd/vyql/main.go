@@ -105,9 +105,18 @@ func cmdScan(args []string) error {
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
+	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this, e.g. 2MB (default 2MiB; 0 disables). Generated artifacts — coverage reports, bundles — explode into huge single-file graphs and contain no hand-written vulnerability")
 	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
 	_ = fs.Parse(args)
 	treesitter.SetExcludes(strings.Split(*exclude, ","))
+	if v := strings.TrimSpace(*maxFileSize); v != "" {
+		n, err := parseBytes(v)
+		if err != nil || n < 0 {
+			fmt.Fprintf(os.Stderr, "vyql: invalid --max-file-size %q (use e.g. 2MB, 512KiB, or 0 to disable)\n", v)
+			os.Exit(2)
+		}
+		treesitter.SetMaxFileBytes(n)
+	}
 	paths := fs.Args()
 	if len(paths) == 0 {
 		usage()
@@ -149,13 +158,24 @@ func applyMaxRAM(v string) func() {
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
-	// Program-controlled budget: the graph lives on disk and RAM is bounded by badger's (off-heap)
-	// cache, sized here — NOT by a tight GOMEMLIMIT, which would make the GC thrash whenever the
-	// resident core approaches the limit. Most of the budget is the cache (the dominant, tunable
-	// consumer); the resident structural core sits on top.
-	lowering.DiskCacheBytes = n * 3 / 4
+	// Partition the budget ONCE across the pools that actually hold memory, and apply the heap
+	// ceiling here too. Previously this path spent the same figure three times over — badger's
+	// block cache, its index cache, AND the on-heap node-detail buffer were each sized from it —
+	// while debug.SetMemoryLimit was called only on the error path below, leaving the heap at
+	// init's 80%-of-physical default. `--max-ram 8GB` could therefore authorise past 20GB.
+	//
+	// Half to badger's off-heap caches, a quarter to the on-heap detail buffer, and the heap
+	// ceiling set to half — the detail buffer plus the resident structural core live inside it.
+	// A scan whose core fits comfortably never feels the limit.
+	lowering.DiskCacheBytes = n / 2
+	lowering.DiskDetailBuf = n / 4
 	lowering.DiskStorePath = dir
-	return func() { os.RemoveAll(dir) }
+	prev := debug.SetMemoryLimit(-1) // -1 reads the current limit without changing it
+	debug.SetMemoryLimit(n / 2)
+	return func() {
+		debug.SetMemoryLimit(prev)
+		os.RemoveAll(dir)
+	}
 }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and
@@ -498,10 +518,35 @@ func printSummaryWithFlags(stats scanStats, findingsN, flagsN int, includeFlags 
 		scanned = strings.Join(parts, " ")
 	}
 	if includeFlags {
-		fmt.Printf("scanned %s — %d finding(s), %d flag(s)\n", scanned, findingsN, flagsN)
+		fmt.Printf("scanned %s — %d finding(s), %d flag(s)%s\n", scanned, findingsN, flagsN, oversizeNote())
 		return
 	}
-	fmt.Printf("scanned %s — %d finding(s)\n", scanned, findingsN)
+	fmt.Printf("scanned %s — %d finding(s)%s\n", scanned, findingsN, oversizeNote())
+}
+
+// oversizeNote reports files dropped by the size guard. Silently skipping input would read as
+// "everything was covered" when it was not, so the summary always says what was left out and how
+// to include it.
+func oversizeNote() string {
+	n := treesitter.OversizeSkipped()
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" — skipped %d file(s) over %s (--max-file-size)",
+		n, humanBytes(treesitter.MaxFileBytes()))
+}
+
+// humanBytes renders a byte count with a binary unit, e.g. 2097152 -> "2MiB".
+func humanBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%gGiB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%gMiB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%gKiB", float64(n)/(1<<10))
+	}
+	return fmt.Sprintf("%dB", n)
 }
 
 func usage() {
