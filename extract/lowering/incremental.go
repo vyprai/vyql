@@ -180,25 +180,26 @@ var (
 	DiskCacheBytes int64
 )
 
-// newGraphStore creates the analysis graph store. BadgerDB is the DEFAULT source of truth:
-// on-disk when a RAM ceiling is configured (DiskStorePath, cache=DiskCacheBytes), else in-memory
-// badger. hint>0 presizes the in-RAM fallback stores.
+// newGraphStore creates the analysis graph store. BadgerDB is used ONLY when a RAM ceiling is
+// configured (DiskStorePath, cache=DiskCacheBytes): there the graph is the source of truth on
+// disk and RAM is bounded by badger's cache.
+//
+// Without a ceiling the graph is fully resident regardless — detCapByte is 0, so node detail
+// never spills and the badger instance ends up storing nothing — while still costing a 128MiB
+// memtable arena plus ristretto caches PER STORE at Open. That was pure overhead, and since
+// nothing closed the store its background goroutines rooted those arenas forever (a scan-per-
+// spec test run leaked ~128MiB each and reached tens of GB). The int-indexed in-RAM store keeps
+// the same usg.IntGraph solver fast path badger provided, at a fraction of the footprint.
+//
+// hint>0 presizes it. UseIntStore forces this store even when a ceiling is configured.
 func newGraphStore(hint int) usg.Store {
-	if UseIntStore {
-		return usg.NewIntStore(hint)
+	if !UseIntStore && DiskStorePath != "" {
+		if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes); err == nil {
+			return g
+		}
+		// badger unavailable → fall through to the in-RAM store.
 	}
-	path, cache := ":memory:", int64(0)
-	if DiskStorePath != "" {
-		path, cache = DiskStorePath, DiskCacheBytes
-	}
-	if g, err := usg.OpenBadgerGraph(path, cache); err == nil {
-		return g
-	}
-	// badger unavailable → fall back to the in-RAM store.
-	if hint > 0 {
-		return usg.NewInMemStoreSized(hint)
-	}
-	return usg.NewInMemStore()
+	return usg.NewIntStore(hint)
 }
 
 func lowerKey(moduleHash, moduleKey, sigFP string) string {
