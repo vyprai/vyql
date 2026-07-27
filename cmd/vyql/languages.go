@@ -85,11 +85,26 @@ func extractAll(paths []string) (nir.Program, []adapters.Adapter, map[string]str
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
+		// A file can be claimed by more than one frontend (an .html is scanned both for inline
+		// JS and as a text pattern), so dedup before reporting — the inventory is about distinct
+		// files on disk, while the per-language counts below are per-frontend.
+		var allFiles []string
+		seenFile := map[string]bool{}
+		for _, lg := range languages {
+			for _, f := range filterEntriesForLanguage(entries, lg) {
+				if !seenFile[f] {
+					seenFile[f] = true
+					allFiles = append(allFiles, f)
+				}
+			}
+		}
+		logFileInventory(allFiles)
 		for _, lg := range languages {
 			files := filterEntriesForLanguage(entries, lg)
 			if len(files) == 0 {
 				continue
 			}
+			vlog("  %-12s %d file(s)", lg.name, len(files))
 			sub, err := lg.extract(files, root)
 			if err != nil {
 				return prog, nil, nil, stats, err

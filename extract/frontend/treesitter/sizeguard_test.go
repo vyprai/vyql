@@ -24,8 +24,8 @@ func withMaxFileBytes(t *testing.T, n int64) {
 	t.Helper()
 	prev := MaxFileBytes()
 	SetMaxFileBytes(n)
-	ResetOversizeSkipped()
-	t.Cleanup(func() { SetMaxFileBytes(prev); ResetOversizeSkipped() })
+	ResetSkipped()
+	t.Cleanup(func() { SetMaxFileBytes(prev); ResetSkipped() })
 }
 
 func TestSizeGuardSkipsOversizeFiles(t *testing.T) {
@@ -93,5 +93,36 @@ func TestDefaultMaxFileBytesKeepsRealisticSource(t *testing.T) {
 	withMaxFileBytes(t, DefaultMaxFileBytes)
 	if got, _ := ListFiles(dir, map[string]bool{".go": true}); len(got) != 1 {
 		t.Fatalf("a 512KB source file must not be skipped by the default ceiling, got %v", got)
+	}
+}
+
+func TestBinaryFilesAreSkippedRegardlessOfSize(t *testing.T) {
+	dir := t.TempDir()
+	// a small binary: well under any size ceiling, but still not source
+	if err := os.WriteFile(filepath.Join(dir, "tiny.dat"), []byte("MZ\x00\x00payload"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeSized(t, dir, "real.dat", 200) // pure text, same extension
+	withMaxFileBytes(t, DefaultMaxFileBytes)
+
+	got, _ := ListFiles(dir, map[string]bool{".dat": true})
+	if len(got) != 1 || filepath.Base(got[0]) != "real.dat" {
+		t.Fatalf("ListFiles = %v, want only real.dat (binary must be skipped)", got)
+	}
+	_, counts, _ := SkippedFiles()
+	if counts["binary"] != 1 {
+		t.Errorf("binary skip count = %d, want 1", counts["binary"])
+	}
+}
+
+func TestTextWithHighBytesIsNotBinary(t *testing.T) {
+	dir := t.TempDir()
+	// UTF-8 source with non-ASCII bytes must NOT be mistaken for binary — only NUL counts.
+	if err := os.WriteFile(filepath.Join(dir, "utf8.go"), []byte("// héllo wörld 日本語\npackage main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withMaxFileBytes(t, DefaultMaxFileBytes)
+	if got, _ := ListFiles(dir, map[string]bool{".go": true}); len(got) != 1 {
+		t.Fatalf("UTF-8 source must not be treated as binary, got %v", got)
 	}
 }

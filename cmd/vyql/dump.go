@@ -50,11 +50,13 @@ func lowerCache() lowering.DeltaCache {
 // (a findings-equivalence harness injects its own cache).
 func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanStats, error) {
 	tk := newTimer()
+	vlog("phase: extract — walking %s", strings.Join(paths, ", "))
 	prog, ads, ctorTypes, stats, err := extractAll(paths)
 	if err != nil {
 		return nil, stats, err
 	}
 	tk.mark("extract")
+	vlog("extracted %d module(s) from %d language(s)", len(prog.Modules), len(stats.languages))
 	if len(stats.files) == 0 {
 		return nil, stats, fmt.Errorf("no supported source found under %s", strings.Join(paths, ", "))
 	}
@@ -78,6 +80,7 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 	// modules, re-lowering only edited ones. Equivalent to LowerTyped (the merged graph is
 	// identical), so adapters/taint/rules below are untouched. Benefits every command that
 	// builds a graph (scan, trace, query, graph, …).
+	vlog("phase: lower — building the analysis graph")
 	var g usg.Store
 	var fresh map[string]bool
 	incremental := cache != nil
@@ -90,6 +93,10 @@ func buildGraphWith(paths []string, cache lowering.DeltaCache) (usg.Store, scanS
 		return nil, stats, err
 	}
 	tk.mark("lower")
+	if n, ok := g.(interface{ NodeCount() int }); ok {
+		vlog("lowered graph: %d node(s)", n.NodeCount())
+	}
+	vlog("phase: sca — discovering dependency manifests")
 	// SCA runs before adapter apply so SBOM/manifest packages join the import evidence
 	// that gates package-aware adapters (the generated catalog included).
 	applySCA(g, paths)

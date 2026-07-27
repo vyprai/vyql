@@ -107,7 +107,12 @@ func cmdScan(args []string) error {
 	exclude := fs.String("exclude", "", "comma-separated glob patterns to skip, layered on the built-in deps/build skips (e.g. test,examples,*.spec.js)")
 	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this, e.g. 2MB (default 2MiB; 0 disables). Generated artifacts — coverage reports, bundles — explode into huge single-file graphs and contain no hand-written vulnerability")
 	adapterOverlay := fs.String("adapter-overlay", "", "optional repo-local adapter overlay directory")
+	verbose := fs.Bool("v", false, "log progress to stderr: each pipeline phase with its wall time, the file inventory (largest first), and every file skipped with the reason")
+	listFiles := fs.Bool("list-files", false, "with -v, list EVERY scanned and skipped file instead of only the largest")
 	_ = fs.Parse(args)
+	verboseOn = *verbose || *listFiles
+	listFilesOn = *listFiles
+	timingOn = verboseOn
 	treesitter.SetExcludes(strings.Split(*exclude, ","))
 	if v := strings.TrimSpace(*maxFileSize); v != "" {
 		n, err := parseBytes(v)
