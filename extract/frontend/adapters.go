@@ -1654,7 +1654,7 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 	for _, v := range pred.Values {
 		switch {
 		case strings.HasPrefix(v, "call_arg:"):
-			return true, flagScopeCallArgHit(s, pred, n, tech, crossLang)
+			return true, flagScopeCallArgHit(s, pred, n, tech, crossLang, scopeIdx)
 		case strings.HasPrefix(v, "call_path:"):
 			probe = flagPredicate{Property: "path", Op: pred.Op, Values: trimFlagValuePrefix(pred.Values, "call_path:"), Exact: pred.Exact}
 			nodeTypes = []string{"code.Call"}
@@ -1683,13 +1683,13 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 			if strings.HasPrefix(v, "subscript:") {
 				prefix = "subscript:"
 			}
-			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
+			return true, flagScopeSubscriptHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang, scopeIdx)
 		case strings.HasPrefix(v, "binary:"), strings.HasPrefix(v, "expr:"):
 			prefix := "binary:"
 			if strings.HasPrefix(v, "expr:") {
 				prefix = "expr:"
 			}
-			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang)
+			return true, flagScopeBinopHit(s, pred, n, trimFlagValuePrefix(pred.Values, prefix), tech, crossLang, scopeIdx)
 		case strings.HasPrefix(v, "name="), strings.HasPrefix(v, "function_name:"):
 			return false, false
 		default:
@@ -1699,30 +1699,17 @@ func flagContextPredicateMatchesAST(s usg.Store, pred flagPredicate, n usg.Node,
 	return true, flagScopeNodeHit(s, probe, n, nodeTypes, tech, crossLang, scopeIdx)
 }
 
-func flagScopeBinopHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.BinOp")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
-		if binopPredicateMatches(s, pred.Op, values, cand) {
+func flagScopeBinopHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) bool {
+	a := newScopeAnchor(n, tech, crossLang)
+	hit := false
+	scopeIdx.eachCandidate(s, "code.BinOp", a.file, func(cand usg.Node) bool {
+		if cand.ID == n.ID || !a.accepts(cand) {
 			return true
 		}
-	}
-	return false
+		hit = binopPredicateMatches(s, pred.Op, values, cand)
+		return !hit
+	})
+	return hit
 }
 
 func binopPredicateMatches(s usg.Store, op string, values []string, n usg.Node) bool {
@@ -1824,30 +1811,17 @@ func normalizeFlagExprFragment(s string) string {
 	return repl.Replace(s)
 }
 
-func flagScopeSubscriptHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.Subscript")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
-		if subscriptPredicateMatches(pred.Op, values, cand) {
+func flagScopeSubscriptHit(s usg.Store, pred flagPredicate, n usg.Node, values []string, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) bool {
+	a := newScopeAnchor(n, tech, crossLang)
+	hit := false
+	scopeIdx.eachCandidate(s, "code.Subscript", a.file, func(cand usg.Node) bool {
+		if cand.ID == n.ID || !a.accepts(cand) {
 			return true
 		}
-	}
-	return false
+		hit = subscriptPredicateMatches(pred.Op, values, cand)
+		return !hit
+	})
+	return hit
 }
 
 func subscriptPredicateMatches(op string, values []string, n usg.Node) bool {
@@ -1892,33 +1866,37 @@ func subscriptKeyMatches(n usg.Node, key string) bool {
 	return false
 }
 
-func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool) bool {
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
-	ids, _ := s.NodesOfType("code.Call")
-	for _, id := range ids {
-		cand, ok, err := s.GetNode(id)
-		if err != nil || !ok || cand.ID == n.ID {
-			continue
-		}
-		candScope := nodeLexicalScope(cand)
-		if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-			continue
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			continue
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			continue
-		}
-		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokensScoped(s, cand, tech, crossLang)) {
+func flagScopeCallArgHit(s usg.Store, pred flagPredicate, n usg.Node, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) bool {
+	a := newScopeAnchor(n, tech, crossLang)
+	hit := false
+	scopeIdx.eachCandidate(s, "code.Call", a.file, func(cand usg.Node) bool {
+		if cand.ID == n.ID || !a.accepts(cand) {
 			return true
 		}
-	}
-	return false
+		toks := scopeIdx.callArgTokens(s, cand, tech, crossLang)
+		hit = contextTokenValuePredicate(pred.Op, pred.Values, toks)
+		return !hit
+	})
+	return hit
 }
 
-func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang bool) string {
+// callArgTokens memoizes callArgContextTokensScoped per node. The token string depends only on
+// the node and the pass-fixed tech/crossLang, but flagScopeCallArgHit asked for it once per
+// candidate per anchor and each call ran its own nested scans — the dominant cost on a real
+// repo. A nil index just recomputes.
+func (x *scopeCandidateIndex) callArgTokens(s usg.Store, n usg.Node, tech string, crossLang bool) string {
+	if x == nil {
+		return callArgContextTokensScoped(s, n, tech, crossLang, nil)
+	}
+	if t, ok := x.argTokens[n.ID]; ok {
+		return t
+	}
+	t := callArgContextTokensScoped(s, n, tech, crossLang, x)
+	x.argTokens[n.ID] = t
+	return t
+}
+
+func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) string {
 	tokens := callArgContextTokens(n)
 	path := n.Prop("callee_path")
 	method := n.Prop("method")
@@ -1959,40 +1937,23 @@ func callArgContextTokensScoped(s usg.Store, n usg.Node, tech string, crossLang 
 		add(node.Prop("path"))
 		add(node.ID)
 	}
-	argIDs, _ := s.NodesOfType("code.Arg")
-	for _, argID := range argIDs {
-		arg, ok, err := s.GetNode(argID)
-		if err != nil || !ok || !scopedCallArgCandidate(arg, n, tech, crossLang) || !nodeFlowsTo(s, arg.ID, n.ID) {
-			continue
+	a := newScopeAnchor(n, tech, crossLang)
+	scopeIdx.eachCandidate(s, "code.Arg", a.file, func(arg usg.Node) bool {
+		if !a.accepts(arg) || !nodeFlowsTo(s, arg.ID, n.ID) {
+			return true
 		}
 		addNode(arg)
 		for _, nodeType := range []string{"code.Format", "code.Const", "code.Name", "code.Attr", "code.Seq", "code.Call"} {
-			ids, _ := s.NodesOfType(nodeType)
-			for _, srcID := range ids {
-				src, ok, err := s.GetNode(srcID)
-				if err != nil || !ok || !scopedCallArgCandidate(src, n, tech, crossLang) || !nodeFlowsTo(s, src.ID, arg.ID) {
-					continue
+			scopeIdx.eachCandidate(s, nodeType, a.file, func(src usg.Node) bool {
+				if a.accepts(src) && nodeFlowsTo(s, src.ID, arg.ID) {
+					addNode(src)
 				}
-				addNode(src)
-			}
+				return true
+			})
 		}
-	}
+		return true
+	})
 	return strings.Join(out, "\x00")
-}
-
-func scopedCallArgCandidate(cand, anchor usg.Node, tech string, crossLang bool) bool {
-	scope := nodeLexicalScope(anchor)
-	candScope := nodeLexicalScope(cand)
-	if scope != "" && candScope != "" && !sameOrNestedScope(candScope, scope) {
-		return false
-	}
-	if prefix := locFile(anchor.Prop("loc")); prefix != "" && locFile(cand.Prop("loc")) != prefix {
-		return false
-	}
-	if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-		return false
-	}
-	return true
 }
 
 func nodeFlowsTo(s usg.Store, srcID, dstID string) bool {
@@ -2047,23 +2008,96 @@ func normalizeSubscriptFlagValues(values []string) []string {
 	return out
 }
 
-// scopeCandidateIndex buckets a store's nodes by (type, file) for flagScopeNodeHit.
+// scopeAnchor is the per-anchor context that every flagScope*Hit helper filters candidates
+// against. The helpers all asked the same four questions — is this the anchor itself, is it in
+// the anchor's file, is it the anchor's technology, is it in the anchor's lexical scope — but
+// each re-derived the anchor's file and scope inside its own loop. Deriving them once and
+// sharing one accepts() keeps the rule in a single place.
+type scopeAnchor struct {
+	node      usg.Node
+	file      string
+	scope     string
+	tech      string
+	crossLang bool
+	// unscopedNeedsContext selects flagScopeNodeHit's stricter rule: a candidate carrying NO
+	// lexical scope is accepted only if it belongs to the anchor's scoped context. The other
+	// helpers accept an unscoped candidate outright, so they leave this false.
+	unscopedNeedsContext bool
+}
+
+func newScopeAnchor(n usg.Node, tech string, crossLang bool) scopeAnchor {
+	return scopeAnchor{
+		node: n, file: locFile(n.Prop("loc")), scope: nodeLexicalScope(n),
+		tech: tech, crossLang: crossLang,
+	}
+}
+
+// accepts reports whether cand is a candidate for this anchor. It deliberately does NOT test
+// cand.ID == anchor.ID: most callers want that, but callArgContextTokensScoped's candidates are
+// a different node kind than its anchor and never self-compared, so the self test stays at the
+// call sites that had it. Guards run cheapest-first; all are pure, so order affects only speed.
+func (a scopeAnchor) accepts(cand usg.Node) bool {
+	if a.file != "" && locFile(cand.Prop("loc")) != a.file {
+		return false
+	}
+	if t := nodeTechFromNode(cand); !a.crossLang && t != "" && t != a.tech {
+		return false
+	}
+	if a.scope != "" {
+		candScope := nodeLexicalScope(cand)
+		if candScope != "" {
+			if !sameOrNestedScope(candScope, a.scope) {
+				return false
+			}
+		} else if a.unscopedNeedsContext && !unscopedNodeBelongsToScopedContext(cand, a.node) {
+			return false
+		}
+	}
+	return true
+}
+
+// scopeCandidateIndex buckets a store's nodes by (type, file) for the flagScope*Hit family.
 //
-// That function only ever accepts a candidate located in the SAME FILE as its anchor node, but
-// it scanned every node of the type for every anchor — making flag matching quadratic in graph
-// size. Bucketing by file makes each lookup proportional to one file's nodes instead of the
-// whole graph. Built once per adapter Apply pass and filled lazily per node type, so a spec that
-// never asks about a type never pays for it.
+// Those helpers only ever accept a candidate located in the SAME FILE as their anchor node, but
+// each scanned every node of the type for every anchor — making flag matching quadratic in graph
+// size. Bucketing by file makes a lookup proportional to one file's nodes instead of the whole
+// graph. Built once per adapter Apply pass and filled lazily per node type, so a spec that never
+// asks about a type never pays for it.
 //
-// The node set is fixed during Apply (adapters attach labels, they do not add nodes), so the
-// buckets cannot go stale within an index's lifetime.
+// It also memoizes callArgContextTokensScoped, whose token string is a pure function of a node
+// (plus the pass-fixed tech/crossLang) yet was recomputed — with its own nested full scans — for
+// every candidate of every anchor.
+//
+// The node set is fixed during Apply (adapters attach labels, they do not add nodes), so neither
+// the buckets nor the memo can go stale within an index's lifetime.
 type scopeCandidateIndex struct {
 	s          usg.Store
 	byTypeFile map[string]map[string][]usg.Node
+	argTokens  map[string]string
 }
 
 func newScopeCandidateIndex(s usg.Store) *scopeCandidateIndex {
-	return &scopeCandidateIndex{s: s, byTypeFile: map[string]map[string][]usg.Node{}}
+	return &scopeCandidateIndex{
+		s: s, byTypeFile: map[string]map[string][]usg.Node{}, argTokens: map[string]string{},
+	}
+}
+
+// eachCandidate streams the candidates of nodeType that could match an anchor in file: the
+// per-file bucket when the anchor has a file (the only candidates any scope helper accepts), and
+// otherwise every node of the type. A nil index also falls through to the full stream, so direct
+// callers and tests still work. Returning false from fn stops early.
+func (x *scopeCandidateIndex) eachCandidate(s usg.Store, nodeType, file string, fn func(usg.Node) bool) {
+	if file != "" {
+		if bucket, ok := x.nodesInFile(nodeType, file); ok {
+			for _, cand := range bucket {
+				if !fn(cand) {
+					return
+				}
+			}
+			return
+		}
+	}
+	rangeNodesOfType(s, nodeType, fn)
 }
 
 // nodesInFile returns the nodes of nodeType whose loc is in file, building that type's buckets on
@@ -2109,54 +2143,16 @@ func rangeNodesOfType(s usg.Store, nodeType string, fn func(usg.Node) bool) {
 func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []string, tech string, crossLang bool, scopeIdx *scopeCandidateIndex) bool {
 	probe := pred
 	probe.Negative = false
-	prefix := locFile(n.Prop("loc"))
-	scope := nodeLexicalScope(n)
+	a := newScopeAnchor(n, tech, crossLang)
+	a.unscopedNeedsContext = true // this helper's rule: an unscoped candidate needs the anchor's context
 
-	// Every guard below is a pure filter, so a candidate qualifies iff it passes all of them and
-	// the ORDER changes only how quickly misses are rejected, never the result. They run
-	// cheapest-first: the same-file test rejects almost every candidate in a multi-file repo
-	// before the scope walk is reached.
-	qualifies := func(cand usg.Node) bool {
-		if cand.ID == n.ID {
-			return false
-		}
-		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-			return false
-		}
-		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-			return false
-		}
-		if scope != "" {
-			if candScope := nodeLexicalScope(cand); candScope != "" {
-				if !sameOrNestedScope(candScope, scope) {
-					return false
-				}
-			} else if !unscopedNodeBelongsToScopedContext(cand, n) {
-				return false
-			}
-		}
-		return flagPredicateMatchesNodeOnly(probe, cand)
-	}
-
-	// A candidate can only qualify if it is in the anchor's file (the prefix guard above), so when
-	// the anchor HAS a file, consult the per-file bucket instead of scanning every node of the
-	// type — that scan is what made flag matching quadratic in graph size. An anchor with no loc
-	// (prefix == "") genuinely has to consider every candidate, and so does a caller without an
-	// index; both fall through to the full stream.
 	for _, nodeType := range nodeTypes {
-		if prefix != "" {
-			if bucket, ok := scopeIdx.nodesInFile(nodeType, prefix); ok {
-				for _, cand := range bucket {
-					if qualifies(cand) {
-						return true
-					}
-				}
-				continue
-			}
-		}
 		hit := false
-		rangeNodesOfType(s, nodeType, func(cand usg.Node) bool {
-			hit = qualifies(cand)
+		scopeIdx.eachCandidate(s, nodeType, a.file, func(cand usg.Node) bool {
+			if cand.ID == n.ID || !a.accepts(cand) {
+				return true
+			}
+			hit = flagPredicateMatchesNodeOnly(probe, cand)
 			return !hit // stop at the first qualifying candidate
 		})
 		if hit {
