@@ -103,6 +103,21 @@ func (s *InMemStore) NodesOfType(nodeType string) ([]string, error) {
 	return out, nil
 }
 
+// RangeNodesOfType streams every node of nodeType to fn (stop early by returning false) WITHOUT
+// NodesOfType's []string copy — the hot-path complement to NodesOfType (see the IntStore twin).
+// fn must not retain the Node.
+func (s *InMemStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, id := range s.byType[nodeType] {
+		n, ok := s.nodes[id]
+		if !ok {
+			continue
+		}
+		if !fn(n) {
+			return
+		}
+	}
+}
+
 func (s *InMemStore) AllNodes() ([]Node, error) {
 	out := make([]Node, 0, len(s.nodes))
 	for _, n := range s.nodes {

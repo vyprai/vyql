@@ -211,6 +211,18 @@ func (s *IntStore) NodesOfType(nodeType string) ([]string, error) {
 	return out, nil
 }
 
+// RangeNodesOfType streams every node of nodeType to fn (stop early by returning false) WITHOUT
+// NodesOfType's []string copy and WITHOUT a string-keyed GetNode per node — the hot-path
+// complement to NodesOfType, used by the adapter flag matcher which scans nodes of a type once
+// per candidate node. fn must not retain the Node.
+func (s *IntStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, i := range s.byType[nodeType] {
+		if !fn(s.nodeAt(i)) {
+			return
+		}
+	}
+}
+
 func (s *IntStore) AllNodes() ([]Node, error) {
 	out := make([]Node, len(s.ids))
 	for i := range s.ids {

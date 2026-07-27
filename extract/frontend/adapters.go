@@ -1232,9 +1232,17 @@ func contextNodeTech(n usg.Node) string {
 	if n.Type != "code.Call" || !strings.HasPrefix(n.Prop("callee_path"), "analysis.") {
 		return ""
 	}
-	for _, tok := range strings.Split(n.Prop("str_args"), "\x00") {
-		if strings.HasPrefix(tok, "lang=") {
-			return strings.TrimPrefix(tok, "lang=")
+	// Walk the \x00-separated tokens in place: strings.Split allocated a []string on every call,
+	// and this runs per candidate node inside the quadratic flag matcher (flagScopeNodeHit).
+	for rest := n.Prop("str_args"); rest != ""; {
+		tok := rest
+		if i := strings.IndexByte(rest, 0); i >= 0 {
+			tok, rest = rest[:i], rest[i+1:]
+		} else {
+			rest = ""
+		}
+		if v, ok := strings.CutPrefix(tok, "lang="); ok {
+			return v
 		}
 	}
 	return ""
@@ -2043,30 +2051,59 @@ func flagScopeNodeHit(s usg.Store, pred flagPredicate, n usg.Node, nodeTypes []s
 	probe.Negative = false
 	prefix := locFile(n.Prop("loc"))
 	scope := nodeLexicalScope(n)
+
+	// Every guard below is a pure filter, so a candidate qualifies iff it passes all of them and
+	// the ORDER changes only how quickly misses are rejected, never the result. They run
+	// cheapest-first: the same-file test rejects almost every candidate in a multi-file repo
+	// before the scope walk is reached.
+	qualifies := func(cand usg.Node) bool {
+		if cand.ID == n.ID {
+			return false
+		}
+		if prefix != "" && locFile(cand.Prop("loc")) != prefix {
+			return false
+		}
+		if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
+			return false
+		}
+		if scope != "" {
+			if candScope := nodeLexicalScope(cand); candScope != "" {
+				if !sameOrNestedScope(candScope, scope) {
+					return false
+				}
+			} else if !unscopedNodeBelongsToScopedContext(cand, n) {
+				return false
+			}
+		}
+		return flagPredicateMatchesNodeOnly(probe, cand)
+	}
+
+	// This runs once per candidate node per predicate, so it is quadratic in graph size; stream
+	// the type's nodes when the store supports it, avoiding NodesOfType's []string copy and a
+	// string-keyed GetNode per candidate. Other stores keep the portable path below.
+	if fast, ok := s.(interface {
+		RangeNodesOfType(nodeType string, fn func(usg.Node) bool)
+	}); ok {
+		for _, nodeType := range nodeTypes {
+			hit := false
+			fast.RangeNodesOfType(nodeType, func(cand usg.Node) bool {
+				hit = qualifies(cand)
+				return !hit // stop at the first qualifying candidate
+			})
+			if hit {
+				return true
+			}
+		}
+		return false
+	}
 	for _, nodeType := range nodeTypes {
 		ids, _ := s.NodesOfType(nodeType)
 		for _, id := range ids {
 			cand, ok, err := s.GetNode(id)
-			if err != nil || !ok || cand.ID == n.ID {
+			if err != nil || !ok {
 				continue
 			}
-			candScope := nodeLexicalScope(cand)
-			if scope != "" {
-				if candScope != "" {
-					if !sameOrNestedScope(candScope, scope) {
-						continue
-					}
-				} else if !unscopedNodeBelongsToScopedContext(cand, n) {
-					continue
-				}
-			}
-			if prefix != "" && locFile(cand.Prop("loc")) != prefix {
-				continue
-			}
-			if t := nodeTechFromNode(cand); !crossLang && t != "" && t != tech {
-				continue
-			}
-			if flagPredicateMatchesNodeOnly(probe, cand) {
+			if qualifies(cand) {
 				return true
 			}
 		}
