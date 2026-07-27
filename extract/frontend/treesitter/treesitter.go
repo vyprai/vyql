@@ -126,10 +126,10 @@ const binarySniffBytes = 512
 // the same one) for "this is not text".
 //
 // The generic text-pattern frontend claims essentially every file, so without this a compiled
-// binary or a database is parsed as source: one real repo fed in a 141MB Mach-O executable
-// (bin/web-cover) and a 6.1MB SQLite db. The size guard happens to catch those two, but only
-// because they are large — a small binary would sail through and produce garbage nodes and
-// findings. Content, not size, is the right test for "is this source at all".
+// binary or a database is parsed as source: one real repo fed in a ~142MB Mach-O executable and
+// a ~6MB SQLite database. The size guard happens to catch those two, but only because they are
+// large — a small binary would sail through and produce garbage nodes and findings. Content, not
+// size, is the right test for "is this source at all".
 //
 // Unreadable files are treated as text: like the size guard, this only ever skips what it can
 // prove should go.
