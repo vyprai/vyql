@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 func readFile(path string) ([]byte, error) { return os.ReadFile(path) }
@@ -28,6 +29,54 @@ func minifiedAsset(base string) bool {
 		}
 	}
 	return false
+}
+
+// DefaultMaxFileBytes is the default per-file source size ceiling. Files above it are skipped.
+//
+// Nothing capped source size before: the only guard was the NAME-based minifiedAsset check, so a
+// generated artifact that does not end in .min.js sailed through — a Go coverage report
+// (coverage/*.cover.html, which embeds every source file plus a large inline script) or a
+// bundled asset in a directory that is not dist/ or node_modules/. Those are machine-generated,
+// contain no hand-written vulnerability, and explode into enormous node counts in a SINGLE file,
+// which also defeats the per-file bucketing in the adapter flag matcher.
+//
+// 2 MiB is far above any realistic hand-written source file (the largest in this repo's own tree
+// is ~130 KB) and far below the generated artifacts that cause the blowup.
+const DefaultMaxFileBytes int64 = 2 << 20
+
+// maxFileBytes is the active ceiling; <= 0 disables the guard.
+var maxFileBytes = DefaultMaxFileBytes
+
+// SetMaxFileBytes installs the per-file size ceiling (<= 0 disables it). Process-global and set
+// once before scanning, like SetExcludes.
+func SetMaxFileBytes(n int64) { maxFileBytes = n }
+
+// MaxFileBytes returns the active ceiling (for cache-key fingerprinting, so a scan with a
+// different ceiling never replays another's cached result).
+func MaxFileBytes() int64 { return maxFileBytes }
+
+// oversizeSkipped counts files skipped by the size guard during the current scan, so the CLI can
+// tell the user what was left out instead of silently dropping it.
+var oversizeSkipped atomic.Int64
+
+// OversizeSkipped returns how many files the size guard skipped.
+func OversizeSkipped() int64 { return oversizeSkipped.Load() }
+
+// ResetOversizeSkipped zeroes the counter (tests scan repeatedly in one process).
+func ResetOversizeSkipped() { oversizeSkipped.Store(0) }
+
+// oversize reports whether a walked file exceeds the ceiling, counting it when it does. A file
+// whose size cannot be read is kept — the guard only ever skips what it can prove is too big.
+func oversize(d os.DirEntry) bool {
+	if maxFileBytes <= 0 {
+		return false
+	}
+	info, err := d.Info()
+	if err != nil || info.Size() <= maxFileBytes {
+		return false
+	}
+	oversizeSkipped.Add(1)
+	return true
 }
 
 // userExcludes are caller-supplied glob patterns (via `vyql scan -exclude`) layered on
@@ -98,7 +147,7 @@ func ListFiles(root string, exts map[string]bool) ([]string, error) {
 			}
 			return nil
 		}
-		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) {
+		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) || oversize(d) {
 			return nil
 		}
 		// match by extension, or by basename for extensionless files (e.g. Dockerfile).
@@ -133,7 +182,7 @@ func ListAllFiles(root string) []Entry {
 			}
 			return nil
 		}
-		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) {
+		if excluded(filepath.Base(path), rel) || minifiedAsset(filepath.Base(path)) || oversize(d) {
 			return nil
 		}
 		out = append(out, Entry{Path: path, Ext: strings.ToLower(filepath.Ext(path)), Base: strings.ToLower(filepath.Base(path))})
