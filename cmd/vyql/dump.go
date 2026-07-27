@@ -17,6 +17,18 @@ import (
 
 var scanAdapterOverlay string
 
+// closeStore releases a graph store the caller owns. Nil-safe, so callers can defer it against a
+// variable that may never be assigned (an early error) or that is legitimately nil ("recognized
+// files, nothing to analyze"). This matters for the badger-backed store used under a RAM ceiling:
+// badger.Open starts background goroutines that root its memtable arenas, so an unclosed store is
+// never collectable. Every code path that RECEIVES a store from scanPaths/scanPathsFull/buildGraph
+// owns it and must close it.
+func closeStore(s usg.Store) {
+	if s != nil {
+		_ = s.Close()
+	}
+}
+
 // buildGraph runs extract → lower → adapters → SCA and returns the analysis graph (the
 // USG the rule engine evaluates against). Shared by scanPaths and the -dump debug path.
 // Returns a nil store when recognized files produced nothing to analyze.
@@ -155,6 +167,7 @@ func dumpGraph(paths []string, mode string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil

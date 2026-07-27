@@ -55,10 +55,11 @@ func TestOWASPBenchmark(t *testing.T) {
 	if len(roots) == 0 {
 		roots = []string{dir}
 	}
-	fs, _, _, err := scanPaths(roots, rules)
+	fs, _, store, err := scanPaths(roots, rules)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
+	defer closeStore(store)
 
 	// detected[testname][category] = VyQL reported that category in that test file.
 	// With BENCH_CONFIDENT=1 only findings WITHOUT an assumption note count (the confident

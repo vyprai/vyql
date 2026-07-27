@@ -310,10 +310,11 @@ func TestVyqlSpecs(t *testing.T) {
 						applyProfile([]string{dir}, s.profile)
 						defer frontend.SetActiveSources(nil)
 					}
-					found, _, _, err := scanPaths([]string{dir}, rules)
+					found, _, store, err := scanPaths([]string{dir}, rules)
 					if err != nil {
 						t.Fatalf("scan: %v", err)
 					}
+					defer closeStore(store) // 3k+ specs: an unclosed store per spec is a leak
 					for _, fnd := range found {
 						fired[fnd.RuleID] = true
 						confidence[fnd.RuleID] = fnd.Confidence
@@ -331,6 +332,7 @@ func TestVyqlSpecs(t *testing.T) {
 						if err != nil {
 							t.Fatalf("build graph for review: %v", err)
 						}
+						defer closeStore(g)
 						for _, row := range collectReviewItems(g) {
 							reviewed[row.Concept] = true
 						}

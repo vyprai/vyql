@@ -66,7 +66,8 @@ func TestPrecisionCorpus(t *testing.T) {
 							paths = append(paths, filepath.Join(repoDir, p))
 						}
 					}
-					fs, _, _, err := scanPaths(paths, rules)
+					fs, _, store, err := scanPaths(paths, rules)
+					defer closeStore(store)
 					if err != nil {
 						t.Fatalf("scan %v: %v", paths, err)
 					}

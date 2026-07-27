@@ -38,6 +38,7 @@ func cmdTrace(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -231,10 +232,11 @@ func cmdExplain(args []string) error {
 	if err != nil {
 		return err
 	}
-	all, _, _, err := scanPaths(paths, src)
+	all, _, g, err := scanPaths(paths, src)
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if len(all) == 0 {
 		fmt.Println("No findings.")
 		return nil
@@ -293,6 +295,7 @@ func cmdMatch(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -367,6 +370,7 @@ func cmdResolve(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -428,6 +432,7 @@ func cmdGraph(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil
@@ -712,6 +717,7 @@ func cmdQuery(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer closeStore(g)
 	if g == nil {
 		fmt.Println("(no analyzable source)")
 		return nil

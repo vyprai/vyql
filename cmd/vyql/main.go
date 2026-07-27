@@ -286,6 +286,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	var all []*findings.Finding
 	var stats scanStats
 	var graph usg.Store
+	defer func() { closeStore(graph) }() // read at defer time: graph is assigned below
 	var ruleMeta map[string]map[string]any
 	wantsFlags := opts.wantsFlags()
 
