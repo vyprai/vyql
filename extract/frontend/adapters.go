@@ -2090,23 +2090,47 @@ func nodeLexicalScope(n usg.Node) string {
 	return n.Prop("region")
 }
 
+// sameOrNestedScope reports whether candidate is anchor, or is lexically nested inside it,
+// comparing "/"-separated segments with any "@order" suffix ignored.
+//
+// This sits on the innermost loop of flag matching — flagScopeNodeHit calls it once per
+// candidate node per predicate — so it walks both strings in place rather than building the
+// normalized forms. The obvious version (strip @order via Split/Join, then ==/HasPrefix) cost
+// two allocations per call and dominated real scans at ~42% of total CPU. Equivalence to that
+// version is pinned by TestSameOrNestedScopeMatchesReference over an exhaustive scope corpus.
 func sameOrNestedScope(candidate, anchor string) bool {
-	candidate = scopeWithoutOrder(candidate)
-	anchor = scopeWithoutOrder(anchor)
-	return candidate == anchor || strings.HasPrefix(candidate, anchor+"/")
+	for {
+		aSeg, aRest, aMore := nextScopeSegment(anchor)
+		cSeg, cRest, cMore := nextScopeSegment(candidate)
+		if aSeg != cSeg {
+			return false
+		}
+		if !aMore {
+			// anchor consumed and every segment matched: candidate is anchor (!cMore) or
+			// extends it by at least one more segment — both are "same or nested".
+			return true
+		}
+		if !cMore {
+			return false // candidate is shallower than anchor
+		}
+		anchor, candidate = aRest, cRest
+	}
 }
 
-func scopeWithoutOrder(scope string) string {
-	if scope == "" {
-		return ""
+// nextScopeSegment splits off the leading "/"-separated segment of s with any "@order" suffix
+// stripped, returning the remainder after the "/" and whether a "/" was present.
+func nextScopeSegment(s string) (seg, rest string, more bool) {
+	if i := strings.IndexByte(s, '/'); i >= 0 {
+		return trimScopeOrder(s[:i]), s[i+1:], true
 	}
-	parts := strings.Split(scope, "/")
-	for i, part := range parts {
-		if at := strings.Index(part, "@"); at >= 0 {
-			parts[i] = part[:at]
-		}
+	return trimScopeOrder(s), "", false
+}
+
+func trimScopeOrder(seg string) string {
+	if at := strings.IndexByte(seg, '@'); at >= 0 {
+		return seg[:at]
 	}
-	return strings.Join(parts, "/")
+	return seg
 }
 
 func flagPredicateMatchesNodeOnly(pred flagPredicate, n usg.Node) bool {
