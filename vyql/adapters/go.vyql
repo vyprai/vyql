@@ -939,6 +939,10 @@ adapter go {
     call "int"
     call "len"
     binary "data.Idx<0"
+    // `binary` compares operand text through the conversion, so `data.Idx<0` reads
+    // the same whether or not the lower bound converts first. A second int() is
+    // what tells the two apart: converting both bounds makes the guard real.
+    not call order "int>int"
   }
   sink method "BranchPageElement" val "Count" -> code.CountDerivedElementAccess
   flag core.MemoryBoundsCheck on any {
