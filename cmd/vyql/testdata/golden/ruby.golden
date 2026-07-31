@@ -1,5 +1,6 @@
 call analysis.function.context
 call analysis.function.return
+call analysis.module.context
 call analysis.parameter.entry
 call analysis.parameter.entry
 call source.value

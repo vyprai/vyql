@@ -443,6 +443,7 @@ adapter java {
   package "org.yaml.snakeyaml" {
     flag code.UnsafeYamlConstructor in class {
       class base "Constructor"
+      not class base "SafeConstructor"
     }
     flag code.UnsafeYamlConstructor on any {
       path exact "org.yaml.snakeyaml.constructor.Constructor"
@@ -583,23 +584,23 @@ adapter java {
   // contexts as authorization checks.
   flag code.IgnoredAuthorizationResult in function {
     call "canFlush"
-    not call "ThriftSecurityException"
+    lacks "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
     call "canPerformSystemActions"
-    not call "ThriftSecurityException"
+    lacks "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
     call "canAlterNamespace"
-    not call "ThriftSecurityException"
+    lacks "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
     call "canAlterTable"
-    not call "ThriftSecurityException"
+    lacks "ThriftSecurityException"
   }
   flag code.IgnoredAuthorizationResult in function {
     call "canObtainDelegationToken"
-    not call "ThriftSecurityException"
+    lacks "ThriftSecurityException"
   }
   control "analysis.function.context" val "call:canFlush" val "call:ThriftSecurityException" -> core.AuthorizationCheck
   control "analysis.function.context" val "call:canPerformSystemActions" val "call:ThriftSecurityException" -> core.AuthorizationCheck
@@ -892,7 +893,7 @@ adapter java {
     selector "Constants.MC_REALPATH"
     selector "Constants.MC_RELATIVE_PATH"
     call "FileReader"
-    not call "FileNotFoundException"
+    lacks "FileNotFoundException"
   }
   flag code.CanonicalPathStringPrefixContainment in function {
     function "getValidDirectoryPath"

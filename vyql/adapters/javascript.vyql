@@ -137,20 +137,20 @@ adapter javascript {
     not call path "sanitizeSvg"
     not call path "DOMPurify"
   }
-  flag code.UnescapedHtmlOptionRenderer in function {
+  flag code.UnescapedHtmlOptionRenderer in module {
     lang "javascript"
-    call path "newTomSelect"
-    identifier "directoryName"
+    call path "TomSelect"
+    selector "directoryName"
     literal "<"
     not call path "sanitizeDirectoryName"
     not selector "textContent"
     not selector "innerHTML"
   }
-  flag code.UnescapedHtmlOptionRenderer in function {
+  flag code.UnescapedHtmlOptionRenderer in module {
     lang "javascript"
     call path "getAttribute"
     literal "data-content"
-    identifier "optionContent"
+    selector "optionContent"
     selector "innerHTML"
     call path "appendChild"
     not call path "sanitizeHtml"
@@ -163,7 +163,6 @@ adapter javascript {
     name "search"
     call path "ignoreDiacriticalMarks"
     literal "search-keyword"
-    identifier "matchingPost"
     not call path "escapeHtml"
   }
   flag code.UnescapedTableExportHtml in module {
@@ -207,7 +206,6 @@ adapter javascript {
     lang "javascript"
     name "formatTooltip"
     call arg "itemModel.get:name"
-    identifier "name"
     call arg "createTooltipMarkup:nameValue"
     not token prop "name=itemName"
     not call arg "encodeHTML:name"
@@ -219,7 +217,6 @@ adapter javascript {
     name "addDropDownEntry"
     selector "li.innerHTML"
     literal "dropdown-item"
-    identifier "label"
     not call arg "sanitizeHTML:label"
     not selector "textContent"
   }
@@ -309,7 +306,6 @@ adapter javascript {
   flag code.JobOutputEventUpdateAuthorizationBypass in function {
     literal "Got job update from child"
     literal "update_event"
-    assign "job[key]=data[key]"
     not literal "allow_event_updates_from_jobs"
     not selector "data.update_event"
   }
@@ -533,9 +529,6 @@ adapter javascript {
     lang "javascript"
     selector contains_any ["ctx.request.method", "ctx.request?.method"]
     literal "POST"
-    identifier "callbackURL"
-    identifier "redirectTo"
-    identifier "trustedOrigins"
     call path "validateURL"
   }
   flag code.CinnyServiceWorkerMediaAuthLeak in function {
@@ -1651,7 +1644,6 @@ adapter javascript {
     name "buildRelayUrl"
     literal "herokuapp.com"
     call arg "encodeURIComponent:gurl"
-    identifier contains_any ["token", "gurl"]
     not identifier "configuredRelayHost"
   }
   // Runtime/default settings that choose auth/session token sync URLs must be
