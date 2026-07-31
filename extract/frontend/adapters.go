@@ -1574,6 +1574,7 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 	if n.Prop("callee_path") == "analysis.function.context" ||
 		n.Prop("callee_path") == "analysis.module.context" ||
 		n.Prop("callee_path") == "analysis.class.context" {
+		pred = scopedNodeKindPredicate(pred)
 		if ok, hit := flagContextPredicateMatchesAST(s, pred, n, tech, crossLang, scopeIdx); ok {
 			if !flagPredicateUsesCallArg(pred) {
 				probe := pred
@@ -1587,6 +1588,29 @@ func flagPredicateMatches(s usg.Store, idx *flowTokenIndex, pred flagPredicate, 
 		}
 	}
 	return flagPredicateMatchesNodeOnly(pred, n)
+}
+
+// scopedNodeKindPredicate rewrites a bare node-kind predicate into the token form the
+// context matcher understands.
+//
+// In a scoped flag the candidate node is a synthetic `analysis.*.context` call, so a
+// predicate naming a node kind — `identifier "x"` — has to be answered by searching the
+// scope for such a node. Without this it fell through to a node-only test against the
+// context node itself, which is a code.Call and can never satisfy an identifier test, so
+// every scoped flag written in the bare form silently never matched. The `token
+// identifier "x"` spelling already routed correctly; both now behave the same.
+func scopedNodeKindPredicate(pred flagPredicate) flagPredicate {
+	if pred.Property != "identifier" || len(pred.Values) == 0 {
+		return pred
+	}
+	values := make([]string, len(pred.Values))
+	for i, v := range pred.Values {
+		values[i] = "identifier:" + v
+	}
+	out := pred
+	out.Property = "tokens"
+	out.Values = values
+	return out
 }
 
 func flagPredicateUsesCallArg(pred flagPredicate) bool {

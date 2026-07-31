@@ -1930,3 +1930,39 @@ func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 		t.Fatalf("receiver control mapping wrong: %+v", got)
 	}
 }
+
+// TestScopedBareIdentifierPredicateSearchesScope pins a matcher bug that silently
+// disabled flags rather than misfiring them.
+//
+// In a scoped flag the candidate node is a synthetic analysis.*.context call. A bare
+// `identifier "x"` predicate used to fall through to a node-only test against that
+// context node — a code.Call, which can never satisfy an identifier test — so the flag
+// never matched and nothing indicated why. Only the `token identifier "x"` spelling
+// routed into the scope search. Both must behave the same.
+func TestScopedBareIdentifierPredicateSearchesScope(t *testing.T) {
+	s := usg.NewInMemStore()
+	anchor := usg.Node{ID: "a.js\x1fctx", Type: "code.Call", Props: map[string]string{
+		"loc": "a.js:1", "callee_path": "analysis.module.context", "method": "context",
+	}}
+	param := usg.Node{ID: "a.js\x1fonCellHtmlData#param#htmlData", Type: "code.Param", Props: map[string]string{
+		"loc": "a.js:5", "func": "onCellHtmlData",
+	}}
+	s.AddNode(anchor)
+	s.AddNode(param)
+	idx := newScopeCandidateIndex(s)
+
+	bare := flagPredicate{Property: "identifier", Op: "contains", Values: []string{"htmlData"}}
+	if !flagPredicateMatches(s, nil, bare, anchor, "javascript", false, nil, idx) {
+		t.Error(`bare identifier "htmlData" did not match a code.Param in scope`)
+	}
+
+	tokenForm := flagPredicate{Property: "tokens", Op: "contains", Values: []string{"identifier:htmlData"}}
+	if !flagPredicateMatches(s, nil, tokenForm, anchor, "javascript", false, nil, idx) {
+		t.Error(`token identifier "htmlData" did not match a code.Param in scope`)
+	}
+
+	absent := flagPredicate{Property: "identifier", Op: "contains", Values: []string{"nosuchparam"}}
+	if flagPredicateMatches(s, nil, absent, anchor, "javascript", false, nil, idx) {
+		t.Error("an identifier absent from the scope matched anyway")
+	}
+}
