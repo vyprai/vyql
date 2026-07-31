@@ -501,6 +501,13 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 					add("prop:" + key + "=" + val)
 				}
 			}
+		case "method_definition":
+			// A shorthand method's name is a property_identifier, so the identifier case
+			// below never sees it — the method's PARAMETERS were collected while the
+			// method itself was invisible. Emit the name so a flag can key on it.
+			if name := jsContextCompact(c.text(field(n, "name"))); name != "" {
+				add("identifier:" + name)
+			}
 		case "member_expression":
 			if sel := c.dotted(n); sel != "" && sel != "?" {
 				add("selector:" + sel)
@@ -1363,6 +1370,24 @@ func safeJSCommandRejectRegex(lit string) bool {
 	return true
 }
 
+// callArgObjectMethodFuncDefs lowers methods defined inside object literals that are
+// passed straight to a call, e.g. `$.extend(defaults, {opts: {onCellHtmlData() {…}}})`.
+// Handing a config object to a call is ordinary JS, but only object literals bound to
+// a variable used to be scanned, so these methods contributed no function at all and
+// anything keyed on the method name could never match. objectMethodFuncDefs already
+// recurses through nested pairs, and ignores arguments that are not object literals.
+func (c *jsConv) callArgObjectMethodFuncDefs(call *tree_sitter.Node) []nir.Stmt {
+	args := field(call, "arguments")
+	if args == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, a := range namedChildren(args) {
+		out = append(out, c.objectMethodFuncDefs(a, false)...)
+	}
+	return out
+}
+
 func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []nir.Stmt {
 	if obj == nil || obj.Kind() != "object" {
 		return nil
@@ -1529,7 +1554,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 		if body := c.iife(inner, L); len(body) > 0 {
 			return body
 		}
-		return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+		return append([]nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}, c.callArgObjectMethodFuncDefs(inner)...)
 	case "unary_expression":
 		if arg := c.unaryArg(inner); arg != nil && arg.Kind() == "call_expression" {
 			if body := c.iife(arg, L); len(body) > 0 {
