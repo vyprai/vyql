@@ -22,6 +22,24 @@ TS="${TS:-tree-sitter}"                       # override with TS=/path/to/tree-s
 
 modver() { ls -d "$MC/$1"@* 2>/dev/null | sort -V | tail -1; }
 
+# copy_license brings the upstream LICENSE along with the sources. Redistributing
+# these grammars requires it, and a refresh that silently dropped it would put the
+# release out of compliance — so a miss is a loud warning, not a silent skip.
+copy_license() { # $1=module  $2=dest-pkg
+  local d f; d="$(modver "$1")"
+  if [ -n "$d" ]; then
+    for f in LICENSE LICENSE.md LICENSE.txt LICENCE COPYING; do
+      if [ -f "$d/$f" ]; then
+        cp "$d/$f" "$GRAMMARS/$2/LICENSE"
+        chmod u+w "$GRAMMARS/$2/LICENSE"
+        return 0
+      fi
+    done
+  fi
+  echo "WARNING: no upstream license found for $2 — fetch it by hand before releasing" >&2
+  return 1
+}
+
 vendor_committed() { # $1=module  $2=dest-pkg  $3=lang
   local d; d="$(modver "$1")"
   mkdir -p "$GRAMMARS/$2/tree_sitter"
@@ -29,6 +47,7 @@ vendor_committed() { # $1=module  $2=dest-pkg  $3=lang
      cp "$d/src/parser.c" "$GRAMMARS/$2/"
   cp "$d/src/tree_sitter/"*.h "$GRAMMARS/$2/tree_sitter/"
   chmod -R u+w "$GRAMMARS/$2"
+  copy_license "$1" "$2" || true
   echo "vendored $3 from committed parser.c ($1)"
 }
 
@@ -45,6 +64,7 @@ vendor_generated() { # $1=module  $2=dest-pkg  $3=lang
   cp "$t/src/"*.h "$GRAMMARS/$2/" 2>/dev/null || true   # custom scanner headers (tsp_*.h, bsearch.h)
   cp "$t/src/tree_sitter/"*.h "$GRAMMARS/$2/tree_sitter/"
   chmod -R u+w "$GRAMMARS/$2"; rm -rf "$t"
+  copy_license "$1" "$2" || true
   echo "generated + vendored $3 ($1)"
 }
 
