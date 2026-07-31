@@ -2768,6 +2768,8 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 	switch n.Kind() {
 	case "identifier", "property_identifier":
 		return c.text(n)
+	case "this":
+		return "this"
 	case "member_expression":
 		return c.dotted(field(n, "object")) + "." + c.text(field(n, "property"))
 	case "call_expression":

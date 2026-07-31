@@ -312,9 +312,9 @@ export const Channel = GObject.registerClass({
 		}
 		tokens := n.Prop("str_args")
 		if strings.Contains(tokens, "name=accept") &&
-			strings.Contains(tokens, "call_path:?.sendPacket") &&
-			strings.Contains(tokens, "call_path:?.readPacket") &&
-			strings.Contains(tokens, "assign:?.identity=awaitthis.readPacket()") {
+			strings.Contains(tokens, "call_path:this.sendPacket") &&
+			strings.Contains(tokens, "call_path:this.readPacket") &&
+			strings.Contains(tokens, "assign:this.identity=awaitthis.readPacket()") {
 			return
 		}
 	}

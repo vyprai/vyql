@@ -176,8 +176,8 @@ adapter javascript {
   }
   flag code.UnescapedHtmlPresenter in module {
     lang "javascript"
-    token prop "presentType=html"
-    call path "present"
+    assign "this.presentType=html"
+    token identifier "present"
     call path "Utils.printable"
     literal "<td>${value}</td>"
     not call path "Utils.escapeHtml"
@@ -768,7 +768,7 @@ adapter javascript {
   }
   flag code.CommandOptionInjection in function {
     name "clone"
-    call path "?.gitExec"
+    call path "this.gitExec"
     literal contains_any ["clone${repository}", "clone${remote}", "clone${url}"]
     not literal contains_any ["--${repository}", "--${remote}", "--${url}"]
   }
@@ -777,9 +777,9 @@ adapter javascript {
     fact git_clone_argv_missing_delimiter "true"
   }
   flag code.GitPackSignatureSearchParsingBypass in function {
-    call path contains_any ["?.lastIndexOf", "req.body.lastIndexOf"]
+    call path contains_any ["this.lastIndexOf", "req.body.lastIndexOf"]
     literal "PACK"
-    call path contains_any ["?.slice", "req.body.slice"]
+    call path contains_any ["this.slice", "req.body.slice"]
     call path "getPackMeta"
     not token identifier "packDataOffset"
     not literal "PACK_SIGNATURE"
@@ -789,7 +789,7 @@ adapter javascript {
     call path "child_process.exec"
     call path "args.join"
     literal "git --git-dir="
-    attr path "?.path"
+    attr path "this.path"
     not call path "child_process.execFile"
   }
   flag code.DynamicFunctionMutableObjectEval in function {
@@ -1765,11 +1765,11 @@ adapter javascript {
   }
   flag code.PostTlsIdentityRebindingMissingCheck in function {
     lang "javascript"
-    call path "?.sendPacket"
-    call path "?.readPacket"
-    selector "?.identity.body.protocolVersion"
-    selector "?.identity.body.deviceId"
-    assign "?.identity=awaitthis.readPacket()"
+    call path "this.sendPacket"
+    call path "this.readPacket"
+    selector "this.identity.body.protocolVersion"
+    selector "this.identity.body.deviceId"
+    assign "this.identity=awaitthis.readPacket()"
     not binary contains_any [
       "this.identity.body.protocolVersion!==identity.body.protocolVersion",
       "this.identity.body.deviceId!==identity.body.deviceId",
