@@ -126,6 +126,23 @@ func (l *lowerer) inRegion(seg string, f func()) {
 	l.region = save
 }
 
+// functionRegion opens the region root for a function body.
+//
+// A function declared at module level gets a fresh root, so structural dominance
+// never spans functions. A function written INSIDE another one — an inline
+// callback — hangs off the region that encloses it, joined with "#". The
+// dominance tests read only "/" as nesting, so a guard inside a callback still
+// does not dominate the code around it, and a release inside one still does not
+// post-dominate it. Reaches does read "#", because a callback body does execute
+// somewhere after the code that passes it: that is what lets an order rule
+// sequence a check made in a callback against a use in the enclosing function.
+func (l *lowerer) functionRegion() string {
+	if l.region == "" {
+		return l.curNS + "/fn" + l.nextBranch()
+	}
+	return l.region + "#fn" + l.nextBranch()
+}
+
 func (l *lowerer) nextBranch() string {
 	l.modBranch[l.curNS]++
 	return strconv.Itoa(l.modBranch[l.curNS])
@@ -1720,7 +1737,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// each function gets a distinct region ROOT, so structural dominance never spans
 		// functions (cross-function flows fall back to presence semantics — conservative).
 		saveRegion := l.region
-		l.region = l.curNS + "/fn" + l.nextBranch()
+		l.region = l.functionRegion()
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		saveFunc := l.curFunc
@@ -2216,7 +2233,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Lambda:
 		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
 		saveRegion := l.region
-		l.region = l.curNS + "/fn" + l.nextBranch()
+		l.region = l.functionRegion()
 		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
