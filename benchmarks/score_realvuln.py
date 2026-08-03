@@ -24,9 +24,14 @@ from scorer.metrics import compute_scorecard  # noqa: E402
 
 
 def rule_cwes():
-    """rule id -> [CWE-nnn], read from the shipped rule packs."""
+    """rule id -> [CWE-nnn], read from the shipped rule packs.
+
+    Recursive: rules live one-per-file under packs/<domain>/vypr/<domain>/. A
+    non-recursive glob finds nothing and the scorer then silently reports zero
+    findings rather than failing, so the count is asserted below.
+    """
     out = {}
-    for f in glob.glob(os.path.join(PACKS, "*.vyql")):
+    for f in glob.glob(os.path.join(PACKS, "**", "*.vyql"), recursive=True):
         for m in re.finditer(r"meta\s*\{([^}]*)\}", open(f).read()):
             body = m.group(1)
             rid = re.search(r'id:\s*"([^"]+)"', body)
@@ -37,6 +42,10 @@ def rule_cwes():
 
 
 CWES = rule_cwes()
+if len(CWES) < 100:
+    sys.exit(f"only {len(CWES)} rules found under {PACKS} -- expected hundreds. "
+             "Every finding would be dropped for want of a CWE and the run would "
+             "report a recall of zero. Check the packs path.")
 
 
 def scan(repo_path):
