@@ -71,24 +71,32 @@ func editDistanceLE1(a, b string) bool {
 func FlagTyposquats(g usg.Store, eco string) (int, error) {
 	d := data()
 	popular := d.popularSet(eco)
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return 0, err
-	}
 	n := 0
-	for _, nd := range nodes {
+	type tokenUpdate struct {
+		id     string
+		tokens []string
+	}
+	var updates []tokenUpdate
+	err := rangeStoreNodes(g, func(nd usg.Node) bool {
 		if nd.Type != "sbom.PackageVersion" {
-			continue
+			return true
 		}
 		name := nd.Prop("name")
 		if name == "" || popular[name] || isTrusted(d, eco, name, nd.Prop("version")) {
-			continue
+			return true
 		}
 		if target := nearestPopular(name, popular); target != "" {
-			if err := addPackageTokens(g, nd.ID, "status=suspicious", "reason=typosquat", "squats="+target); err != nil {
-				return n, err
-			}
+			updates = append(updates, tokenUpdate{nd.ID, []string{"status=suspicious", "reason=typosquat", "squats=" + target}})
 			n++
+		}
+		return true
+	})
+	if err != nil {
+		return n, err
+	}
+	for _, update := range updates {
+		if err := addPackageTokens(g, update.id, update.tokens...); err != nil {
+			return n, err
 		}
 	}
 	return n, nil

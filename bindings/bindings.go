@@ -15,7 +15,9 @@ package bindings
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/vyprai/vyql/usg"
@@ -132,12 +134,39 @@ func Apply(store usg.Store, apps []Applicator, tenantOverrides []Mapping) ([]Con
 	// repos, so keep only the winning proposal unless a key actually collides.
 	pos := map[key]proposalGroup{}
 	neg := map[key][]Applicator{}
-	for _, app := range apps {
-		appStart := time.Now()
-		mappings := app.Apply(store)
-		if bindingTimingOn {
-			fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d mapping(s)\n", app.Name, float64(time.Since(appStart))/1e6, len(mappings))
-		}
+
+	// Each applicator's Apply is read-only on the store and independent, so run them
+	// concurrently. The merge below stays serial and in applicator order, so the
+	// per-(node,concept) tie-breaking is identical to the old sequential pass —
+	// parallelism changes wall-clock only, not the result.
+	results := make([][]Mapping, len(apps))
+	limit := runtime.GOMAXPROCS(0)
+	if limit > len(apps) {
+		limit = len(apps)
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i := range apps {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			appStart := time.Now()
+			results[i] = apps[i].Apply(store)
+			if bindingTimingOn {
+				fmt.Fprintf(os.Stderr, "[binding] %-48s %7.1fms %7d mapping(s)\n", apps[i].Name, float64(time.Since(appStart))/1e6, len(results[i]))
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for i := range apps {
+		app := apps[i]
+		mappings := results[i]
 		for _, m := range mappings {
 			proposalCount++
 			p := proposal{app, m}

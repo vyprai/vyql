@@ -95,6 +95,23 @@ func TestBoundaryValuePredicatesMatchTokenSegments(t *testing.T) {
 	}
 }
 
+func TestLowerStringPreservesSemantics(t *testing.T) {
+	cases := []string{
+		"already-lower\x00tokens",
+		"MixedCASE\x00HTTPInput",
+		"Straße",
+		"ASCII-then-É",
+	}
+	for _, input := range cases {
+		if got, want := lowerString(input), strings.ToLower(input); got != want {
+			t.Fatalf("lowerString(%q)=%q want %q", input, got, want)
+		}
+	}
+	if got := lowerString("already-lower"); got != "already-lower" {
+		t.Fatalf("lowerString should leave lowercase ASCII unchanged, got %q", got)
+	}
+}
+
 func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	tokens := "function_name:validateRedirect\x00literal:/admin.html"
 	if !contextTokenValuePredicate("starts_with", []string{"function_name:validate"}, tokens) {
@@ -105,6 +122,246 @@ func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	}
 	if contextTokenValuePredicate("ends_with", []string{"function_name:validate"}, tokens) {
 		t.Fatal("ends_with should not match a prefix-only value")
+	}
+}
+
+func TestFlagPredicateOrderChecksSelectiveContextBeforeLanguage(t *testing.T) {
+	preds := []flagPredicate{
+		newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"python_review:archive_symlink_filter_bypass"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"call_path:os.open"}, false, false),
+		newFlagPredicate("node", "tokens", "contains", []string{"binary:len(payload)==0"}, false, false),
+	}
+	order := flagPredicateOrder(preds)
+	if len(order) != len(preds) {
+		t.Fatalf("expected reordered predicates, got %v", order)
+	}
+	if order[0] != 1 {
+		t.Fatalf("python_review predicate should run first, got order %v", order)
+	}
+	if order[len(order)-1] != 0 {
+		t.Fatalf("language predicate should run last, got order %v", order)
+	}
+}
+
+func TestCachedContextTokenPredicateMatchesUncachedSemantics(t *testing.T) {
+	text := strings.Join([]string{
+		"lang=python",
+		"function_name:load_model",
+		"literal:/admin.html",
+		"call_path:package.os.open",
+		"class_base:org.yaml.snakeyaml.constructor.SafeConstructor",
+	}, "\x00")
+	idx := &flagMatchIndex{}
+	cases := []struct {
+		op     string
+		values []string
+	}{
+		{"equals", []string{"lang=python"}},
+		{"contains", []string{"function_name:load"}},
+		{"contains", []string{"call_path:os.open"}},
+		{"contains", []string{"class_base:Constructor"}},
+		{"contains", []string{"class_base:SafeConstructor"}},
+		{"starts_with", []string{"function_name:load"}},
+		{"ends_with", []string{"literal:.html"}},
+		{"contains_any", []string{"literal:/login", "literal:/admin"}},
+		{"contains_any", []string{"call_path:missing", "call_path:os.open"}},
+	}
+	for _, c := range cases {
+		pred := newFlagPredicate("node", "tokens", c.op, c.values, false, false)
+		got := flagContextTokenValuePredicateCached(idx, pred, text)
+		want := flagContextTokenValuePredicate(pred, text)
+		if got != want {
+			t.Fatalf("cached predicate %s %v = %v, want %v", c.op, c.values, got, want)
+		}
+	}
+}
+
+func TestLowerTextValueCachesLargeContextText(t *testing.T) {
+	oldLimit := lowerTextCacheMaxBytes
+	lowerTextCacheMaxBytes = 8 * 1024
+	defer func() { lowerTextCacheMaxBytes = oldLimit }()
+
+	text := strings.Repeat("Call_Path:Example.Handler\x00Literal:Payload", 160)
+	if len(text) <= 4096 || len(text) >= lowerTextCacheMaxBytes {
+		t.Fatalf("test text length %d outside intended cache window", len(text))
+	}
+	idx := &flagMatchIndex{}
+	first := idx.lowerTextValue(text)
+	second := idx.lowerTextValue(text)
+	if first != second || !strings.Contains(first, "call_path:example.handler") {
+		t.Fatalf("large lower text cache changed lowercasing: first=%q second=%q", first[:32], second[:32])
+	}
+	if _, ok := idx.lowerText.Load(text); !ok {
+		t.Fatal("large context text inside the cache limit was not cached")
+	}
+}
+
+func TestFlagContextOnlyPredicateChoosesSelectivePlainContextToken(t *testing.T) {
+	fl := flagSpec{
+		Predicates: []flagPredicate{
+			newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),
+			newFlagPredicate("node", "tokens", "contains", []string{"python_review:archive_symlink_filter_bypass"}, false, false),
+			newFlagPredicate("node", "tokens", "contains", []string{"call_path:os.open"}, false, false),
+			newFlagPredicate("node", "tokens", "contains", []string{"function_name:load_model"}, false, false),
+		},
+	}
+	fl.PredicateOrder = flagPredicateOrder(fl.Predicates)
+	pred, ok := flagContextOnlyPredicate(fl, "go")
+	if !ok {
+		t.Fatal("expected a context-only predicate")
+	}
+	if got := pred.Values[0]; got != "python_review:archive_symlink_filter_bypass" {
+		t.Fatalf("expected selective python_review predicate, got %q", got)
+	}
+	if isPlainContextTokenPredicate(newFlagPredicate("node", "tokens", "contains", []string{"call_path:os.open"}, false, false)) {
+		t.Fatal("AST-routed call_path must not be used as a context-only shortcut")
+	}
+	if !isPlainContextTokenPredicate(newFlagPredicate("node", "tokens", "contains", []string{"function_name:load_model"}, false, false)) {
+		t.Fatal("function_name payload matching should use the prefix-aware context shortcut")
+	}
+	pyPred, ok := flagContextOnlyPredicate(fl, "python")
+	if !ok {
+		t.Fatal("expected a python context-only predicate")
+	}
+	if got := pyPred.Values[0]; got != "python_review:archive_symlink_filter_bypass" {
+		t.Fatalf("python should still prefer the most selective ordered predicate, got %q", got)
+	}
+	pyCallOnly := flagSpec{Predicates: []flagPredicate{
+		newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),
+		newFlagPredicate("node", "tokens", "contains_any", []string{"call_path:LOG.debug", "call_path:logger.debug"}, false, false),
+	}}
+	pyCallOnly.PredicateOrder = flagPredicateOrder(pyCallOnly.Predicates)
+	pyCallPred, ok := flagContextOnlyPredicate(pyCallOnly, "python")
+	if !ok {
+		t.Fatal("expected python call_path predicate to be usable as a context prefilter")
+	}
+	if got := pyCallPred.Values[0]; got != "call_path:LOG.debug" {
+		t.Fatalf("expected python call_path prefilter, got %q", got)
+	}
+	if !flagContextOnlyPredicateMaybePresent(pred, "lang=python\x00python_review:archive_symlink_filter_bypass") {
+		t.Fatal("present context-only predicate should pass the prefilter")
+	}
+	if flagContextOnlyPredicateMaybePresent(pred, "lang=python") {
+		t.Fatal("absent context-only predicate should fail the prefilter")
+	}
+	eqPred := newFlagPredicate("node", "tokens", "equals", []string{"python_review:archive_symlink_filter_bypass"}, false, false)
+	if !flagContextOnlyPredicateMaybePresent(eqPred, "lang=python\x00python_review:archive_symlink_filter_bypass") {
+		t.Fatal("present equality-shaped review predicate should pass the prefilter")
+	}
+	if flagContextOnlyPredicateMaybePresent(eqPred, "lang=python") {
+		t.Fatal("absent equality-shaped review predicate should fail the prefilter")
+	}
+	fnPred := newFlagPredicate("node", "tokens", "contains_any", []string{"function_name:load", "function_name:restore"}, false, false)
+	if !flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:safe_load") {
+		t.Fatal("function_name shortcut should search token payload")
+	}
+	if flagContextOnlyPredicateMaybePresent(fnPred, "lang=python\x00function_name:validate") {
+		t.Fatal("function_name shortcut should reject absent payload")
+	}
+}
+
+func TestFlagPositiveOpPredicateChoosesOrderedOp(t *testing.T) {
+	fl := flagSpec{
+		Predicates: []flagPredicate{
+			newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),
+			newFlagPredicate("node", "op", "contains", []string{"not in"}, false, false),
+		},
+	}
+	fl.PredicateOrder = flagPredicateOrder(fl.Predicates)
+	pred, ok := flagPositiveOpPredicate(fl)
+	if !ok {
+		t.Fatal("expected positive op predicate")
+	}
+	if pred.Property != "op" || pred.Values[0] != "not in" {
+		t.Fatalf("unexpected op predicate: %+v", pred)
+	}
+	if isPositiveOpPredicate(newFlagPredicate("node", "op", "contains", []string{"not in"}, false, true)) {
+		t.Fatal("negative op predicate must not be used as a prefilter")
+	}
+}
+
+func TestFlagOperandsMatchNodeStreamsGroupedFlowSemantics(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "binop", Type: "code.BinOp", Props: map[string]string{
+		"loc": "sample.py:5", "arg0": "arg0", "arg1": "arg1",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{"loc": "sample.py:5"}})
+	store.AddNode(usg.Node{ID: "arg1", Type: "code.Arg", Props: map[string]string{"loc": "sample.py:5"}})
+	store.AddNode(usg.Node{ID: "path-a", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.py:4", "callee_path": "get_request_basic_auth",
+	}})
+	store.AddNode(usg.Node{ID: "name-a", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.py:4", "name": "secret",
+	}})
+	store.AddNode(usg.Node{ID: "path-b", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.py:4", "callee_path": "basic_auth",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "path-a", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "name-a", Dst: "path-a"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "path-b", Dst: "arg1"})
+	binop, ok, err := store.GetNode("binop")
+	if err != nil || !ok {
+		t.Fatalf("missing binop: ok=%v err=%v", ok, err)
+	}
+	specs := []flagOperandSpec{
+		{Predicates: []flagPredicate{
+			newFlagPredicate("operand", "path", "contains", []string{"get_request_basic_auth"}, false, false),
+			newFlagPredicate("operand", "identifier", "contains", []string{"secret"}, false, false),
+		}},
+		{Predicates: []flagPredicate{
+			newFlagPredicate("operand", "path", "contains", []string{"basic_auth"}, false, false),
+		}},
+	}
+	if flagOperandsMatchNode(store, &flagMatchIndex{}, specs, binop, false) {
+		t.Fatal("direct operands should not satisfy flow-only operand predicates")
+	}
+	if !flagOperandsMatchNode(store, &flagMatchIndex{}, specs, binop, true) {
+		t.Fatal("flow operands should preserve grouped predicate semantics")
+	}
+	duplicate := []flagOperandSpec{
+		{Predicates: []flagPredicate{newFlagPredicate("operand", "path", "contains", []string{"get_request_basic_auth"}, false, false)}},
+		{Predicates: []flagPredicate{newFlagPredicate("operand", "path", "contains", []string{"get_request_basic_auth"}, false, false)}},
+	}
+	if flagOperandsMatchNode(store, &flagMatchIndex{}, duplicate, binop, true) {
+		t.Fatal("duplicate operand requirements must still match distinct operand groups")
+	}
+}
+
+func TestAnalysisContextScopeCallUsesStructuredCallFacts(t *testing.T) {
+	store := usg.NewInMemStore()
+	pred := newFlagPredicate("scope_call", "any", "contains_any", []string{"hmac.compare_digest", "compare_digest"}, false, true)
+	ctx := usg.Node{ID: "ctx", Type: "code.Call", Props: map[string]string{
+		"callee_path": "analysis.function.context",
+		"str_args":    "def f(): hmac.compare_digest\x00call_path:get_request_basic_auth\x00call:get_request_basic_auth",
+		"loc":         "sample.py:1",
+	}}
+	if !flagPredicateMatches(store, &flagMatchIndex{}, pred, ctx, "python", false, nil) {
+		t.Fatal("raw context body text must not satisfy scopeCall without a structured call fact")
+	}
+	ctx.Props["str_args"] += "\x00call_path:hmac.compare_digest\x00call:compare_digest"
+	if flagPredicateMatches(store, &flagMatchIndex{}, pred, ctx, "python", false, nil) {
+		t.Fatal("structured scopeCall fact should satisfy and invert a negative predicate")
+	}
+}
+
+func TestScopeCallFallbackStillUsesASTForNonContextNodes(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "binop", Type: "code.BinOp", Scope: "fn@1", Props: map[string]string{
+		"loc": "sample.py:7",
+	}})
+	store.AddNode(usg.Node{ID: "safe", Type: "code.Call", Scope: "fn@2", Props: map[string]string{
+		"loc":         "sample.py:6",
+		"callee_path": "hmac.compare_digest",
+		"method":      "compare_digest",
+	}})
+	binop, ok, err := store.GetNode("binop")
+	if err != nil || !ok {
+		t.Fatalf("missing binop: ok=%v err=%v", ok, err)
+	}
+	pred := newFlagPredicate("scope_call", "any", "contains_any", []string{"hmac.compare_digest", "compare_digest"}, false, true)
+	if flagPredicateMatches(store, &flagMatchIndex{}, pred, binop, "python", false, nil) {
+		t.Fatal("non-context nodes should still find scoped AST calls")
 	}
 }
 
@@ -2020,6 +2277,234 @@ func TestCollectionFirstSinkTargetsElementThroughVariableArg(t *testing.T) {
 	got := spec.sinkApplicator().Apply(store)
 	if len(got) != 1 || got[0].NodeID != "elem0" || got[0].Concept != "custom.Command" {
 		t.Fatalf("collection first sink should follow variable-held argv list: %+v", got)
+	}
+}
+
+func TestAnalysisSinkValueMatchDoesNotExpandFlow(t *testing.T) {
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.AnalysisSink",
+			Pattern:    "analysis.function.context.sink",
+			ArgIndex:   0,
+			ValMatches: []string{"needle"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "flow-src", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "needle",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "analysis.function.context.sink", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "flow-src", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	if got := spec.sinkApplicator().Apply(store); len(got) != 0 {
+		t.Fatalf("analysis sink value predicates should use direct context only, got %+v", got)
+	}
+
+	store = usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name", "str_args": "needle",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "analysis.function.context.sink", "arg0": "arg0",
+	}})
+	if got := spec.sinkApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "arg0" {
+		t.Fatalf("analysis sink direct value predicate should still match, got %+v", got)
+	}
+}
+
+func TestAnalysisSinkDirectSegmentsMatchSelectedContext(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "str_args": "safe_path",
+	}})
+	store.AddNode(usg.Node{ID: "arg1", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "str_args": "ForURLInURLs:\x00requests.get(url)",
+	}})
+	call := usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.x:2",
+		"callee_path": "analysis.function.context.sink",
+		"str_args":    "function_name:download",
+		"arg0":        "arg0",
+		"arg1":        "arg1",
+	}}
+	store.AddNode(call)
+
+	cache := &valueTokenCache{}
+	if !valCondsForSinkDirectSegments(store, cache, call, 1, []string{"forurlinurls:", "requests.get(url)"}, nil) {
+		t.Fatal("direct segment matcher should match mixed-case context markers on the selected arg")
+	}
+	if valCondsForSinkDirectSegments(store, cache, call, 0, []string{"forurlinurls:"}, nil) {
+		t.Fatal("direct segment matcher should not inspect unselected args")
+	}
+	if valCondsForSinkDirectSegments(store, cache, call, 1, []string{"forurlinurls:"}, []string{"requests.get(url)"}) {
+		t.Fatal("direct segment matcher should honor negative value predicates")
+	}
+	if !valContainsFoldedNeedle("ForURLInURLs:", "forurlinurls:") {
+		t.Fatal("folded needle search should match ASCII case differences without changing semantics")
+	}
+	if present, ok := rawSegmentsContainStructuredContextNeedle([]string{"body mentions name=generate_auth_token"}, "name=generate_auth_token"); !ok || present {
+		t.Fatal("structured context precheck should ignore non-token raw body text")
+	}
+	if present, ok := rawSegmentsContainStructuredContextNeedle([]string{"body text\x00Name=Generate_Auth_Token"}, "name=generate_auth_token"); !ok || !present {
+		t.Fatal("structured context precheck should match folded context tokens")
+	}
+	if present, ok := rawSegmentsContainStructuredContextNeedle([]string{"Class_Bases=serializers.ModelSerializer"}, "class_bases=serializers.modelserializer"); !ok || !present {
+		t.Fatal("class_bases context tokens should use the structured precheck")
+	}
+	if present, ok := rawSegmentsContainStructuredContextNeedle([]string{"huge body python_review:loop_requests_get_url_without_validation"}, "python_review:loop_requests_get_url_without_validation"); !ok || present {
+		t.Fatal("python_review precheck should ignore non-token body text")
+	}
+	if present, ok := rawSegmentsContainStructuredContextNeedle([]string{"huge body\x00python_review:loop_requests_get_url_without_validation"}, "python_review:loop_requests_get_url_without_validation"); !ok || !present {
+		t.Fatal("python_review context tokens should use the structured precheck")
+	}
+	if !shouldFoldedDirectPrecheck([]string{"traceback.format_exc"}, nil) {
+		t.Fatal("long plain literals should use the raw folded absence precheck")
+	}
+	if shouldFoldedDirectPrecheck([]string{"short"}, nil) {
+		t.Fatal("short plain literals should stay on the cached lower-segment path")
+	}
+	if !shouldFoldedDirectPrecheck([]string{"<pre"}, nil) {
+		t.Fatal("html tag literals should use the raw folded absence precheck")
+	}
+	if !rawSegmentCoveredBy("prefix\x00lang=python\x00decorator_method:get", "lang=python\x00decorator_method:get") {
+		t.Fatal("direct segment deduplication should recognize complete token sequences")
+	}
+	if rawSegmentCoveredBy("body mentions name=generate_auth_token", "name=generate_auth_token") {
+		t.Fatal("direct segment deduplication must not erase structured token boundaries")
+	}
+}
+
+func TestAnalysisFunctionReturnSinkValueMatchStillExpandsFlow(t *testing.T) {
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.AnalysisReturnSink",
+			Pattern:    "analysis.function.return",
+			ArgIndex:   0,
+			ValMatches: []string{"needle"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "flow-src", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "needle",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "analysis.function.return", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "flow-src", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	if got := spec.sinkApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "arg0" {
+		t.Fatalf("analysis function return sink should still use flow expansion, got %+v", got)
+	}
+}
+
+func TestAnalysisFunctionReturnDecoratorValueUsesDirectContext(t *testing.T) {
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.AnalysisReturnSink",
+			Pattern:    "analysis.function.return",
+			ArgIndex:   0,
+			ValMatches: []string{"decorator_method:get"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "flow-src", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "decorator_method:get",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "analysis.function.return", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "flow-src", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	if got := spec.sinkApplicator().Apply(store); len(got) != 0 {
+		t.Fatalf("decorator metadata should be direct return context, got %+v", got)
+	}
+
+	store.AddNode(usg.Node{ID: "arg1", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name", "str_args": "decorator_method:get",
+	}})
+	store.AddNode(usg.Node{ID: "call-direct", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:3", "callee_path": "analysis.function.return", "arg0": "arg1",
+	}})
+	if got := spec.sinkApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "arg1" {
+		t.Fatalf("direct decorator metadata should still match, got %+v", got)
+	}
+}
+
+func TestAnalysisSourcePythonReviewValueUsesStructuredPrecheck(t *testing.T) {
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Inputs: []inputSpec{{
+			Concept:    "custom.AnalysisSource",
+			Paths:      []string{"analysis.function.context.source"},
+			ValMatches: []string{"python_review:loop_requests_get_url_without_validation"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "body-only", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.x:1",
+		"callee_path": "analysis.function.context.source",
+		"method":      "source",
+		"str_args":    "body mentions python_review:loop_requests_get_url_without_validation",
+	}})
+	store.AddNode(usg.Node{ID: "token", Type: "code.Call", Props: map[string]string{
+		"loc":         "sample.x:2",
+		"callee_path": "analysis.function.context.source",
+		"method":      "source",
+		"str_args":    "body\x00python_review:loop_requests_get_url_without_validation",
+	}})
+	got := spec.sourceApplicator().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "token" {
+		t.Fatalf("analysis source should match only tokenized python_review evidence, got %+v", got)
+	}
+}
+
+func TestRegularSinkValueMatchStillExpandsFlow(t *testing.T) {
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:    "custom.RegularSink",
+			Pattern:    "runtime.exec",
+			ArgIndex:   0,
+			ValMatches: []string{"needle"},
+		}},
+	}
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "flow-src", Type: "code.Name", Props: map[string]string{
+		"loc": "sample.x:1", "str_args": "needle",
+	}})
+	store.AddNode(usg.Node{ID: "arg0", Type: "code.Arg", Props: map[string]string{
+		"loc": "sample.x:2", "vkind": "Name",
+	}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:2", "callee_path": "runtime.exec", "method": "exec", "arg0": "arg0",
+	}})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "flow-src", Dst: "arg0"})
+	store.AddEdge(usg.Edge{Type: "FLOWS", Src: "arg0", Dst: "call"})
+
+	if got := spec.sinkApplicator().Apply(store); len(got) != 1 || got[0].NodeID != "arg0" {
+		t.Fatalf("regular sink value predicate should still use flow expansion, got %+v", got)
 	}
 }
 

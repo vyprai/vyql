@@ -13,9 +13,26 @@ import (
 // flat selector chain (base · .method · (args)) and splits a function into a
 // `function_signature` followed by a sibling `function_body`.
 type dartConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *dartConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractDart parses Dart files into one NIR Program (one module per file).
@@ -48,7 +65,7 @@ func (c *dartConv) text(n *tree_sitter.Node) string {
 // function_body that follows it.
 func (c *dartConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
 		switch ch.Kind() {
@@ -84,7 +101,7 @@ func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	var params []string
 	paramTypes := map[string]string{}
 	if pl := lastChildKind(fs, "formal_parameter_list"); pl != nil {
-		for _, p := range namedChildren(pl) {
+		for _, p := range c.namedChildren(pl) {
 			if nm := field(p, "name"); nm != nil {
 				name := c.text(nm)
 				params = append(params, name)
@@ -113,13 +130,13 @@ func (c *dartConv) block(n *tree_sitter.Node) []nir.Stmt {
 		}
 		// expression-bodied `=> expr`
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, nir.ExprStmt{Value: c.expr(ch)})
 		}
 		return out
 	}
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -143,7 +160,7 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "expression_statement":
 		// a bare `c = v;` parses as expression_statement>assignment_expression; route it
 		// through the assignment case so block-nested reassignments are tracked (no FN).
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 1 && kids[0].Kind() == "assignment_expression" {
 			return c.stmt(kids[0])
 		}
@@ -156,7 +173,7 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	case "return_statement":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[0])}}
 		}
 		return []nir.Stmt{nir.Return{}}
@@ -178,7 +195,7 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 // chainAfterName folds the selector chain that forms an initializer's value when
 // it is not exposed via the `value` field (base identifier + selectors).
 func (c *dartConv) chainAfterName(ivd *tree_sitter.Node, name string) nir.Expr {
-	kids := namedChildren(ivd)
+	kids := c.namedChildren(ivd)
 	for i, k := range kids {
 		if k.Kind() == "identifier" && c.text(k) == name {
 			if i+1 < len(kids) {
@@ -199,7 +216,7 @@ func (c *dartConv) assignTargetName(left *tree_sitter.Node) string {
 	case "identifier":
 		return c.text(left)
 	case "assignable_expression":
-		if k := namedChildren(left); len(k) == 1 && k[0].Kind() == "identifier" {
+		if k := c.namedChildren(left); len(k) == 1 && k[0].Kind() == "identifier" {
 			return c.text(k[0])
 		}
 	}
@@ -210,7 +227,7 @@ func (c *dartConv) assignTargetPath(left *tree_sitter.Node) string {
 	if left == nil {
 		return ""
 	}
-	ex := c.foldChain(namedChildren(left))
+	ex := c.foldChain(c.namedChildren(left))
 	switch t := ex.(type) {
 	case nir.Attr:
 		return t.Path
@@ -278,12 +295,12 @@ func (c *dartConv) dartSwitch(n *tree_sitter.Node) nir.Stmt {
 	if body == nil {
 		return sw
 	}
-	for _, cs := range namedChildren(body) {
+	for _, cs := range c.namedChildren(body) {
 		switch cs.Kind() {
 		case "switch_statement_case":
 			var labs []nir.Expr
 			var stmts []nir.Stmt
-			for _, ch := range namedChildren(cs) {
+			for _, ch := range c.namedChildren(cs) {
 				switch ch.Kind() {
 				case "case_builtin":
 					// the `case` keyword wrapper
@@ -298,7 +315,7 @@ func (c *dartConv) dartSwitch(n *tree_sitter.Node) nir.Stmt {
 			sw.Cases = append(sw.Cases, stmts)
 			sw.Labels = append(sw.Labels, labs)
 		case "switch_statement_default":
-			for _, ch := range namedChildren(cs) {
+			for _, ch := range c.namedChildren(cs) {
 				if k := ch.Kind(); k == "break_statement" || k == "continue_statement" {
 					continue
 				}
@@ -357,7 +374,7 @@ func (c *dartConv) foldChain(nodes []*tree_sitter.Node) nir.Expr {
 		default: // index selector etc.
 			var key nir.Expr
 			if inner.Kind() == "index_selector" {
-				if k := namedChildren(inner); len(k) > 0 {
+				if k := c.namedChildren(inner); len(k) > 0 {
 					key = c.expr(k[0])
 				}
 			}
@@ -374,9 +391,9 @@ func (c *dartConv) args(argPart *tree_sitter.Node) []nir.Expr {
 	if a == nil {
 		return nil
 	}
-	for _, arg := range namedChildren(a) {
+	for _, arg := range c.namedChildren(a) {
 		if arg.Kind() == "argument" {
-			out = append(out, c.foldChain(namedChildren(arg)))
+			out = append(out, c.foldChain(c.namedChildren(arg)))
 		} else {
 			out = append(out, c.expr(arg))
 		}
@@ -401,7 +418,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		// rather than assuming it is an unnamed token.
 		var ops []nir.Expr
 		op := "?"
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "relational_operator", "equality_operator", "multiplicative_operator":
 				op = c.text(ch)
@@ -416,9 +433,9 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string_literal":
 		// interpolated strings ("$x"/"${x}") carry taint via template_substitution.
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "template_substitution" || ch.Kind() == "interpolation" {
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
 			}
@@ -431,7 +448,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: strings.Trim(strings.TrimPrefix(c.text(n), "r"), "\"'")}
 	case "additive_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "additive_operator" {
 				continue
 			}
@@ -460,7 +477,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary_expression":
 		var op string
 		var operand nir.Expr = nir.Const{Loc: L}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if k := ch.Kind(); k == "prefix_operator" || k == "postfix_operator" {
 				op = c.text(ch)
 			} else {
@@ -482,16 +499,16 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		// directly, NOT a selector/argument_part chain.
 		path := "?"
 		var args []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "type_identifier", "identifier", "scoped_identifier":
 				if path == "?" {
 					path = c.text(ch)
 				}
 			case "arguments":
-				for _, arg := range namedChildren(ch) {
+				for _, arg := range c.namedChildren(ch) {
 					if arg.Kind() == "argument" {
-						args = append(args, c.foldChain(namedChildren(arg)))
+						args = append(args, c.foldChain(c.namedChildren(arg)))
 					} else {
 						args = append(args, c.expr(arg))
 					}
@@ -500,24 +517,24 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: args, Path: path, Method: lastSeg(path), Loc: L}
 	case "argument":
-		return c.foldChain(namedChildren(n))
+		return c.foldChain(c.namedChildren(n))
 	case "expression_statement":
-		return c.foldChain(namedChildren(n))
+		return c.foldChain(c.namedChildren(n))
 	case "parenthesized_expression", "await_expression", "postfix_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
 	case "selector_expression", "cascade_section":
-		return c.foldChain(namedChildren(n))
+		return c.foldChain(c.namedChildren(n))
 	case "list_literal", "set_or_map_literal":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	// node that begins a selector chain (identifier followed by selectors)
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) > 1 && kids[1].Kind() == "selector" {
 		return c.foldChain(kids)
 	}

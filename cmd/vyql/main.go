@@ -19,12 +19,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/vyprai/vyql/datadir"
 	"github.com/vyprai/vyql/engine"
@@ -69,6 +71,22 @@ func main() {
 			os.Exit(1)
 		}
 		defer pprof.StopCPUProfile()
+	}
+	// Opt-in heap profile for local memory work (explicit env, no behavior change):
+	// VYQL_MEMPROFILE=/path/to/heap.prof vyql scan ...
+	if p := os.Getenv("VYQL_MEMPROFILE"); p != "" {
+		defer func() {
+			f, err := os.Create(p)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
+				return
+			}
+			defer f.Close()
+			runtime.GC()
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				fmt.Fprintln(os.Stderr, "vyql: memprofile: "+err.Error())
+			}
+		}()
 	}
 	// the data dir (ontology/taxonomy/packs) is required; a missing one panics
 	// deep in loading — recover into a clean message rather than a stack trace.
@@ -128,6 +146,7 @@ func cmdScan(args []string) error {
 	flagLoc := fs.String("flag-loc", "", "flag location substring filter when flags are enabled")
 	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
 	bindingOverlay := fs.String("binding-overlay", "", "optional repo-local binding overlay directory")
+	exclude := fs.String("exclude", "", "comma-separated path segments to skip, e.g. _vendor,node_modules,tests")
 	cacheDir := fs.String("cache", "auto", "persistent scan cache: auto | off | <dir>")
 	incrementalCache := fs.Bool("incremental-cache", false, "also populate per-file parse/lower/binding caches for edit-loop scans")
 	_ = fs.Parse(args)
@@ -143,6 +162,9 @@ func cmdScan(args []string) error {
 	oldOverlay := scanBindingOverlay
 	scanBindingOverlay = strings.TrimSpace(*bindingOverlay)
 	defer func() { scanBindingOverlay = oldOverlay }()
+	oldExcludes := scanExcludes
+	scanExcludes = parseExcludes(*exclude)
+	defer func() { scanExcludes = oldExcludes }()
 	return run(paths, *rulesPath, *format, *profileName, scanRunOptions{
 		ShowStats:    *stats,
 		IncludeFlags: *allResults,
@@ -304,18 +326,41 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	eng := engine.New(rules.onto, g)
 	var all []*findings.Finding
 	tk := newTimer()
+	ruleTimingOn := os.Getenv("VYQL_RULE_TIMING") != ""
+	var activeRules []*engine.CompiledRule
 	for _, cr := range rules.compiled {
 		if !ruleActiveForProfile(cr, profileName) {
 			continue
 		}
+		activeRules = append(activeRules, cr)
+	}
+	if err := eng.PrecomputeTaintFlows(activeRules); err != nil {
+		return nil, stats, g, err
+	}
+	for _, cr := range activeRules {
+		start := time.Now()
 		got, err := eng.Evaluate(cr)
 		if err != nil {
 			return nil, stats, g, err
+		}
+		if ruleTimingOn {
+			fmt.Fprintf(os.Stderr, "[rule] %-32s %7.1fms %6d finding(s)\n",
+				scanRuleID(cr), float64(time.Since(start))/1e6, len(got))
 		}
 		all = append(all, got...)
 	}
 	tk.mark("evaluate")
 	return all, stats, g, nil
+}
+
+func scanRuleID(cr *engine.CompiledRule) string {
+	if cr == nil || cr.Rule == nil {
+		return "<nil>"
+	}
+	if id, ok := cr.Rule.Meta["id"].(string); ok && strings.TrimSpace(id) != "" {
+		return id
+	}
+	return cr.Rule.QualifiedName()
 }
 
 func activeRuleBindingConcepts(rules compiledRuleSet, profileName string) map[string]bool {
@@ -784,7 +829,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: vyql <command> [flags] <path>...")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "commands:")
-	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags]")
+	fmt.Fprintln(os.Stderr, "  scan       run rules and report findings/flags   [-rules -format text|sarif|json -profile -stats -all -flags -exclude _vendor,…]")
 	fmt.Fprintln(os.Stderr, "  trace      trace taint source→sink; show the path or where it dead-ends   [-from -to]")
 	fmt.Fprintln(os.Stderr, "  query      query the analysis graph by predicate   [-type -concept -call -loc -edges -count | -from -to]")
 	fmt.Fprintln(os.Stderr, "  explain    run rules and print each finding's full proof tree + negation evidence")

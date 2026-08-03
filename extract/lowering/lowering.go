@@ -13,6 +13,7 @@
 package lowering
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -617,7 +618,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 			}
 		}
 	}
+	var vars []string
 	for v := range changed {
+		vars = append(vars, v)
+	}
+	sort.Strings(vars)
+	for _, v := range vars {
 		phi := l.node("Phi", "?:0", nil)
 		srcs := map[string]bool{}
 		for _, br := range branches {
@@ -632,7 +638,12 @@ func (l *lowerer) mergeBindings(sc *scope, before map[string]string, branches []
 		if before[v] != "" {
 			srcs[before[v]] = true // the branch(es) may not run — keep the pre-branch value
 		}
+		var srcIDs []string
 		for s := range srcs {
+			srcIDs = append(srcIDs, s)
+		}
+		sort.Strings(srcIDs)
+		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
 		sc.node[v] = phi
@@ -691,11 +702,7 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	slot := l.node("Name", loc, map[string]string{
-		"callee_path":     name,
-		"method":          name,
-		"lexical_binding": "true",
-	})
+	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
 	sc.node[name] = slot
 	sc.lex[name] = true
@@ -898,12 +905,7 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisFunctionContext.path,
-		"method":      analysisFunctionContext.method,
-		"str_args":    strings.Join(contextTokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisFunctionContext.method, analysisFunctionContext.path, strings.Join(contextTokens, "\x00"), "")
 }
 
 func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
@@ -931,12 +933,7 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisClassContext.path,
-		"method":      analysisClassContext.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisClassContext.method, analysisClassContext.path, strings.Join(tokens, "\x00"), "")
 }
 
 func classMemberContextTokens(stmts []nir.Stmt) []string {
@@ -989,12 +986,7 @@ func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisGlobalMutation.path,
-		"method":      analysisGlobalMutation.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisGlobalMutation.method, analysisGlobalMutation.path, strings.Join(tokens, "\x00"), "")
 }
 
 func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
@@ -1022,17 +1014,14 @@ func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []st
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Return")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": analysisFunctionReturn.path,
-		"method":      analysisFunctionReturn.method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, analysisFunctionReturn.method, analysisFunctionReturn.path, strArgs, "")
 	l.flow(arg, call)
 }
 
@@ -1043,12 +1032,7 @@ func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisParameterEntry.path,
-		"method":      analysisParameterEntry.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, analysisParameterEntry.method, analysisParameterEntry.path, strings.Join(tokens, "\x00"), "")
 	l.flow(call, paramNode)
 }
 
@@ -1063,17 +1047,14 @@ func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string)
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Analysis"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Analysis")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": path,
-		"method":      method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, method, path, strArgs, "")
 	l.flow(arg, call)
 	return call
 }
@@ -1089,11 +1070,11 @@ func (l *lowerer) guardObservation(path, method, observed, loc string, valToks .
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{"callee_path": path, "method": method}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, method, path, strArgs, "")
 	l.flow(observed, call)
 	in, _ := l.g.InEdges(observed, "FLOWS")
 	for _, ed := range in {
@@ -1153,7 +1134,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:        prog.Self(),
 		resolveImports:  resolveImports,
 		ctorTypes:       ctorTypes,
-		g:               newGraphStore(0),
+		g:               newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:          map[string]int{},
 		modOrder:        map[string]int{},
 		modBranch:       map[string]int{},
@@ -1173,6 +1154,115 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		derivedChildren: map[string][]string{},
 		membersOfShort:  map[string]map[string]bool{},
 		allMembersMemo:  map[string]map[string]bool{},
+	}
+}
+
+func estimateGraphNodeHint(prog nir.Program) int {
+	hint := len(prog.Modules) * 4
+	for _, m := range prog.Modules {
+		hint += len(m.Imports)
+		hint += estimateStmtListNodes(m.Body)
+	}
+	if hint <= 0 {
+		return 0
+	}
+	return hint
+}
+
+func estimateStmtListNodes(stmts []nir.Stmt) int {
+	n := 0
+	for _, st := range stmts {
+		n += estimateStmtNodes(st)
+	}
+	return n
+}
+
+func estimateStmtNodes(st nir.Stmt) int {
+	switch s := st.(type) {
+	case nil:
+		return 0
+	case nir.Assign:
+		return 1 + len(s.Targets) + estimateExprNodes(s.Value)
+	case nir.AugAssign:
+		return 2 + estimateExprNodes(s.Value)
+	case nir.Return:
+		return 1 + estimateExprNodes(s.Value)
+	case nir.ExprStmt:
+		return estimateExprNodes(s.Value)
+	case nir.FuncDef:
+		return 2 + len(s.Params) + len(s.ParamEntries) + len(s.ResultEntries) + estimateStmtListNodes(s.Body)
+	case nir.ClassDef:
+		return 1 + estimateStmtListNodes(s.Body)
+	case nir.Block:
+		return estimateStmtListNodes(s.Stmts)
+	case nir.If:
+		return 2 + estimateExprNodes(s.Cond) + estimateStmtListNodes(s.Then) + estimateStmtListNodes(s.Else)
+	case nir.Loop:
+		return 2 + len(s.Vars) + estimateExprNodes(s.Cond) + estimateExprNodes(s.Iter) + estimateStmtListNodes(s.Body)
+	case nir.Switch:
+		total := 2 + estimateExprNodes(s.Subject) + estimateStmtListNodes(s.Default)
+		for _, labels := range s.Labels {
+			for _, label := range labels {
+				total += estimateExprNodes(label)
+			}
+		}
+		for _, arm := range s.Cases {
+			total += estimateStmtListNodes(arm)
+		}
+		return total
+	case nir.Try:
+		total := 2 + len(s.HandlerParams) + estimateStmtListNodes(s.Body) + estimateStmtListNodes(s.Finally)
+		for _, h := range s.Handlers {
+			total += estimateStmtListNodes(h)
+		}
+		return total
+	default:
+		return 1
+	}
+}
+
+func estimateExprNodes(ex nir.Expr) int {
+	switch e := ex.(type) {
+	case nil:
+		return 0
+	case nir.Name, nir.Const:
+		return 1
+	case nir.Attr:
+		return 1 + estimateExprNodes(e.Base)
+	case nir.Index:
+		return 1 + estimateExprNodes(e.Base) + estimateExprNodes(e.Key)
+	case nir.Call:
+		total := 2 + len(e.Args) + estimateExprNodes(e.Callee)
+		for _, a := range e.Args {
+			total += estimateExprNodes(a)
+		}
+		return total
+	case nir.Format:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Seq:
+		total := 1
+		for _, p := range e.Parts {
+			total += estimateExprNodes(p)
+		}
+		return total
+	case nir.Pair:
+		return 1 + estimateExprNodes(e.Value)
+	case nir.Lambda:
+		return 2 + len(e.Params) + len(e.ParamEntries) + estimateStmtListNodes(e.Body)
+	case nir.Thru:
+		return estimateExprNodes(e.Inner)
+	case nir.BinOp:
+		return 1 + estimateExprNodes(e.Left) + estimateExprNodes(e.Right)
+	case nir.Unary:
+		return 1 + estimateExprNodes(e.Operand)
+	case nir.Ternary:
+		return 1 + estimateExprNodes(e.Cond) + estimateExprNodes(e.Then) + estimateExprNodes(e.Else)
+	default:
+		return 1
 	}
 }
 
@@ -1236,10 +1326,18 @@ func (l *lowerer) node(kind, loc string, props map[string]string) string {
 	return l.nodeWithID(l.nid(kind), kind, loc, props)
 }
 
+func (l *lowerer) nodeInline(kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
+	return l.nodeInlineWithID(l.nid(kind), kind, loc, props, method, calleePath, strArgs, vkind)
+}
+
 // nodeWithID creates a node with an explicit id — used for signature nodes (Param/Return)
 // whose ids are NAME-derived (sigID) so they survive a body edit and remain valid targets for
 // cross-module call edges from other (possibly cached) modules.
 func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) string {
+	return l.nodeInlineWithID(id, kind, loc, props, "", "", "", "")
+}
+
+func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
 	ord := l.modOrder[l.curNS]
 	l.modOrder[l.curNS]++
 	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
@@ -1248,9 +1346,46 @@ func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) stri
 	if len(props) > 0 {
 		extras = props
 	}
+	if !storeUsesInlineNodeProps(l.g) {
+		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
+	}
 	l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
-		Order: int32(ord), HasOrder: true, Props: extras})
+		Order: int32(ord), HasOrder: true, Props: extras,
+		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind})
 	return id
+}
+
+func storeUsesInlineNodeProps(s usg.Store) bool {
+	switch st := s.(type) {
+	case *usg.IntStore:
+		return true
+	case *recordingStore:
+		return storeUsesInlineNodeProps(st.Store)
+	default:
+		return false
+	}
+}
+
+func propsWithInline(props map[string]string, method, calleePath, strArgs, vkind string) map[string]string {
+	if method == "" && calleePath == "" && strArgs == "" && vkind == "" {
+		return props
+	}
+	if props == nil {
+		props = map[string]string{}
+	}
+	if method != "" {
+		props["method"] = method
+	}
+	if calleePath != "" {
+		props["callee_path"] = calleePath
+	}
+	if strArgs != "" {
+		props["str_args"] = strArgs
+	}
+	if vkind != "" {
+		props["vkind"] = vkind
+	}
+	return props
 }
 
 // sigID is the stable, name-derived id of a function's signature node (a Param or Return).
@@ -1262,6 +1397,10 @@ func sigID(modkey, qual, kind, name string) string {
 
 func (l *lowerer) flow(a, b string) {
 	if a == "" || b == "" {
+		return
+	}
+	if g, ok := l.g.(interface{ AddFlowEdgeIfPresent(string, string) bool }); ok {
+		g.AddFlowEdgeIfPresent(a, b)
 		return
 	}
 	if !l.exists(a) || !l.exists(b) {
@@ -1313,8 +1452,8 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 	for _, name := range topLevelAssignedNames(m.Body) {
 		slot := globals[name]
 		if slot == "" {
-			slot = l.nodeWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
-				map[string]string{"callee_path": name, "method": name, "module_global": "true"})
+			slot = l.nodeInlineWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
+				map[string]string{"module_global": "true"}, name, name, "", "")
 			globals[name] = slot
 		}
 		sc.node[name] = slot
@@ -1954,7 +2093,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
-		exn := l.node("Exception", st.Loc, map[string]string{"callee_path": "analysis.exception", "method": "exception"})
+		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
@@ -1990,10 +2129,6 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
-		props := map[string]string{"callee_path": ex.ID, "method": ex.ID}
-		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
-			props["decl_type"] = typ[1]
-		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
@@ -2007,13 +2142,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				return l.elemNode(self, ex.ID, ex.Loc)
 			}
 		}
-		return l.node("Name", ex.Loc, props)
-	case nir.Const:
-		props := map[string]string{}
-		if v := unquoteLit(ex.Value); v != "" {
-			props["str_args"] = v
+		var props map[string]string
+		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
+			props = map[string]string{"decl_type": typ[1]}
 		}
-		return l.node("Const", ex.Loc, props)
+		return l.nodeInline("Name", ex.Loc, props, ex.ID, ex.ID, "", "")
+	case nir.Const:
+		strArgs := ""
+		if v := unquoteLit(ex.Value); v != "" {
+			strArgs = v
+		}
+		return l.nodeInline("Const", ex.Loc, nil, "", "", strArgs, "")
 	case nir.Thru:
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:
@@ -2021,11 +2160,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
 		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
 		// (the NIR golden serializes callee_path, not method).
-		props := map[string]string{"callee_path": ex.Path, "method": ex.Attr}
+		var props map[string]string
 		if t := l.recvType(base); t != "" {
-			props["recv_type"] = t
+			props = map[string]string{"recv_type": t}
 		}
-		n := l.node("Attr", ex.Loc, props)
+		n := l.nodeInline("Attr", ex.Loc, props, ex.Attr, ex.Path, "", "")
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
 		// an alias sharing this base node), pull that slot's taint too.
@@ -2036,13 +2175,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		key := l.eval(ex.Key, sc)
-		props := map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key}
+		props := map[string]string{"arg0": key}
 		var valToks []string
 		collectValTokens(ex.Key, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Subscript", ex.Loc, props)
+		n := l.nodeInline("Subscript", ex.Loc, props, "[]", ex.Path+".__subscript", strArgs, "")
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
 			l.flow(key, n)
@@ -2052,29 +2192,32 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Call:
 		return l.evalCall(ex, sc)
 	case nir.Format:
-		props := map[string]string{}
 		var valToks []string
 		if ex.Text != "" {
 			valToks = append(valToks, ex.Text)
 		}
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Format", ex.Loc, props)
+		n := l.nodeInline("Format", ex.Loc, nil, "", "", strArgs, "")
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}
 		return n
 	case nir.Seq:
-		props := map[string]string{"callee_path": "__object_literal"}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
 		collectKeyPathTokens(ex.KeyPath, &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Seq", ex.Loc, props)
+		n := l.nodeInline("Seq", ex.Loc, nil, "", "__object_literal", strArgs, "")
+		if staticLiteralSeq(ex) {
+			return n
+		}
 		var ci *containerInfo
 		for _, part := range ex.Parts {
 			if _, ok := part.(nir.Pair); ok {
@@ -2083,10 +2226,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			}
 		}
 		for i, p := range ex.Parts {
-			elem := l.node("CollectionElement", ex.Loc, map[string]string{
+			elem := l.nodeInline("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
-				"vkind":            nirKind(p),
-			})
+			}, "", "", "", nirKind(p))
 			l.flow(l.eval(p, sc), elem)
 			l.flow(elem, n)
 			if ci == nil {
@@ -2106,18 +2248,19 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.BinOp:
 		left := l.eval(ex.Left, sc)
 		right := l.eval(ex.Right, sc)
-		leftArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Left)})
-		rightArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Right)})
+		leftArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Left))
+		rightArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Right))
 		l.flow(left, leftArg)
 		l.flow(right, rightArg)
 		method := binopMethod(ex.Op)
-		props := map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg}
+		props := map[string]string{"op": ex.Op, "arg0": leftArg, "arg1": rightArg}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("BinOp", ex.Loc, props)
+		n := l.nodeInline("BinOp", ex.Loc, props, method, "__binop."+method, strArgs, "")
 		l.flow(leftArg, n)
 		l.flow(rightArg, n)
 		l.flow(left, n)
@@ -2129,7 +2272,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Unary:
 		operand := l.eval(ex.Operand, sc)
 		method := unaryMethod(ex.Op)
-		n := l.node("Unary", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__unary." + method, "method": method, "arg0": operand})
+		n := l.nodeInline("Unary", ex.Loc, map[string]string{"op": ex.Op, "arg0": operand}, method, "__unary."+method, "", "")
 		l.flow(operand, n)
 		return n
 	case nir.Ternary:
@@ -2643,7 +2786,7 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 	if n, ok, _ := l.g.GetNode(val); ok {
 		loc = n.Loc
 	}
-	typed := l.node("Name", loc, map[string]string{"callee_path": typ, "method": typ, "decl_type": typ})
+	typed := l.nodeInline("Name", loc, map[string]string{"decl_type": typ}, typ, typ, "", "")
 	l.flow(val, typed)
 	return typed
 }
@@ -2656,22 +2799,55 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// e.g. call(input_value).
 	var args []string
 	var argVals []string // the eval'd value node per arg (a Func node for a callback)
+	if len(call.Args) > 0 {
+		var argsBuf [4]string
+		var argValsBuf [4]string
+		if len(call.Args) <= len(argsBuf) {
+			args = argsBuf[:0]
+			argVals = argValsBuf[:0]
+		} else {
+			args = make([]string, 0, len(call.Args))
+			argVals = make([]string, 0, len(call.Args))
+		}
+	}
 	var valToks []string // literal value tokens for value-matching sinks (`val`/`nval`)
-	for _, a := range call.Args {
+	var argLitFirst []string
+	var argLitFirstBuf [4]string
+	litCount := 0
+	for argIndex, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
 		// Record the argument's NIR kind on the slot, so sink binding applicators can
 		// distinguish a string-building position (Format/Const/Name/...) from a
 		// collection literal (Seq).
-		an := l.node("Arg", call.Loc, map[string]string{"vkind": nirKind(a)})
+		an := l.nodeInline("Arg", call.Loc, nil, "", "", "", nirKind(a))
 		l.flow(av, an)
 		args = append(args, an)
+		tokStart := len(valToks)
 		collectValTokens(a, "", &valToks)
 		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
 		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
 		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
+		litFirst := ""
 		if sv, ok := l.constStrVal(a, sc); ok {
-			valToks = append(valToks, sv)
+			litFirst = sv
+			if !containsString(valToks[tokStart:], sv) {
+				valToks = append(valToks, sv)
+			}
+		}
+		if litFirst == "" && len(valToks) > tokStart {
+			litFirst = valToks[tokStart]
+		}
+		if litFirst != "" {
+			if argLitFirst == nil {
+				if len(call.Args) <= len(argLitFirstBuf) {
+					argLitFirst = argLitFirstBuf[:len(call.Args)]
+				} else {
+					argLitFirst = make([]string, len(call.Args))
+				}
+			}
+			argLitFirst[argIndex] = litFirst
+			litCount++
 		}
 	}
 	// A bare call to a `from mod import sym` alias is matched by bindings under its
@@ -2692,46 +2868,52 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	props := map[string]string{"callee_path": calleePath, "method": call.Method}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
-	}
-	for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
-		props["arg"+strconv.Itoa(i)] = a
-	}
-	// per-arg literal value (first literal token) — lets a `filter` directive read the
-	// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
-	for i, a := range call.Args {
-		var toks []string
-		collectValTokens(a, "", &toks)
-		if sv, ok := l.constStrVal(a, sc); ok {
-			toks = append([]string{sv}, toks...)
-		}
-		if len(toks) > 0 {
-			props["lit"+strconv.Itoa(i)] = toks[0]
-		}
+		strArgs = strings.Join(valToks, "\x00")
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
 	// stamp recv_type so type-constrained sink binding applicators can reason about it.
 	var recvNode string
+	var recvType string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
-				sc.node[nm.ID] = l.node("Name", nm.Loc, map[string]string{
-					"callee_path": nm.ID,
-					"method":      nm.ID,
-				})
+				sc.node[nm.ID] = l.nodeInline("Name", nm.Loc, nil, nm.ID, nm.ID, "", "")
 			}
 		}
 		recvNode = l.eval(attr.Base, sc)
+		recvType = l.recvType(recvNode)
+	}
+	propCount := len(args)
+	propCount += litCount
+	if recvNode != "" {
+		propCount++
+	}
+	if recvType != "" {
+		propCount++
+	}
+	var props map[string]string
+	if propCount > 0 {
+		props = make(map[string]string, propCount)
+		for i, a := range args { // arg0, arg1, … so sinks can target a non-first arg
+			props[usg.ArgPropKey(i)] = a
+		}
+		// per-arg literal value (first literal token) — lets a `filter` directive read the
+		// regex pattern (arg0) and replacement (arg1) of a replace(pattern, repl) call.
+		for i, first := range argLitFirst {
+			if first != "" {
+				props[usg.LitPropKey(i)] = first
+			}
+		}
 		if recvNode != "" {
 			props["recv"] = recvNode
 		}
-		if t := l.recvType(recvNode); t != "" {
-			props["recv_type"] = t
+		if recvType != "" {
+			props["recv_type"] = recvType
 		}
 	}
-	result := l.node("Call", call.Loc, props)
+	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
 	l.rememberTemplate(call, result, sc)
 	if recvNode != "" { // receiver taint (chained calls)
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
@@ -2875,6 +3057,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	l.applyCallEffects(call, argVals, result, recvNode, sc)
 	return result
+}
+
+func containsString(vals []string, want string) bool {
+	for _, v := range vals {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNode string) {
@@ -3079,6 +3270,35 @@ func (l *lowerer) addrTakenExpr(e nir.Expr) {
 		l.addrTakenExpr(x.Then)
 		l.addrTakenExpr(x.Else)
 	case nir.Const:
+	}
+}
+
+func staticLiteralSeq(ex nir.Seq) bool {
+	if len(ex.Parts) == 0 {
+		return true
+	}
+	for _, p := range ex.Parts {
+		if !staticLiteralExpr(p) {
+			return false
+		}
+	}
+	return true
+}
+
+func staticLiteralExpr(e nir.Expr) bool {
+	switch x := e.(type) {
+	case nil:
+		return true
+	case nir.Const:
+		return true
+	case nir.Pair:
+		return staticLiteralExpr(x.Value)
+	case nir.Seq:
+		return staticLiteralSeq(x)
+	case nir.Thru:
+		return staticLiteralExpr(x.Inner)
+	default:
+		return false
 	}
 }
 

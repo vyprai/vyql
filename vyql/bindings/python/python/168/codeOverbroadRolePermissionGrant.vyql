@@ -1,6 +1,6 @@
 module bindings.python.generated.m21017d75;
 
 binding overbroadRolePermissionGrant168 {
-  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "viewer_scopes:CONFIG_UPDATE", "viewer_scopes:ADMIN", "read_only_scopes:CONFIG_READ", "read_only_scopes:CONFIG_UPDATE", "guest_scopes:CONFIG_READ", "public_scopes:CONFIG_READ"])
+  query pattern presenceNode where node.scope == "module" and node.context.pythonReview == "overbroad_role_permission_grant"
   emit issue code.OverbroadRolePermissionGrant at node
 }

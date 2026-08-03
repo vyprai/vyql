@@ -49,10 +49,10 @@ func (s *InMemStore) AddNode(n Node) error {
 	return nil
 }
 
-// inIndexedTypes are the only edge types ever queried by InEdges (endpoint-guard resolution).
-// Reverse-indexing only these — instead of every edge — roughly halves edge memory on large
-// graphs, where FLOWS/STEP/NET edges dominate and are never traversed backwards.
-var inIndexedTypes = map[string]bool{"PROTECTS": true, "CHECKS": true}
+// inIndexedTypes are the only edge types queried by InEdges. Keep this sparse: STEP/NET and
+// other high-volume edges are forward-only, while FLOWS is needed for bounded upstream binding
+// predicates and is cheaper to index once in the store than to rebuild later per scan phase.
+var inIndexedTypes = map[string]bool{"PROTECTS": true, "CHECKS": true, "FLOWS": true}
 
 func (s *InMemStore) AddEdge(e Edge) error {
 	s.out[e.Src] = append(s.out[e.Src], e)
@@ -96,6 +96,16 @@ func (s *InMemStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	return filterEdges(s.in[dst], edgeType), nil
 }
 
+func (s *InMemStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	for _, e := range s.in[dst] {
+		if edgeType == "" || e.Type == edgeType {
+			if !fn(e.Src) {
+				return
+			}
+		}
+	}
+}
+
 func (s *InMemStore) NodesWithConcept(concept string) ([]string, error) {
 	out := make([]string, len(s.byConcpt[concept]))
 	copy(out, s.byConcpt[concept])
@@ -107,6 +117,14 @@ func (s *InMemStore) NodesOfType(nodeType string) ([]string, error) {
 	out := make([]string, len(ids))
 	copy(out, ids)
 	return out, nil
+}
+
+func (s *InMemStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, id := range s.byType[nodeType] {
+		if !fn(s.nodes[id]) {
+			return
+		}
+	}
 }
 
 func (s *InMemStore) AllNodes() ([]Node, error) {

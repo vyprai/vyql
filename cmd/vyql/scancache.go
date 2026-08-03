@@ -46,6 +46,10 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 		io.WriteString(h, "\x00binding-overlay\x00")
 		statWalk(h, overlay)
 	}
+	for _, ex := range scanExcludes {
+		io.WriteString(h, "\x00exclude\x00")
+		io.WriteString(h, ex)
+	}
 	for _, p := range paths {
 		io.WriteString(h, "\x00src\x00")
 		statWalk(h, p)

@@ -166,6 +166,7 @@ viewer_scopes = [
 			"assign_call:feast_config:yaml.load",
 			"assign_item:viewer_scopes:CLIENT_READ",
 			"assign_item:viewer_scopes:CONFIG_READ",
+			"python_review:overbroad_role_permission_grant",
 			"call_path:yaml.load",
 			"selector:yaml.Loader",
 			"literal:/var/feast/feature_store.yaml",

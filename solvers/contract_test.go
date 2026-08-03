@@ -123,6 +123,54 @@ func TestSolverContractConformance(t *testing.T) {
 	}
 }
 
+func TestIntTaintScratchDoesNotLeakPolicyState(t *testing.T) {
+	g := usg.NewIntStore(3)
+	for _, id := range []string{"src", "mid", "sink"} {
+		if err := g.AddNode(usg.Node{ID: id, Type: "code.X", Props: map[string]string{"loc": id}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := g.AddLabel("src", usg.Label{Concept: "test.Source"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.AddLabel("mid", usg.Label{Concept: "test.Kill"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.AddLabel("sink", usg.Label{Concept: "test.Sink"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.AddEdge(usg.Edge{Type: "FLOWS", Src: "src", Dst: "mid"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.AddEdge(usg.Edge{Type: "FLOWS", Src: "mid", Dst: "sink"}); err != nil {
+		t.Fatal(err)
+	}
+
+	killed, err := FindTaintFlows(g, set("test.Source"), set("test.Sink"), set("test.Kind"), set("test.Kill"), "", set())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(killed) != 0 {
+		t.Fatalf("kill-control run emitted %d flow(s), want 0", len(killed))
+	}
+
+	live, err := FindTaintFlows(g, set("test.Source"), set("test.Sink"), set("test.Kind"), set(), "", set())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live) != 1 {
+		t.Fatalf("live run emitted %d flow(s), want 1", len(live))
+	}
+
+	killedAgain, err := FindTaintFlows(g, set("test.Source"), set("test.Sink"), set("test.Kind"), set("test.Kill"), "", set())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(killedAgain) != 0 {
+		t.Fatalf("second kill-control run emitted %d flow(s), want 0", len(killedAgain))
+	}
+}
+
 func TestCacheFingerprintStable(t *testing.T) {
 	a := CacheFingerprint("taint", "code.HttpInput", "code.SqlExecution")
 	b := CacheFingerprint("taint", "code.HttpInput", "code.SqlExecution")

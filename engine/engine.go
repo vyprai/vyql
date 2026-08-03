@@ -16,38 +16,46 @@ import (
 
 // Engine evaluates compiled rules against a USG store.
 type Engine struct {
-	Onto               *ontology.Ontology
-	Store              usg.Store
-	conceptRole        map[string]map[string]bool
-	contextReach       []contextReachSource
-	contextReachSet    bool
-	contextAssets      []contextAssetConcept
-	contextAssetsSet   bool
-	contextConfirms    []contextConfirmation
-	contextConfirmsSet bool
-	cfg                map[string]bool
-	labelsByNode       map[string][]usg.Label
-	nodesByConcept     map[string][]string
-	flowGuards         map[string][]string
-	dominanceGuards    map[string][]string
-	sameReceiverGuards map[string]map[string]bool
-	sameScopeGuards    map[string]map[string]bool
-	globalGuards       map[string]bool
+	Onto                   *ontology.Ontology
+	Store                  usg.Store
+	conceptRole            map[string]map[string]bool
+	contextReach           []contextReachSource
+	contextReachSet        bool
+	contextAssets          []contextAssetConcept
+	contextAssetsSet       bool
+	contextConfirms        []contextConfirmation
+	contextConfirmsSet     bool
+	cfg                    map[string]bool
+	labelsByNode           map[string][]usg.Label
+	nodesByConcept         map[string][]string
+	reviewByNodeConcept    map[string][]findings.ReviewCondition
+	contextBySink          map[string][]string
+	contextConfirmByTarget map[string][]string
+	flowGuards             map[string][]string
+	dominanceGuards        map[string][]string
+	sameReceiverGuards     map[string]map[string]bool
+	sameScopeGuards        map[string]map[string]bool
+	globalGuards           map[string]bool
+	taintFlowCache         map[string][]solvers.TaintFlow
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
 	return &Engine{
-		Onto:               onto,
-		Store:              store,
-		conceptRole:        map[string]map[string]bool{},
-		cfg:                map[string]bool{},
-		labelsByNode:       map[string][]usg.Label{},
-		nodesByConcept:     map[string][]string{},
-		flowGuards:         map[string][]string{},
-		dominanceGuards:    map[string][]string{},
-		sameReceiverGuards: map[string]map[string]bool{},
-		sameScopeGuards:    map[string]map[string]bool{},
-		globalGuards:       map[string]bool{},
+		Onto:                   onto,
+		Store:                  store,
+		conceptRole:            map[string]map[string]bool{},
+		cfg:                    map[string]bool{},
+		labelsByNode:           map[string][]usg.Label{},
+		nodesByConcept:         map[string][]string{},
+		reviewByNodeConcept:    map[string][]findings.ReviewCondition{},
+		contextBySink:          map[string][]string{},
+		contextConfirmByTarget: map[string][]string{},
+		flowGuards:             map[string][]string{},
+		dominanceGuards:        map[string][]string{},
+		sameReceiverGuards:     map[string]map[string]bool{},
+		sameScopeGuards:        map[string]map[string]bool{},
+		globalGuards:           map[string]bool{},
+		taintFlowCache:         map[string][]solvers.TaintFlow{},
 	}
 }
 
@@ -59,6 +67,59 @@ func (e *Engine) Evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
 		return nil, err
 	}
 	return e.applyConfidenceFloor(cr, resultpolicy.Dedup(fs)), nil
+}
+
+// PrecomputeTaintFlows batches compatible taint solver calls across the active
+// rules for this Engine. It is deliberately conservative: only rules with the
+// same propagation policy (source concepts, taint kinds, kill controls,
+// excluded characters, and char-filter concepts) share a solver run. The shared
+// run uses the union of their sink concepts, then seeds each rule's exact cache
+// entry with flows filtered back to that rule's own sink set. Rule-specific
+// coverage, confidence, review, and finding identity still run in Evaluate.
+func (e *Engine) PrecomputeTaintFlows(rules []*CompiledRule) error {
+	charFilters := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter)
+	groups := map[string][]*CompiledRule{}
+	for _, cr := range rules {
+		if cr == nil || cr.Rule == nil {
+			continue
+		}
+		body, ok := cr.Rule.Body.(*parser.FlowStmt)
+		if !ok || body.Verb != "taint" {
+			continue
+		}
+		srcConcepts, sinkConcepts, taintKinds, killControls, excluded := e.taintPolicy(cr)
+		exactKey := taintFlowCacheKey(srcConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+		if _, ok := e.taintFlowCache[exactKey]; ok {
+			continue
+		}
+		batchKey := taintFlowBatchKey(srcConcepts, taintKinds, killControls, excluded, charFilters)
+		groups[batchKey] = append(groups[batchKey], cr)
+	}
+	for _, group := range groups {
+		if len(group) == 0 {
+			continue
+		}
+		srcConcepts, _, taintKinds, killControls, excluded := e.taintPolicy(group[0])
+		unionSinks := map[string]bool{}
+		for _, cr := range group {
+			_, sinkConcepts, _, _, _ := e.taintPolicy(cr)
+			for c, ok := range sinkConcepts {
+				if ok {
+					unionSinks[c] = true
+				}
+			}
+		}
+		flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, unionSinks, taintKinds, killControls, excluded, charFilters)
+		if err != nil {
+			return err
+		}
+		for _, cr := range group {
+			src, sinks, kinds, kills, excl := e.taintPolicy(cr)
+			exactKey := taintFlowCacheKey(src, sinks, kinds, kills, excl, charFilters)
+			e.taintFlowCache[exactKey] = e.filterFlowsForSinks(flows, sinks)
+		}
+	}
+	return nil
 }
 
 func (e *Engine) evaluate(cr *CompiledRule) ([]*findings.Finding, error) {
@@ -242,6 +303,9 @@ func mergeWhere(existing, next parser.Expr) parser.Expr {
 // Concepts define which sink properties point to related graph nodes and how
 // evidence should be rendered; the engine only follows those links.
 func (e *Engine) crossDomainContext(sinkID string) []string {
+	if ctx, ok := e.contextBySink[sinkID]; ok {
+		return append([]string(nil), ctx...)
+	}
 	n, ok, _ := e.Store.GetNode(sinkID)
 	if !ok {
 		return nil
@@ -284,6 +348,7 @@ func (e *Engine) crossDomainContext(sinkID string) []string {
 			ctx = append(ctx, renderContextLabel(ac.Label, target, kinds))
 		}
 	}
+	e.contextBySink[sinkID] = append([]string(nil), ctx...)
 	return ctx
 }
 
@@ -357,6 +422,9 @@ func renderContextLabel(template, target string, kinds []string) string {
 }
 
 func (e *Engine) contextConfirmations(target string) []string {
+	if out, ok := e.contextConfirmByTarget[target]; ok {
+		return append([]string(nil), out...)
+	}
 	var out []string
 	for _, c := range e.contextConfirmationSpecs() {
 		ids := e.nodesWithConcept(c.Concept)
@@ -371,6 +439,7 @@ func (e *Engine) contextConfirmations(target string) []string {
 			out = append(out, c.Label)
 		}
 	}
+	e.contextConfirmByTarget[target] = append([]string(nil), out...)
 	return out
 }
 
@@ -520,11 +589,9 @@ func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkC
 	if e.hasCFG(sinkID) {
 		guarded := map[string]bool{}
 		for _, pid := range path {
-			edges, _ := e.Store.OutEdges(pid, "FLOWS")
-			for _, ed := range edges {
-				gid := ed.Dst
+			e.rangeFlowOut(pid, func(gid string) bool {
 				if gid == sinkID || guarded[gid] || !e.hasCFG(gid) {
-					continue
+					return true
 				}
 				guarded[gid] = true
 				for _, l := range e.labels(gid) {
@@ -540,34 +607,33 @@ func (e *Engine) neutralizerAdvisoryEvidence(path []string, sinkID string, sinkC
 						add("guard", l.Detail["pattern"])
 					}
 				}
-			}
+				return true
+			})
 		}
 	}
 	return out
 }
 
-func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
-	body := cr.Rule.Body.(*parser.FlowStmt)
-	srcConcepts := cr.SourceConcepts
-	if srcConcepts == nil {
-		srcConcepts = e.Onto.Descendants(body.Src.Concept)
+func (e *Engine) rangeFlowOut(id string, fn func(dst string) bool) {
+	if rg, ok := e.Store.(interface {
+		RangeOutEdges(string, string, func(string) bool)
+	}); ok {
+		rg.RangeOutEdges(id, "FLOWS", fn)
+		return
 	}
-	sinkConcepts := cr.SinkConcepts
-	if sinkConcepts == nil {
-		sinkConcepts = e.Onto.Descendants(body.Dst.Concept)
+	edges, _ := e.Store.OutEdges(id, "FLOWS")
+	for _, ed := range edges {
+		if !fn(ed.Dst) {
+			return
+		}
 	}
-	taintKinds := cr.TaintKinds
-	if taintKinds == nil {
-		taintKinds = taintKindsFor(e.Onto, srcConcepts)
-	}
-	excluded := cr.ExcludedChars
-	if cr.SinkConcepts == nil {
-		// excluded characters for this sink threat (declared on the sink concept(s) via
-		// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
-		excluded = excludedCharsFor(e.Onto, sinkConcepts)
-	}
+}
 
-	flows, err := solvers.FindTaintFlows(e.Store, srcConcepts, sinkConcepts, taintKinds, cr.KillControls, excluded, e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter))
+func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
+	srcConcepts, sinkConcepts, taintKinds, killControls, excluded := e.taintPolicy(cr)
+
+	charFilters := e.conceptsWithInternalConceptRole(ontology.InternalConceptRoleCharFilter)
+	flows, err := e.taintFlowsFor(srcConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
 	if err != nil {
 		return nil, err
 	}
@@ -687,6 +753,16 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		srcC := e.conceptIn(fl.SourceID, srcConcepts)
 		snkC := e.conceptIn(fl.SinkID, sinkConcepts)
 		conf := e.confBindings(bindingRef{nodeID: fl.SourceID, concept: srcC}, bindingRef{nodeID: fl.SinkID, concept: snkC})
+		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
+			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
+			if resultpolicy.ConfidenceRank(conf) > resultpolicy.ConfidenceRank(ceil) {
+				conf = ceil
+			}
+		}
+		if idx, seen := bySink[fl.SinkID]; seen &&
+			resultpolicy.ConfidenceRank(conf) <= resultpolicy.ConfidenceRank(out[idx].Confidence) {
+			continue
+		}
 		review := e.reviewConditions(fl.SinkID, snkC)
 		if srcMeta := e.sourceConcept(srcC); srcMeta != nil && srcMeta.SourceCondition != "" {
 			n, _, _ := e.Store.GetNode(fl.SourceID)
@@ -701,10 +777,6 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 				Assumption: srcMeta.SourceAssumption,
 				Confidence: firstNonEmpty(srcMeta.SourceConfidence, "medium"),
 			})
-			ceil := firstNonEmpty(srcMeta.SourceConfidence, "medium")
-			if resultpolicy.ConfidenceRank(conf) > resultpolicy.ConfidenceRank(ceil) {
-				conf = ceil
-			}
 		}
 		f := &findings.Finding{
 			RuleID:   e.ruleID(cr),
@@ -722,11 +794,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			ReviewConditions: review,
 		}
 		if idx, seen := bySink[fl.SinkID]; seen {
-			// same sink already reported for this rule — keep whichever source gives the
-			// higher-confidence witness (strict, so ties keep the earlier/deterministic one).
-			if resultpolicy.ConfidenceRank(f.Confidence) > resultpolicy.ConfidenceRank(out[idx].Confidence) {
-				out[idx] = f
-			}
+			out[idx] = f
 			continue
 		}
 		bySink[fl.SinkID] = len(out)
@@ -736,6 +804,101 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 }
 
 // --- helpers -------------------------------------------------------------
+
+func (e *Engine) taintFlowsFor(sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) ([]solvers.TaintFlow, error) {
+	key := taintFlowCacheKey(sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+	if flows, ok := e.taintFlowCache[key]; ok {
+		return flows, nil
+	}
+	flows, err := solvers.FindTaintFlows(e.Store, sourceConcepts, sinkConcepts, taintKinds, killControls, excluded, charFilters)
+	if err != nil {
+		return nil, err
+	}
+	e.taintFlowCache[key] = flows
+	return flows, nil
+}
+
+func (e *Engine) taintPolicy(cr *CompiledRule) (sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string) {
+	body := cr.Rule.Body.(*parser.FlowStmt)
+	sourceConcepts = cr.SourceConcepts
+	if sourceConcepts == nil {
+		sourceConcepts = e.Onto.Descendants(body.Src.Concept)
+	}
+	sinkConcepts = cr.SinkConcepts
+	if sinkConcepts == nil {
+		sinkConcepts = e.Onto.Descendants(body.Dst.Concept)
+	}
+	taintKinds = cr.TaintKinds
+	if taintKinds == nil {
+		taintKinds = taintKindsFor(e.Onto, sourceConcepts)
+	}
+	killControls = cr.KillControls
+	if killControls == nil {
+		killControls = map[string]bool{}
+	}
+	excluded = cr.ExcludedChars
+	if cr.SinkConcepts == nil {
+		// excluded characters for this sink threat (declared on the sink concept(s) via
+		// `excluded_chars`) — lets an allowlist character-filter be proven a sound sanitizer.
+		excluded = excludedCharsFor(e.Onto, sinkConcepts)
+	}
+	return sourceConcepts, sinkConcepts, taintKinds, killControls, excluded
+}
+
+func (e *Engine) filterFlowsForSinks(flows []solvers.TaintFlow, sinkConcepts map[string]bool) []solvers.TaintFlow {
+	if len(flows) == 0 {
+		return nil
+	}
+	out := make([]solvers.TaintFlow, 0, len(flows))
+	for _, fl := range flows {
+		if e.conceptIn(fl.SinkID, sinkConcepts) != "" {
+			out = append(out, fl)
+		}
+	}
+	return out
+}
+
+func taintFlowBatchKey(sourceConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) string {
+	var b strings.Builder
+	writeSetKey(&b, "src", sourceConcepts)
+	writeSetKey(&b, "kind", taintKinds)
+	writeSetKey(&b, "kill", killControls)
+	writeSetKey(&b, "char", charFilters)
+	b.WriteString("excluded=")
+	b.WriteString(excluded)
+	return b.String()
+}
+
+func taintFlowCacheKey(sourceConcepts, sinkConcepts, taintKinds, killControls map[string]bool, excluded string, charFilters map[string]bool) string {
+	var b strings.Builder
+	writeSetKey(&b, "src", sourceConcepts)
+	writeSetKey(&b, "sink", sinkConcepts)
+	writeSetKey(&b, "kind", taintKinds)
+	writeSetKey(&b, "kill", killControls)
+	writeSetKey(&b, "char", charFilters)
+	b.WriteString("excluded=")
+	b.WriteString(excluded)
+	return b.String()
+}
+
+func writeSetKey(b *strings.Builder, name string, set map[string]bool) {
+	b.WriteString(name)
+	b.WriteByte('=')
+	if len(set) > 0 {
+		keys := make([]string, 0, len(set))
+		for k, ok := range set {
+			if ok {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			b.WriteString(k)
+			b.WriteByte('\x00')
+		}
+	}
+	b.WriteByte('\x1f')
+}
 
 func (e *Engine) ruleID(cr *CompiledRule) string {
 	if id, ok := cr.Rule.Meta["id"].(string); ok {
@@ -857,6 +1020,10 @@ func labelProvenancePriority(l usg.Label) int {
 }
 
 func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondition {
+	cacheKey := nodeID + "\x00" + concept
+	if out, ok := e.reviewByNodeConcept[cacheKey]; ok {
+		return append([]findings.ReviewCondition(nil), out...)
+	}
 	var out []findings.ReviewCondition
 	seen := map[string]bool{}
 	for _, l := range e.labels(nodeID) {
@@ -884,6 +1051,7 @@ func (e *Engine) reviewConditions(nodeID, concept string) []findings.ReviewCondi
 			out = append(out, ec)
 		}
 	}
+	e.reviewByNodeConcept[cacheKey] = append([]findings.ReviewCondition(nil), out...)
 	return out
 }
 
@@ -1315,14 +1483,14 @@ func (e *Engine) flowGuardCandidates(nodeID, control string) []string {
 		seen[id] = true
 		out = append(out, id)
 	}
-	edges, _ := e.Store.OutEdges(nodeID, "FLOWS")
-	for _, ed := range edges {
-		add(ed.Dst)
-		midEdges, _ := e.Store.OutEdges(ed.Dst, "FLOWS")
-		for _, mid := range midEdges {
-			add(mid.Dst)
-		}
-	}
+	e.rangeFlowOut(nodeID, func(dst string) bool {
+		add(dst)
+		e.rangeFlowOut(dst, func(mid string) bool {
+			add(mid)
+			return true
+		})
+		return true
+	})
 	e.flowGuards[key] = out
 	return out
 }

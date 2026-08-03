@@ -38,13 +38,69 @@ type Node struct {
 	HasOrder bool              `json:"hasOrder,omitempty"` // distinguishes Order==0 from "unset"
 	Props    map[string]string `json:"props,omitempty"`
 	Scope    string            `json:"scope,omitempty"`
+
+	// Method/CalleePath/StrArgs are the hottest match-path properties, carried inline
+	// (like Loc/Region) so the matcher avoids a map hash per lookup and so leaf value
+	// nodes — the bulk of the graph — need no Props map at all. A store that leaves
+	// these empty and keeps the values in Props still works: Prop falls through to the
+	// map, so behavior is identical regardless of where a store puts them.
+	Method     string `json:"-"`
+	CalleePath string `json:"-"`
+	StrArgs    string `json:"-"`
+	Vkind      string `json:"-"`
 }
 
-// Prop returns a property value (empty string if absent). loc/region/order resolve to the inline
+// inlinedPropKeys are the property keys a store copies into Node columns in AddNode, so a
+// node carrying only these needs no Props map. It deliberately excludes loc/region/order:
+// those are inline on the Node value but are NOT extracted from the Props map here, so a
+// map that still holds them must be retained for Prop's fall-through to find them.
+var inlinedPropKeys = map[string]bool{
+	"method": true, "callee_path": true, "str_args": true, "vkind": true,
+}
+
+var (
+	argPropKeys = [...]string{
+		"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7",
+		"arg8", "arg9", "arg10", "arg11", "arg12", "arg13", "arg14", "arg15",
+	}
+	litPropKeys = [...]string{
+		"lit0", "lit1", "lit2", "lit3", "lit4", "lit5", "lit6", "lit7",
+		"lit8", "lit9", "lit10", "lit11", "lit12", "lit13", "lit14", "lit15",
+	}
+)
+
+// ArgPropKey returns the canonical property key for the i-th call argument.
+func ArgPropKey(i int) string {
+	if uint(i) < uint(len(argPropKeys)) {
+		return argPropKeys[i]
+	}
+	return "arg" + strconv.Itoa(i)
+}
+
+// LitPropKey returns the canonical property key for the i-th literal call argument.
+func LitPropKey(i int) string {
+	if uint(i) < uint(len(litPropKeys)) {
+		return litPropKeys[i]
+	}
+	return "lit" + strconv.Itoa(i)
+}
+
+// PropsOnlyInlined reports whether every key in m is one a store copies into an inline Node
+// field, so the store can drop the map entirely after copying the values into columns.
+func PropsOnlyInlined(m map[string]string) bool {
+	for k := range m {
+		if !inlinedPropKeys[k] {
+			return false
+		}
+	}
+	return true
+}
+
+// Prop returns a property value (empty string if absent). Inlined keys resolve to the inline
 // fields; everything else comes from the Props map.
 func (n Node) Prop(k string) string {
 	// inline fields win when set; otherwise fall through to Props so nodes built the old way
-	// (hand-built graphs, tests, spec fixtures that put loc/region/order in the map) still work.
+	// (hand-built graphs, tests, spec fixtures that put these in the map) still work.
 	switch k {
 	case "loc":
 		if n.Loc != "" {
@@ -57,6 +113,22 @@ func (n Node) Prop(k string) string {
 	case "order":
 		if n.HasOrder {
 			return strconv.Itoa(int(n.Order))
+		}
+	case "method":
+		if n.Method != "" {
+			return n.Method
+		}
+	case "callee_path":
+		if n.CalleePath != "" {
+			return n.CalleePath
+		}
+	case "str_args":
+		if n.StrArgs != "" {
+			return n.StrArgs
+		}
+	case "vkind":
+		if n.Vkind != "" {
+			return n.Vkind
 		}
 	}
 	if n.Props == nil {
@@ -122,6 +194,18 @@ func BFS(s Store, start, edgeType string, maxHops int) (map[string]bool, error) 
 		cur := queue[0]
 		queue = queue[1:]
 		if cur.hops >= maxHops {
+			continue
+		}
+		if rg, ok := s.(interface {
+			RangeOutEdges(string, string, func(string) bool)
+		}); ok {
+			rg.RangeOutEdges(cur.id, edgeType, func(dst string) bool {
+				if !seen[dst] {
+					seen[dst] = true
+					queue = append(queue, item{dst, cur.hops + 1})
+				}
+				return true
+			})
 			continue
 		}
 		edges, err := s.OutEdges(cur.id, edgeType)

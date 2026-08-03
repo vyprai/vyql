@@ -85,6 +85,15 @@ func extractAll(paths []string) (nir.Program, []bindings.Applicator, map[string]
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
 		}
+		if len(scanExcludes) > 0 {
+			kept := entries[:0]
+			for _, e := range entries {
+				if !pathHasExcludedSegment(e.Path, scanExcludes) {
+					kept = append(kept, e)
+				}
+			}
+			entries = kept
+		}
 		if props := propertiesFromEntries(entries); len(props) > 0 {
 			if prog.Properties == nil {
 				prog.Properties = map[string]string{}

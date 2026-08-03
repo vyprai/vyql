@@ -20,7 +20,7 @@ import (
 //	gx\0<idx>         -> id string             reverse: index -> id
 //	gn\0<idx>         -> node detail blob       type/loc/region/order/scope/props
 //	go\0<idx>         -> out-adjacency blob     []{typeId, dstIdx[, props]}
-//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes: PROTECTS/CHECKS)
+//	gr\0<idx>         -> in-adjacency blob      (only inIndexedTypes)
 //	gl\0<idx>         -> labels blob
 //	gc\0<concept>     -> []int32 (nodes w/ concept)
 //	gt\0<type>        -> []int32 (nodes of type)
@@ -41,6 +41,8 @@ type BadgerGraph struct {
 	ids        []string
 	out        [][]iedge
 	in         map[int32][]iedge
+	flowOut    [][]int32
+	flowIn     [][]int32
 	labels     [][]Label
 	byType     map[string][]int32
 	byConcept  map[string][]int32
@@ -107,6 +109,8 @@ func (g *BadgerGraph) intern(id string) int32 {
 	g.idx[id] = i
 	g.ids = append(g.ids, id)
 	g.out = append(g.out, nil)
+	g.flowOut = append(g.flowOut, nil)
+	g.flowIn = append(g.flowIn, nil)
 	g.labels = append(g.labels, nil)
 	return i
 }
@@ -152,11 +156,34 @@ func (g *BadgerGraph) AddEdge(e Edge) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	si, di := g.intern(e.Src), g.intern(e.Dst)
-	g.out[si] = append(g.out[si], iedge{typ: e.Type, dst: di, props: e.Props})
-	if inIndexedTypes[e.Type] {
-		g.in[di] = append(g.in[di], iedge{typ: e.Type, dst: si, props: e.Props})
+	typ := edgeTypeIDFor(e.Type)
+	if typ == edgeTypeFlows && len(e.Props) == 0 {
+		g.flowOut[si] = append(g.flowOut[si], di)
+		g.flowIn[di] = append(g.flowIn[di], si)
+		return nil
+	}
+	g.out[si] = append(g.out[si], iedge{typ: typ, dst: di, props: e.Props})
+	if edgeTypeInIndexed(typ) {
+		g.in[di] = append(g.in[di], iedge{typ: typ, dst: si, props: e.Props})
 	}
 	return nil
+}
+
+// AddFlowEdgeIfPresent appends a prop-less FLOWS edge only when both endpoints already exist.
+func (g *BadgerGraph) AddFlowEdgeIfPresent(src, dst string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	si, ok := g.idx[src]
+	if !ok {
+		return false
+	}
+	di, ok := g.idx[dst]
+	if !ok {
+		return false
+	}
+	g.flowOut[si] = append(g.flowOut[si], di)
+	g.flowIn[di] = append(g.flowIn[di], si)
+	return true
 }
 
 func (g *BadgerGraph) AddLabel(nodeID string, l Label) error {
@@ -254,9 +281,14 @@ func (g *BadgerGraph) OutEdges(src, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: src, Dst: g.ids[dst]})
+		}
+	}
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: src, Dst: g.ids[e.dst], Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: src, Dst: g.ids[e.dst], Props: e.props})
 		}
 	}
 	return out, nil
@@ -268,12 +300,38 @@ func (g *BadgerGraph) InEdges(dst, edgeType string) ([]Edge, error) {
 		return nil, nil
 	}
 	var out []Edge
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range g.flowIn[i] {
+			out = append(out, Edge{Type: "FLOWS", Src: g.ids[src], Dst: dst})
+		}
+	}
 	for _, e := range g.in[i] {
-		if edgeType == "" || e.typ == edgeType {
-			out = append(out, Edge{Type: e.typ, Src: g.ids[e.dst], Dst: dst, Props: e.props})
+		if edgeTypeMatches(e.typ, edgeType) {
+			out = append(out, Edge{Type: edgeTypeName(e.typ), Src: g.ids[e.dst], Dst: dst, Props: e.props})
 		}
 	}
 	return out, nil
+}
+
+func (g *BadgerGraph) RangeInEdges(dst, edgeType string, fn func(src string) bool) {
+	i, ok := g.idxOf(dst)
+	if !ok {
+		return
+	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, src := range g.flowIn[i] {
+			if !fn(g.ids[src]) {
+				return
+			}
+		}
+	}
+	for _, e := range g.in[i] {
+		if edgeTypeMatches(e.typ, edgeType) {
+			if !fn(g.ids[e.dst]) {
+				return
+			}
+		}
+	}
 }
 
 func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
@@ -282,6 +340,15 @@ func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
 func (g *BadgerGraph) NodesOfType(nodeType string) ([]string, error) {
 	return g.idsOf(g.byType[nodeType]), nil
 }
+
+func (g *BadgerGraph) RangeNodesOfType(nodeType string, fn func(Node) bool) {
+	for _, i := range g.byType[nodeType] {
+		if !fn(g.nodeAt(i)) {
+			return
+		}
+	}
+}
+
 func (g *BadgerGraph) idsOf(idxs []int32) []string {
 	out := make([]string, len(idxs))
 	for k, i := range idxs {
@@ -408,8 +475,15 @@ func (g *BadgerGraph) RangeOut(src int32, edgeType string, fn func(dst int32) bo
 	if int(src) >= len(g.out) {
 		return
 	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[src] {
+			if !fn(dst) {
+				return
+			}
+		}
+	}
 	for _, e := range g.out[src] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(e.dst) {
 				return
 			}
@@ -422,8 +496,15 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 	if !ok {
 		return
 	}
+	if edgeTypeMatches(edgeTypeFlows, edgeType) {
+		for _, dst := range g.flowOut[i] {
+			if !fn(g.ids[dst]) {
+				return
+			}
+		}
+	}
 	for _, e := range g.out[i] {
-		if edgeType == "" || e.typ == edgeType {
+		if edgeTypeMatches(e.typ, edgeType) {
 			if !fn(g.ids[e.dst]) {
 				return
 			}

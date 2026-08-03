@@ -10,6 +10,8 @@ package treesitter
 import (
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tspython "github.com/tree-sitter/tree-sitter-python/bindings/go"
@@ -27,6 +29,40 @@ type pyConv struct {
 	moduleTokens  []string
 	classContext  []string
 	decorators    []string
+	childCache    map[uintptr][]*tree_sitter.Node
+	allChildCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *pyConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
+}
+
+func (c *pyConv) children(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.allChildCache == nil {
+		c.allChildCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.allChildCache[id]; ok {
+		return kids
+	}
+	kids := children(n)
+	c.allChildCache[id] = kids
+	return kids
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -78,12 +114,12 @@ func namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	// cache the count: each *Count() is a cgo call, and re-evaluating it in the loop
-	// condition (once per child) was the bulk of the cgo traffic in this hot helper.
-	k := n.NamedChildCount()
-	out := make([]*tree_sitter.Node, 0, k)
-	for i := uint(0); i < k; i++ {
-		out = append(out, n.NamedChild(i))
+	cursor := n.Walk()
+	defer cursor.Close()
+	nodes := n.NamedChildren(cursor)
+	out := make([]*tree_sitter.Node, len(nodes))
+	for i := range nodes {
+		out[i] = &nodes[i]
 	}
 	return out
 }
@@ -106,7 +142,7 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 	walk = func(n *tree_sitter.Node) {
 		switch n.Kind() {
 		case "import_statement":
-			for _, ch := range namedChildren(n) {
+			for _, ch := range c.namedChildren(n) {
 				if ch.Kind() == "aliased_import" {
 					nm := c.text(orSelf(field(ch, "name"), ch))
 					al := field(ch, "alias")
@@ -125,7 +161,7 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 		case "import_from_statement":
 			mod := field(n, "module_name")
 			modtxt := c.text(mod)
-			for _, ch := range namedChildren(n) {
+			for _, ch := range c.namedChildren(n) {
 				if ch == mod {
 					continue
 				}
@@ -144,7 +180,7 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -155,7 +191,7 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 // blockChildren lowers the statements of a node's named children.
 func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	statements := namedChildren(n)
+	statements := c.namedChildren(n)
 	for i, st := range statements {
 		out = append(out, c.stmt(st)...)
 		if c.pyLengthGuardDefinitelyTerminates(st, statements[:i]) {
@@ -197,7 +233,7 @@ func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
 		if n == nil {
 			return
 		}
-		for _, ch := range children(n) {
+		for _, ch := range c.children(n) {
 			if ch.Kind() == "comment" {
 				for _, tok := range vyqlMarkerTokens(c.text(ch)) {
 					out = append(out, nir.ResultEntry{Tokens: []string{tok}})
@@ -231,15 +267,15 @@ func vyqlMarkerTokens(comment string) []string {
 
 // firstIdent returns the first identifier at or under n (e.g. the target name inside a
 // with-statement `as` alias, which may be wrapped in an as_pattern_target).
-func firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
+func (c *pyConv) firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
 	if n.Kind() == "identifier" {
 		return n
 	}
-	for _, ch := range children(n) {
-		if r := firstIdent(ch); r != nil {
+	for _, ch := range c.children(n) {
+		if r := c.firstIdent(ch); r != nil {
 			return r
 		}
 	}
@@ -250,11 +286,11 @@ func firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 // node (empty for a plain string literal).
 func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 	var interps []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "interpolation" {
 			e := field(ch, "expression")
 			if e == nil {
-				if kids := namedChildren(ch); len(kids) > 0 {
+				if kids := c.namedChildren(ch); len(kids) > 0 {
 					e = kids[0]
 				}
 			}
@@ -270,9 +306,9 @@ func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 // default, literal patterns (and unions of literals) yield label expressions, and anything
 // else (capture, class, value, guard) returns literal=false so the match is left unprunable.
 func (c *pyConv) matchPatternLabels(caseClause *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
-	for _, ch := range children(caseClause) {
+	for _, ch := range c.children(caseClause) {
 		if ch.Kind() == "case_pattern" {
-			if kids := namedChildren(ch); len(kids) > 0 {
+			if kids := c.namedChildren(ch); len(kids) > 0 {
 				return c.patternLabels(kids[0])
 			}
 			if strings.TrimSpace(c.text(ch)) == "_" {
@@ -291,7 +327,7 @@ func (c *pyConv) patternLabels(p *tree_sitter.Node) (labels []nir.Expr, isDefaul
 		return []nir.Expr{c.expr(p)}, false, true
 	case "union_pattern":
 		var labs []nir.Expr
-		for _, sub := range namedChildren(p) {
+		for _, sub := range c.namedChildren(p) {
 			l, d, lit := c.patternLabels(sub)
 			if d || !lit {
 				return nil, false, false // a non-literal alternative — unprunable
@@ -300,7 +336,7 @@ func (c *pyConv) patternLabels(p *tree_sitter.Node) (labels []nir.Expr, isDefaul
 		}
 		return labs, false, len(labs) > 0
 	case "case_pattern":
-		if kids := namedChildren(p); len(kids) > 0 {
+		if kids := c.namedChildren(p); len(kids) > 0 {
 			return c.patternLabels(kids[0])
 		}
 	}
@@ -326,7 +362,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "decorated_definition":
 		def := field(n, "definition")
 		if def == nil {
-			cs := namedChildren(n)
+			cs := c.namedChildren(n)
 			if len(cs) > 0 {
 				def = cs[len(cs)-1]
 			}
@@ -356,7 +392,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		c.classContext = c.classContext[:len(c.classContext)-len(ctx)]
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L, Bases: bases}}
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
@@ -401,7 +437,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 		}
 	case "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -443,7 +479,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var pre []nir.Stmt
 		var walkWith func(node *tree_sitter.Node)
 		walkWith = func(node *tree_sitter.Node) {
-			for _, ch := range children(node) {
+			for _, ch := range c.children(node) {
 				switch ch.Kind() {
 				case "with_clause":
 					walkWith(ch)
@@ -453,13 +489,13 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						continue
 					}
 					if val.Kind() == "as_pattern" {
-						kids := namedChildren(val)
+						kids := c.namedChildren(val)
 						if len(kids) == 0 {
 							continue
 						}
 						expr := c.expr(kids[0])
 						if alias := field(val, "alias"); alias != nil {
-							if id := firstIdent(alias); id != nil {
+							if id := c.firstIdent(alias); id != nil {
 								pre = append(pre, nir.Assign{Targets: []string{c.text(id)}, Value: expr})
 								continue
 							}
@@ -489,7 +525,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if body == nil {
 			body = n
 		}
-		for _, cl := range children(body) {
+		for _, cl := range c.children(body) {
 			if cl.Kind() != "case_clause" {
 				continue
 			}
@@ -523,7 +559,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 // trailing else becomes a plain block. Returns nil when there is no else/elif.
 func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	var alts []*tree_sitter.Node
-	for _, ch := range children(n) {
+	for _, ch := range c.children(n) {
 		if ch.Kind() == "elif_clause" || ch.Kind() == "else_clause" {
 			alts = append(alts, ch)
 		}
@@ -559,7 +595,7 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
-		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(bodyText), "")},
+		nir.Const{Loc: loc, Value: pyContextCompactUnbounded(bodyText)},
 		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
 	localEndArgs := []nir.Expr{
@@ -721,7 +757,7 @@ func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 	args := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=python"},
 		nir.Const{Loc: loc, Value: text},
-		nir.Const{Loc: loc, Value: strings.Join(strings.Fields(text), "")},
+		nir.Const{Loc: loc, Value: pyContextCompactUnbounded(text)},
 	}
 	for _, tok := range c.moduleTokens {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
@@ -744,8 +780,8 @@ func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []
 }
 
 func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name string, scopeLocal bool, localBodyText string, controlFacts pyControlContextFacts) []string {
-	seen := map[string]bool{}
-	var out []string
+	seen := make(map[string]bool, 64)
+	out := make([]string, 0, 64)
 	add := func(tok string) {
 		if tok == "" || seen[tok] || len(out) >= pyContextBaseTokenLimit {
 			return
@@ -781,7 +817,11 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 					add("assign:" + lhs + "=" + rhs)
 				}
 				for _, item := range c.pyContextAssignmentItems(right) {
-					add("assign_item:" + lhs + ":" + item)
+					assignItem := lhs + ":" + item
+					add("assign_item:" + assignItem)
+					if pyOverbroadRolePermissionGrantItem(assignItem) {
+						add("python_review:overbroad_role_permission_grant")
+					}
 				}
 				if right != nil && right.Kind() == "call" {
 					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
@@ -823,7 +863,7 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 				add("literal:" + lit)
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -898,6 +938,29 @@ func pySemanticReviewTokens(raw, name string) []string {
 	var out []string
 	add := func(fact string) {
 		out = append(out, "python_review:"+fact)
+	}
+	if strings.Contains(compact, "forurlinurls:") &&
+		strings.Contains(compact, "requests.get(url") &&
+		!strings.Contains(compact, "validate_url(url") &&
+		!strings.Contains(compact, "_validate_url(url") {
+		add("loop_requests_get_url_without_validation")
+	}
+	if strings.Contains(compact, "traceback.format_exc") &&
+		!strings.Contains(compact, "cgi.escape") &&
+		!strings.Contains(compact, "html.escape") &&
+		!strings.Contains(compact, "markupsafe.escape") {
+		if strings.Contains(compact, "<pre") {
+			add("traceback_format_exc_pre_unescaped")
+		}
+		if strings.Contains(compact, "<html") {
+			add("traceback_format_exc_html_unescaped")
+		}
+	}
+	if pyRequestPathPercentSLogInjection(compact) {
+		add("request_path_percent_s_log_injection")
+	}
+	if pyCredentialAttributeLogExposure(compact) {
+		add("credential_attribute_log_exposure")
 	}
 	if strings.Contains(compact, "app.config[\"SECRET_KEY\"]=") || strings.Contains(compact, "app.config['SECRET_KEY']=") {
 		if !strings.Contains(compact, "os.environ") &&
@@ -1186,6 +1249,9 @@ func pySemanticReviewTokens(raw, name string) []string {
 		!strings.Contains(compact, "UNSUPPORTED_MEDIA_TYPE") {
 		add("request_selected_deserialization_format")
 	}
+	if pyPickleLoadsJoblibModelLoader(compact, name) {
+		add("pickle_loads_joblib_model_loader")
+	}
 	if strings.Contains(compact, "QueryRequest(") &&
 		strings.Contains(compact, "sql=") &&
 		strings.Contains(compact, ".execute_query(") &&
@@ -1372,6 +1438,77 @@ func pySemanticReviewTokens(raw, name string) []string {
 	return out
 }
 
+func pyRequestPathPercentSLogInjection(compact string) bool {
+	if !strings.Contains(compact, "request.path") {
+		return false
+	}
+	if !pyCompactContainsAny(compact, "LOG.debug(", "logger.debug(", "logging.debug(", "log.debug(") {
+		return false
+	}
+	if !pyCompactContainsAny(compact,
+		"LOG.debug(\"Requestto'%s",
+		"LOG.debug('Requestto\\'%s",
+		"logger.debug(\"requestpath%s",
+		"logger.debug('requestpath%s",
+		"logging.debug(\"path%s",
+		"logging.debug('path%s",
+		"log.debug(\"path%s",
+		"log.debug('path%s",
+	) {
+		return false
+	}
+	if pyCompactContainsAny(compact,
+		"LOG.debug(\"Requestto'%r",
+		"LOG.debug('Requestto\\'%r",
+		"logger.debug(\"requestpath%r",
+		"logger.debug('requestpath%r",
+		"logging.debug(\"path%r",
+		"logging.debug('path%r",
+		"log.debug(\"path%r",
+		"log.debug('path%r",
+	) {
+		return false
+	}
+	return !pyCompactContainsAny(compact, "repr(", "escape(", "sanitize(")
+}
+
+func pyCredentialAttributeLogExposure(compact string) bool {
+	if !pyCompactContainsAny(compact, "LOG.debug(", "logger.debug(", "logging.debug(") {
+		return false
+	}
+	if !pyCompactContainsAny(compact, "loc.accesskey", "loc.secretkey") {
+		return false
+	}
+	return pyCompactContainsAny(compact, "accesskey", "access_key", "secretkey", "secret_key")
+}
+
+func pyPickleLoadsJoblibModelLoader(compact, name string) bool {
+	switch name {
+	case "load", "load_model", "from_pretrained", "restore":
+	default:
+		return false
+	}
+	if !strings.Contains(compact, "pickle.loads(") || !strings.Contains(compact, "joblib.load(") {
+		return false
+	}
+	return !pyCompactContainsAny(compact, "RestrictedUnpickler", "safe_load")
+}
+
+func pyOverbroadRolePermissionGrantItem(item string) bool {
+	switch item {
+	case "viewer_scopes:CONFIG_READ",
+		"viewer_scopes:CONFIG_UPDATE",
+		"viewer_scopes:ADMIN",
+		"read_only_scopes:CONFIG_READ",
+		"read_only_scopes:CONFIG_UPDATE",
+		"guest_scopes:CONFIG_READ",
+		"public_scopes:CONFIG_READ":
+		return true
+	default:
+		return false
+	}
+}
+
 func pyWaterfallReloadOptionUnescaped(compactBody string) bool {
 	if !strings.Contains(compactBody, ".args") {
 		return false
@@ -1399,7 +1536,7 @@ func pyWaterfallReloadOptionUnescaped(compactBody string) bool {
 }
 
 func pyContextCompactUnbounded(raw string) string {
-	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+	return pyCompactWhitespace(raw, 0)
 }
 
 func pyCompactContainsAny(compact string, needles ...string) bool {
@@ -1474,7 +1611,7 @@ func (c *pyConv) pyContextAssignmentItems(n *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		item := c.pyContextPath(ch)
 		if item == "" {
 			continue
@@ -1508,11 +1645,53 @@ func pyContextValue(raw string) string {
 }
 
 func pyContextCompact(raw string) string {
-	s := strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
-	if len(s) > 160 {
+	return pyCompactWhitespace(raw, 160)
+}
+
+func pyCompactWhitespace(raw string, maxBytes int) string {
+	if raw == "" {
 		return ""
 	}
-	return s
+	var b strings.Builder
+	changed := false
+	last := 0
+	kept := 0
+	for i := 0; i < len(raw); {
+		r, size := utf8.DecodeRuneInString(raw[i:])
+		if unicode.IsSpace(r) {
+			if !changed {
+				b.Grow(len(raw))
+				changed = true
+			}
+			if i > last {
+				part := raw[last:i]
+				kept += len(part)
+				if maxBytes > 0 && kept > maxBytes {
+					return ""
+				}
+				b.WriteString(part)
+			}
+			i += size
+			last = i
+			continue
+		}
+		i += size
+	}
+	if !changed {
+		if maxBytes > 0 && len(raw) > maxBytes {
+			return ""
+		}
+		return raw
+	}
+	if last < len(raw) {
+		part := raw[last:]
+		kept += len(part)
+		if maxBytes > 0 && kept > maxBytes {
+			return ""
+		}
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
@@ -1522,7 +1701,7 @@ func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string
 		"class_name:" + name,
 		"class_bases=" + strings.Join(bases, ","),
 		body,
-		strings.Join(strings.Fields(body), ""),
+		pyContextCompactUnbounded(body),
 	}
 	for _, base := range bases {
 		if base != "" {
@@ -1543,7 +1722,7 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 			toks = append(toks, c.text(n))
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -1553,7 +1732,7 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 
 // clauseBlock returns the lowered statements of a clause's `block` child.
 func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
-	for _, cc := range children(clause) {
+	for _, cc := range c.children(clause) {
 		if cc.Kind() == "block" {
 			return c.block(cc)
 		}
@@ -1563,12 +1742,12 @@ func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
 
 func (c *pyConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range children(n) {
+	for _, ch := range c.children(n) {
 		switch ch.Kind() {
 		case "block":
 			out = append(out, c.block(ch)...)
 		case "elif_clause", "else_clause", "except_clause", "finally_clause", "with_clause":
-			for _, cc := range children(ch) {
+			for _, cc := range c.children(ch) {
 				if cc.Kind() == "block" {
 					out = append(out, c.block(cc)...)
 				}
@@ -1595,7 +1774,7 @@ func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 		seen[tok] = true
 		out = append(out, tok)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() != "decorator" {
 			continue
 		}
@@ -1645,7 +1824,7 @@ func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
 	case "identifier":
 		return c.text(n)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if p := c.pyDecoratorPath(ch); p != "" {
 			return p
 		}
@@ -1659,7 +1838,7 @@ func (c *pyConv) pyClassBases(n *tree_sitter.Node) []string {
 	if args == nil {
 		return bases
 	}
-	for _, ch := range namedChildren(args) {
+	for _, ch := range c.namedChildren(args) {
 		if ch.Kind() == "keyword_argument" {
 			continue
 		}
@@ -1679,14 +1858,14 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 		return nil
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
 			out = append(out, pyParamName(c.text(ch)))
 		case "default_parameter", "typed_parameter", "typed_default_parameter":
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, pyParamName(c.text(nm)))
-			} else if kids := namedChildren(ch); len(kids) > 0 {
+			} else if kids := c.namedChildren(ch); len(kids) > 0 {
 				out = append(out, pyParamName(c.text(kids[0])))
 			}
 		}
@@ -1699,13 +1878,13 @@ func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params == nil {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "typed_parameter", "typed_default_parameter":
 			name := ""
 			if nm := field(ch, "name"); nm != nil {
 				name = pyParamName(c.text(nm))
-			} else if kids := namedChildren(ch); len(kids) > 0 {
+			} else if kids := c.namedChildren(ch); len(kids) > 0 {
 				name = pyParamName(c.text(kids[0]))
 			}
 			putParamType(out, name, paramTypeFromField(c, ch))
@@ -1727,7 +1906,7 @@ func (c *pyConv) targets(left *tree_sitter.Node) []string {
 		return []string{c.text(left)}
 	case "pattern_list", "tuple_pattern", "tuple":
 		var out []string
-		for _, ch := range namedChildren(left) {
+		for _, ch := range c.namedChildren(left) {
 			if ch.Kind() == "identifier" {
 				out = append(out, c.text(ch))
 			}
@@ -1750,7 +1929,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		// interpolations from EVERY part (previously this dropped them all, hiding any
 		// tainted value or sink call inside the later parts).
 		var interps []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "string" {
 				interps = append(interps, c.stringInterps(ch)...)
 			}
@@ -1769,13 +1948,13 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "keyword_argument":
 		return nir.Pair{Key: c.keyName(field(n, "name")), Value: c.expr(field(n, "value")), Loc: L}
 	case "list_splat", "dictionary_splat":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 		return nir.Const{Loc: L}
 	case "dictionary":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "pair" {
 				keyNode := field(ch, "key")
 				parts = append(parts, nir.Pair{
@@ -1799,7 +1978,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 			if args.Kind() == "generator_expression" {
 				arglist = append(arglist, c.expr(args))
 			} else {
-				for _, a := range namedChildren(args) {
+				for _, a := range c.namedChildren(args) {
 					arglist = append(arglist, c.expr(a))
 				}
 			}
@@ -1810,7 +1989,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Call{Callee: c.expr(fn), Args: arglist, Path: path, Method: method, Loc: L}
 	case "await":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "binary_operator":
@@ -1822,7 +2001,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "comparison_operator":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 2 { // simple `a OP b` (chained comparisons keep their Seq fallback)
 			return nir.BinOp{Op: c.text(field(n, "operators")), Left: c.expr(kids[0]), Right: c.expr(kids[1]), Loc: L}
 		}
@@ -1832,7 +2011,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "not_operator":
 		return nir.Unary{Op: "not", Operand: c.expr(field(n, "argument")), Loc: L}
 	case "conditional_expression":
-		kids := namedChildren(n) // [then, cond, else]
+		kids := c.namedChildren(n) // [then, cond, else]
 		if len(kids) >= 3 {
 			return nir.Ternary{Then: c.expr(kids[0]), Cond: c.expr(kids[1]), Else: c.expr(kids[2]), Loc: L}
 		}
@@ -1843,19 +2022,19 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "tuple", "list":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "generator_expression", "list_comprehension", "set_comprehension":
 		return c.comprehensionValue(n, L)
 	case "parenthesized_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.expr(kids[0])
 		}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -1865,13 +2044,13 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 	body := field(n, "body")
 	if body == nil {
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: loc}
 	}
 	parts := []nir.Expr{c.expr(body)}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "if_clause" {
 			parts = append(parts, c.expr(ch))
 		}
@@ -1880,7 +2059,7 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 	if len(parts) > 1 {
 		out = nir.Seq{Parts: parts, Loc: loc}
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() != "for_in_clause" {
 			continue
 		}

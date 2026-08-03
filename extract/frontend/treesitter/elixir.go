@@ -13,9 +13,26 @@ import (
 // `call` (defmodule/def are calls with a do_block); module calls are `dot`
 // (alias + function). `<>` builds strings, `|>` pipes the LHS as the first arg.
 type exConv struct {
-	src  []byte
-	file string
-	key  string
+	src        []byte
+	file       string
+	key        string
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *exConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
 }
 
 // ExtractElixir parses Elixir files into one NIR Program (one module per file).
@@ -48,7 +65,7 @@ func (c *exConv) text(n *tree_sitter.Node) string {
 // functions surface as top-level FuncDefs.
 func (c *exConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -83,7 +100,7 @@ func (c *exConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 // callStmt handles defmodule/def/defp specially; everything else is an expression.
 func (c *exConv) callStmt(n *tree_sitter.Node) []nir.Stmt {
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) == 0 {
 		return nil
 	}
@@ -113,13 +130,13 @@ func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 	var fname string
 	var params []string
 	if args != nil {
-		for _, a := range namedChildren(args) {
+		for _, a := range c.namedChildren(args) {
 			if a.Kind() == "call" { // name(params)
 				if h := firstNamed(a); h != nil {
 					fname = c.text(h)
 				}
 				if pa := lastChildKind(a, "arguments"); pa != nil {
-					for _, p := range namedChildren(pa) {
+					for _, p := range c.namedChildren(pa) {
 						params = append(params, c.patName(p))
 					}
 				}
@@ -134,12 +151,12 @@ func (c *exConv) funcDef(n *tree_sitter.Node) []nir.Stmt {
 	} else if args != nil {
 		// keyword-shorthand body: `def f(x), do: expr` — the body is the `do:` pair's value
 		// in the call's keyword arguments (no do_block). Extremely common in Elixir.
-		for _, a := range namedChildren(args) {
+		for _, a := range c.namedChildren(args) {
 			if a.Kind() != "keywords" {
 				continue
 			}
-			for _, pr := range namedChildren(a) {
-				kids := namedChildren(pr)
+			for _, pr := range c.namedChildren(a) {
+				kids := c.namedChildren(pr)
 				if len(kids) >= 2 && strings.TrimRight(strings.TrimSpace(c.text(kids[0])), ":") == "do" {
 					body = append(body, c.stmt(kids[len(kids)-1])...)
 				}
@@ -176,7 +193,7 @@ func (c *exConv) exFunctionContext(name string, n *tree_sitter.Node) []string {
 			return
 		}
 		if cur.Kind() == "call" {
-			if kids := namedChildren(cur); len(kids) > 0 {
+			if kids := c.namedChildren(cur); len(kids) > 0 {
 				if path := c.dotted(kids[0]); path != "" && !seenCalls[path] {
 					seenCalls[path] = true
 					tokens = append(tokens, "call_path:"+path)
@@ -191,7 +208,7 @@ func (c *exConv) exFunctionContext(name string, n *tree_sitter.Node) []string {
 				tokens = append(tokens, "identifier:"+ident)
 			}
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -253,9 +270,9 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string", "charlist":
 		// strings with #{…} interpolation propagate taint.
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "interpolation" {
-				for _, e := range namedChildren(ch) {
+				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
 			}
@@ -269,13 +286,13 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "dot":
 		// `conn.params` (lowercase base) is a struct-field read → Attr source node;
 		// `System.cmd` (alias base) is a module reference → Name.
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 2 && kids[0].Kind() == "identifier" {
 			return nir.Attr{Base: c.expr(kids[0]), Attr: c.text(kids[1]), Path: c.dotted(n), Loc: L}
 		}
 		return nir.Name{ID: c.dotted(n), Loc: L}
 	case "access_call": // params["key"]
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		var base nir.Expr = nir.Const{Loc: L}
 		if len(kids) > 0 {
 			base = c.expr(kids[0])
@@ -296,26 +313,26 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.BinOp{Op: op, Left: c.expr(l), Right: c.expr(r), Loc: L}
 	case "unary_operator":
 		op := c.text(field(n, "operator"))
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Unary{Op: op, Operand: c.expr(kids[len(kids)-1]), Loc: L}
 		}
 		return nir.Const{Loc: L}
 	case "list", "tuple", "bitstring":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "keywords", "pair":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	// fall back: union of children (taint-approximate)
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	if len(parts) == 1 {
@@ -328,7 +345,7 @@ func (c *exConv) expr(n *tree_sitter.Node) nir.Expr {
 // calls `if`/`unless` are modeled as a Ternary so a constant predicate prunes an arm.
 func (c *exConv) callExpr(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
-	kids := namedChildren(n)
+	kids := c.namedChildren(n)
 	if len(kids) == 0 {
 		return nir.Const{Loc: L}
 	}
@@ -344,7 +361,7 @@ func (c *exConv) callExpr(n *tree_sitter.Node) nir.Expr {
 	path := c.dotted(fn)
 	var args []nir.Expr
 	if a := lastChildKind(n, "arguments"); a != nil {
-		for _, ch := range namedChildren(a) {
+		for _, ch := range c.namedChildren(a) {
 			args = append(args, c.expr(ch))
 		}
 	}
@@ -356,7 +373,7 @@ func (c *exConv) isCaseCall(n *tree_sitter.Node) bool {
 	if n.Kind() != "call" {
 		return false
 	}
-	k := namedChildren(n)
+	k := c.namedChildren(n)
 	return len(k) > 0 && k[0].Kind() == "identifier" && c.text(k[0]) == "case"
 }
 
@@ -370,19 +387,19 @@ type exArm struct {
 func (c *exConv) exCaseParts(n *tree_sitter.Node) (nir.Expr, []exArm) {
 	var subject nir.Expr = nir.Const{Loc: c.loc(n)}
 	if args := lastChildKind(n, "arguments"); args != nil {
-		if k := namedChildren(args); len(k) > 0 {
+		if k := c.namedChildren(args); len(k) > 0 {
 			subject = c.expr(k[0])
 		}
 	}
 	var arms []exArm
 	if do := lastChildKind(n, "do_block"); do != nil {
-		for _, sc := range namedChildren(do) {
+		for _, sc := range c.namedChildren(do) {
 			if sc.Kind() != "stab_clause" {
 				continue
 			}
 			a := exArm{body: field(sc, "right")}
 			if lft := field(sc, "left"); lft != nil {
-				if pk := namedChildren(lft); len(pk) > 0 {
+				if pk := c.namedChildren(lft); len(pk) > 0 {
 					if c.text(pk[0]) == "_" {
 						a.isDefault = true
 					} else {
@@ -419,7 +436,7 @@ func (c *exConv) exCaseStmt(n *tree_sitter.Node) nir.Stmt {
 	for _, a := range arms {
 		var stmts []nir.Stmt
 		if a.body != nil {
-			for _, b := range namedChildren(a.body) {
+			for _, b := range c.namedChildren(a.body) {
 				stmts = append(stmts, c.stmt(b)...)
 			}
 		}
@@ -437,7 +454,7 @@ func (c *exConv) exBodyTail(body *tree_sitter.Node) nir.Expr {
 	if body == nil {
 		return nir.Const{Loc: "?:0"}
 	}
-	bk := namedChildren(body)
+	bk := c.namedChildren(body)
 	if len(bk) == 0 {
 		return nir.Const{Loc: c.loc(body)}
 	}
@@ -451,7 +468,7 @@ func (c *exConv) exIf(n *tree_sitter.Node, unless bool) nir.Expr {
 	L := c.loc(n)
 	var cond, thenE, elseE nir.Expr = nir.Const{Loc: L}, nir.Const{Loc: L}, nir.Const{Loc: L}
 	if args := lastChildKind(n, "arguments"); args != nil {
-		ak := namedChildren(args)
+		ak := c.namedChildren(args)
 		if len(ak) > 0 {
 			cond = c.expr(ak[0])
 		}
@@ -472,7 +489,7 @@ func (c *exConv) exIf(n *tree_sitter.Node, unless bool) nir.Expr {
 
 // exDoElse reads do:/else: pairs from a keyword list.
 func (c *exConv) exDoElse(kw *tree_sitter.Node, thenE, elseE *nir.Expr) {
-	for _, pr := range namedChildren(kw) {
+	for _, pr := range c.namedChildren(kw) {
 		if pr.Kind() != "pair" {
 			continue
 		}
@@ -490,9 +507,9 @@ func (c *exConv) exDoElse(kw *tree_sitter.Node, thenE, elseE *nir.Expr) {
 // exDoBlock takes the tail value of a do-block's then-part and its else_block.
 func (c *exConv) exDoBlock(do *tree_sitter.Node, thenE, elseE *nir.Expr) {
 	var thenVals []nir.Expr
-	for _, ch := range namedChildren(do) {
+	for _, ch := range c.namedChildren(do) {
 		if ch.Kind() == "else_block" {
-			ek := namedChildren(ch)
+			ek := c.namedChildren(ch)
 			if len(ek) > 0 {
 				*elseE = c.expr(ek[len(ek)-1])
 			}
@@ -510,13 +527,13 @@ func (c *exConv) exDoBlock(do *tree_sitter.Node, thenE, elseE *nir.Expr) {
 func (c *exConv) pipe(left, right *tree_sitter.Node, L string) nir.Expr {
 	lv := c.expr(left)
 	if right != nil && right.Kind() == "call" {
-		kids := namedChildren(right)
+		kids := c.namedChildren(right)
 		if len(kids) > 0 {
 			fn := kids[0]
 			path := c.dotted(fn)
 			args := []nir.Expr{lv}
 			if a := lastChildKind(right, "arguments"); a != nil {
-				for _, ch := range namedChildren(a) {
+				for _, ch := range c.namedChildren(a) {
 					args = append(args, c.expr(ch))
 				}
 			}
@@ -538,7 +555,7 @@ func (c *exConv) dotted(n *tree_sitter.Node) string {
 	case "identifier", "alias", "atom":
 		return c.text(n)
 	case "dot":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 2 {
 			return c.dotted(kids[0]) + "." + c.dotted(kids[1])
 		}
@@ -546,11 +563,11 @@ func (c *exConv) dotted(n *tree_sitter.Node) string {
 			return c.dotted(kids[0])
 		}
 	case "call":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0])
 		}
 	case "access_call":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0]) + "[]"
 		}
 	}

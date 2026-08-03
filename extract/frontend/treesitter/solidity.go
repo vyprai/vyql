@@ -19,12 +19,29 @@ type solConv struct {
 	file         string
 	key          string
 	adminGuarded bool
+	childCache   map[uintptr][]*tree_sitter.Node
 }
 
 var (
 	solRsaSha256SuffixRE = regexp.MustCompile(`sha256\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes32\([A-Za-z_][A-Za-z0-9_]*\.length-32\)`)
 	solRsaSha1SuffixRE   = regexp.MustCompile(`SHA1\.sha1\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes20\([A-Za-z_][A-Za-z0-9_]*\.length-20\)`)
 )
+
+func (c *solConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = make(map[uintptr][]*tree_sitter.Node)
+	}
+	key := uintptr(n.Id())
+	if kids, ok := c.childCache[key]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[key] = kids
+	return kids
+}
 
 // ExtractSolidity parses .sol files into one NIR Program.
 func ExtractSolidity(files []string, root string) (nir.Program, error) {
@@ -54,7 +71,7 @@ func (c *solConv) text(n *tree_sitter.Node) string {
 
 func (c *solConv) unwrap(n *tree_sitter.Node) *tree_sitter.Node {
 	for n != nil && n.Kind() == "expression" {
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) != 1 {
 			break
 		}
@@ -65,7 +82,7 @@ func (c *solConv) unwrap(n *tree_sitter.Node) *tree_sitter.Node {
 
 func (c *solConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -95,12 +112,12 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}}
 	case "statement":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
 	case "expression_statement":
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) == 0 {
 			return nil
 		}
@@ -108,7 +125,7 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "variable_declaration_statement":
 		return c.varDeclStmt(n)
 	case "return_statement":
-		k := namedChildren(n)
+		k := c.namedChildren(n)
 		if len(k) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
 		}
@@ -129,7 +146,7 @@ func (c *solConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *solConv) varDeclStmt(n *tree_sitter.Node) []nir.Stmt {
 	var name string
 	var val *tree_sitter.Node
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "variable_declaration":
 			name = c.text(field(ch, "name"))
@@ -187,7 +204,7 @@ func solAdminGuarded(body string) bool {
 }
 
 func (c *solConv) solBody(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "contract_body", "interface_body", "library_body", "function_body":
 			return ch
@@ -201,7 +218,7 @@ func (c *solConv) block(body *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	var out []nir.Stmt
-	for _, ch := range namedChildren(body) {
+	for _, ch := range c.namedChildren(body) {
 		out = append(out, c.stmt(ch)...)
 	}
 	return out
@@ -246,7 +263,7 @@ func (c *solConv) solStmts(n *tree_sitter.Node) []nir.Stmt {
 	switch n.Kind() {
 	case "block_statement", "unchecked_block":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, c.stmt(ch)...)
 		}
 		return out
@@ -275,7 +292,7 @@ func (c *solConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *solConv) params(n *tree_sitter.Node) []string {
 	var out []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
@@ -287,7 +304,7 @@ func (c *solConv) params(n *tree_sitter.Node) []string {
 
 func (c *solConv) paramTypes(n *tree_sitter.Node) map[string]string {
 	out := map[string]string{}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "parameter" {
 			if nm := field(ch, "name"); nm != nil {
 				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
@@ -298,7 +315,7 @@ func (c *solConv) paramTypes(n *tree_sitter.Node) map[string]string {
 }
 
 func (c *solConv) isPublicFn(n *tree_sitter.Node) bool {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "visibility" {
 			v := c.text(ch)
 			return v == "public" || v == "external"
@@ -311,7 +328,7 @@ func (c *solConv) isPublicFn(n *tree_sitter.Node) bool {
 }
 
 func (c *solConv) solVisibility(n *tree_sitter.Node) string {
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "visibility" {
 			return c.text(ch)
 		}
@@ -412,24 +429,24 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "ternary_expression":
-		if k := namedChildren(n); len(k) == 3 {
+		if k := c.namedChildren(n); len(k) == 3 {
 			return nir.Ternary{Cond: c.expr(k[0]), Then: c.expr(k[1]), Else: c.expr(k[2]), Loc: L}
 		}
 	case "unary_expression":
 		arg := field(n, "argument")
 		if arg == nil {
-			if k := namedChildren(n); len(k) > 0 {
+			if k := c.namedChildren(n); len(k) > 0 {
 				arg = k[len(k)-1]
 			}
 		}
 		return nir.Unary{Op: c.text(field(n, "operator")), Operand: c.expr(arg), Loc: L}
 	case "parenthesized_expression", "type_cast_expression":
-		if k := namedChildren(n); len(k) > 0 {
+		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
 	case "tuple_expression", "inline_array_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
@@ -437,7 +454,7 @@ func (c *solConv) expr(n *tree_sitter.Node) nir.Expr {
 		return c.expr(field(n, "right"))
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	if len(parts) == 1 {
@@ -471,9 +488,9 @@ func (c *solConv) call(n *tree_sitter.Node) nir.Expr {
 	if callee != nil && callee.Kind() == "member_expression" {
 		args = append(args, c.expr(field(callee, "object"))) // receiver as arg0
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "call_argument" {
-			k := namedChildren(ch)
+			k := c.namedChildren(ch)
 			if len(k) > 0 {
 				args = append(args, c.expr(k[len(k)-1]))
 			}

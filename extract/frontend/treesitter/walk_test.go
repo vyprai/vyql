@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,6 +100,50 @@ func TestListFilesKeepsFirstPartyVendorAssets(t *testing.T) {
 	}
 	if hasEntrySuffix(entries, "vendor/github.com/other/dep/dep.go") {
 		t.Fatalf("ListAllFiles included unrelated vendored Go source: %v", entries)
+	}
+}
+
+func TestListFilesSkipsOnlyLargeTestResources(t *testing.T) {
+	dir := t.TempDir()
+	largeFixture := filepath.Join(dir, "src", "test", "resources", "huge.ts")
+	smallFixture := filepath.Join(dir, "src", "test", "resources", "small.ts")
+	largeSource := filepath.Join(dir, "src", "main", "resources", "large.ts")
+	for path, size := range map[string]int{
+		largeFixture: largeTestResourceMaxBytes + 1,
+		smallFixture: 64,
+		largeSource:  largeTestResourceMaxBytes + 1,
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, bytes.Repeat([]byte("x"), size), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := ListFiles(dir, map[string]bool{".ts": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasPathSuffix(files, "src/test/resources/huge.ts") {
+		t.Fatalf("ListFiles included large test resource: %v", files)
+	}
+	if !hasPathSuffix(files, "src/test/resources/small.ts") {
+		t.Fatalf("ListFiles pruned small test resource: %v", files)
+	}
+	if !hasPathSuffix(files, "src/main/resources/large.ts") {
+		t.Fatalf("ListFiles pruned large non-test resource: %v", files)
+	}
+
+	entries := ListAllFiles(dir)
+	if hasEntrySuffix(entries, "src/test/resources/huge.ts") {
+		t.Fatalf("ListAllFiles included large test resource: %v", entries)
+	}
+	if !hasEntrySuffix(entries, "src/test/resources/small.ts") {
+		t.Fatalf("ListAllFiles pruned small test resource: %v", entries)
+	}
+	if !hasEntrySuffix(entries, "src/main/resources/large.ts") {
+		t.Fatalf("ListAllFiles pruned large non-test resource: %v", entries)
 	}
 }
 

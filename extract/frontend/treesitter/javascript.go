@@ -20,11 +20,28 @@ import (
 // type annotation — `: Promise<string | null>` — no longer mis-parses `<` as less-than
 // and drops the function body.
 type jsConv struct {
-	src      []byte
-	root     string
-	file     string
-	key      string
-	exported map[string]bool
+	src        []byte
+	root       string
+	file       string
+	key        string
+	exported   map[string]bool
+	childCache map[uintptr][]*tree_sitter.Node
+}
+
+func (c *jsConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.childCache == nil {
+		c.childCache = map[uintptr][]*tree_sitter.Node{}
+	}
+	id := n.Id()
+	if kids, ok := c.childCache[id]; ok {
+		return kids
+	}
+	kids := namedChildren(n)
+	c.childCache[id] = kids
+	return kids
 }
 
 func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
@@ -313,7 +330,7 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 		if obj == nil || obj.Kind() != "object" {
 			return
 		}
-		for _, pr := range namedChildren(obj) {
+		for _, pr := range c.namedChildren(obj) {
 			switch pr.Kind() {
 			case "pair":
 				v := field(pr, "value")
@@ -336,7 +353,7 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 		}
 		switch n.Kind() {
 		case "export_statement":
-			for _, ch := range namedChildren(n) {
+			for _, ch := range c.namedChildren(n) {
 				if ch.Kind() == "function_declaration" || ch.Kind() == "generator_function_declaration" {
 					if name := c.text(field(ch, "name")); name != "" {
 						out[name] = true
@@ -367,7 +384,7 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -394,7 +411,7 @@ func (c *jsConv) markThisAssignedHelpers(body *tree_sitter.Node, out map[string]
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -602,7 +619,7 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -723,7 +740,7 @@ func (c *jsConv) jsIncompleteGeneratedIdentifierReservedWords(root *tree_sitter.
 				hasGeneratedPropertyTemplate = true
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			collect(ch)
 		}
 	}
@@ -738,7 +755,7 @@ func (c *jsConv) jsIncompleteGeneratedIdentifierReservedWords(root *tree_sitter.
 			usesIncompleteSet = true
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			findUse(ch)
 		}
 	}
@@ -761,7 +778,7 @@ func jsIncompleteReservedWordSet(c *jsConv, n *tree_sitter.Node) bool {
 				words[v] = true
 			}
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -813,7 +830,7 @@ func (c *jsConv) jsGitCloneArgvTokens(n *tree_sitter.Node) []string {
 		return nil
 	}
 	var elems []string
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "string", "template_string":
 			if v := jsContextValue(c.text(ch)); v != "" {
@@ -961,7 +978,7 @@ func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]boo
 				out[c.text(name)] = true
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -974,7 +991,7 @@ func (c *jsConv) jsObjectHasSecretConfigPair(n *tree_sitter.Node) bool {
 	if n == nil || n.Kind() != "object" {
 		return false
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "pair":
 			key := strings.ToLower(c.keyName(field(ch, "key")))
@@ -1032,7 +1049,7 @@ func (c *jsConv) jsCallArgsContainSecretConfig(n *tree_sitter.Node, secretVars m
 	if args == nil {
 		return false, ""
 	}
-	for _, a := range namedChildren(args) {
+	for _, a := range c.namedChildren(args) {
 		a = c.unwrapJsTransparentExpr(a)
 		if a == nil {
 			continue
@@ -1374,7 +1391,7 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 			mod := c.resolveRequire(strings.Trim(src, "'\"`"))
 			clause := field(n, "import_clause")
 			if clause == nil {
-				for _, ch := range namedChildren(n) {
+				for _, ch := range c.namedChildren(n) {
 					if ch.Kind() == "import_clause" {
 						clause = ch
 						break
@@ -1384,16 +1401,16 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 			if clause == nil {
 				clause = n
 			}
-			for _, ch := range namedChildren(clause) {
+			for _, ch := range c.namedChildren(clause) {
 				switch ch.Kind() {
 				case "identifier": // default import
 					out = append(out, nir.Import{Local: c.text(ch), Module: mod, IsModule: true})
 				case "namespace_import":
-					if id := lastIdent(ch); id != nil {
+					if id := c.lastIdent(ch); id != nil {
 						out = append(out, nir.Import{Local: c.text(id), Module: mod, IsModule: true})
 					}
 				case "named_imports":
-					for _, spec := range namedChildren(ch) {
+					for _, spec := range c.namedChildren(ch) {
 						if spec.Kind() == "import_specifier" {
 							name := c.text(orSelf(field(spec, "name"), spec))
 							alias := field(spec, "alias")
@@ -1420,7 +1437,7 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 				fn := field(requireCall, "function")
 				if fn != nil && c.text(fn) == "require" {
 					if args := field(requireCall, "arguments"); args != nil {
-						for _, a := range namedChildren(args) {
+						for _, a := range c.namedChildren(args) {
 							if a.Kind() == "string" {
 								mod := c.resolveRequire(strings.Trim(c.text(a), "'\"`"))
 								name := field(n, "name")
@@ -1437,7 +1454,7 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 				}
 			}
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -1447,7 +1464,7 @@ func (c *jsConv) imports(root *tree_sitter.Node) []nir.Import {
 
 func (c *jsConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
-	for _, st := range namedChildren(n) {
+	for _, st := range c.namedChildren(n) {
 		out = append(out, c.stmt(st)...)
 	}
 	return out
@@ -1499,7 +1516,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return nil
 	case "lexical_declaration", "variable_declaration":
 		var out []nir.Stmt
-		for _, d := range namedChildren(n) {
+		for _, d := range c.namedChildren(n) {
 			if d.Kind() == "variable_declarator" {
 				name := field(d, "name")
 				val := field(d, "value")
@@ -1538,13 +1555,13 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "expression_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nil
 		}
 		return c.exprStmt(kids[0], L)
 	case "return_statement":
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) > 0 {
 			return []nir.Stmt{nir.Return{Value: c.expr(kids[0])}}
 		}
@@ -1598,7 +1615,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// unwrap `export [default] <decl>` / `export async function …` so the
 		// declaration inside is analyzed (Next.js route handlers are all exports).
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "call_expression" {
 				out = append(out, c.exprStmt(ch, L)...)
 				continue
@@ -1630,7 +1647,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *jsConv) jsAssignmentExpr(n *tree_sitter.Node) (string, nir.Expr, bool) {
 	for n != nil && isJsTransparentExpr(n.Kind()) {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return "", nil, false
 		}
@@ -1669,7 +1686,7 @@ func jsRejectingCommandRegexGuard(c *jsConv, n *tree_sitter.Node) bool {
 		return false
 	}
 	if n.Kind() == "parenthesized_expression" {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 1 {
 			return jsRejectingCommandRegexGuard(c, kids[0])
 		}
@@ -1688,7 +1705,7 @@ func jsRejectingCommandRegexGuard(c *jsConv, n *tree_sitter.Node) bool {
 	if fn == nil || fn.Kind() != "member_expression" || c.text(field(fn, "property")) != "test" {
 		return false
 	}
-	if args := field(n, "arguments"); args == nil || len(namedChildren(args)) == 0 {
+	if args := field(n, "arguments"); args == nil || len(c.namedChildren(args)) == 0 {
 		return false
 	}
 	return safeJSCommandRejectRegex(c.text(field(fn, "object")))
@@ -1721,7 +1738,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 		return nil
 	}
 	var out []nir.Stmt
-	for _, pr := range namedChildren(obj) {
+	for _, pr := range c.namedChildren(obj) {
 		switch pr.Kind() {
 		case "method_definition":
 			name := c.text(field(pr, "name"))
@@ -1752,7 +1769,7 @@ func (c *jsConv) objectMethodFuncDefs(obj *tree_sitter.Node, exported bool) []ni
 func (c *jsConv) returnedObjectMethodFuncDefs(fn *tree_sitter.Node, exported bool) []nir.Stmt {
 	body := field(fn, "body")
 	if body == nil {
-		for _, ch := range namedChildren(fn) {
+		for _, ch := range c.namedChildren(fn) {
 			if ch.Kind() == "statement_block" {
 				body = ch
 				break
@@ -1769,14 +1786,14 @@ func (c *jsConv) returnedObjectMethodFuncDefs(fn *tree_sitter.Node, exported boo
 			return
 		}
 		if n.Kind() == "return_statement" {
-			for _, ch := range namedChildren(n) {
+			for _, ch := range c.namedChildren(n) {
 				if ch.Kind() == "object" {
 					out = append(out, c.objectMethodFuncDefs(ch, exported)...)
 				}
 			}
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -1796,7 +1813,7 @@ func (c *jsConv) classExpressionFuncDefs(root *tree_sitter.Node) []nir.Stmt {
 			out = append(out, c.body(field(n, "body"))...)
 			return
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
@@ -1869,7 +1886,7 @@ func (c *jsConv) exportFuncName(left *tree_sitter.Node) string {
 func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 	switch inner.Kind() {
 	case "parenthesized_expression":
-		if kids := namedChildren(inner); len(kids) > 0 && kids[0].Kind() == "call_expression" {
+		if kids := c.namedChildren(inner); len(kids) > 0 && kids[0].Kind() == "call_expression" {
 			if body := c.iife(kids[0], L); len(body) > 0 {
 				return body
 			}
@@ -2014,7 +2031,7 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
 	fn := field(call, "function")
 	if fn != nil && fn.Kind() == "parenthesized_expression" {
-		if kids := namedChildren(fn); len(kids) > 0 {
+		if kids := c.namedChildren(fn); len(kids) > 0 {
 			fn = kids[0]
 		}
 	}
@@ -2025,7 +2042,7 @@ func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
 	ps := c.funcParams(fn)
 	var as []*tree_sitter.Node
 	if args := field(call, "arguments"); args != nil {
-		as = namedChildren(args)
+		as = c.namedChildren(args)
 	}
 	for i, p := range ps {
 		if i >= len(as) {
@@ -2043,7 +2060,7 @@ func (c *jsConv) unaryArg(n *tree_sitter.Node) *tree_sitter.Node {
 	if arg := field(n, "argument"); arg != nil {
 		return arg
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() != "comment" {
 			return ch
 		}
@@ -2062,7 +2079,7 @@ func (c *jsConv) branchBody(n *tree_sitter.Node) []nir.Stmt {
 		return c.blockChildren(n)
 	case "else_clause":
 		var out []nir.Stmt
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			out = append(out, c.branchBody(ch)...)
 		}
 		return out
@@ -2079,12 +2096,12 @@ func (c *jsConv) switchStmt(n *tree_sitter.Node) nir.Stmt {
 	var deflt []nir.Stmt
 	var pending []nir.Expr
 	if b := field(n, "body"); b != nil {
-		for _, sc := range namedChildren(b) {
+		for _, sc := range c.namedChildren(b) {
 			switch sc.Kind() {
 			case "switch_case":
 				lv := field(sc, "value")
 				var stmts []nir.Stmt
-				for _, ch := range namedChildren(sc) {
+				for _, ch := range c.namedChildren(sc) {
 					if lv != nil && ch.StartByte() == lv.StartByte() {
 						continue // the label expr, not a body statement
 					}
@@ -2099,7 +2116,7 @@ func (c *jsConv) switchStmt(n *tree_sitter.Node) nir.Stmt {
 					pending = nil
 				}
 			case "switch_default":
-				for _, ch := range namedChildren(sc) {
+				for _, ch := range c.namedChildren(sc) {
 					deflt = append(deflt, c.stmt(ch)...)
 				}
 			}
@@ -2142,7 +2159,7 @@ func (c *jsConv) collectStatementBlocks(n *tree_sitter.Node) []nir.Stmt {
 		}
 		switch m.Kind() {
 		case "else_clause", "catch_clause", "finally_clause":
-			for _, ch := range namedChildren(m) {
+			for _, ch := range c.namedChildren(m) {
 				if !jsBodyHandled(ch.Kind()) {
 					out = append(out, c.stmt(ch)...)
 				}
@@ -2226,7 +2243,7 @@ func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
 	}
 	body := field(n, "body")
 	if body == nil {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "statement_block" {
 				body = ch
 				break
@@ -2255,7 +2272,7 @@ func (c *jsConv) functionUsesArguments(fn *tree_sitter.Node) bool {
 	}
 	body := field(fn, "body")
 	if body == nil {
-		for _, ch := range namedChildren(fn) {
+		for _, ch := range c.namedChildren(fn) {
 			if ch.Kind() == "statement_block" {
 				body = ch
 				break
@@ -2273,7 +2290,7 @@ func (c *jsConv) functionUsesArguments(fn *tree_sitter.Node) bool {
 		if n.Kind() == "identifier" && c.text(n) == "arguments" {
 			return true
 		}
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if walk(ch) {
 				return true
 			}
@@ -2289,7 +2306,7 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 	}
 	body := field(n, "body")
 	if body == nil {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "statement_block" {
 				body = ch
 				break
@@ -2515,7 +2532,7 @@ func (c *jsConv) jsDecoratorTokens(n *tree_sitter.Node) []string {
 		seen[tok] = true
 		out = append(out, tok)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() != "decorator" {
 			continue
 		}
@@ -2569,7 +2586,7 @@ func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
 	case "identifier":
 		return c.text(n)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if p := c.jsDecoratorPath(ch); p != "" {
 			return p
 		}
@@ -2586,7 +2603,7 @@ func (c *jsConv) params(params *tree_sitter.Node) []string {
 		return []string{c.text(params)}
 	}
 	var out []string
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
 			out = append(out, c.text(ch))
@@ -2611,7 +2628,7 @@ func (c *jsConv) paramTypes(params *tree_sitter.Node) map[string]string {
 	if params.Kind() == "identifier" {
 		return out
 	}
-	for _, ch := range namedChildren(params) {
+	for _, ch := range c.namedChildren(params) {
 		switch ch.Kind() {
 		case "identifier":
 			if typ := jsTypeAnnotationAfter(c, params, ch); typ != "" {
@@ -2635,7 +2652,7 @@ func jsTypeAnnotationAfter(c *jsConv, parent, id *tree_sitter.Node) string {
 		return ""
 	}
 	seen := false
-	for _, ch := range namedChildren(parent) {
+	for _, ch := range c.namedChildren(parent) {
 		if sameTSNode(ch, id) {
 			seen = true
 			continue
@@ -2726,7 +2743,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		var arglist []nir.Expr
 		if args := field(n, "arguments"); args != nil {
-			for _, a := range namedChildren(args) {
+			for _, a := range c.namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
 			}
 		}
@@ -2756,7 +2773,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		path := c.dotted(ctor)
 		var arglist []nir.Expr
 		if args := field(n, "arguments"); args != nil {
-			for _, a := range namedChildren(args) {
+			for _, a := range c.namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
 			}
 		}
@@ -2776,12 +2793,12 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Name{ID: name, Loc: L}
 	case "jsx_expression":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 		return nir.Const{Loc: L}
 	case "await_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
-		if kids := namedChildren(n); len(kids) > 0 {
+		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "arrow_function", "function_expression", "function":
@@ -2797,7 +2814,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "unary_expression":
 		arg := field(n, "argument")
 		if arg == nil {
-			for _, ch := range namedChildren(n) {
+			for _, ch := range c.namedChildren(n) {
 				if ch.Kind() != "comment" {
 					arg = ch
 					break
@@ -2809,9 +2826,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
 	case "template_string":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "template_substitution" {
-				if kids := namedChildren(ch); len(kids) > 0 {
+				if kids := c.namedChildren(ch); len(kids) > 0 {
 					parts = append(parts, c.expr(kids[0]))
 				}
 			}
@@ -2824,13 +2841,13 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "array", "arguments", "sequence_expression":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "object":
 		var parts []nir.Expr
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			switch ch.Kind() {
 			case "pair":
 				parts = append(parts, nir.Pair{Key: c.keyName(field(ch, "key")), Value: c.expr(field(ch, "value")), Loc: L})
@@ -2839,7 +2856,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 				nm := c.text(ch)
 				parts = append(parts, nir.Pair{Key: nm, Value: nir.Name{ID: nm, Loc: L}, Loc: L})
 			case "spread_element":
-				if k := namedChildren(ch); len(k) > 0 {
+				if k := c.namedChildren(ch); len(k) > 0 {
 					parts = append(parts, c.expr(k[len(k)-1]))
 				}
 			}
@@ -2847,7 +2864,7 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Seq{Parts: parts, Loc: L}
 	}
 	var parts []nir.Expr
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		parts = append(parts, c.expr(ch))
 	}
 	return nir.Seq{Parts: parts, Loc: L}
@@ -2860,7 +2877,7 @@ func (c *jsConv) jsxAttributeName(n *tree_sitter.Node) string {
 	if name := field(n, "name"); name != nil {
 		return c.text(name)
 	}
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		switch ch.Kind() {
 		case "property_identifier", "identifier", "jsx_identifier":
 			return c.text(ch)
@@ -2877,7 +2894,7 @@ func (c *jsConv) jsxAttributeValue(n *tree_sitter.Node) *tree_sitter.Node {
 		return val
 	}
 	name := c.jsxAttributeName(n)
-	for _, ch := range namedChildren(n) {
+	for _, ch := range c.namedChildren(n) {
 		if c.text(ch) == name {
 			continue
 		}
@@ -2895,7 +2912,7 @@ func (c *jsConv) jsxDangerouslySetInnerHTMLArg(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	if n.Kind() == "object" {
-		for _, ch := range namedChildren(n) {
+		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "pair" && c.keyName(field(ch, "key")) == "__html" {
 				return c.expr(field(ch, "value"))
 			}
@@ -2908,7 +2925,7 @@ func (c *jsConv) unwrapJSXExpression(n *tree_sitter.Node) *tree_sitter.Node {
 	for n != nil {
 		switch n.Kind() {
 		case "jsx_expression", "parenthesized_expression", "non_null_expression", "as_expression", "satisfies_expression", "instantiation_expression", "type_assertion":
-			kids := namedChildren(n)
+			kids := c.namedChildren(n)
 			if len(kids) == 0 {
 				return n
 			}
@@ -2971,7 +2988,7 @@ func (c *jsConv) bindingNames(n *tree_sitter.Node) []string {
 			}
 			return
 		}
-		for _, ch := range namedChildren(cur) {
+		for _, ch := range c.namedChildren(cur) {
 			walk(ch)
 		}
 	}
@@ -3002,7 +3019,7 @@ func isJsTransparentExpr(kind string) bool {
 
 func (c *jsConv) unwrapJsTransparentExpr(n *tree_sitter.Node) *tree_sitter.Node {
 	for n != nil && isJsTransparentExpr(n.Kind()) {
-		kids := namedChildren(n)
+		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return n
 		}
@@ -3051,8 +3068,8 @@ func (c *jsConv) dotted(n *tree_sitter.Node) string {
 	return "?"
 }
 
-func lastIdent(n *tree_sitter.Node) *tree_sitter.Node {
-	for _, ch := range namedChildren(n) {
+func (c *jsConv) lastIdent(n *tree_sitter.Node) *tree_sitter.Node {
+	for _, ch := range c.namedChildren(n) {
 		if ch.Kind() == "identifier" {
 			return ch
 		}
