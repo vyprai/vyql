@@ -694,11 +694,7 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	slot := l.node("Name", loc, map[string]string{
-		"callee_path":     name,
-		"method":          name,
-		"lexical_binding": "true",
-	})
+	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
 	sc.node[name] = slot
 	sc.lex[name] = true
@@ -897,12 +893,7 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisFunctionContext.path,
-		"method":      analysisFunctionContext.method,
-		"str_args":    strings.Join(contextTokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisFunctionContext.method, analysisFunctionContext.path, strings.Join(contextTokens, "\x00"), "")
 }
 
 func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
@@ -930,12 +921,7 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisClassContext.path,
-		"method":      analysisClassContext.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisClassContext.method, analysisClassContext.path, strings.Join(tokens, "\x00"), "")
 }
 
 func classMemberContextTokens(stmts []nir.Stmt) []string {
@@ -988,12 +974,7 @@ func (l *lowerer) globalMutationAnalysisEvent(loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisGlobalMutation.path,
-		"method":      analysisGlobalMutation.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	l.node("Call", loc, props)
+	l.nodeInline("Call", loc, nil, analysisGlobalMutation.method, analysisGlobalMutation.path, strings.Join(tokens, "\x00"), "")
 }
 
 func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []string) {
@@ -1021,17 +1002,14 @@ func (l *lowerer) functionReturnAnalysisEvent(id, loc string, contextTokens []st
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Return"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Return")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": analysisFunctionReturn.path,
-		"method":      analysisFunctionReturn.method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, analysisFunctionReturn.method, analysisFunctionReturn.path, strArgs, "")
 	l.flow(arg, call)
 }
 
@@ -1042,12 +1020,7 @@ func (l *lowerer) parameterEntry(paramNode, loc string, tokens []string) {
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{
-		"callee_path": analysisParameterEntry.path,
-		"method":      analysisParameterEntry.method,
-		"str_args":    strings.Join(tokens, "\x00"),
-	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, analysisParameterEntry.method, analysisParameterEntry.path, strings.Join(tokens, "\x00"), "")
 	l.flow(call, paramNode)
 }
 
@@ -1062,17 +1035,14 @@ func (l *lowerer) syntheticCall(path, method, id, loc string, valToks ...string)
 	if loc == "" {
 		loc = "?:0"
 	}
-	arg := l.node("Arg", loc, map[string]string{"vkind": "Analysis"})
+	arg := l.nodeInline("Arg", loc, nil, "", "", "", "Analysis")
 	l.flow(id, arg)
-	props := map[string]string{
-		"callee_path": path,
-		"method":      method,
-		"arg0":        arg,
-	}
+	props := map[string]string{"arg0": arg}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, props, method, path, strArgs, "")
 	l.flow(arg, call)
 	return call
 }
@@ -1088,11 +1058,11 @@ func (l *lowerer) guardObservation(path, method, observed, loc string, valToks .
 	if loc == "" {
 		loc = "?:0"
 	}
-	props := map[string]string{"callee_path": path, "method": method}
+	strArgs := ""
 	if len(valToks) > 0 {
-		props["str_args"] = strings.Join(valToks, "\x00")
+		strArgs = strings.Join(valToks, "\x00")
 	}
-	call := l.node("Call", loc, props)
+	call := l.nodeInline("Call", loc, nil, method, path, strArgs, "")
 	l.flow(observed, call)
 	in, _ := l.g.InEdges(observed, "FLOWS")
 	for _, ed := range in {
@@ -1469,8 +1439,8 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 	for _, name := range topLevelAssignedNames(m.Body) {
 		slot := globals[name]
 		if slot == "" {
-			slot = l.nodeWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
-				map[string]string{"callee_path": name, "method": name, "module_global": "true"})
+			slot = l.nodeInlineWithID(sigID(l.curNS, "__module", "var", name), "Name", m.File,
+				map[string]string{"module_global": "true"}, name, name, "", "")
 			globals[name] = slot
 		}
 		sc.node[name] = slot
@@ -2083,7 +2053,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.mergeBindings(sc, before, branches)
 	case nir.Try:
 		b := l.nextBranch()
-		exn := l.node("Exception", st.Loc, map[string]string{"callee_path": "analysis.exception", "method": "exception"})
+		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
@@ -2118,10 +2088,6 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
-		props := map[string]string{"callee_path": ex.ID, "method": ex.ID}
-		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
-			props["decl_type"] = typ[1]
-		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}
@@ -2135,13 +2101,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				return l.elemNode(self, ex.ID, ex.Loc)
 			}
 		}
-		return l.node("Name", ex.Loc, props)
-	case nir.Const:
-		props := map[string]string{}
-		if v := unquoteLit(ex.Value); v != "" {
-			props["str_args"] = v
+		var props map[string]string
+		if typ, ok := sc.typ[ex.ID]; ok && typ[1] != "" {
+			props = map[string]string{"decl_type": typ[1]}
 		}
-		return l.node("Const", ex.Loc, props)
+		return l.nodeInline("Name", ex.Loc, props, ex.ID, ex.ID, "", "")
+	case nir.Const:
+		strArgs := ""
+		if v := unquoteLit(ex.Value); v != "" {
+			strArgs = v
+		}
+		return l.nodeInline("Const", ex.Loc, nil, "", "", strArgs, "")
 	case nir.Thru:
 		return l.eval(ex.Inner, sc)
 	case nir.Attr:
@@ -2149,11 +2119,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// `method` carries the attribute NAME (last segment) so `source method "ssn"`
 		// matches a field read like `user.ssn` regardless of receiver. Golden-neutral
 		// (the NIR golden serializes callee_path, not method).
-		props := map[string]string{"callee_path": ex.Path, "method": ex.Attr}
+		var props map[string]string
 		if t := l.recvType(base); t != "" {
-			props["recv_type"] = t
+			props = map[string]string{"recv_type": t}
 		}
-		n := l.node("Attr", ex.Loc, props)
+		n := l.nodeInline("Attr", ex.Loc, props, ex.Attr, ex.Path, "", "")
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
 		// an alias sharing this base node), pull that slot's taint too.
@@ -2164,13 +2134,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
 		key := l.eval(ex.Key, sc)
-		props := map[string]string{"callee_path": ex.Path + ".__subscript", "method": "[]", "arg0": key}
+		props := map[string]string{"arg0": key}
 		var valToks []string
 		collectValTokens(ex.Key, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Subscript", ex.Loc, props)
+		n := l.nodeInline("Subscript", ex.Loc, props, "[]", ex.Path+".__subscript", strArgs, "")
 		// element-sensitive: `lst[0]` after `lst.add(p); lst.add("safe")` reads slot 0 only.
 		if !l.containerRead(base, n, ex.Key, sc) {
 			l.flow(key, n)
@@ -2180,37 +2151,36 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Call:
 		return l.evalCall(ex, sc)
 	case nir.Format:
-		props := map[string]string{}
 		var valToks []string
 		if ex.Text != "" {
 			valToks = append(valToks, ex.Text)
 		}
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Format", ex.Loc, props)
+		n := l.nodeInline("Format", ex.Loc, nil, "", "", strArgs, "")
 		for _, p := range ex.Parts {
 			l.flow(l.eval(p, sc), n)
 		}
 		return n
 	case nir.Seq:
-		props := map[string]string{"callee_path": "__object_literal"}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
 		collectKeyPathTokens(ex.KeyPath, &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("Seq", ex.Loc, props)
+		n := l.nodeInline("Seq", ex.Loc, nil, "", "__object_literal", strArgs, "")
 		if staticLiteralSeq(ex) {
 			return n
 		}
 		for i, p := range ex.Parts {
-			elem := l.node("CollectionElement", ex.Loc, map[string]string{
+			elem := l.nodeInline("CollectionElement", ex.Loc, map[string]string{
 				"collection_index": strconv.Itoa(i),
-				"vkind":            nirKind(p),
-			})
+			}, "", "", "", nirKind(p))
 			l.flow(l.eval(p, sc), elem)
 			l.flow(elem, n)
 		}
@@ -2218,18 +2188,19 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.BinOp:
 		left := l.eval(ex.Left, sc)
 		right := l.eval(ex.Right, sc)
-		leftArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Left)})
-		rightArg := l.node("Arg", ex.Loc, map[string]string{"vkind": nirKind(ex.Right)})
+		leftArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Left))
+		rightArg := l.nodeInline("Arg", ex.Loc, nil, "", "", "", nirKind(ex.Right))
 		l.flow(left, leftArg)
 		l.flow(right, rightArg)
 		method := binopMethod(ex.Op)
-		props := map[string]string{"op": ex.Op, "callee_path": "__binop." + method, "method": method, "arg0": leftArg, "arg1": rightArg}
+		props := map[string]string{"op": ex.Op, "arg0": leftArg, "arg1": rightArg}
 		var valToks []string
 		collectValTokens(ex, "", &valToks)
+		strArgs := ""
 		if len(valToks) > 0 {
-			props["str_args"] = strings.Join(valToks, "\x00")
+			strArgs = strings.Join(valToks, "\x00")
 		}
-		n := l.node("BinOp", ex.Loc, props)
+		n := l.nodeInline("BinOp", ex.Loc, props, method, "__binop."+method, strArgs, "")
 		l.flow(leftArg, n)
 		l.flow(rightArg, n)
 		l.flow(left, n)
@@ -2241,7 +2212,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Unary:
 		operand := l.eval(ex.Operand, sc)
 		method := unaryMethod(ex.Op)
-		n := l.node("Unary", ex.Loc, map[string]string{"op": ex.Op, "callee_path": "__unary." + method, "method": method, "arg0": operand})
+		n := l.nodeInline("Unary", ex.Loc, map[string]string{"op": ex.Op, "arg0": operand}, method, "__unary."+method, "", "")
 		l.flow(operand, n)
 		return n
 	case nir.Ternary:
@@ -2753,7 +2724,7 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 	if n, ok, _ := l.g.GetNode(val); ok {
 		loc = n.Loc
 	}
-	typed := l.node("Name", loc, map[string]string{"callee_path": typ, "method": typ, "decl_type": typ})
+	typed := l.nodeInline("Name", loc, map[string]string{"decl_type": typ}, typ, typ, "", "")
 	l.flow(val, typed)
 	return typed
 }
@@ -2790,22 +2761,21 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		an := l.nodeInline("Arg", call.Loc, nil, "", "", "", nirKind(a))
 		l.flow(av, an)
 		args = append(args, an)
-		var toks []string
-		collectValTokens(a, "", &toks)
+		tokStart := len(valToks)
+		collectValTokens(a, "", &valToks)
 		// value-flow: fold a const-propped variable, an array-literal index (['kind'][0]),
 		// or an object-literal property ({name:'mode'}.name) to its string so it value-matches
 		// like the inline literal — `factory(kind)`, `make(['kind'][0])`, etc.
 		litFirst := ""
 		if sv, ok := l.constStrVal(a, sc); ok {
 			litFirst = sv
-			if !containsString(toks, sv) {
-				toks = append(toks, sv)
+			if !containsString(valToks[tokStart:], sv) {
+				valToks = append(valToks, sv)
 			}
 		}
-		if litFirst == "" && len(toks) > 0 {
-			litFirst = toks[0]
+		if litFirst == "" && len(valToks) > tokStart {
+			litFirst = valToks[tokStart]
 		}
-		valToks = append(valToks, toks...)
 		if litFirst != "" {
 			if argLitFirst == nil {
 				if len(call.Args) <= len(argLitFirstBuf) {
@@ -2847,10 +2817,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
-				sc.node[nm.ID] = l.node("Name", nm.Loc, map[string]string{
-					"callee_path": nm.ID,
-					"method":      nm.ID,
-				})
+				sc.node[nm.ID] = l.nodeInline("Name", nm.Loc, nil, nm.ID, nm.ID, "", "")
 			}
 		}
 		recvNode = l.eval(attr.Base, sc)

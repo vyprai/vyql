@@ -8,6 +8,7 @@ package solvers
 import (
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/usg"
 )
@@ -20,6 +21,62 @@ type TaintFlow struct {
 	Path     []string
 	// controls on killed sibling paths (for near-miss negation evidence)
 	NearMiss [][2]string
+}
+
+type intTaintScratch struct {
+	tainted     []bool
+	pred        []int32
+	dist        []int32
+	killMemo    []int8
+	touched     []int32
+	killTouched []int32
+	killConcept map[int32]string
+	queue       []int32
+}
+
+var intTaintScratchPool sync.Pool
+
+func getIntTaintScratch(n int, sourceCap int) *intTaintScratch {
+	sc, _ := intTaintScratchPool.Get().(*intTaintScratch)
+	if sc == nil {
+		sc = &intTaintScratch{}
+	}
+	if cap(sc.tainted) < n {
+		sc.tainted = make([]bool, n)
+		sc.pred = make([]int32, n)
+		sc.dist = make([]int32, n)
+		sc.killMemo = make([]int8, n)
+	} else {
+		sc.tainted = sc.tainted[:n]
+		sc.pred = sc.pred[:n]
+		sc.dist = sc.dist[:n]
+		sc.killMemo = sc.killMemo[:n]
+	}
+	sc.touched = sc.touched[:0]
+	sc.killTouched = sc.killTouched[:0]
+	if sc.killConcept == nil {
+		sc.killConcept = map[int32]string{}
+	}
+	if cap(sc.queue) < sourceCap {
+		sc.queue = make([]int32, 0, sourceCap)
+	} else {
+		sc.queue = sc.queue[:0]
+	}
+	return sc
+}
+
+func putIntTaintScratch(sc *intTaintScratch) {
+	for _, i := range sc.touched {
+		sc.tainted[i] = false
+	}
+	for _, i := range sc.killTouched {
+		sc.killMemo[i] = 0
+		delete(sc.killConcept, i)
+	}
+	sc.touched = sc.touched[:0]
+	sc.killTouched = sc.killTouched[:0]
+	sc.queue = sc.queue[:0]
+	intTaintScratchPool.Put(sc)
 }
 
 // excludesAll reports whether a char-filter's bounded output alphabet excludes every
@@ -293,55 +350,54 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 	sort.Slice(sinks, func(a, b int) bool { return sinks[a] < sinks[b] })
 
-	// memoized kill check on a node index.
-	killMemo := make([]int8, n) // 0 unknown, 1 kill, 2 not-kill
-	killConcept := map[int32]string{}
+	sc := getIntTaintScratch(n, len(srcs)*4)
+	defer putIntTaintScratch(sc)
+
+	// Memoized kill check on a node index. The memo array is scratch-backed and
+	// reset only for nodes inspected by this run, so repeated taint policy groups
+	// do not allocate or clear node-sized arrays.
 	killOf := func(i int32) (bool, string) {
-		switch killMemo[i] {
+		switch sc.killMemo[i] {
 		case 1:
-			return true, killConcept[i]
+			return true, sc.killConcept[i]
 		case 2:
 			return false, ""
 		}
+		sc.killTouched = append(sc.killTouched, i)
 		for _, l := range g.LabelsAt(i) {
 			if l.Detail["advisory"] == "true" {
 				continue
 			}
 			if killControls[l.Concept] {
-				killMemo[i] = 1
-				killConcept[i] = l.Concept
+				sc.killMemo[i] = 1
+				sc.killConcept[i] = l.Concept
 				return true, l.Concept
 			}
 			if charFilters[l.Concept] && excluded != "" {
 				if l.Detail["bounded"] == "true" && excludesAll(l.Detail["alphabet"], excluded) {
-					killMemo[i] = 1
-					killConcept[i] = l.Concept
+					sc.killMemo[i] = 1
+					sc.killConcept[i] = l.Concept
 					return true, l.Concept
 				}
 				if removed := l.Detail["removed"]; removed != "" && coversAll(removed, excluded) {
-					killMemo[i] = 1
-					killConcept[i] = l.Concept
+					sc.killMemo[i] = 1
+					sc.killConcept[i] = l.Concept
 					return true, l.Concept
 				}
 			}
 		}
-		killMemo[i] = 2
+		sc.killMemo[i] = 2
 		return false, ""
 	}
 
-	tainted := make([]bool, n)
-	pred := make([]int32, n)
-	dist := make([]int32, n)
-	for i := range pred {
-		pred[i] = -1
-		dist[i] = -1
-	}
 	var nearMiss [][2]string
-	queue := make([]int32, 0, len(srcs)*4)
+	queue := sc.queue
 	for _, s := range srcs {
-		if !tainted[s] {
-			tainted[s] = true
-			dist[s] = 0
+		if !sc.tainted[s] {
+			sc.tainted[s] = true
+			sc.touched = append(sc.touched, s)
+			sc.pred[s] = -1
+			sc.dist[s] = 0
 			queue = append(queue, s)
 		}
 	}
@@ -353,22 +409,23 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			continue
 		}
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
-			ndist := dist[node] + 1
-			if !tainted[dst] {
-				tainted[dst] = true
-				pred[dst] = node
-				dist[dst] = ndist
+			ndist := sc.dist[node] + 1
+			if !sc.tainted[dst] {
+				sc.tainted[dst] = true
+				sc.touched = append(sc.touched, dst)
+				sc.pred[dst] = node
+				sc.dist[dst] = ndist
 				queue = append(queue, dst)
 				return true
 			}
-			if dist[dst] < 0 || ndist < dist[dst] {
-				pred[dst] = node
-				dist[dst] = ndist
+			if ndist < sc.dist[dst] {
+				sc.pred[dst] = node
+				sc.dist[dst] = ndist
 				queue = append(queue, dst)
 				return true
 			}
-			if ndist == dist[dst] && (pred[dst] < 0 || node < pred[dst]) {
-				pred[dst] = node
+			if ndist == sc.dist[dst] && (sc.pred[dst] < 0 || node < sc.pred[dst]) {
+				sc.pred[dst] = node
 			}
 			return true
 		})
@@ -376,7 +433,7 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 
 	pathTo := func(sink int32) []string {
 		var rev []int32
-		for i := sink; i >= 0; i = pred[i] {
+		for i := sink; i >= 0; i = sc.pred[i] {
 			rev = append(rev, i)
 		}
 		out := make([]string, len(rev))
@@ -390,7 +447,7 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	nm := dedupPairs(nearMiss)
 	var out []TaintFlow
 	for _, sink := range sinks {
-		if !tainted[sink] {
+		if !sc.tainted[sink] {
 			continue
 		}
 		if k, _ := killOf(sink); k {

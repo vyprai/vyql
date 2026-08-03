@@ -438,6 +438,12 @@ func (s *IntStore) RangeNodesOfType(nodeType string, fn func(Node) bool) {
 	}
 }
 
+// TypeNodeIndexes returns the store-owned dense indexes for a node type.
+// Callers must treat the returned slice as read-only.
+func (s *IntStore) TypeNodeIndexes(nodeType string) []int32 {
+	return s.byType[nodeType]
+}
+
 // RangeNodeIndexes streams dense node indexes with their materialized node payload.
 // It is for hot in-memory analysis paths that need to retain compact references
 // without converting through string ids.

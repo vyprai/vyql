@@ -13,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/vyprai/vyql/bindings"
 	"github.com/vyprai/vyql/datadir"
@@ -212,18 +214,20 @@ func lowerString(s string) string {
 			return strings.ToLower(s)
 		}
 		if ch >= 'A' && ch <= 'Z' {
+			for j := i + 1; j < len(s); j++ {
+				if s[j] >= 0x80 {
+					return strings.ToLower(s)
+				}
+			}
 			b := []byte(s)
 			b[i] = ch + ('a' - 'A')
 			for j := i + 1; j < len(b); j++ {
 				ch = b[j]
-				if ch >= 0x80 {
-					return strings.ToLower(s)
-				}
 				if ch >= 'A' && ch <= 'Z' {
 					b[j] = ch + ('a' - 'A')
 				}
 			}
-			return string(b)
+			return unsafe.String(unsafe.SliceData(b), len(b))
 		}
 	}
 	return s
@@ -480,10 +484,10 @@ func buildSinkValueRaw(s usg.Store, idx *flowTokenIndex, call usg.Node, argIndex
 		}
 	}
 	if argIndex >= 0 {
-		addArg(call.Prop("arg" + strconv.Itoa(argIndex)))
+		addArg(call.Prop(usg.ArgPropKey(argIndex)))
 	} else {
 		for ai := 0; ; ai++ {
-			arg := call.Prop("arg" + strconv.Itoa(ai))
+			arg := call.Prop(usg.ArgPropKey(ai))
 			if arg == "" {
 				break
 			}
@@ -520,10 +524,10 @@ func (c *valueTokenCache) buildSinkValueLower(s usg.Store, idx *flowTokenIndex, 
 		}
 	}
 	if argIndex >= 0 {
-		addArg(call.Prop("arg" + strconv.Itoa(argIndex)))
+		addArg(call.Prop(usg.ArgPropKey(argIndex)))
 	} else {
 		for ai := 0; ; ai++ {
-			arg := call.Prop("arg" + strconv.Itoa(ai))
+			arg := call.Prop(usg.ArgPropKey(ai))
 			if arg == "" {
 				break
 			}
@@ -566,10 +570,10 @@ func (c *valueTokenCache) directSegments(s usg.Store, call usg.Node, argIndex in
 		}
 	}
 	if argIndex >= 0 {
-		addArg(call.Prop("arg" + strconv.Itoa(argIndex)))
+		addArg(call.Prop(usg.ArgPropKey(argIndex)))
 	} else {
 		for ai := 0; ; ai++ {
-			arg := call.Prop("arg" + strconv.Itoa(ai))
+			arg := call.Prop(usg.ArgPropKey(ai))
 			if arg == "" {
 				break
 			}
@@ -761,6 +765,17 @@ func sharedFlagIndex(s usg.Store) *flagMatchIndex {
 	si := storeIndexes(s)
 	si.flagOnce.Do(func() { si.flag = &flagMatchIndex{} })
 	return si.flag
+}
+
+func alreadyBuiltSharedFlagIndex(s usg.Store) *flagMatchIndex {
+	if _, ok := s.(interface{ StructEpoch() uint64 }); !ok {
+		return nil
+	}
+	idx := sharedFlagIndex(s)
+	if idx.built.Load() {
+		return idx
+	}
+	return nil
 }
 
 func sharedFlowIndex(s usg.Store) *flowTokenIndex {
@@ -985,6 +1000,7 @@ func allContentNeedlesFound(missing map[string]bool) bool {
 
 type flagMatchIndex struct {
 	once            sync.Once // guards the read-only index build (ensure)
+	built           atomic.Bool
 	flow            flowTokenIndex
 	types           map[string][]string
 	typesByTech     map[string]map[string][]string // tech -> type -> node IDs ("" tech = unknown, kept by every language)
@@ -1084,7 +1100,10 @@ type scopedPredicateHitSet struct {
 }
 
 func (idx *flagMatchIndex) ensure(s usg.Store) {
-	idx.once.Do(func() { idx.build(s) })
+	idx.once.Do(func() {
+		idx.build(s)
+		idx.built.Store(true)
+	})
 }
 
 func (idx *flagMatchIndex) build(s usg.Store) {
@@ -1168,11 +1187,22 @@ func (idx *flagMatchIndex) buildInt(s usg.Store, is interface {
 	idx.callsByFileTerm = map[string]map[string][]string{}
 	idx.paramsByLineI = map[string]map[int][]int32{}
 	fileTech := sharedFileContextTechs(s)
+	typeIndexes, _ := s.(interface {
+		TypeNodeIndexes(string) []int32
+	})
 	count := 0
 	techCounts := map[string]int{}
 	is.RangeNodeIndexes(func(i int32, n usg.Node) bool {
 		count++
-		idx.typesI[n.Type] = append(idx.typesI[n.Type], i)
+		if _, ok := idx.typesI[n.Type]; !ok {
+			if typeIndexes != nil {
+				idx.typesI[n.Type] = typeIndexes.TypeNodeIndexes(n.Type)
+			} else {
+				idx.typesI[n.Type] = append(idx.typesI[n.Type], i)
+			}
+		} else if typeIndexes == nil {
+			idx.typesI[n.Type] = append(idx.typesI[n.Type], i)
+		}
 		tech := nodeTechFromNodeWithFileContext(n, fileTech)
 		techCounts[tech]++
 		if idx.typesByTechI[tech] == nil {
@@ -1797,10 +1827,10 @@ func valCondsForSink(s usg.Store, idx *flowTokenIndex, call usg.Node, sk sinkSpe
 		}
 	}
 	if sk.ArgIndex >= 0 {
-		addArg(call.Prop("arg" + strconv.Itoa(sk.ArgIndex)))
+		addArg(call.Prop(usg.ArgPropKey(sk.ArgIndex)))
 	} else {
 		for ai := 0; ; ai++ {
-			arg := call.Prop("arg" + strconv.Itoa(ai))
+			arg := call.Prop(usg.ArgPropKey(ai))
 			if arg == "" {
 				break
 			}
@@ -2095,6 +2125,10 @@ func rangeNodesOfTechTypeDirect(s usg.Store, tech, typ string, crossLang bool, f
 }
 
 func rangeTechNodesDirect(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
+	if idx := alreadyBuiltSharedFlagIndex(s); idx != nil {
+		idx.rangeTechNodes(s, tech, crossLang, fn, types...)
+		return
+	}
 	if rg, ok := s.(interface {
 		RangeNodesOfType(string, func(usg.Node) bool)
 	}); ok {
@@ -3556,7 +3590,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 					// arg all (ArgIndex == -1): any tainted argument may be relevant.
 					if sk.ArgIndex < 0 {
 						for ai := 0; ; ai++ {
-							arg := n.Prop("arg" + strconv.Itoa(ai))
+							arg := n.Prop(usg.ArgPropKey(ai))
 							if arg == "" {
 								break
 							}
@@ -3590,7 +3624,7 @@ func (spec bindingSpec) sinkApplicator() bindings.Applicator {
 						}
 						continue
 					}
-					arg := n.Prop("arg" + strconv.Itoa(sk.ArgIndex))
+					arg := n.Prop(usg.ArgPropKey(sk.ArgIndex))
 					if arg == "" {
 						continue
 					}
@@ -5097,7 +5131,7 @@ func flagOperandsMatchNode(s usg.Store, idx *flagMatchIndex, specs []flagOperand
 	}
 	hadArgProps := false
 	for ai := 0; ; ai++ {
-		argID := n.Prop("arg" + strconv.Itoa(ai))
+		argID := n.Prop(usg.ArgPropKey(ai))
 		if argID == "" {
 			break
 		}
@@ -5237,7 +5271,7 @@ func flagOperandCandidates(s usg.Store, idx *flagMatchIndex, n usg.Node, include
 	}
 	hadArgProps := false
 	for ai := 0; ; ai++ {
-		argID := n.Prop("arg" + strconv.Itoa(ai))
+		argID := n.Prop(usg.ArgPropKey(ai))
 		if argID == "" {
 			break
 		}
@@ -6106,19 +6140,38 @@ func callArgContextTokens(n usg.Node) string {
 	if path == "" && method == "" {
 		return ""
 	}
-	var out []string
-	for _, arg := range strings.Split(n.Prop("str_args"), "\x00") {
+	text := n.Prop("str_args")
+	var b strings.Builder
+	wrote := false
+	add := func(prefix, arg string) {
+		if wrote {
+			b.WriteByte(0)
+		}
+		b.WriteString(prefix)
+		b.WriteString(arg)
+		wrote = true
+	}
+	for start := 0; start <= len(text); {
+		end := strings.IndexByte(text[start:], '\x00')
+		var arg string
+		if end < 0 {
+			arg = text[start:]
+			start = len(text) + 1
+		} else {
+			arg = text[start : start+end]
+			start += end + 1
+		}
 		if arg == "" {
 			continue
 		}
 		if path != "" {
-			out = append(out, "call_arg:"+path+":"+arg)
+			add("call_arg:"+path+":", arg)
 		}
 		if method != "" {
-			out = append(out, "call_arg_method:"+method+":"+arg)
+			add("call_arg_method:"+method+":", arg)
 		}
 	}
-	return strings.Join(out, "\x00")
+	return b.String()
 }
 
 func trimFlagValuePrefix(values []string, prefix string) []string {
@@ -7074,7 +7127,7 @@ func markTargets(s usg.Store, idx *collectionFlowIndex, n usg.Node, m controlSpe
 	}
 	if m.ArgIndex < 0 {
 		for ai := 0; ; ai++ {
-			arg := n.Prop("arg" + strconv.Itoa(ai))
+			arg := n.Prop(usg.ArgPropKey(ai))
 			if arg == "" {
 				break
 			}
@@ -7082,7 +7135,7 @@ func markTargets(s usg.Store, idx *collectionFlowIndex, n usg.Node, m controlSpe
 		}
 		return out
 	}
-	addArgTarget(n.Prop("arg" + strconv.Itoa(m.ArgIndex)))
+	addArgTarget(n.Prop(usg.ArgPropKey(m.ArgIndex)))
 	return out
 }
 
