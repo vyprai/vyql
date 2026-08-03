@@ -50,10 +50,15 @@ BenchmarkJava, BenchmarkPython and BenchmarkUtils. JS coverage comes from our ow
 Both public suites are **GPL**: clone them at run time, never vendor them into a
 permissively-licensed repo.
 
+`benchmarks/fetch-corpora.sh` fetches every corpus into
+`~/workspace/vypr/benchmark-corpora` — outside this repo, so nothing GPL is
+vendored — and symlinks it at `/tmp/bench`, which is where the `BENCH_DIR` paths
+below point. It is idempotent, so a corpus already fetched is never refetched;
+after a reboot clears `/tmp`, re-running it just restores the symlinks. Run it
+with `--update` to pull each corpus.
+
 ```sh
-git clone --depth 1 https://github.com/OWASP-Benchmark/BenchmarkJava.git   /tmp/bench/BenchmarkJava
-git clone --depth 1 https://github.com/OWASP-Benchmark/BenchmarkPython.git /tmp/bench/BenchmarkPython
-git clone --depth 1 https://github.com/vyprai/vypr-owasp-ports.git         /tmp/bench/ports
+./benchmarks/fetch-corpora.sh
 
 cd go
 VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkJava    go test -count=1 -v ./cmd/vyql/ -run TestOWASPBenchmark
@@ -268,11 +273,17 @@ every other commit — so the historical columns differ only by engine, never by
 ## 8. Reproducing the RealVuln score
 
 ```sh
-git clone --depth 1 https://github.com/kolega-ai/Real-Vuln-Benchmark.git /tmp/realvuln
-cd /tmp/realvuln && python3 clone_repos.py            # or --repo <ids> for a subset
-cd go && go build -o /tmp/vyql ./cmd/vyql
-python3 benchmarks/score_realvuln.py /tmp/realvuln /tmp/vyql "$PWD/vyql" "$PWD/vyql/packs"
+./benchmarks/fetch-corpora.sh     # clones RealVuln and its 66 target repos, once
+cd go && go build -o /tmp/vyql ./cmd/vyql && cd ..
+python3 benchmarks/score_realvuln.py /tmp/bench/Real-Vuln-Benchmark /tmp/vyql \
+        "$PWD/vyql" "$PWD/vyql/packs"
 ```
+
+The rule-to-CWE lookup reads `vyql/packs/**` recursively, because v2 stores one rule
+per file under `packs/<domain>/vypr/<domain>/`. A non-recursive glob matches nothing
+there, every finding then loses its CWE and is dropped by the matcher, and the run
+reports a recall of zero that looks like a measurement. The script now refuses to run
+if it finds fewer than 100 rules.
 
 The script emits one `NormalisedFinding` per (SARIF result × CWE of its rule) and defers
 all matching and metrics to RealVuln's own `scorer` package, so VyQL is scored by exactly
