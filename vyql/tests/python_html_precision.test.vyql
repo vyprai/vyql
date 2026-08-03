@@ -230,3 +230,66 @@ test "python html precision: arbitrary numeric guard may be false"
           return ""
       return make_response("<p>{}</p>".format(value))
   ```
+
+# A route handler's return is only an HTML sink when it plausibly IS html. Flask's
+# `@app.route` bare-string return is html and stays covered; FastAPI's verb-decorated
+# handlers serialize to JSON, so their returns are not. FastAPI's actual html path is
+# HTMLResponse, which is bound directly rather than inferred from the decorator.
+
+test "fastapi json endpoint returning a record is not an xss sink"
+  lang python
+  reject VYQL-INJ-004
+  code
+  ```
+  from fastapi import APIRouter
+
+  router = APIRouter()
+
+  @router.get("/items", response_model=list)
+  def list_items(q):
+      return db.query(Item).filter(Item.name == q).all()
+  ```
+
+test "fastapi handler building raw html from input is an xss sink"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from fastapi import APIRouter
+
+  router = APIRouter()
+
+  @router.get("/greet")
+  def greet(name):
+      return "<div class='greeting'>Hello " + name + "</div>"
+  ```
+
+test "fastapi HTMLResponse carrying request input is an xss sink"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from fastapi import APIRouter
+  from fastapi.responses import HTMLResponse
+
+  router = APIRouter()
+
+  @router.get("/page")
+  def page(name):
+      return HTMLResponse(build_page(name))
+  ```
+
+test "flask route returning a bare interpolated string is still an xss sink"
+  lang python
+  expect VYQL-INJ-004
+  code
+  ```
+  from flask import Flask, request
+
+  app = Flask(__name__)
+
+  @app.route("/echo", methods=["GET"])
+  def echo():
+      bar = request.args.get("bar")
+      return f"bar is '{bar}'"
+  ```
