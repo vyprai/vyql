@@ -17,8 +17,8 @@ const SolverContractVersion = "0.1.0"
 // source endpoint, a sink/target endpoint, and a witness sufficient to rebuild
 // a proof tree. The concrete TaintFlow/ReachPath/AssumePath satisfy it.
 type Result interface {
-	Source() string  // source_id or principal_id
-	Target() string  // sink_id or target_id
+	Source() string // source_id or principal_id
+	Target() string // sink_id or target_id
 	Witness() []string
 }
 

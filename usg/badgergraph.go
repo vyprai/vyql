@@ -465,6 +465,13 @@ func decDet(b []byte) nodeDetail {
 
 // --- IntGraph fast path ---------------------------------------------------------------------
 
+// Asserted, not assumed: solvers.FindTaintFlows dispatches on this interface and
+// silently falls back to its string-keyed implementation for a store that does not
+// satisfy it. The answers stay the same, but the hot loop starts touching string ids
+// and payload — which is the whole cost this store exists to avoid — so losing
+// conformance would surface only as an unexplained slowdown on large scans.
+var _ IntGraph = (*BadgerGraph)(nil)
+
 func (g *BadgerGraph) NodeCount() int                      { return len(g.ids) }
 func (g *BadgerGraph) ConceptNodes(concept string) []int32 { return g.byConcept[concept] }
 func (g *BadgerGraph) LabelsAt(idx int32) []Label          { return g.labels[idx] }
